@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RUN_ME_V18｜物品编辑器 v18（box occlusion 排序修复）</title>
+  <link rel="stylesheet" href="styles/editor-v18.css?v=20260321-v18-entry-log" />
+  <script>window.__APP_ENTRY_INFO={kind:"editor",label:"编辑器",entryFile:"START_V18_ONLY.html",launcherHint:"start_editor.bat",build:"20260320-v18-box-occlusion"};</script>
+</head>
+<body>
+  <div style="position:fixed;top:8px;right:12px;z-index:99999;padding:10px 14px;border:2px solid #ff7070;background:#2a1212;color:#ffd7d7;font:700 14px/1.2 system-ui;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.35)">RUNNING BUILD 20260320-v18-box-occlusion</div>
+  <div style="position:fixed;top:8px;left:12px;z-index:99999;padding:10px 14px;border:2px solid #70b7ff;background:#0d1a2a;color:#d8ecff;font:700 14px/1.2 system-ui;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.35)">ENTRY: START_V18_ONLY.html</div>
+
+  <div class="editorLayout">
+    <aside class="editorSidebar">
+      <div class="sidebarTop">
+        <h1>RUN_ME_V18｜物品编辑器 v18（box occlusion 排序修复）</h1>
+        <div class="buildBadge">BUILD: 20260320-v18-box-occlusion</div>
+        <p class="lead">左侧改成按工作流切换的三步页签：<strong>编辑图片</strong>、<strong>编辑 voxel</strong>、<strong>保存相关</strong>。一次只看当前步骤，右侧仍保持统一主编辑视图；图片和 voxel 继续共用同一个 prefab 数据，不改主程序协议。</p>
+      </div>
+
+      <nav class="sidebarStepTabs" aria-label="编辑器步骤">
+        <button id="editorStepImage" class="sidebarStepTab activeStepTab" data-step="image" type="button">1. 编辑图片</button>
+        <button id="editorStepVoxel" class="sidebarStepTab" data-step="voxel" type="button">2. 编辑 voxel</button>
+        <button id="editorStepSave" class="sidebarStepTab" data-step="save" type="button">3. 保存相关</button>
+      </nav>
+
+      <section id="editorPageImage" class="sidebarSection sidebarPage sidebarSectionImage" data-step="image">
+        <div class="sidebarSectionHeader">
+          <div>
+            <div class="sectionIndex">1. 编辑图片</div>
+            <h2>Sprite 导入、对齐与显示</h2>
+          </div>
+          <div class="sectionHint">先把图片对到 footprint，再微调上下位置</div>
+        </div>
+        <div class="sidebarSectionBody">
+          <div class="group compactGroup">
+            <h3>显示模式 / 图片文件</h3>
+            <label>renderMode
+              <select id="renderMode">
+                <option value="voxel">voxel（只显示体素）</option>
+                <option value="sprite_proxy">sprite_proxy（显示图片，体素只作代理）</option>
+                <option value="hybrid">hybrid（图片 + 体素）</option>
+              </select>
+            </label>
+            <div class="spritePanel">
+              <div class="spriteThumbWrap" id="spriteThumbWrap">
+                <div class="spriteThumbPlaceholder" id="spriteThumbPlaceholder">未导入图片</div>
+                <img id="spriteThumb" alt="sprite preview" style="display:none">
+              </div>
+              <div>
+                <div class="rowButtons rowButtons2">
+                  <button id="importSpriteImage">导入等距 PNG</button>
+                  <button id="clearSpriteImage">清除图片</button>
+                </div>
+                <input id="spriteImageFile" type="file" accept="image/png,image/webp,image/*" hidden>
+                <label>sprite 文件名 <input id="spriteImageName" type="text" value="" placeholder="未导入图片"></label>
+              </div>
+            </div>
+          </div>
+
+          <div class="group compactGroup">
+            <h3>图片变换</h3>
+            <div class="triple">
+              <label>sprite.scale <input id="spriteScale" type="number" min="0.1" max="8" step="0.05" value="1.0"></label>
+              <label>offsetX(px) <input id="spriteOffsetX" type="number" step="1" value="0"></label>
+              <label>offsetY(px) <input id="spriteOffsetY" type="number" step="1" value="0"></label>
+            </div>
+            <div id="interactionModeSummary" class="toolStatusLine">当前步骤会自动切换交互：进入“编辑图片”即为图片模式，进入“编辑 voxel”即为 voxel 模式。</div>
+            <label>编辑器图片透明度
+              <div class="rangeRow rangeRowWide">
+                <input id="spritePreviewOpacity" type="range" min="0.05" max="1" step="0.05" value="1">
+                <input id="spritePreviewOpacityNumber" type="number" min="5" max="100" step="5" value="100" class="opacityNumber">
+                <span id="spritePreviewOpacityValue" class="rangeValue">100%</span>
+              </div>
+            </label>
+            <div class="smallMuted">点击上方“编辑图片”步骤会自动进入图片模式：在右侧画布中直接拖拽图片；拖拽图片右下角的小手柄可缩放；按住 Ctrl + 滚轮也可缩放。这个透明度只用于编辑器里描 proxy，不影响主程序最终显示。</div>
+          </div>
+
+          <div class="group compactGroup spriteAssistGroup">
+            <h3>自动占地适配</h3>
+            <div class="triple">
+              <label>footprint.m（x 方向格数）<input id="footprintCols" type="number" min="1" max="64" step="1" value="1"></label>
+              <label>footprint.n（y 方向格数）<input id="footprintRows" type="number" min="1" max="64" step="1" value="1"></label>
+              <label>sample band(px)<input id="spriteSampleBand" type="number" min="1" max="128" step="1" value="1"></label>
+            </div>
+            <label>左右边界检测
+              <select id="spriteFitMode">
+                <option value="full">全图最左 / 最右</option>
+                <option value="sample-band">取鼠标指定高度的左右像素</option>
+              </select>
+            </label>
+            <div class="triple">
+              <label>sampleY(%)<input id="spriteSampleYPercent" type="number" min="0" max="100" step="1" value="100"></label>
+              <label>当前 anchor.x <input id="footprintAnchorReadX" type="text" value="0" readonly></label>
+              <label>当前 anchor.y <input id="footprintAnchorReadY" type="text" value="0" readonly></label>
+            </div>
+            <div class="rowButtons rowButtons3">
+              <button id="swapFootprint">交换 m / n</button>
+              <button id="applySelectionFootprint">用当前选区设占地</button>
+              <button id="autoFitSpriteFootprint">自动适配占地</button>
+            </div>
+            <div class="rowButtons rowButtons3">
+              <button id="pickSpriteSampleLine">在预览图上点取参考高度</button>
+              <button id="toggleSpriteFitGuides">显示辅助线</button>
+              <button id="toggleSpriteLockX">锁定水平移动</button>
+            </div>
+            <div id="spriteFitSummary" class="toolStatusLine">自动占地：1×1 · 检测=全图最左/最右 · 可切到图片模式后在预览图上点取参考高度</div>
+            <div class="smallMuted">逻辑：以 anchor(x,y,z) 作为最深处起始格，自动把图片左右参考线对齐到 m×n footprint 的左右外侧角竖线；默认只锁定水平拖拽，自由缩放仍保留。</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="editorPageVoxel" class="sidebarSection sidebarPage sidebarSectionVoxel isHiddenStep" data-step="voxel">
+        <div class="sidebarSectionHeader">
+          <div>
+            <div class="sectionIndex">2. 编辑 voxel</div>
+            <h2>网格、选区、层级与占地</h2>
+          </div>
+          <div class="sectionHint">图片对齐依赖这里的 anchor / 选区 / footprint</div>
+        </div>
+        <div class="sidebarSectionBody">
+          <div class="group compactGroup">
+            <h3>锚点 / 基准层 / 预览尺度</h3>
+            <div class="triple">
+              <label>anchor.x <input id="anchorX" type="number" step="1" value="0"></label>
+              <label>anchor.y <input id="anchorY" type="number" step="1" value="0"></label>
+              <label>anchor.z <input id="anchorZ" type="number" step="1" value="0"></label>
+            </div>
+            <div class="rowButtons rowButtons3">
+              <button id="layerDown">下降一层</button>
+              <button id="layerUp">上升一层</button>
+              <button id="clearLayer">清空当前层</button>
+            </div>
+            <label>当前基准层 L（最底层固定为 0）<input id="currentLayer" type="number" min="0" step="1" value="0"></label>
+            <div class="triple">
+              <label>网格列数 <input id="editorGridW" type="number" min="4" max="64" step="1" value="10"></label>
+              <label>网格行数 <input id="editorGridH" type="number" min="4" max="64" step="1" value="10"></label>
+              <label>预览缩放 <input id="previewScale" type="number" min="0.5" max="2.5" step="0.1" value="1.0"></label>
+            </div>
+          </div>
+
+          <div class="group compactGroup">
+            <h3>右侧选区工具</h3>
+            <div class="rowButtons rowButtons4">
+              <button id="toolPaint">1 单格选区</button>
+              <button id="toolErase">2 清除选区</button>
+              <button id="toolRect">3 矩形选区</button>
+              <button id="toolVolume">4 体积选区</button>
+            </div>
+            <div id="toolStatusLine" class="toolStatusLine">当前工具：单格选区</div>
+            <div id="selectionSummary" class="selectionSummary">当前选区：无</div>
+            <div class="rowButtons rowButtons3">
+              <button id="modeBuild">填充选区</button>
+              <button id="modeFocus">删除选区</button>
+              <button id="clearSelection">清空选区</button>
+            </div>
+            <ul class="smallList compactList">
+              <li>右侧滚轮：切换当前基准层 <strong>L</strong>；图片模式下按住 <strong>Ctrl</strong> 再滚轮可缩放图片。</li>
+              <li>显示规则：<code>z = L</code> 蓝色高亮，<code>z &gt; L</code> 正常颜色，<code>z &lt; L</code> 灰色半透明仅参考；矩形/体积工具在点下第一个起点后才会进入实时预览。</li>
+              <li>单格选区：可选第 L 层空格，或选择已有 voxel 的顶面（只限 <code>z &gt;= L</code>）。</li>
+              <li>矩形选区：在第 L 层选一个二维矩形。</li>
+              <li>体积选区：先选底面矩形，再上下移动鼠标定高度，最后点一下或按 Enter 确认选区。</li>
+              <li>右侧只负责“选区”，真正生成/删除由左侧按钮执行；Esc 清空当前选区流程。</li>
+            </ul>
+          </div>
+
+          <div class="group compactGroup">
+            <h3>voxel 内容操作</h3>
+            <div class="rowButtons rowButtons2">
+              <button id="newPrefab">新建空 Prefab</button>
+              <button id="clearAll">清空全部体素</button>
+            </div>
+            <div class="rowButtons rowButtons2">
+              <button id="loadSampleStair">载入阶梯示例</button>
+              <button id="loadSampleT">载入 T 形示例</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="editorPageSave" class="sidebarSection sidebarPage sidebarSectionSave isHiddenStep" data-step="save">
+        <div class="sidebarSectionHeader">
+          <div>
+            <div class="sectionIndex">3. 保存相关</div>
+            <h2>Prefab 信息、导入导出与状态</h2>
+          </div>
+          <div class="sectionHint">整理名字、保存 JSON、查看状态和日志</div>
+        </div>
+        <div class="sidebarSectionBody">
+          <div class="group compactGroup">
+            <h3>Prefab 基本信息</h3>
+            <label>ID <input id="prefabId" type="text" value="custom_prefab_01"></label>
+            <label>名称 <input id="prefabName" type="text" value="Custom Prefab"></label>
+            <label>类型 kind <input id="prefabKind" type="text" value="custom"></label>
+            <label>素材文件名 <input id="prefabAsset" type="text" value=""></label>
+            <label>基础颜色 <input id="prefabBase" type="color" value="#c7b0df"></label>
+          </div>
+
+          <div class="group compactGroup">
+            <h3>导入 / 导出</h3>
+            <div class="rowButtons rowButtons2">
+              <button id="saveLibrary">保存到 assets/prefabs</button>
+              <button id="downloadJson">下载 JSON</button>
+            </div>
+            <div class="rowButtons rowButtons2">
+              <button id="importJson">导入 JSON</button>
+              <button id="openMain">打开主程序</button>
+            </div>
+            <div class="rowButtons rowButtons2">
+              <button id="exportEditorLogs">导出编辑器日志</button>
+              <button id="clearEditorLogs">清空编辑器日志</button>
+            </div>
+            <input id="importFile" type="file" accept=".json,application/json" hidden>
+          </div>
+
+          <div class="group compactGroup">
+            <h3>状态</h3>
+            <div id="modeSummary" class="modeSummary">build=20260320-v18-box-occlusion · 单图 sprite 导入 + voxel proxy 保存</div>
+            <div id="editorStatus" class="statusBox">就绪</div>
+            <textarea id="editorLogPreview" class="logPreview" readonly></textarea>
+          </div>
+        </div>
+      </section>
+    </aside>
+
+    <main class="editorMain">
+      <section class="canvasCard">
+        <div class="cardHeader">
+          <strong>局部 voxel 网格（当前层精修）</strong>
+          <span id="gridSummary"></span>
+        </div>
+        <canvas id="gridCanvas" width="560" height="560"></canvas>
+      </section>
+
+      <section class="canvasCard buildCard">
+        <div class="cardHeader">
+          <strong>主编辑视图（步骤页自动切换交互模式）</strong>
+          <span id="previewSummary"></span>
+        </div>
+        <canvas id="previewCanvas" width="980" height="720"></canvas>
+      </section>
+
+      <section class="dataCard">
+        <div class="cardHeader">
+          <strong>当前 Prefab JSON</strong>
+          <span id="voxelCountText"></span>
+        </div>
+        <textarea id="jsonPreview" readonly></textarea>
+      </section>
+    </main>
+  </div>
+
+  <script>window.__EXPECTED_BUILD='20260320-v18-box-occlusion';</script>
+  <script src="src/editor-unified-v18.js?v=20260320-v18-box-occlusion"></script>
+</body>
+</html>

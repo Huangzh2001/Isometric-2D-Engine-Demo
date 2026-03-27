@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>等距房间编辑 + 光影一体化 Demo</title>
+  <link rel="stylesheet" href="styles/main.css" />
+</head>
+<body>
+  <div style="position:fixed;top:8px;left:12px;z-index:99999;padding:10px 14px;border:2px solid #70ffb0;background:#0d2217;color:#dcfff0;font:700 14px/1.2 system-ui;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.35)">ENTRY: MAIN / index.html / start.bat / HABBO SELECTOR FIX 20260325MP</div>
+  <div class="layout">
+    <aside class="panel sidebar">
+      <h1>等距房间编辑 + 光影一体化 Demo</h1>
+      <p>这版把<strong>房间编辑系统 + 多光源系统 + 人物代理体积阴影</strong>合并在一起。人物的阴影不再按单点脚底处理，而是按一个可调尺寸的代理长方体投影到地面，并随移动实时更新。</p>
+
+      <div class="panelTabs">
+        <button id="tabWorld" class="panelTab active">世界</button>
+        <button id="tabItems" class="panelTab">物品</button>
+        <button id="tabLights" class="panelTab">灯光</button>
+        <button id="tabPlayer" class="panelTab">角色</button>
+      </div>
+
+      <section id="tabWorldPage" class="tabPage active">
+      <div class="controls">
+        <div class="group inspectorGroup">
+          <h2>世界 / 网格</h2>
+          <label>列数 <input id="gridW" type="number" min="6" max="128" step="1" value="11"></label>
+          <label>行数 <input id="gridH" type="number" min="6" max="128" step="1" value="9"></label>
+          <label>世界颗粒度
+            <select id="worldResolution">
+              <option value="1">1x（默认）</option>
+              <option value="2">2x（更细）</option>
+              <option value="4">4x（很细）</option>
+            </select>
+          </label>
+          <label>基础格子缩放 <input id="tileScale" type="number" min="0.5" max="2.4" step="0.1" value="1.0"></label>
+          <div class="rowButtons rowButtons2">
+            <button id="applyWorld">应用到新世界</button>
+            <button id="resetScene">重置默认</button>
+          </div>
+          <div class="hintBox">说明：这里修改的是整个世界的尺寸与颗粒度。第一版中，颗粒度只作用于“新世界/重置世界”，不会强行重采样当前已有场景。</div>
+          <div id="worldInspectorSummary" class="inspectorSummary"></div>
+          <pre id="worldInspectorDetails" class="inspectorPre"></pre>
+        </div>
+
+        <div class="group checks">
+          <label><input id="xrayFaces" type="checkbox"> 调试：额外显示隐藏面</label>
+          <label><input id="showDebugBox" type="checkbox"> 调试：显示脚点/体积线</label>
+          <label><input id="showFrontLines" type="checkbox"> 调试：显示所有前沿线</label>
+          <label><input id="verboseLog" type="checkbox" checked> 调试：详细日志（很啰嗦）</label>
+          <label><input id="shadowDebugDetailed" type="checkbox" checked> 阴影调试：详细几何日志</label>
+        </div>
+
+        <div class="group">
+          <div class="rowButtons rowButtons2">
+            <button id="clearLog">清空日志</button>
+            <button id="downloadLog">下载日志</button>
+          </div>
+          <div class="rowButtons rowButtons2">
+            <button id="downloadHabboDebug">下载 Habbo 调试 JSON</button>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;"><input id="showHabboDebugOverlay" type="checkbox" checked> 显示 Habbo 调试覆盖层</label>
+          </div>
+          <div class="rowButtons rowButtons2">
+            <button id="dumpScene">导出场景JSON</button>
+            <button id="dumpCandidate">记录当前预览</button>
+          </div>
+          <div class="rowButtons rowButtons2">
+            <button id="saveScene">保存场景</button>
+            <button id="loadScene">读取存档</button>
+          </div>
+          <div class="rowButtons rowButtons3">
+            <button id="saveSceneFile">保存到文件</button>
+            <button id="openDefaultSceneFile">打开默认文件</button>
+            <button id="importSceneFile">导入场景文件</button>
+          </div>
+          <input id="sceneImportFileInput" type="file" accept=".json,application/json" style="display:none">
+          <div id="sceneFileStatus" class="hintBox">场景文件：未连接默认文件。</div>
+          <textarea id="debugLog" rows="12" readonly placeholder="这里会显示放置、排序、阴影、循环依赖等日志。"></textarea>
+        </div>
+      </div>
+      </section>
+
+      <section id="tabItemsPage" class="tabPage">
+      <div class="controls">
+        <div class="group">
+          <div class="modeBar">
+            <button id="modeView" class="modeBtn active">不编辑 / 拖动画面</button>
+            <button id="modePlace" class="modeBtn">建立物件</button>
+            <button id="modeDelete" class="modeBtn">删除物件</button>
+          </div>
+          <label>Prefab 模板
+            <select id="prefabSelect"></select>
+          </label>
+          <div class="rowButtons rowButtons3">
+            <button id="importPrefabJson">导入 Prefab JSON</button>
+            <button id="rescanAssetPrefabs">重新扫描 assets</button>
+            <button id="openEditor">打开物品编辑器</button>
+          </div>
+          <div class="rowButtons rowButtons2">
+            <button id="importHabboSwf">导入 Habbo SWF</button>
+            <button id="importHabboDemo">导入内置 Habbo 示例</button>
+          </div>
+          <div class="rowButtons rowButtons2">
+            <button id="setHabboAssetRoot">设置 Habbo 根目录</button>
+            <button id="scanHabboAssetRoot">批量导入根目录 SWF</button>
+          </div>
+          <div class="rowButtons rowButtons2">
+            <button id="openHabboLibrary">打开 Habbo 资源选择器</button>
+            <button id="refreshHabboLibrary">刷新资源库索引</button>
+          </div>
+          <label>Habbo 内置样例
+            <select id="habboSampleSelect">
+              <option value="nft_h26_silverelf.swf">nft_h26_silverelf.swf · 1x1x2</option>
+              <option value="table_polyfon_med.swf">table_polyfon_med.swf · 2x2x0.7</option>
+              <option value="trophy_videographer_bronze.swf">trophy_videographer_bronze.swf · 1x1x1</option>
+              <option value="nft_cm2_sprucechair.swf">nft_cm2_sprucechair.swf · 1x1x1.2</option>
+              <option value="nft_cm2_croksleepingbag.swf">nft_cm2_croksleepingbag.swf · 1x3x0.9</option>
+              <option value="nft_snst_fireplace.swf">nft_snst_fireplace.swf · 3x3x1</option>
+              <option value="nft_xmas_r17_carriage.swf">nft_xmas_r17_carriage.swf · 2x2x1.5</option>
+              <option value="nft_xmas13_machine1.swf">nft_xmas13_machine1.swf · 1x1x4</option>
+              <option value="nft_xmas14_octosanta.swf">nft_xmas14_octosanta.swf · 3x3x1</option>
+              <option value="neopets_c26_bruce2.swf">neopets_c26_bruce2.swf · 1x1x1.4</option>
+            </select>
+          </label>
+          <input id="prefabFileInput" type="file" accept=".json,application/json" style="display:none">
+          <input id="habboSwfFileInput" type="file" accept=".swf,application/x-shockwave-flash" style="display:none">
+          <div id="prefabHint" class="hintBox">选择一个预制物件进行摆放。当前会摆放整个物件实例，而不是单个方块。你也可以导入编辑器导出的 Prefab JSON；通过 start.bat 启动时，主程序也会自动扫描 assets/prefabs。</div>
+          <div id="habboImportStatus" class="hintBox">Habbo 导入：严肃参考 Scuti 的组织方式——直接读取 SWF 里的 objectData / visualization / assets / bitmap tags，先按 room object 的 floor anchor 放到场景里，再按 direction + layer offsets 组装 2D 显示，并自动生成 proxy。当前版不再 flatten 成单张 body 图，而是按 direction + layer 单独绘制，包含 shadow/body 等层；并内置多种 Habbo SWF 样例，方便直接回归测试。</div>
+          <div id="habboRootStatus" class="hintBox">Habbo 根目录：未配置。这里应指向你“分类后的 Habbo 素材库根目录”（里面有 index.json、room/wall 子目录，以及每个物件目录中的 swf+icon）。</div>
+          <div id="assetScanStatus" class="hintBox">assets 扫描状态：尚未开始</div>
+          <pre id="assetScanDetails" class="inspectorPre"></pre>
+        </div>
+        <div class="group inspectorGroup">
+          <h2>物品检查器</h2>
+          <div id="itemInspectorEmpty" class="hintBox">在查看模式下点击场景中的物件，即可在这里查看该 instance 与 prefab 的信息。</div>
+          <div id="itemInspectorSummary" class="inspectorSummary hidden"></div>
+          <div id="itemInspectorPanel" class="hidden">
+            <label>实例信息</label>
+            <pre id="itemInspectorInstance" class="inspectorPre"></pre>
+            <label>模板信息</label>
+            <pre id="itemInspectorPrefab" class="inspectorPre"></pre>
+          </div>
+        </div>
+      </div>
+      </section>
+
+      <section id="tabLightsPage" class="tabPage">
+      <div class="lightEditor">
+        <div class="group">
+          <h2>多光源</h2>
+          <label><input id="lightingEnabled" type="checkbox" checked> 启用光影系统</label>
+          <label>环境光 <span id="ambientValue">0.22</span><input id="ambientStrength" type="range" min="0" max="1.40" step="0.01" value="0.22"></label>
+        </div>
+
+        <div id="lightingAdvancedPanel">
+        <div class="group">
+          <div class="rowButtons rowButtons4">
+            <button id="presetAllOn">全灯开启</button>
+            <button id="presetWarmHome">暖居家</button>
+            <button id="presetCoolShowroom">冷展厅</button>
+            <button id="presetMoonNight">夜灯月光</button>
+          </div>
+          <div class="rowButtons rowButtons3">
+            <button id="addLight">新增光源</button>
+            <button id="deleteLight">删除当前</button>
+            <button id="toggleLightAxes">显示/隐藏光轴</button>
+          </div>
+          <div id="lightList" class="lightList"></div>
+        </div>
+
+        <div class="group">
+          <label>当前光源名称 <input id="lightName" type="text" value="主灯"></label>
+          <label>光源类型
+            <select id="lightType">
+              <option value="point">点光源 Point</option>
+              <option value="directional">方向光 Directional</option>
+              <option value="spot">聚光灯 Spot</option>
+              <option value="area">面积光 Area</option>
+            </select>
+          </label>
+          <label>颜色 <input id="lightColor" type="color" value="#ffe59b"></label>
+          <label>强度 <span id="lightIntensityValue">1.00</span><input id="lightIntensity" type="range" min="0.1" max="2.5" step="0.05" value="1.00"></label>
+          <label>半径 <span id="lightRadiusValue">260 px</span><input id="lightRadius" type="range" min="80" max="520" step="5" value="260"></label>
+          <label>水平角 <span id="lightAngleValue">45°</span><input id="lightAngle" type="range" min="-180" max="180" step="1" value="45"></label>
+          <label>俯仰角 <span id="lightPitchValue">55°</span><input id="lightPitch" type="range" min="5" max="89" step="1" value="55"></label>
+          <label>聚光张角 <span id="lightSpreadValue">34°</span><input id="lightSpread" type="range" min="5" max="85" step="1" value="34"></label>
+          <label>柔和度 <span id="lightSoftnessValue">0.45</span><input id="lightSoftness" type="range" min="0" max="1" step="0.01" value="0.45"></label>
+          <label>面积尺寸 <span id="lightSizeValue">1.20</span><input id="lightSize" type="range" min="0.5" max="3" step="0.05" value="1.20"></label>
+          <div id="lightTypeHint" class="hintBox">点光源：像灯泡、床头灯，最适合做局部亮斑和明显衰减。</div>
+          <div class="xyzReadout">
+            <div>X <strong id="lightXText">0</strong></div>
+            <div>Y <strong id="lightYText">0</strong></div>
+            <div>Z <strong id="lightZText">0</strong></div>
+          </div>
+          <div class="xyzInputs">
+            <label>X 位置 <input id="lightXInput" type="number" step="0.1" value="0"></label>
+            <label>Y 位置 <input id="lightYInput" type="number" step="0.1" value="0"></label>
+            <label>Z 位置 <input id="lightZInput" type="number" step="0.1" value="0"></label>
+          </div>
+          <div class="hintBox">光源位置不再限制在地图内。可以把光源拖到地图外，用来模拟窗外月光、走廊射入的侧光等。</div>
+          <div class="checks">
+            <label><input id="showLightShadows" type="checkbox" checked> 显示简化阴影</label>
+            <label><input id="showLightGlow" type="checkbox" checked> 显示光晕</label>
+            <label><input id="shadowHighContrast" type="checkbox"> 高对比阴影</label>
+          </div>
+          <label>阴影观察色 <input id="shadowDebugColor" type="color" value="#ff2a6d"></label>
+          <label>阴影全局透明度 <span id="shadowAlphaValue">1.00</span><input id="shadowAlpha" type="range" min="0.10" max="1.60" step="0.02" value="1.00"></label>
+          <label>阴影强度倍率 <span id="shadowOpacityValue">1.00×</span><input id="shadowOpacity" type="range" min="0.30" max="3.00" step="0.05" value="1.00"></label>
+          <label><input id="shadowDistanceFadeEnabled" type="checkbox"> 阴影内部距离渐淡</label>
+          <label>距离渐淡速率 <span id="shadowDistanceFadeRateValue">0.35</span><input id="shadowDistanceFadeRate" type="range" min="0.00" max="1.50" step="0.01" value="0.35"></label>
+          <label>最远端最小保留 <span id="shadowDistanceFadeMinValue">0.18</span><input id="shadowDistanceFadeMin" type="range" min="0.00" max="1.00" step="0.01" value="0.18"></label>
+          <label><input id="shadowEdgeFadeEnabled" type="checkbox"> 阴影边缘淡化</label>
+          <label>边缘淡化强度 <span id="shadowEdgeFadePxValue">6.0 px</span><input id="shadowEdgeFadePx" type="range" min="0.0" max="20.0" step="0.5" value="6.0"></label>
+          <div class="hintBox">“阴影内部距离渐淡”会在同一片阴影内部，沿着离遮挡体更远的方向连续变浅；“边缘淡化”只做边界羽化，不会改变阴影主体位置。</div>
+          <div class="hintBox">说明：普通模式下阴影颜色仍是黑色，只是带透明度；如果多个阴影多边形重叠，颜色会自然变得更深。你现在可以单独调“全局透明度”来压低这种叠加发黑。</div>
+        </div>
+        </div>
+      </div>
+      </section>
+
+      <section id="tabPlayerPage" class="tabPage">
+        <div class="group">
+          <h2>角色控制</h2>
+          <label>人物代理高(格) <input id="playerHeightCells" type="number" min="0.2" max="6" step="0.1" value="1.7"></label>
+          <label>人物代理宽(格) <input id="playerProxyW" type="number" min="0.15" max="4" step="0.05" value="0.32"></label>
+          <label>人物代理深(格) <input id="playerProxyD" type="number" min="0.15" max="4" step="0.05" value="0.24"></label>
+          <div class="rowButtons rowButtons2">
+            <button id="applyPlayerSettings">应用角色参数</button>
+            <button id="resetPlayerButton">重置角色位置</button>
+          </div>
+          <div class="hintBox">这里先提供只读角色检查器与代理体积参数。后续再扩展角色状态修改、角色行为脚本等能力。</div>
+        </div>
+        <div class="group inspectorGroup">
+          <h2>角色检查器</h2>
+          <div id="playerInspectorSummary" class="inspectorSummary"></div>
+          <pre id="playerInspectorDetails" class="inspectorPre"></pre>
+        </div>
+      </section>
+
+      <div class="keys">
+        <div><kbd>WASD</kbd> / 方向键：按屏幕方向移动人物</div>
+        <div><kbd>1</kbd>~<kbd>7</kbd>：选择要摆的 Prefab</div>
+        <div><kbd>Q</kbd>：旋转 footprint（交换宽深）</div>
+        <div><kbd>左键</kbd>：根据模式执行（拖动画面 / 放置 / 删除）</div>
+        <div><kbd>Shift</kbd> + <kbd>左键</kbd>：在“建立物件”模式下拖动物体</div>
+        <div><kbd>右键</kbd>：取消拖动</div>
+        <div><kbd>G</kbd>：调试显示</div>
+        <div><kbd>T</kbd>：切换侧面半透明</div>
+        <div><kbd>L</kbd>：切换所有前沿线</div>
+        <div><kbd>R</kbd>：重置人物</div>
+        <div><kbd>U</kbd>：显示/隐藏光轴</div>
+      </div>
+      <ul class="small">
+        <li>绿色 = 可以放；红色 = 不可以放。</li>
+        <li>人物使用“代理长方体”参与碰撞、禁放检测和阴影投影；宽/深/高都可单独设置，高度支持小数。</li>
+        <li>普通左键会先命中顶面：点到物件顶面就优先叠到顶面。</li>
+        <li>Shift + 左键：拖动物体；普通左键优先放置当前预览。</li>
+        <li>当前 Prefab v1 只支持等高支撑面；更复杂的支撑规则（柱撑平台/墙挂）后续再扩展。</li>
+      </ul>
+    </aside>
+
+    <section class="stagePane">
+      <div class="stageHeader">
+        <div>
+          <strong>预览画面</strong>
+          <span class="stageMeta">固定在右侧，方便一边调参数一边观察</span>
+        </div>
+        <div class="stageMeta">当前版本：编辑 / 光影 / 角色代理体积一体化</div>
+      </div>
+      <div class="canvasWrap">
+        <canvas id="game" width="1180" height="780"></canvas>
+      </div>
+    </section>
+  </div>
+  
+
+  <div id="habboLibraryModal" class="habboLibraryModal hidden">
+    <div id="habboLibraryBackdrop" class="habboLibraryBackdrop"></div>
+    <div class="habboLibraryDialog">
+      <div class="habboLibraryHeader">
+        <div>
+          <strong>Habbo 资源选择器</strong>
+          <div id="habboLibraryRootLabel" class="stageMeta">请选择一个外部分类素材库根目录后使用</div>
+        </div>
+        <div class="rowButtons rowButtons2 habboLibraryHeaderBtns">
+          <button id="habboLibraryRefresh">刷新索引</button>
+          <button id="habboLibraryClose">关闭</button>
+        </div>
+      </div>
+      <div class="habboLibraryToolbar">
+        <input id="habboLibrarySearch" type="text" placeholder="搜索家具名 / 分类 / 关键词，例如 table、chair、lamp">
+        <div class="habboLibraryTypeTabs">
+          <button id="habboLibraryTypeRoom" class="panelTab active" type="button">物品</button>
+          <button id="habboLibraryTypeWall" class="panelTab" type="button">墙面</button>
+        </div>
+      </div>
+      <div id="habboLibraryStatus" class="hintBox">资源库尚未加载</div>
+      <pre id="habboLibraryDiagnostics" class="habboLibraryDiagnostics">等待打开资源选择器…</pre>
+      <div class="habboLibraryBody">
+        <aside>
+          <div class="group">
+            <h2>分类</h2>
+            <div id="habboLibraryCategoryList" class="habboLibraryCategoryList"></div>
+          </div>
+        </aside>
+        <section class="habboLibraryGridPane">
+          <div id="habboLibrarySummary" class="inspectorSummary">尚未加载资源</div>
+          <div id="habboLibraryGrid" class="habboLibraryGrid"></div>
+        </section>
+        <aside class="group habboLibraryPreviewPane">
+          <h2>当前选择</h2>
+          <div class="habboLibraryPreviewCard">
+            <div id="habboLibraryPreviewThumb" class="habboLibraryPreviewThumb empty">未选择</div>
+            <div class="habboLibraryPreviewActions">
+              <button id="habboLibraryPlace" type="button">加载并进入放置模式</button>
+            </div>
+            <div id="habboLibraryPreviewMeta" class="inspectorPre habboLibraryPreviewMeta">请先从中间网格里选择一个资源。</div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.__APP_ENTRY_INFO = {
+      kind: 'main',
+      label: '主程序',
+      entryFile: 'index.html',
+      launcherHint: 'start.bat',
+      build: '20260326-shadow-controls-v8'
+    };
+  </script>
+  <script src="src/logging/logging.js"></script>
+  <script src="src/placement/placement.js"></script>
+  <script src="src/lighting/lighting.js"></script>
+  <script src="src/state.js"></script>
+  <script src="src/asset-management/asset-management.js"></script>
+  <script src="src/scene-storage/scene-storage.js"></script>
+  <script src="src/player/player.js"></script>
+  <script src="src/ui.js"></script>
+  <script src="src/logic.js"></script>
+  <script src="src/render.js"></script>
+  <script src="src/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "id": "t_shape",
+  "name": "T Shape",
+  "kind": "shape",
+  "asset": "",
+  "base": "#7fbf9a",
+  "anchor": { "x": 0, "y": 0, "z": 0 },
+  "voxels": [
+    { "x": 0, "y": 0, "z": 0, "solid": true, "collidable": true },
+    { "x": 1, "y": 0, "z": 0, "solid": true, "collidable": true },
+    { "x": 2, "y": 0, "z": 0, "solid": true, "collidable": true },
+    { "x": 1, "y": 1, "z": 0, "solid": true, "collidable": true }
+  ]
+}

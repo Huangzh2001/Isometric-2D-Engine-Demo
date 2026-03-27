@@ -1,0 +1,16 @@
+{
+  "id": "stair_3step",
+  "name": "Stair",
+  "kind": "stair",
+  "asset": "",
+  "base": "#c99568",
+  "anchor": { "x": 0, "y": 0, "z": 0 },
+  "voxels": [
+    { "x": 0, "y": 0, "z": 0, "solid": true, "collidable": true },
+    { "x": 1, "y": 0, "z": 0, "solid": true, "collidable": true },
+    { "x": 1, "y": 0, "z": 1, "solid": true, "collidable": true },
+    { "x": 2, "y": 0, "z": 0, "solid": true, "collidable": true },
+    { "x": 2, "y": 0, "z": 1, "solid": true, "collidable": true },
+    { "x": 2, "y": 0, "z": 2, "solid": true, "collidable": true }
+  ]
+}
