@@ -120,15 +120,46 @@ async function uiLoadSceneTarget(options) {
   return { ok: false, reason: 'missing-scene-workflow-service' };
 }
 
-function applyWorldDisplayScale(nextDisplayScale, anchorWorld = null, anchorScreen = null) {
-  var prevDisplayScale = settings.worldDisplayScale;
-  nextDisplayScale = clamp(Number(nextDisplayScale) || prevDisplayScale || 1, 0.5, 2.4);
-  if (Math.abs(nextDisplayScale - prevDisplayScale) < 0.0001) return false;
-  settings.worldDisplayScale = nextDisplayScale;
-  settings.tileScale = settings.worldDisplayScale / settings.worldResolution;
+function getUnifiedWorldZoomValue() {
+  try {
+    if (window.App && window.App.state && window.App.state.runtimeState && typeof window.App.state.runtimeState.getEditorCameraSettingsValue === 'function') {
+      var cameraSettings = window.App.state.runtimeState.getEditorCameraSettingsValue();
+      var runtimeZoom = Number(cameraSettings && cameraSettings.zoom);
+      if (Number.isFinite(runtimeZoom)) return runtimeZoom;
+    }
+  } catch (_) {}
+  return Number(settings && settings.worldDisplayScale) || 1;
+}
+
+function requestUnifiedWorldZoom(nextZoom, source) {
+  var requestSource = String(source || 'ui:world-zoom');
+  var controller = getUiMainController();
+  var dispatched = uiDispatchControllerCommand('main', 'setMainEditorZoom', [nextZoom, requestSource]);
+  if (dispatched && dispatched.zoom != null) return Number(dispatched.zoom) || Number(nextZoom) || 1;
+  if (controller && typeof controller.setMainEditorZoom === 'function') {
+    var result = controller.setMainEditorZoom(nextZoom, requestSource);
+    if (result && result.zoom != null) return Number(result.zoom) || Number(nextZoom) || 1;
+  }
+  try {
+    if (window.App && window.App.state && window.App.state.runtimeState && typeof window.App.state.runtimeState.patchEditorCameraSettings === 'function') {
+      var fallbackResult = window.App.state.runtimeState.patchEditorCameraSettings({ zoom: nextZoom }, { source: requestSource + ':fallback-runtime' });
+      if (fallbackResult && fallbackResult.zoom != null) return Number(fallbackResult.zoom) || Number(nextZoom) || 1;
+    }
+  } catch (_) {}
+  settings.worldDisplayScale = Number(nextZoom) || 1;
+  settings.tileScale = settings.worldDisplayScale / Math.max(1, Number(settings.worldResolution) || 1);
   settings.tileW = BASE_TILE_W * settings.tileScale;
   settings.tileH = BASE_TILE_H * settings.tileScale;
-  if (ui.tileScale) ui.tileScale.value = String(Number(settings.worldDisplayScale.toFixed(2)));
+  return Number(settings.worldDisplayScale) || 1;
+}
+
+function applyWorldDisplayScale(nextDisplayScale, anchorWorld = null, anchorScreen = null, options = null) {
+  var opts = options && typeof options === 'object' ? options : {};
+  var prevDisplayScale = getUnifiedWorldZoomValue();
+  nextDisplayScale = clamp(Number(nextDisplayScale) || prevDisplayScale || 1, 0.5, 2.4);
+  if (opts.forceApply !== true && Math.abs(nextDisplayScale - prevDisplayScale) < 0.0001) return false;
+  var appliedZoom = requestUnifiedWorldZoom(nextDisplayScale, opts.source || 'ui:applyWorldDisplayScale');
+  if (ui.tileScale) ui.tileScale.value = String(Number(appliedZoom.toFixed(2)));
   if (anchorWorld && anchorScreen && Number.isFinite(anchorWorld.x) && Number.isFinite(anchorWorld.y) && Number.isFinite(anchorScreen.x) && Number.isFinite(anchorScreen.y)) {
     var anchored = iso(anchorWorld.x, anchorWorld.y, anchorWorld.z || 0);
     var nextCamera = { x: camera.x + (anchorScreen.x - anchored.x), y: camera.y + (anchorScreen.y - anchored.y) };
@@ -141,7 +172,7 @@ function applyWorldDisplayScale(nextDisplayScale, anchorWorld = null, anchorScre
   invalidateShadowGeometryCache('world-zoom');
   refreshInspectorPanels();
   if (editor.mode === 'place' || editor.mode === 'drag') updatePreview();
-  pushLog(`world-zoom: displayScale=${settings.worldDisplayScale.toFixed(2)} tileScale=${settings.tileScale.toFixed(2)} camera=(${camera.x.toFixed(1)},${camera.y.toFixed(1)})`);
+  pushLog(`world-zoom: displayScale=${Number(settings.worldDisplayScale || appliedZoom).toFixed(2)} tileScale=${Number(settings.tileScale || appliedZoom).toFixed(2)} runtimeZoom=${Number(appliedZoom).toFixed(2)} camera=(${camera.x.toFixed(1)},${camera.y.toFixed(1)})`);
   return true;
 }
 
@@ -152,15 +183,13 @@ function applySettings() {
   settings.worldRows = clamp(parseInt(ui.gridH.value || '9', 10), WORLD_SIZE_MIN, WORLD_SIZE_MAX);
   settings.worldResolution = clamp(parseInt((ui.worldResolution && ui.worldResolution.value) || '1', 10) || 1, 1, 4);
   if (![1, 2, 4].includes(settings.worldResolution)) settings.worldResolution = 1;
-  settings.worldDisplayScale = clamp(parseFloat(ui.tileScale.value || '1'), 0.5, 2.4);
+  var requestedWorldDisplayScale = clamp(parseFloat(ui.tileScale.value || '1'), 0.5, 2.4);
   settings.gridW = settings.worldCols * settings.worldResolution;
   settings.gridH = settings.worldRows * settings.worldResolution;
-  settings.tileScale = settings.worldDisplayScale / settings.worldResolution;
   settings.playerHeightCells = clamp(parseFloat(ui.playerHeightCells.value || '1.7'), 0.2, 6);
   settings.playerProxyW = clamp(parseFloat((ui.playerProxyW && ui.playerProxyW.value) || '0.32'), 0.15, 4);
   settings.playerProxyD = clamp(parseFloat((ui.playerProxyD && ui.playerProxyD.value) || '0.24'), 0.15, 4);
-  settings.tileW = BASE_TILE_W * settings.tileScale;
-  settings.tileH = BASE_TILE_H * settings.tileScale;
+  applyWorldDisplayScale(requestedWorldDisplayScale, null, null, { source: 'ui:applySettings', forceApply: true });
   settings.originX = VIEW_W * 0.57;
   settings.originY = 150;
 
@@ -364,9 +393,14 @@ function uiHandleMainCameraSetInterpolationMode(mode, source) {
 function uiHandleMainCameraSetZoom(zoom, source) {
   var controller = getUiMainController();
   var dispatched = uiDispatchControllerCommand('main', 'setMainEditorZoom', [zoom, source || 'camera-panel:zoom']);
-  if (dispatched) { uiRefreshMainCameraPanel(source); return dispatched; }
+  if (dispatched) {
+    if (ui.tileScale) ui.tileScale.value = String(Number((((dispatched && dispatched.zoom) != null ? dispatched.zoom : getUnifiedWorldZoomValue()) || 1).toFixed(2)));
+    uiRefreshMainCameraPanel(source);
+    return dispatched;
+  }
   if (controller && typeof controller.setMainEditorZoom === 'function') {
     var result = controller.setMainEditorZoom(zoom, source || 'camera-panel:zoom');
+    if (ui.tileScale) ui.tileScale.value = String(Number((((result && result.zoom) != null ? result.zoom : getUnifiedWorldZoomValue()) || 1).toFixed(2)));
     uiRefreshMainCameraPanel(source);
     return result;
   }
@@ -491,6 +525,9 @@ function uiReadMainTerrainFormValues() {
     baseHeightOffset: Number(ui.terrainBaseHeightOffset && ui.terrainBaseHeightOffset.value || 0),
     terrainDebugFaceColorsEnabled: !!(ui.terrainDebugFaceColorsEnabled && ui.terrainDebugFaceColorsEnabled.checked),
     terrainColorMode: (ui.terrainDebugFaceColorsEnabled && ui.terrainDebugFaceColorsEnabled.checked) ? 'debug-semantic' : 'natural',
+    terrainBuildColorMode: String(ui.terrainBuildColorMode && ui.terrainBuildColorMode.value || 'natural'),
+    terrainBuildLightingBypass: !!(ui.terrainBuildLightingBypass && ui.terrainBuildLightingBypass.checked),
+    terrainDetailedProfilingEnabled: !!(ui.terrainDetailedProfilingEnabled && ui.terrainDetailedProfilingEnabled.checked),
     heightProfileConfig: uiReadTerrainProfileRows()
   };
 }
@@ -522,6 +559,9 @@ function uiApplyMainTerrainSettingsToForm(settings) {
   if (ui.terrainWaterLevel) ui.terrainWaterLevel.value = String(Number(settings.waterLevel) || 0);
   if (ui.terrainBaseHeightOffset) ui.terrainBaseHeightOffset.value = String(Number(settings.baseHeightOffset) || 0);
   if (ui.terrainDebugFaceColorsEnabled) ui.terrainDebugFaceColorsEnabled.checked = settings.terrainDebugFaceColorsEnabled === true;
+  if (ui.terrainBuildColorMode) ui.terrainBuildColorMode.value = String(settings.terrainBuildColorMode || 'natural');
+  if (ui.terrainBuildLightingBypass) ui.terrainBuildLightingBypass.checked = settings.terrainBuildLightingBypass === true;
+  if (ui.terrainDetailedProfilingEnabled) ui.terrainDetailedProfilingEnabled.checked = settings.terrainDetailedProfilingEnabled === true;
   var profile = Array.isArray(settings.heightProfileConfig) ? settings.heightProfileConfig : [];
   [0, 1, 2, 3].forEach(function (idx) {
     var segment = profile[idx] || { start: 0, end: 1, baseHeight: 0 };
@@ -538,7 +578,7 @@ function uiRefreshMainTerrainPanel(source) {
   if (ui.terrainSummary) {
     var summary = settings.lastSummary || null;
     ui.terrainSummary.textContent = summary
-      ? ('Terrain：batch=' + String(summary.terrainBatchId || '-') + ' · cells=' + String(summary.generatedCellCount || 0) + ' · voxels=' + String(summary.generatedVoxelCount || 0) + ' · min/max=' + String(summary.minHeightObserved || 0) + '/' + String(summary.maxHeightObserved || 0) + ((settings.terrainDebugFaceColorsEnabled === true) ? ' · debug-colors=on' : ''))
+      ? ('Terrain：batch=' + String(summary.terrainBatchId || '-') + ' · cells=' + String(summary.generatedCellCount || 0) + ' · voxels=' + String(summary.generatedVoxelCount || 0) + (summary.appliedVoxelCount != null ? (' · applied=' + String(summary.appliedVoxelCount || 0)) : '') + ' · min/max=' + String(summary.minHeightObserved || 0) + '/' + String(summary.maxHeightObserved || 0) + ((settings.terrainDebugFaceColorsEnabled === true) ? ' · debug-colors=on' : '') + ' · buildColor=' + String(settings.terrainBuildColorMode || 'natural') + ' · lightingBypass=' + String(settings.terrainBuildLightingBypass === true) + ' · detailedLog=' + String(settings.terrainDetailedProfilingEnabled === true))
       : 'Terrain：尚未生成。';
   }
   if (ui.terrainDetails) {
@@ -561,6 +601,33 @@ function uiHandleTerrainDebugFaceColorsToggle(source) {
   if (typeof updatePreview === 'function') { try { updatePreview(); } catch (_) {} }
   return result;
 }
+
+function uiHandleTerrainBuildColorModeChange(source) {
+  var controller = getUiMainController();
+  var payload = {
+    terrainBuildColorMode: String(ui.terrainBuildColorMode && ui.terrainBuildColorMode.value || 'natural'),
+    terrainBuildLightingBypass: !!(ui.terrainBuildLightingBypass && ui.terrainBuildLightingBypass.checked)
+  };
+  var dispatched = uiDispatchControllerCommand('main', 'setMainEditorTerrainSettings', [payload, source || 'terrain-panel:build-color-mode']);
+  var result = dispatched || (controller && typeof controller.setMainEditorTerrainSettings === 'function' ? controller.setMainEditorTerrainSettings(payload, source || 'terrain-panel:build-color-mode') : null);
+  uiRefreshMainTerrainPanel(source);
+  return result;
+}
+
+function uiHandleTerrainBuildLightingBypassToggle(source) {
+  return uiHandleTerrainBuildColorModeChange(source || 'terrain-panel:build-lighting-bypass');
+}
+function uiHandleTerrainDetailedProfilingToggle(source) {
+  var controller = getUiMainController();
+  var payload = {
+    terrainDetailedProfilingEnabled: !!(ui.terrainDetailedProfilingEnabled && ui.terrainDetailedProfilingEnabled.checked)
+  };
+  var dispatched = uiDispatchControllerCommand('main', 'setMainEditorTerrainSettings', [payload, source || 'terrain-panel:detailed-terrain-profiling']);
+  var result = dispatched || (controller && typeof controller.setMainEditorTerrainSettings === 'function' ? controller.setMainEditorTerrainSettings(payload, source || 'terrain-panel:detailed-terrain-profiling') : null);
+  uiRefreshMainTerrainPanel(source);
+  return result;
+}
+
 
 function uiHandleTerrainGenerate(source) {
   var controller = getUiMainController();
@@ -614,6 +681,9 @@ safeListen(ui.downloadMainViewRotationDiagnostic, 'click', () => uiHandleMainVie
 safeListen(ui.terrainGenerate, 'click', () => uiHandleTerrainGenerate('terrain-panel:generate'));
 safeListen(ui.terrainClear, 'click', () => uiHandleTerrainClear('terrain-panel:clear'));
 safeListen(ui.terrainResetParams, 'click', () => uiHandleTerrainReset('terrain-panel:reset'));
+safeListen(ui.terrainBuildColorMode, 'change', () => uiHandleTerrainBuildColorModeChange('terrain-panel:build-color-mode'));
+safeListen(ui.terrainBuildLightingBypass, 'change', () => uiHandleTerrainBuildLightingBypassToggle('terrain-panel:build-lighting-bypass'));
+safeListen(ui.terrainDetailedProfilingEnabled, 'change', () => uiHandleTerrainDetailedProfilingToggle('terrain-panel:detailed-terrain-profiling'));
 safeListen(ui.terrainDebugFaceColorsEnabled, 'change', () => { uiHandleTerrainDebugFaceColorsToggle('terrain-panel:debug-face-colors-toggle'); });
 
 safeListen(ui.previewRotateLeft, 'click', () => uiHandlePreviewFacingRotate(-1, 'ui.previewRotateLeft.click'));

@@ -1015,6 +1015,7 @@
       asset: state.asset,
       base: state.base,
       renderMode: spriteVisible ? (state.renderMode || 'sprite_proxy') : 'voxel',
+      renderUpdateMode: spriteVisible ? 'dynamic' : 'static',
       anchor: { ...state.anchor },
       voxels: exportVoxels,
       sprite: spriteVisible ? {

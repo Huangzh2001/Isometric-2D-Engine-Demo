@@ -121,6 +121,9 @@ var terrainGenerator = {
   nextBatchSeq: 1,
   terrainDebugFaceColorsEnabled: false,
   terrainColorMode: 'natural',
+  terrainBuildColorMode: 'natural',
+  terrainBuildLightingBypass: false,
+  terrainDetailedProfilingEnabled: false,
 };
 
 var terrainLogic = {
@@ -178,7 +181,10 @@ function getTerrainGeneratorSettingsValue() {
     activeTerrainBatchId: terrainGenerator.activeTerrainBatchId,
     lastSummary: terrainGenerator.lastSummary ? JSON.parse(JSON.stringify(terrainGenerator.lastSummary)) : null,
     terrainDebugFaceColorsEnabled: terrainGenerator.terrainDebugFaceColorsEnabled === true,
-    terrainColorMode: String(terrainGenerator.terrainColorMode || (terrainGenerator.terrainDebugFaceColorsEnabled ? 'debug-semantic' : 'natural'))
+    terrainColorMode: String(terrainGenerator.terrainColorMode || (terrainGenerator.terrainDebugFaceColorsEnabled ? 'debug-semantic' : 'natural')),
+    terrainBuildColorMode: String(terrainGenerator.terrainBuildColorMode || 'natural'),
+    terrainBuildLightingBypass: terrainGenerator.terrainBuildLightingBypass === true,
+    terrainDetailedProfilingEnabled: terrainGenerator.terrainDetailedProfilingEnabled === true
   };
 }
 
@@ -214,6 +220,9 @@ function patchTerrainGeneratorSettings(patch, meta) {
   }
   if (Object.prototype.hasOwnProperty.call(patch, 'terrainDebugFaceColorsEnabled')) terrainGenerator.terrainDebugFaceColorsEnabled = patch.terrainDebugFaceColorsEnabled === true;
   if (Object.prototype.hasOwnProperty.call(patch, 'terrainColorMode')) terrainGenerator.terrainColorMode = String(patch.terrainColorMode || (terrainGenerator.terrainDebugFaceColorsEnabled ? 'debug-semantic' : 'natural'));
+  if (Object.prototype.hasOwnProperty.call(patch, 'terrainBuildColorMode')) terrainGenerator.terrainBuildColorMode = String(patch.terrainBuildColorMode || 'natural');
+  if (Object.prototype.hasOwnProperty.call(patch, 'terrainBuildLightingBypass')) terrainGenerator.terrainBuildLightingBypass = patch.terrainBuildLightingBypass === true;
+  if (Object.prototype.hasOwnProperty.call(patch, 'terrainDetailedProfilingEnabled')) terrainGenerator.terrainDetailedProfilingEnabled = patch.terrainDetailedProfilingEnabled === true;
   if (Object.prototype.hasOwnProperty.call(patch, 'nextBatchSeq')) terrainGenerator.nextBatchSeq = Math.max(1, Math.round(Number(patch.nextBatchSeq) || 1));
   runtimeWrite('patchTerrainGeneratorSettings', {
     source: meta && meta.source ? String(meta.source) : 'unknown',
@@ -491,6 +500,25 @@ function clampEditorZoomValue(value, minZoom, maxZoom) {
   return Math.max(min, Math.min(max, zoom));
 }
 
+function syncLegacyWorldZoomFromEditor(source) {
+  var runtimeZoom = clampEditorZoomValue(editor && editor.zoom, editor && editor.minZoom, editor && editor.maxZoom);
+  var worldResolution = Math.max(1, Number(settings && settings.worldResolution) || 1);
+  editor.zoom = runtimeZoom;
+  if (settings) {
+    settings.worldDisplayScale = runtimeZoom;
+    settings.tileScale = runtimeZoom / worldResolution;
+    settings.tileW = BASE_TILE_W * settings.tileScale;
+    settings.tileH = BASE_TILE_H * settings.tileScale;
+  }
+  return {
+    source: String(source || 'runtime-sync-world-zoom'),
+    runtimeZoom: runtimeZoom,
+    worldDisplayScale: Number(settings && settings.worldDisplayScale || runtimeZoom),
+    tileScale: Number(settings && settings.tileScale || runtimeZoom),
+    worldResolution: worldResolution
+  };
+}
+
 function getEditorCameraSettingsValue() {
   return {
     zoom: Number(editor && editor.zoom) || 1,
@@ -523,6 +551,7 @@ function patchEditorCameraSettings(patch, meta) {
   editor.maxZoom = nextMax;
   if (Object.prototype.hasOwnProperty.call(patch, 'zoom')) editor.zoom = clampEditorZoomValue(patch.zoom, nextMin, nextMax);
   else editor.zoom = clampEditorZoomValue(editor.zoom, nextMin, nextMax);
+  syncLegacyWorldZoomFromEditor(meta && meta.source ? meta.source : 'patchEditorCameraSettings');
   if (Object.prototype.hasOwnProperty.call(patch, 'cameraCullingEnabled')) editor.cameraCullingEnabled = patch.cameraCullingEnabled !== false;
   if (Object.prototype.hasOwnProperty.call(patch, 'cullingMargin')) {
     var margin = Number(patch.cullingMargin);

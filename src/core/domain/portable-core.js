@@ -53,6 +53,7 @@ var __APP_CORE_PORTABLE_CORE__ = (function () {
         id: String(p.id || ''),
         name: String(p.name || p.id || ''),
         renderMode: String(p.renderMode || ''),
+        renderUpdateMode: String(p.renderUpdateMode || ''),
         interactionMode: String(p.interactionMode || ''),
         w: toNumber(p.w, 0),
         d: toNumber(p.d, 0),

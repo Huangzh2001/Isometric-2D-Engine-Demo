@@ -538,7 +538,7 @@ function applySceneSnapshot(snapshot, options = {}) {
   if (!nextInstances && Array.isArray(incoming.boxes) && incoming.boxes.length) nextInstances = legacyBoxesToInstances(incoming.boxes);
   if (!nextInstances || !nextInstances.length) nextInstances = base.instances;
   var normalizedInstances = nextInstances.map(function (inst, idx) {
-    return {
+    var normalized = {
       instanceId: typeof inst.instanceId === 'string' && inst.instanceId ? inst.instanceId : 'obj_' + String(idx + 1).padStart(4, '0'),
       prefabId: (findPrefabByIdExact(inst.prefabId || '') || ensureMissingPrefabRegistered(inst.prefabId || '')).id,
       x: Number(inst.x) || 0,
@@ -547,6 +547,10 @@ function applySceneSnapshot(snapshot, options = {}) {
       rotation: ((parseInt(inst.rotation || 0, 10) % 4) + 4) % 4,
       name: inst.name || undefined,
     };
+    if (inst && (inst.renderUpdateMode === 'static' || inst.renderUpdateMode === 'dynamic')) {
+      normalized.renderUpdateMode = String(inst.renderUpdateMode);
+    }
+    return normalized;
   });
   if (__sceneGraphApi && typeof __sceneGraphApi.replaceSceneGraph === 'function') {
     __sceneGraphApi.replaceSceneGraph({ instances: normalizedInstances }, { source: 'scene-storage:applySceneSnapshot' });

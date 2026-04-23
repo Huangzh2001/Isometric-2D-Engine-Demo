@@ -8,5 +8,6 @@ assert(renderSource.includes('renderedAsRealFaces: true'), 'placed instance rend
 assert(renderSource.includes('renderedAsOverlay: false'), 'placed instance render path should prove overlay is not used');
 assert(renderSource.includes('boxBaseUsedForDebugFaces: false'), 'placed instance render path should prove base color is not used');
 assert(renderSource.includes('const placedFaces = buildPlacedDebugInstanceFaceRenderables(inst, prefab, occupiedKeySet, viewRotationInfo);'), 'buildRenderables should route debug prefabs through placed face renderables');
-assert(renderSource.includes('return !isFiveFaceDebugPrefab(prefab);'), 'static voxel cache should exclude debug prefabs from monochrome static path');
+assert(renderSource.includes('function isStaticWorldBoxForRender('), 'shared static-world chunk cache should classify static voxel boxes through render update mode filtering');
+assert(renderSource.includes('buildInstanceRenderUpdateModeIndex(instances)'), 'shared static-world chunk cache should resolve instance render update modes before filtering');
 console.log('placed-instance-semantic-face-pipeline.test.js: OK');

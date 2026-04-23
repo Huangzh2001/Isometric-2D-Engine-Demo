@@ -519,14 +519,37 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
         semanticTextureMap: instance.semanticTextureMap || null,
         semanticTextures: instance.semanticTextures || null,
         semanticFaceColors: instance.semanticFaceColors || null,
+        renderUpdateMode: instance.renderUpdateMode || prefab.renderUpdateMode || null,
+        rotation: Number(instance.rotation) || 0,
         localIndex: i,
       });
     }
     return out;
   }
 
-  function rebuildBoxesFromInstances() {
+  function placementPerfNowMs() {
+    try {
+      if (typeof performance !== 'undefined' && performance && typeof performance.now === 'function') return performance.now();
+    } catch (_) {}
+    return Date.now();
+  }
+
+  function emitPlacementSceneCommitProfile(payload) {
+    var line = '[SCENE-COMMIT-PROFILE] ';
+    try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
+    try {
+      if (typeof pushLog === 'function') pushLog(line);
+      else if (typeof console !== 'undefined' && console.log) console.log(line);
+    } catch (_) {}
+    return line;
+  }
+
+  function rebuildBoxesFromInstances(meta) {
+    var source = meta && meta.source ? String(meta.source) : 'placement:rebuildBoxesFromInstances';
+    var totalStartAt = placementPerfNowMs();
+    var previousBoxes = Array.isArray(boxes) ? boxes.slice() : [];
     nextId = 1;
+    var deriveBoxesStartAt = placementPerfNowMs();
     var domainCore = getDomainSceneCoreApi();
     if (domainCore && typeof domainCore.deriveBoxesFromInstances === 'function') {
       boxes = domainCore.deriveBoxesFromInstances(instances, expandInstanceToBoxes);
@@ -535,14 +558,51 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
       for (var i = 0; i < instances.length; i++) rebuilt.push.apply(rebuilt, expandInstanceToBoxes(instances[i], true));
       boxes = rebuilt;
     }
-    placementStateWrite('replaceSceneGraph', { source: 'placement:rebuildBoxesFromInstances', instances: instances.length, boxes: boxes.length });
-    placementRoute('rebuildBoxesFromInstances', { instances: instances.length, boxes: boxes.length });
+    var deriveBoxesMs = Math.max(0, placementPerfNowMs() - deriveBoxesStartAt);
+    var occupancyUpdateMs = 0;
+    var sceneSessionApi = getSceneSessionApi();
+    if (sceneSessionApi && typeof sceneSessionApi.updateOccupancyCacheFromBoxDiff === 'function') {
+      try {
+        var occupancyUpdateStartAt = placementPerfNowMs();
+        sceneSessionApi.updateOccupancyCacheFromBoxDiff({
+          previousBoxes: previousBoxes,
+          nextBoxes: boxes,
+          reason: source,
+          source: source
+        });
+        occupancyUpdateMs = Math.max(0, placementPerfNowMs() - occupancyUpdateStartAt);
+      } catch (_) {}
+    } else if (typeof window !== 'undefined' && window.__SCENE_OCCUPANCY_CACHE__ && typeof window.__SCENE_OCCUPANCY_CACHE__.updateFromBoxDiff === 'function') {
+      try {
+        var legacyOccupancyUpdateStartAt = placementPerfNowMs();
+        window.__SCENE_OCCUPANCY_CACHE__.updateFromBoxDiff({
+          previousBoxes: previousBoxes,
+          nextBoxes: boxes,
+          reason: source,
+          source: source
+        });
+        occupancyUpdateMs = Math.max(0, placementPerfNowMs() - legacyOccupancyUpdateStartAt);
+      } catch (_) {}
+    }
+    emitPlacementSceneCommitProfile({
+      reason: source,
+      step: 'rebuildBoxesFromInstances',
+      instancesBefore: Number(instances.length || 0),
+      instancesAfter: Number(instances.length || 0),
+      boxesBefore: Number(previousBoxes.length || 0),
+      boxesAfter: Number(boxes.length || 0),
+      deriveBoxesMs: Number(deriveBoxesMs.toFixed(3)),
+      occupancyUpdateMs: Number(occupancyUpdateMs.toFixed(3)),
+      totalMs: Number(Math.max(0, placementPerfNowMs() - totalStartAt).toFixed(3))
+    });
+    placementStateWrite('replaceSceneGraph', { source: source, instances: instances.length, boxes: boxes.length });
+    placementRoute('rebuildBoxesFromInstances', { source: source, instances: instances.length, boxes: boxes.length });
     return boxes;
   }
 
   function refreshPlacementOrdering(reason) {
     placementRoute('refreshPlacementOrdering', { reason: reason || 'unspecified' });
-    rebuildBoxesFromInstances();
+    rebuildBoxesFromInstances({ source: reason || 'placement:refreshPlacementOrdering' });
     if (typeof invalidateShadowGeometryCache === 'function') invalidateShadowGeometryCache(reason || 'placement-refresh');
     return boxes;
   }
@@ -583,7 +643,7 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
     }
     instances = instances.filter(function (inst) { return inst.instanceId !== instanceId; });
     if (inspectorState.selectedInstanceId === instanceId) clearSelectedInstance({ source: 'placement:removeInstanceById' });
-    rebuildBoxesFromInstances();
+    rebuildBoxesFromInstances({ source: meta && meta.source ? String(meta.source) : 'placement:removeInstanceById' });
     placementStateWrite('removeInstanceById', { source: 'placement:removeInstanceById', instanceId: instanceId, instances: instances.length, boxes: boxes.length, fallback: true });
     return true;
   }
@@ -673,7 +733,7 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
         editorRef.preview = null;
       }
     }
-    removeInstanceById(instance.instanceId);
+    removeInstanceById(instance.instanceId, { source: 'placement:startDragging' });
     if (typeof invalidateShadowGeometryCache === 'function') invalidateShadowGeometryCache('startDragging');
     pushLog(`scene-after-drag-start: instances=${instances.length} boxes=${boxes.length}`);
   }
@@ -758,7 +818,7 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
     if (sceneGraphApi && typeof sceneGraphApi.addInstance === 'function') sceneGraphApi.addInstance(instance, { source: 'placement:placeCurrentPrefab' });
     else {
       instances.push(instance);
-      rebuildBoxesFromInstances();
+      rebuildBoxesFromInstances({ source: 'placement:placeCurrentPrefab' });
       placementStateWrite('addInstance', { source: 'placement:placeCurrentPrefab', instanceId: instance.instanceId, prefabId: instance.prefabId, instances: instances.length, boxes: boxes.length });
     }
     return instance;
@@ -790,7 +850,7 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
       if (sceneGraphApi && typeof sceneGraphApi.addInstance === 'function') sceneGraphApi.addInstance(moved, { source: 'placement:commitPreview.drag' });
       else {
         instances.push(moved);
-        rebuildBoxesFromInstances();
+        rebuildBoxesFromInstances({ source: 'placement:commitPreview.drag' });
         placementStateWrite('addInstance', { source: 'placement:commitPreview.drag', instanceId: moved.instanceId, prefabId: moved.prefabId, instances: instances.length, boxes: boxes.length });
       }
       if (verboseLog) pushLog(`drag-commit ${moved.instanceId}:${getPrefabById(moved.prefabId).name} -> (${moved.x},${moved.y},${moved.z})`);
@@ -855,7 +915,7 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
       if (sceneGraphApi && typeof sceneGraphApi.addInstance === 'function') sceneGraphApi.addInstance(editorRef.draggingInstance, { source: 'placement:cancelDrag' });
       else {
         instances.push(editorRef.draggingInstance);
-        rebuildBoxesFromInstances();
+        rebuildBoxesFromInstances({ source: 'placement:cancelDrag' });
         placementStateWrite('addInstance', { source: 'placement:cancelDrag', instanceId: editorRef.draggingInstance.instanceId, prefabId: editorRef.draggingInstance.prefabId, instances: instances.length, boxes: boxes.length });
       }
       var placementControllerOnCancel = getPlacementControllerApi();
@@ -911,7 +971,7 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
       return null;
     }
     inst.rotation = nextRotation;
-    rebuildBoxesFromInstances();
+    rebuildBoxesFromInstances({ source: meta && meta.source ? String(meta.source) : 'placement:updateInstanceRotation' });
     placementStateWrite('updateInstanceRotation', {
       source: meta && meta.source ? String(meta.source) : 'placement:updateInstanceRotation',
       instanceId: targetId,

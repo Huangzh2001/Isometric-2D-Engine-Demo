@@ -157,6 +157,33 @@ function cloneJsonSafe(value) {
   catch (err) { return value; }
 }
 
+function normalizeRenderUpdateMode(value, fallback) {
+  var mode = String(value || '').trim().toLowerCase();
+  if (mode === 'dynamic') return 'dynamic';
+  if (mode === 'static') return 'static';
+  return String(fallback || 'static') === 'dynamic' ? 'dynamic' : 'static';
+}
+
+function derivePrefabRenderUpdateMode(def, context) {
+  context = context || {};
+  if (def && (def.renderUpdateMode === 'static' || def.renderUpdateMode === 'dynamic')) {
+    return normalizeRenderUpdateMode(def.renderUpdateMode, 'static');
+  }
+  var hasSpriteVisual = !!(context.sprite || context.spriteDirections || context.habboLayerDirections);
+  return hasSpriteVisual ? 'dynamic' : 'static';
+}
+
+function getPrefabRenderUpdateMode(prefab, instanceOrOverride) {
+  var instanceMode = null;
+  if (instanceOrOverride && typeof instanceOrOverride === 'object') instanceMode = instanceOrOverride.renderUpdateMode;
+  else if (typeof instanceOrOverride === 'string') instanceMode = instanceOrOverride;
+  if (instanceMode === 'static' || instanceMode === 'dynamic') return normalizeRenderUpdateMode(instanceMode, 'static');
+  if (prefab && (prefab.renderUpdateMode === 'static' || prefab.renderUpdateMode === 'dynamic')) {
+    return normalizeRenderUpdateMode(prefab.renderUpdateMode, 'static');
+  }
+  return normalizeRenderUpdateMode(null, prefab && (prefab.renderMode || 'voxel') !== 'voxel' ? 'dynamic' : 'static');
+}
+
 function normalizePrefab(def) {
   var hasExplicitVoxelArray = Array.isArray(def.voxels);
   var explicitVoxelCount = hasExplicitVoxelArray ? def.voxels.length : null;
@@ -171,6 +198,13 @@ function normalizePrefab(def) {
   var semanticFaceColors = Object.assign({}, def.semanticFaceColors || {});
   ['top', 'north', 'east', 'south', 'west'].forEach(function (key) {
     if (!semanticFaceColors[key] && semanticTextureMap[key]) semanticFaceColors[key] = semanticTextureMap[key].color;
+  });
+  var inferredRenderMode = String((sprite || spriteDirections || habboLayerDirections) ? (def.renderMode || 'sprite_proxy') : 'voxel');
+  var renderUpdateMode = derivePrefabRenderUpdateMode(def, {
+    sprite: sprite,
+    spriteDirections: spriteDirections,
+    habboLayerDirections: habboLayerDirections,
+    renderMode: inferredRenderMode
   });
   var maxX = 0, maxY = 0, maxZ = 0;
   for (var i = 0; i < rawVoxels.length; i++) {
@@ -196,7 +230,8 @@ function normalizePrefab(def) {
     spriteDirections: spriteDirections,
     habboLayerDirections: habboLayerDirections,
     habboMeta: habboMeta,
-    renderMode: String((sprite || spriteDirections || habboLayerDirections) ? (def.renderMode || 'sprite_proxy') : 'voxel'),
+    renderMode: inferredRenderMode,
+    renderUpdateMode: renderUpdateMode,
     slices: Array.isArray(def.slices) ? def.slices.slice() : [],
     voxels: rawVoxels,
     explicitVoxelCount: explicitVoxelCount,
@@ -216,21 +251,21 @@ var DEBUG_5FACE_TEXTURE_MAP = {
 };
 
 var prototypes = [
-  normalizePrefab({ key: '1', id: 'debug_cube_5faces', name: 'Debug Cube · 5 Faces', base: '#c7b0df', spriteStrategyHint: 'single', itemRotationDebug: true, semanticTextureMap: DEBUG_5FACE_TEXTURE_MAP, semanticTextures: DEBUG_5FACE_TEXTURE_MAP, semanticFaceColors: { top: '#2F80ED', north: '#E74C3C', east: '#27AE60', south: '#F2C94C', west: '#9B51E0' }, voxels: [{ x: 0, y: 0, z: 0 }] }),
-  normalizePrefab({ key: '2', id: 'debug_rect_2x1_5faces', name: 'Debug Rect 2×1 · 5 Faces', base: '#d4bb90', spriteStrategyHint: 'single', itemRotationDebug: true, semanticTextureMap: DEBUG_5FACE_TEXTURE_MAP, semanticTextures: DEBUG_5FACE_TEXTURE_MAP, semanticFaceColors: { top: '#2F80ED', north: '#E74C3C', east: '#27AE60', south: '#F2C94C', west: '#9B51E0' }, voxels: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }] }),
-  normalizePrefab({ key: '3', id: 'cube_1x1', name: 'Cube', base: '#c7b0df', voxels: [{ x: 0, y: 0, z: 0 }] }),
-  normalizePrefab({ key: '2', id: 'bench_2x1', name: 'Bench', base: '#d4bb90', voxels: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }] }),
-  normalizePrefab({ key: '3', id: 'sofa_2x1', name: 'Sofa', base: '#9eb6dd', voxels: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }] }),
-  normalizePrefab({ key: '4', id: 'cabinet_1x1x2', name: 'Cabinet', base: '#a8c46d', voxels: [{ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }] }),
-  normalizePrefab({ key: '5', id: 'stair_3step', name: 'Stair', base: '#c99568', voxels: [
+  normalizePrefab({ key: '1', id: 'debug_cube_5faces', name: 'Debug Cube · 5 Faces', base: '#c7b0df', renderUpdateMode: 'dynamic', spriteStrategyHint: 'single', itemRotationDebug: true, semanticTextureMap: DEBUG_5FACE_TEXTURE_MAP, semanticTextures: DEBUG_5FACE_TEXTURE_MAP, semanticFaceColors: { top: '#2F80ED', north: '#E74C3C', east: '#27AE60', south: '#F2C94C', west: '#9B51E0' }, voxels: [{ x: 0, y: 0, z: 0 }] }),
+  normalizePrefab({ key: '2', id: 'debug_rect_2x1_5faces', name: 'Debug Rect 2×1 · 5 Faces', base: '#d4bb90', renderUpdateMode: 'dynamic', spriteStrategyHint: 'single', itemRotationDebug: true, semanticTextureMap: DEBUG_5FACE_TEXTURE_MAP, semanticTextures: DEBUG_5FACE_TEXTURE_MAP, semanticFaceColors: { top: '#2F80ED', north: '#E74C3C', east: '#27AE60', south: '#F2C94C', west: '#9B51E0' }, voxels: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }] }),
+  normalizePrefab({ key: '3', id: 'cube_1x1', name: 'Cube', base: '#c7b0df', renderUpdateMode: 'static', voxels: [{ x: 0, y: 0, z: 0 }] }),
+  normalizePrefab({ key: '2', id: 'bench_2x1', name: 'Bench', base: '#d4bb90', renderUpdateMode: 'static', voxels: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }] }),
+  normalizePrefab({ key: '3', id: 'sofa_2x1', name: 'Sofa', base: '#9eb6dd', renderUpdateMode: 'static', voxels: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }] }),
+  normalizePrefab({ key: '4', id: 'cabinet_1x1x2', name: 'Cabinet', base: '#a8c46d', renderUpdateMode: 'static', voxels: [{ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }] }),
+  normalizePrefab({ key: '5', id: 'stair_3step', name: 'Stair', base: '#c99568', renderUpdateMode: 'static', voxels: [
     { x: 0, y: 0, z: 0 },
     { x: 1, y: 0, z: 0 }, { x: 1, y: 0, z: 1 },
     { x: 2, y: 0, z: 0 }, { x: 2, y: 0, z: 1 }, { x: 2, y: 0, z: 2 }
   ] }),
-  normalizePrefab({ key: '6', id: 't_shape', name: 'T Shape', base: '#7fbf9a', voxels: [
+  normalizePrefab({ key: '6', id: 't_shape', name: 'T Shape', base: '#7fbf9a', renderUpdateMode: 'static', voxels: [
     { x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }, { x: 2, y: 0, z: 0 }, { x: 1, y: 1, z: 0 }
   ] }),
-  normalizePrefab({ key: '7', id: 'table_2x1', name: 'Table', base: '#cfa670', voxels: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }] })
+  normalizePrefab({ key: '7', id: 'table_2x1', name: 'Table', base: '#cfa670', renderUpdateMode: 'static', voxels: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }] })
 ];
 prototypes.forEach(function (prefab) {
   tracePrefabRegister(prefab.id, 'built-in', { builtIn: true, voxels: prefab.voxels.length });
@@ -394,6 +429,8 @@ function prefabVariant(prefab, rotation) {
 
 var PREFAB_REGISTRY_API = {
   owner: PREFAB_REGISTRY_OWNER,
+  normalizeRenderUpdateMode: normalizeRenderUpdateMode,
+  getPrefabRenderUpdateMode: getPrefabRenderUpdateMode,
   normalizePrefab: normalizePrefab,
   ensurePrefabRegistered: ensurePrefabRegistered,
   registerPrefab: registerPrefab,

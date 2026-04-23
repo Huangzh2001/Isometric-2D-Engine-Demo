@@ -172,7 +172,10 @@
     baseHeightOffset: 0,
     heightProfileConfig: DEFAULT_HEIGHT_PROFILE,
     terrainDebugFaceColorsEnabled: false,
-    terrainColorMode: 'natural'
+    terrainColorMode: 'natural',
+    terrainBuildColorMode: 'natural',
+    terrainBuildLightingBypass: false,
+    terrainDetailedProfilingEnabled: false
   };
 
   function normalizeTerrainParams(params) {
@@ -203,7 +206,10 @@
       baseHeightOffset: Math.round(toNumber(src.baseHeightOffset, DEFAULT_SETTINGS.baseHeightOffset)),
       heightProfileConfig: normalizeHeightProfileConfig(src.heightProfileConfig),
       terrainDebugFaceColorsEnabled: src.terrainDebugFaceColorsEnabled === true,
-      terrainColorMode: String(src.terrainColorMode || (src.terrainDebugFaceColorsEnabled ? 'debug-semantic' : 'natural'))
+      terrainColorMode: String(src.terrainColorMode || (src.terrainDebugFaceColorsEnabled ? 'debug-semantic' : 'natural')),
+      terrainBuildColorMode: String(src.terrainBuildColorMode || 'natural'),
+      terrainBuildLightingBypass: src.terrainBuildLightingBypass === true,
+      terrainDetailedProfilingEnabled: src.terrainDetailedProfilingEnabled === true
     };
   }
 

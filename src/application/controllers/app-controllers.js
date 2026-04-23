@@ -190,6 +190,16 @@
     return state && state.sceneSession ? state.sceneSession : (appPath('state.sceneSession') || (typeof window !== 'undefined' ? window.__SCENE_SESSION_STATE__ || null : null));
   }
 
+  function getSceneGraphApi() {
+    var state = getState();
+    return state && state.sceneGraph ? state.sceneGraph : (appPath('state.sceneGraph') || (typeof window !== 'undefined' ? window.__SCENE_GRAPH_STATE__ || null : null));
+  }
+
+  function isDetailedTerrainProfilingEnabledForController() {
+    var settings = getMainEditorTerrainSettings('app-controllers:detailed-terrain-profiling');
+    return !!(settings && settings.terrainDetailedProfilingEnabled === true);
+  }
+
   function recordTerrainDiagnostic(event, payload) {
     var entry = Object.assign({ event: String(event || '') }, safeClone(payload || {}));
     try {
@@ -198,6 +208,41 @@
       else if (typeof console !== 'undefined' && console.log) console.log(line);
     } catch (_) {}
     return entry;
+  }
+
+  function controllerPerfNowMs() {
+    try {
+      if (typeof performance !== 'undefined' && performance && typeof performance.now === 'function') return performance.now();
+    } catch (_) {}
+    return Date.now();
+  }
+
+  function emitStructuredControllerLog(tag, payload) {
+    var line = '[' + String(tag || 'APP-CONTROLLER') + '] ';
+    try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
+    try {
+      if (typeof pushLog === 'function') pushLog(line);
+      else if (typeof console !== 'undefined' && console.log) console.log(line);
+    } catch (_) {}
+    return line;
+  }
+
+  function emitTerrainGenerateProfile(payload) {
+    return emitStructuredControllerLog('TERRAIN-GENERATE-PROFILE', payload || {});
+  }
+
+  function emitSceneCommitProfile(payload) {
+    return emitStructuredControllerLog('SCENE-COMMIT-PROFILE', payload || {});
+  }
+
+
+  var __pendingTerrainApplyJob = null;
+  var TERRAIN_APPLY_BATCH_INSTANCE_COUNT = 512;
+
+  function cancelPendingTerrainApplyJob(reason) {
+    if (!__pendingTerrainApplyJob) return false;
+    __pendingTerrainApplyJob = null;
+    return true;
   }
 
   var __itemFacingCoreBindCheckLogged = false;
@@ -1781,7 +1826,8 @@
         { start: 0.28, end: 0.56, baseHeight: 3 },
         { start: 0.56, end: 0.80, baseHeight: 7 },
         { start: 0.80, end: 1.01, baseHeight: 12 }
-      ]
+      ],
+      terrainDetailedProfilingEnabled: false
     };
     return setMainEditorTerrainSettings(defaults, requestSource);
   }
@@ -1795,19 +1841,107 @@
   function replaceCurrentSceneInstances(nextInstances, source) {
     var requestSource = String(source || 'terrain:replace-instances');
     var sceneSessionApi = getSceneSessionApi();
+    var totalStartAt = controllerPerfNowMs();
+    var beforeInstances = sceneSessionApi && typeof sceneSessionApi.getInstances === 'function'
+      ? (sceneSessionApi.getInstances() || []).length
+      : ((typeof instances !== 'undefined' && Array.isArray(instances)) ? instances.length : 0);
+    var beforeBoxes = sceneSessionApi && typeof sceneSessionApi.getBoxes === 'function'
+      ? (sceneSessionApi.getBoxes() || []).length
+      : ((typeof boxes !== 'undefined' && Array.isArray(boxes)) ? boxes.length : 0);
+    var replaceSceneGraphMs = 0;
+    var replaceInstancesMs = 0;
+    var syncDerivedStateMs = 0;
+    var commitPath = 'scene-session.replaceInstances';
+    var ok = false;
     if (sceneSessionApi && typeof sceneSessionApi.replaceInstances === 'function') {
+      var replaceStartAt = controllerPerfNowMs();
       sceneSessionApi.replaceInstances(nextInstances, { source: requestSource });
+      replaceInstancesMs = Math.max(0, controllerPerfNowMs() - replaceStartAt);
       if (typeof sceneSessionApi.syncDerivedState === 'function') {
+        var syncStartAt = controllerPerfNowMs();
         try { sceneSessionApi.syncDerivedState({ source: requestSource + ':sync' }); } catch (_) {}
+        syncDerivedStateMs = Math.max(0, controllerPerfNowMs() - syncStartAt);
       }
-      return true;
+      ok = true;
     }
-    if (typeof instances !== 'undefined' && Array.isArray(instances)) {
+    if (!ok && typeof instances !== 'undefined' && Array.isArray(instances)) {
+      commitPath = 'legacy-global.replaceInstances';
+      var legacyReplaceStartAt = controllerPerfNowMs();
       instances = Array.isArray(nextInstances) ? nextInstances.slice() : [];
-      if (typeof rebuildBoxesFromInstances === 'function') rebuildBoxesFromInstances();
-      return true;
+      if (typeof rebuildBoxesFromInstances === 'function') rebuildBoxesFromInstances({ source: requestSource + ':legacy-rebuild' });
+      replaceInstancesMs = Math.max(0, controllerPerfNowMs() - legacyReplaceStartAt);
+      ok = true;
     }
-    return false;
+    var afterInstances = sceneSessionApi && typeof sceneSessionApi.getInstances === 'function'
+      ? (sceneSessionApi.getInstances() || []).length
+      : ((typeof instances !== 'undefined' && Array.isArray(instances)) ? instances.length : 0);
+    var afterBoxes = sceneSessionApi && typeof sceneSessionApi.getBoxes === 'function'
+      ? (sceneSessionApi.getBoxes() || []).length
+      : ((typeof boxes !== 'undefined' && Array.isArray(boxes)) ? boxes.length : 0);
+    emitSceneCommitProfile({
+      reason: requestSource,
+      commitPath: commitPath,
+      instancesBefore: Number(beforeInstances || 0),
+      instancesAfter: Number(afterInstances || 0),
+      boxesBefore: Number(beforeBoxes || 0),
+      boxesAfter: Number(afterBoxes || 0),
+      replaceSceneGraphMs: Number(replaceSceneGraphMs.toFixed(3)),
+      replaceInstancesMs: Number(replaceInstancesMs.toFixed(3)),
+      syncDerivedStateMs: Number(syncDerivedStateMs.toFixed(3)),
+      totalMs: Number(Math.max(0, controllerPerfNowMs() - totalStartAt).toFixed(3))
+    });
+    return ok;
+  }
+
+
+  function readCurrentSceneBoxes() {
+    var sceneSessionApi = getSceneSessionApi();
+    if (sceneSessionApi && typeof sceneSessionApi.getBoxes === 'function') return sceneSessionApi.getBoxes().slice();
+    return (typeof boxes !== 'undefined' && Array.isArray(boxes)) ? boxes.slice() : [];
+  }
+
+  function replaceCurrentSceneGraph(nextInstances, nextBoxes, source) {
+    var requestSource = String(source || 'terrain:replace-scene-graph');
+    var sceneSessionApi = getSceneSessionApi();
+    var sceneGraphApi = getSceneGraphApi();
+    var totalStartAt = controllerPerfNowMs();
+    var beforeInstances = sceneSessionApi && typeof sceneSessionApi.getInstances === 'function'
+      ? (sceneSessionApi.getInstances() || []).length
+      : ((typeof instances !== 'undefined' && Array.isArray(instances)) ? instances.length : 0);
+    var beforeBoxes = sceneSessionApi && typeof sceneSessionApi.getBoxes === 'function'
+      ? (sceneSessionApi.getBoxes() || []).length
+      : ((typeof boxes !== 'undefined' && Array.isArray(boxes)) ? boxes.length : 0);
+    var replaceSceneGraphMs = 0;
+    var replaceInstancesMs = 0;
+    var syncDerivedStateMs = 0;
+    var commitPath = 'scene-graph.replaceSceneGraph';
+    var ok = false;
+    if (sceneGraphApi && typeof sceneGraphApi.replaceSceneGraph === 'function' && Array.isArray(nextBoxes)) {
+      var replaceSceneStartAt = controllerPerfNowMs();
+      sceneGraphApi.replaceSceneGraph({ instances: Array.isArray(nextInstances) ? nextInstances : [], boxes: nextBoxes }, { source: requestSource });
+      replaceSceneGraphMs = Math.max(0, controllerPerfNowMs() - replaceSceneStartAt);
+      ok = true;
+    }
+    if (!ok) return replaceCurrentSceneInstances(nextInstances, requestSource + ':fallback-replaceInstances');
+    var afterInstances = sceneSessionApi && typeof sceneSessionApi.getInstances === 'function'
+      ? (sceneSessionApi.getInstances() || []).length
+      : ((typeof instances !== 'undefined' && Array.isArray(instances)) ? instances.length : 0);
+    var afterBoxes = sceneSessionApi && typeof sceneSessionApi.getBoxes === 'function'
+      ? (sceneSessionApi.getBoxes() || []).length
+      : ((typeof boxes !== 'undefined' && Array.isArray(boxes)) ? boxes.length : 0);
+    emitSceneCommitProfile({
+      reason: requestSource,
+      commitPath: commitPath,
+      instancesBefore: Number(beforeInstances || 0),
+      instancesAfter: Number(afterInstances || 0),
+      boxesBefore: Number(beforeBoxes || 0),
+      boxesAfter: Number(afterBoxes || 0),
+      replaceSceneGraphMs: Number(replaceSceneGraphMs.toFixed(3)),
+      replaceInstancesMs: Number(replaceInstancesMs.toFixed(3)),
+      syncDerivedStateMs: Number(syncDerivedStateMs.toFixed(3)),
+      totalMs: Number(Math.max(0, controllerPerfNowMs() - totalStartAt).toFixed(3))
+    });
+    return true;
   }
 
   function buildManualColumnHeightMapFromBoxes(inputBoxes, width, height) {
@@ -1976,8 +2110,188 @@
     });
   }
 
+
+  function buildTerrainInstancesAndBoxesFromPlacementPlanRange(plan, startIndex, count, batchId, terrainSettings, heightMap, semanticMeta, startingBoxId) {
+    var map = Array.isArray(heightMap) ? heightMap : [];
+    var list = Array.isArray(plan) ? plan : [];
+    var safeStart = Math.max(0, Math.round(Number(startIndex) || 0));
+    var safeCount = Math.max(0, Math.round(Number(count) || 0));
+    var outInstances = [];
+    var outBoxes = [];
+    var nextBoxId = Math.max(1, Math.round(Number(startingBoxId) || 1));
+    var semantic = semanticMeta && typeof semanticMeta === 'object' ? semanticMeta : buildTerrainInstanceSemanticMetadata(terrainSettings);
+    for (var i = 0; i < safeCount && (safeStart + i) < list.length; i++) {
+      var step = list[safeStart + i] || {};
+      var x = Number(step.x) || 0;
+      var y = Number(step.y) || 0;
+      var z = Number(step.z) || 0;
+      var targetHeight = Array.isArray(map[x]) ? Number(map[x][y] || 0) : 0;
+      var instanceId = String(batchId || 'terrain') + ':' + String(x) + ':' + String(y) + ':' + String(z);
+      var baseColor = getTerrainBlockBaseColor(targetHeight, terrainSettings);
+      var instance = {
+        instanceId: instanceId,
+        prefabId: 'cube_1x1',
+        x: x,
+        y: y,
+        z: z,
+        rotation: 0,
+        name: 'Terrain Block',
+        generatedBy: 'terrain-generator',
+        terrainBatchId: batchId || null,
+        terrainCellX: Number(step.terrainCellX) || 0,
+        terrainCellY: Number(step.terrainCellY) || 0,
+        semanticTextureMap: semantic.semanticTextureMap || null,
+        semanticFaceColors: semantic.semanticFaceColors || null,
+        base: baseColor,
+        renderUpdateMode: 'static'
+      };
+      outInstances.push(instance);
+      outBoxes.push({
+        id: nextBoxId + i,
+        instanceId: instanceId,
+        prefabId: 'cube_1x1',
+        name: 'Terrain Block',
+        x: x,
+        y: y,
+        z: z,
+        w: 1,
+        d: 1,
+        h: 1,
+        base: baseColor,
+        generatedBy: 'terrain-generator',
+        terrainBatchId: batchId || null,
+        terrainCellX: Number(step.terrainCellX) || 0,
+        terrainCellY: Number(step.terrainCellY) || 0,
+        semanticTextureMap: semantic.semanticTextureMap || null,
+        semanticTextures: null,
+        semanticFaceColors: semantic.semanticFaceColors || null,
+        renderUpdateMode: 'static',
+        rotation: 0,
+        localIndex: 0
+      });
+    }
+    return { instances: outInstances, boxes: outBoxes };
+  }
+
+  function beginTerrainApplyJob(job) {
+    __pendingTerrainApplyJob = job || null;
+    return __pendingTerrainApplyJob;
+  }
+
+  function finalizePendingTerrainApplyJob(job, source) {
+    var sceneSessionApi = getSceneSessionApi();
+    var summary = job && job.summary ? Object.assign({}, job.summary, { appliedVoxelCount: job.appliedInstances.length, applyInProgress: false }) : null;
+    if (job) {
+      applyTerrainRuntimeModel({
+        activeTerrainBatchId: job.batchId,
+        width: job.normalizedParams.width,
+        height: job.normalizedParams.height,
+        heightMap: job.generated.heightMap,
+        existingHeightMap: job.occupancySummary.existingHeightMap,
+        materialMap: null,
+        editDiff: {},
+        params: job.normalizedParams,
+        lastSummary: summary,
+        terrainUsesColumnModel: false,
+        terrainExpandedVoxelInstanceCount: job.appliedInstances.length,
+        terrainOwnedDeltaBlockCount: job.worldIntegration.terrainOwnedDeltaBlockCount,
+        existingManualBlockCount: job.occupancySummary.manualBlockCount,
+        overlappingColumnCount: job.worldIntegration.overlappingColumnCount,
+        mergedWithExistingOccupancy: true,
+        stackedOnExistingBlocks: job.worldIntegration.stackedOnExistingBlocks,
+        chunkSize: 16,
+        dirtyChunkKeys: [],
+        terrainChunkCacheVersion: Number((getTerrainRuntimeModel() && getTerrainRuntimeModel().terrainChunkCacheVersion) || 0) + 1
+      }, String(source || job.source || 'terrain:apply-complete') + ':runtime-model');
+      applyTerrainBatchState({ activeTerrainBatchId: job.batchId, lastSummary: summary }, String(source || job.source || 'terrain:apply-complete') + ':runtime');
+      job.profile.terrainGeneratedInstanceCount = Number(job.appliedInstances.length || 0);
+      job.profile.finalInstanceCountAfter = Number(readCurrentSceneInstances().length || 0);
+      job.profile.finalBoxCountAfter = Number(sceneSessionApi && typeof sceneSessionApi.getBoxes === 'function' ? ((sceneSessionApi.getBoxes() || []).length) : readCurrentSceneBoxes().length);
+      job.profile.timings.sceneCommitMs = Number(job.sceneCommitMsTotal.toFixed(3));
+      job.profile.timings.totalMs = Number(Math.max(0, controllerPerfNowMs() - job.startedAt).toFixed(3));
+      emitTerrainGenerateProfile(job.profile);
+      recordTerrainDiagnostic('terrain-generator-apply-complete', {
+        terrainBatchId: job.batchId,
+        appliedTerrainInstanceCount: job.appliedInstances.length,
+        plannedTerrainInstanceCount: job.terrainPlacementPlan.length,
+        source: source || job.source || 'terrain:apply-complete'
+      });
+      if (typeof refreshInspectorPanels === 'function') { try { refreshInspectorPanels(); } catch (_) {} }
+      if (typeof updatePreview === 'function') { try { updatePreview(); } catch (_) {} }
+    }
+    __pendingTerrainApplyJob = null;
+    return summary;
+  }
+
+  function tickMainEditorTerrainApply(now, source) {
+    var job = __pendingTerrainApplyJob;
+    if (!job) return null;
+    var sceneSessionApi = getSceneSessionApi();
+    var requestSource = String(source || 'terrain:apply-batch');
+    var remaining = Math.max(0, job.terrainPlacementPlan.length - job.nextPlanIndex);
+    if (remaining <= 0) return finalizePendingTerrainApplyJob(job, requestSource + ':complete');
+    var batchCount = Math.min(job.batchSize, remaining);
+    var range = sceneSessionApi && typeof sceneSessionApi.allocateBoxIdRange === 'function'
+      ? sceneSessionApi.allocateBoxIdRange(batchCount, { source: requestSource + ':allocate-box-range' })
+      : { start: job.nextBoxId, count: batchCount };
+    var startingBoxId = range && Number.isFinite(Number(range.start)) ? Number(range.start) : job.nextBoxId;
+    var materializeStartAt = controllerPerfNowMs();
+    var built = buildTerrainInstancesAndBoxesFromPlacementPlanRange(job.terrainPlacementPlan, job.nextPlanIndex, batchCount, job.batchId, job.normalizedParams, job.generated.heightMap, job.semanticMeta, startingBoxId);
+    var materializeMs = Math.max(0, controllerPerfNowMs() - materializeStartAt);
+    var nextInstances = job.survivors.concat(job.appliedInstances, built.instances);
+    var nextBoxes = job.survivorsBoxes.concat(job.appliedBoxes, built.boxes);
+    var commitStartAt = controllerPerfNowMs();
+    replaceCurrentSceneGraph(nextInstances, nextBoxes, requestSource + ':scene-graph');
+    var commitMs = Math.max(0, controllerPerfNowMs() - commitStartAt);
+    Array.prototype.push.apply(job.appliedInstances, built.instances);
+    Array.prototype.push.apply(job.appliedBoxes, built.boxes);
+    job.nextPlanIndex += built.instances.length;
+    job.nextBoxId = startingBoxId + built.boxes.length;
+    job.materializeMsTotal += materializeMs;
+    job.sceneCommitMsTotal += commitMs;
+    var appliedCount = job.appliedInstances.length;
+    var summary = Object.assign({}, job.summary, { appliedVoxelCount: appliedCount, applyInProgress: appliedCount < job.terrainPlacementPlan.length });
+    job.summary = summary;
+    applyTerrainRuntimeModel({
+      activeTerrainBatchId: job.batchId,
+      width: job.normalizedParams.width,
+      height: job.normalizedParams.height,
+      heightMap: job.generated.heightMap,
+      existingHeightMap: job.occupancySummary.existingHeightMap,
+      materialMap: null,
+      editDiff: {},
+      params: job.normalizedParams,
+      lastSummary: summary,
+      terrainUsesColumnModel: false,
+      terrainExpandedVoxelInstanceCount: appliedCount,
+      terrainOwnedDeltaBlockCount: job.worldIntegration.terrainOwnedDeltaBlockCount,
+      existingManualBlockCount: job.occupancySummary.manualBlockCount,
+      overlappingColumnCount: job.worldIntegration.overlappingColumnCount,
+      mergedWithExistingOccupancy: true,
+      stackedOnExistingBlocks: job.worldIntegration.stackedOnExistingBlocks,
+      chunkSize: 16,
+      dirtyChunkKeys: []
+    }, requestSource + ':runtime-model');
+    applyTerrainBatchState({ activeTerrainBatchId: job.batchId, lastSummary: summary }, requestSource + ':runtime');
+    if (isDetailedTerrainProfilingEnabledForController()) {
+      recordTerrainDiagnostic('terrain-generator-apply-batch', {
+        terrainBatchId: job.batchId,
+        appliedTerrainInstanceCount: appliedCount,
+        batchCount: built.instances.length,
+        batchIndexStart: job.nextPlanIndex - built.instances.length,
+        batchIndexEndExclusive: job.nextPlanIndex,
+        remainingTerrainInstanceCount: Math.max(0, job.terrainPlacementPlan.length - job.nextPlanIndex),
+        materializeMs: Number(materializeMs.toFixed(3)),
+        sceneCommitMs: Number(commitMs.toFixed(3))
+      });
+    }
+    if (job.nextPlanIndex >= job.terrainPlacementPlan.length) return finalizePendingTerrainApplyJob(job, requestSource + ':complete');
+    return summary;
+  }
+
   function clearMainEditorTerrain(source) {
     var requestSource = String(source || 'terrain:clear');
+    cancelPendingTerrainApplyJob(requestSource + ':cancel-pending');
     var current = readCurrentSceneInstances();
     var removedLegacy = current.filter(isTerrainGeneratedInstance);
     var survivors = current.filter(function (inst) { return !isTerrainGeneratedInstance(inst); });
@@ -2003,12 +2317,37 @@
 
   function generateMainEditorTerrain(source) {
     var requestSource = String(source || 'terrain:generate');
+    cancelPendingTerrainApplyJob(requestSource + ':cancel-pending');
     var terrainCore = getTerrainGeneratorCoreApi();
     if (!terrainCore || typeof terrainCore.generateHeightMap !== 'function' || typeof terrainCore.heightMapToVoxelStacks !== 'function') {
       return { ok: false, reason: 'missing-terrain-generator-core' };
     }
+    var terrainProfileStartAt = controllerPerfNowMs();
+    var terrainProfile = {
+      terrainBatchId: null,
+      width: 0,
+      height: 0,
+      heightMapCellCount: 0,
+      terrainPlacementPlanLength: 0,
+      terrainGeneratedInstanceCount: 0,
+      survivorsCount: 0,
+      existingInstanceCountBefore: 0,
+      existingBoxCountBefore: 0,
+      finalInstanceCountAfter: 0,
+      finalBoxCountAfter: 0,
+      timings: {
+        buildHeightMapMs: 0,
+        buildOccupancySummaryMs: 0,
+        buildPlacementPlanMs: 0,
+        buildTerrainInstancesMs: 0,
+        clearLegacyCommitMs: 0,
+        sceneCommitMs: 0,
+        totalMs: 0
+      }
+    };
     var currentSettings = getMainEditorTerrainSettings(requestSource);
     var runtimeApi = getRuntimeStateApi();
+    var sceneSessionApi = getSceneSessionApi();
     var gridW = runtimeApi && runtimeApi.settings ? Number(runtimeApi.settings.gridW || runtimeApi.settings.worldCols || currentSettings.width || 1) : Number(currentSettings.width || 1);
     var gridH = runtimeApi && runtimeApi.settings ? Number(runtimeApi.settings.gridH || runtimeApi.settings.worldRows || currentSettings.height || 1) : Number(currentSettings.height || 1);
     var requestedParams = Object.assign({}, currentSettings, {
@@ -2016,6 +2355,8 @@
       height: Math.max(1, Math.min(Math.round(Number(currentSettings.height) || 1), Math.max(1, Math.round(gridH) || 1)))
     });
     var normalizedParams = terrainCore.normalizeTerrainParams ? terrainCore.normalizeTerrainParams(requestedParams) : requestedParams;
+    terrainProfile.width = Number(normalizedParams.width || 0);
+    terrainProfile.height = Number(normalizedParams.height || 0);
     recordTerrainDiagnostic('terrain-generator-params', {
       seed: normalizedParams.seed,
       width: normalizedParams.width,
@@ -2034,22 +2375,41 @@
       waterLevel: normalizedParams.waterLevel,
       heightProfileConfig: normalizedParams.heightProfileConfig
     });
+    var current = readCurrentSceneInstances();
+    terrainProfile.existingInstanceCountBefore = Number(current.length || 0);
+    terrainProfile.existingBoxCountBefore = Number(sceneSessionApi && typeof sceneSessionApi.getBoxes === 'function'
+      ? ((sceneSessionApi.getBoxes() || []).length)
+      : ((typeof boxes !== 'undefined' && Array.isArray(boxes)) ? boxes.length : 0));
+    var buildHeightMapStartAt = controllerPerfNowMs();
     var generated = terrainCore.generateHeightMap(normalizedParams);
     var stacks = terrainCore.heightMapToVoxelStacks(generated);
-    var current = readCurrentSceneInstances();
+    terrainProfile.timings.buildHeightMapMs = Number(Math.max(0, controllerPerfNowMs() - buildHeightMapStartAt).toFixed(3));
+    terrainProfile.heightMapCellCount = Number((Array.isArray(generated && generated.heightMap) ? generated.heightMap.length : 0) && Array.isArray(generated && generated.heightMap && generated.heightMap[0])
+      ? (generated.heightMap.length * generated.heightMap[0].length)
+      : (normalizedParams.width * normalizedParams.height));
     var survivors = current.filter(function (inst) { return !isTerrainGeneratedInstance(inst); });
+    terrainProfile.survivorsCount = Number(survivors.length || 0);
+    var clearLegacyCommitStartAt = controllerPerfNowMs();
     replaceCurrentSceneInstances(survivors, requestSource + ':clear-legacy');
+    terrainProfile.timings.clearLegacyCommitMs = Number(Math.max(0, controllerPerfNowMs() - clearLegacyCommitStartAt).toFixed(3));
     var manualBoxes = (typeof boxes !== 'undefined' && Array.isArray(boxes)) ? boxes.filter(function (box) { return !(box && box.generatedBy === 'terrain-generator'); }) : [];
+    var occupancySummaryStartAt = controllerPerfNowMs();
     var occupancySummary = buildManualColumnHeightMapFromBoxes(manualBoxes, normalizedParams.width, normalizedParams.height);
     var worldIntegration = summarizeTerrainWorldIntegration(generated.heightMap, occupancySummary.existingHeightMap);
+    terrainProfile.timings.buildOccupancySummaryMs = Number(Math.max(0, controllerPerfNowMs() - occupancySummaryStartAt).toFixed(3));
     var batchId = allocateTerrainBatchId(requestSource);
+    terrainProfile.terrainBatchId = batchId;
     var terrainRuntime = getTerrainRuntimeModel();
+    var buildPlacementPlanStartAt = controllerPerfNowMs();
     var terrainPlacementPlan = buildTerrainPlacementPlan(generated.heightMap, occupancySummary.existingHeightMap);
-    var terrainInstances = buildTerrainInstancesFromPlacementPlan(terrainPlacementPlan, batchId, normalizedParams, generated.heightMap);
-    replaceCurrentSceneInstances(survivors.concat(terrainInstances), requestSource + ':apply-placement-plan');
+    terrainProfile.timings.buildPlacementPlanMs = Number(Math.max(0, controllerPerfNowMs() - buildPlacementPlanStartAt).toFixed(3));
+    terrainProfile.terrainPlacementPlanLength = Number(terrainPlacementPlan.length || 0);
+    terrainProfile.terrainGeneratedInstanceCount = Number(terrainPlacementPlan.length || 0);
     var summary = {
       generatedCellCount: stacks.generatedCellCount,
-      generatedVoxelCount: stacks.generatedVoxelCount,
+      generatedVoxelCount: terrainPlacementPlan.length,
+      appliedVoxelCount: 0,
+      applyInProgress: terrainPlacementPlan.length > 0,
       minHeightObserved: generated.minHeightObserved,
       maxHeightObserved: generated.maxHeightObserved,
       avgHeightObserved: generated.avgHeightObserved,
@@ -2058,6 +2418,7 @@
       existingManualBlockCount: occupancySummary.manualBlockCount,
       overlappingColumnCount: worldIntegration.overlappingColumnCount
     };
+    var survivorsBoxes = readCurrentSceneBoxes();
     applyTerrainRuntimeModel({
       activeTerrainBatchId: batchId,
       width: normalizedParams.width,
@@ -2069,7 +2430,7 @@
       params: normalizedParams,
       lastSummary: summary,
       terrainUsesColumnModel: false,
-      terrainExpandedVoxelInstanceCount: terrainInstances.length,
+      terrainExpandedVoxelInstanceCount: 0,
       terrainOwnedDeltaBlockCount: worldIntegration.terrainOwnedDeltaBlockCount,
       existingManualBlockCount: occupancySummary.manualBlockCount,
       overlappingColumnCount: worldIntegration.overlappingColumnCount,
@@ -2080,6 +2441,28 @@
       terrainChunkCacheVersion: Number((terrainRuntime && terrainRuntime.terrainChunkCacheVersion) || 0) + 1
     }, requestSource + ':runtime-model');
     applyTerrainBatchState({ activeTerrainBatchId: batchId, lastSummary: summary }, requestSource + ':runtime');
+    beginTerrainApplyJob({
+      batchId: batchId,
+      source: requestSource,
+      normalizedParams: normalizedParams,
+      generated: generated,
+      occupancySummary: occupancySummary,
+      worldIntegration: worldIntegration,
+      terrainPlacementPlan: terrainPlacementPlan,
+      survivors: survivors,
+      survivorsBoxes: survivorsBoxes,
+      appliedInstances: [],
+      appliedBoxes: [],
+      nextPlanIndex: 0,
+      nextBoxId: 1,
+      semanticMeta: buildTerrainInstanceSemanticMetadata(normalizedParams),
+      batchSize: TERRAIN_APPLY_BATCH_INSTANCE_COUNT,
+      summary: summary,
+      startedAt: terrainProfileStartAt,
+      materializeMsTotal: 0,
+      sceneCommitMsTotal: terrainProfile.timings.clearLegacyCommitMs,
+      profile: terrainProfile
+    });
     recordTerrainDiagnostic('terrain-world-integration-summary', {
       terrainBatchId: batchId,
       terrainTargetColumnCount: worldIntegration.terrainTargetColumnCount,
@@ -2092,7 +2475,7 @@
     recordTerrainDiagnostic('terrain-logic-summary', {
       terrainCellCount: normalizedParams.width * normalizedParams.height,
       terrainColumnCount: stacks.generatedCellCount,
-      terrainExpandedVoxelInstanceCount: terrainInstances.length,
+      terrainExpandedVoxelInstanceCount: terrainPlacementPlan.length,
       terrainUsesColumnModel: false
     });
     recordTerrainDiagnostic('terrain-placement-unification-check', {
@@ -2102,7 +2485,7 @@
       terrainUsesDedicatedGeometryPath: false,
       terrainUsesDedicatedCameraPath: false,
       terrainPlacementPlanLength: terrainPlacementPlan.length,
-      terrainGeneratedInstanceCount: terrainInstances.length,
+      terrainGeneratedInstanceCount: terrainPlacementPlan.length,
       terrainBatchId: batchId
     });
     recordTerrainDiagnostic('terrain-debug-face-unification-check', {
@@ -2134,16 +2517,22 @@
     recordTerrainDiagnostic('terrain-generator-summary', summary);
     recordTerrainDiagnostic('terrain-generator-apply', {
       terrainBatchId: batchId,
-      terrainInstanceCount: terrainInstances.length,
-      terrainVoxelCount: terrainInstances.length,
+      terrainInstanceCount: terrainPlacementPlan.length,
+      terrainVoxelCount: terrainPlacementPlan.length,
       appliedToMainEditor: true,
       appliedAsPlacementPlan: true,
-      appliedThroughSharedBlockPipeline: true
+      appliedThroughSharedBlockPipeline: true,
+      applyMode: 'batched'
     });
-    invalidateMainEditorTerrainRenderCaches(requestSource + ':invalidate');
+    terrainProfile.timings.totalMs = Number(Math.max(0, controllerPerfNowMs() - terrainProfileStartAt).toFixed(3));
+    emitTerrainGenerateProfile(Object.assign({}, terrainProfile, {
+      finalInstanceCountAfter: Number(readCurrentSceneInstances().length || 0),
+      finalBoxCountAfter: Number(readCurrentSceneBoxes().length || 0),
+      generateQueued: true
+    }));
     if (typeof refreshInspectorPanels === 'function') { try { refreshInspectorPanels(); } catch (_) {} }
     if (typeof updatePreview === 'function') { try { updatePreview(); } catch (_) {} }
-    return Object.assign({ ok: true }, summary, { terrainInstanceCount: terrainInstances.length, terrainVoxelCount: terrainInstances.length, terrainUsesColumnModel: false });
+    return Object.assign({ ok: true }, summary, { terrainInstanceCount: terrainPlacementPlan.length, terrainVoxelCount: terrainPlacementPlan.length, terrainUsesColumnModel: false, applyMode: 'batched' });
   }
 
 
@@ -2178,6 +2567,7 @@
     resetMainEditorTerrainSettings: resetMainEditorTerrainSettings,
     generateMainEditorTerrain: generateMainEditorTerrain,
     clearMainEditorTerrain: clearMainEditorTerrain,
+    tickMainEditorTerrainApply: tickMainEditorTerrainApply,
     resetMainEditorViewRotation: resetMainEditorViewRotation,
     setMainEditorViewRotation: setMainEditorViewRotation,
     rotateMainEditorView: rotateMainEditorView,
@@ -2267,7 +2657,7 @@
     owner: 'src/application/controllers/app-controllers.js',
     roots: ['controllers.main', 'controllers.scene', 'controllers.assetLibrary', 'controllers.placement', 'controllers.editorHandoff', 'controllers.dispatch'],
     functions: {
-      main: ['summarizeBoundary','resetBoundaryAudit','openEditorFromMain', 'handleOpenEditorButton', 'requestModeChange', 'runAssetScan', 'handleRescanAssetsButton', 'saveSceneTarget', 'loadSceneTarget', 'getMainEditorViewRotation', 'getMainEditorCameraSettings', 'getMainEditorVisualRotation', 'isMainEditorViewRotating', 'tickMainEditorViewRotationAnimation', 'completeMainEditorViewRotationAnimation', 'setMainEditorRotationAnimationEnabled', 'setMainEditorRotationAnimationMs', 'setMainEditorRotationInterpolationEnabled', 'setMainEditorRotationInterpolationMode', 'setMainEditorZoom', 'setMainEditorZoomBounds', 'setMainEditorCameraCullingEnabled', 'setMainEditorCullingMargin', 'setMainEditorShowCameraBounds', 'setMainEditorShowCullingBounds', 'getMainEditorTerrainSettings', 'setMainEditorTerrainSettings', 'resetMainEditorTerrainSettings', 'generateMainEditorTerrain', 'clearMainEditorTerrain', 'resetMainEditorViewRotation', 'setMainEditorViewRotation', 'rotateMainEditorView', 'exportMainViewRotationDiagnostic', 'dispatch'],
+      main: ['summarizeBoundary','resetBoundaryAudit','openEditorFromMain', 'handleOpenEditorButton', 'requestModeChange', 'runAssetScan', 'handleRescanAssetsButton', 'saveSceneTarget', 'loadSceneTarget', 'getMainEditorViewRotation', 'getMainEditorCameraSettings', 'getMainEditorVisualRotation', 'isMainEditorViewRotating', 'tickMainEditorViewRotationAnimation', 'completeMainEditorViewRotationAnimation', 'setMainEditorRotationAnimationEnabled', 'setMainEditorRotationAnimationMs', 'setMainEditorRotationInterpolationEnabled', 'setMainEditorRotationInterpolationMode', 'setMainEditorZoom', 'setMainEditorZoomBounds', 'setMainEditorCameraCullingEnabled', 'setMainEditorCullingMargin', 'setMainEditorShowCameraBounds', 'setMainEditorShowCullingBounds', 'getMainEditorTerrainSettings', 'setMainEditorTerrainSettings', 'resetMainEditorTerrainSettings', 'generateMainEditorTerrain', 'clearMainEditorTerrain', 'tickMainEditorTerrainApply', 'resetMainEditorViewRotation', 'setMainEditorViewRotation', 'rotateMainEditorView', 'exportMainViewRotationDiagnostic', 'dispatch'],
       scene: ['saveSceneTarget', 'loadSceneTarget', 'saveLocalScene', 'loadLocalScene', 'saveSceneFile', 'openDefaultScene', 'importSceneFile', 'dispatch'],
       assetLibrary: ['openHabboLibrary', 'handleOpenBrowserClick', 'handleRefreshBrowserClick', 'handleTypeSwitch', 'handleCategorySelect', 'handleSearchInput', 'handlePageAction', 'handlePlaceSelectedItem', 'runAssetScan', 'dispatch'],
       placement: ['requestModeChange', 'handleModeButton', 'selectPrefabByIndex', 'selectPrefabById', 'handlePrefabSelectChange', 'applyPlacementIntent', 'getPreviewFacing', 'setPreviewFacing', 'rotatePreviewFacing', 'rotatePreviewFacingByWheel', 'startDragging', 'commitPreview', 'cancelDrag', 'completeDragInteraction', 'syncPlacementUi', 'summarizeRoutes', 'resetRouteAudit', 'dispatch'],

@@ -58,6 +58,7 @@
             <button id="clearLog">清空日志</button>
             <button id="downloadLog">下载日志</button>
           </div>
+          <label><input id="terrainDetailedProfilingEnabled" type="checkbox"> 生成详细地形日志（默认关闭）</label>
           <div class="rowButtons rowButtons2">
             <button id="runSelfCheck">运行自检并保存报告</button>
             <button id="downloadSelfCheckReport">下载最近自检报告</button>
@@ -285,6 +286,14 @@
           <h2>调试显示 / Debug</h2>
           <label><input id="terrainDebugFaceColorsEnabled" type="checkbox"> Terrain Semantic Edge Colors</label>
           <div class="hintBox">开启后，terrain 使用原方块语义面的调试颜色；关闭后恢复自然地形颜色。</div>
+          <label>Terrain Build Color Mode
+            <select id="terrainBuildColorMode">
+              <option value="natural">natural</option>
+              <option value="flat_debug">flat_debug</option>
+            </select>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;"><input id="terrainBuildLightingBypass" type="checkbox"> Terrain Build Lighting Bypass</label>
+          <div class="hintBox">这两个开关直接作用于 chunk rebuild 阶段的 buildColor 热路径，用于比较 natural / flat_debug 与 lighting bypass 对 step4_buildColorMs 的影响。</div>
         </div>
 
         <div class="group inspectorGroup">
@@ -533,6 +542,7 @@
   <script src="src/presentation/ui/ui-habbo-library.js"></script>
   <script src="src/presentation/ui/ui.js"></script>
   <script src="src/presentation/render/logic.js"></script>
+  <script src="src/presentation/render/static-world-cache.js"></script>
   <script src="src/presentation/render/render.js"></script>
   <script src="src/presentation/render/renderer/canvas2d-renderer.js"></script>
   <script src="src/presentation/shell/app-shell.js"></script>

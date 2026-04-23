@@ -22,7 +22,7 @@
       scope: 'main-runtime',
       owner: 'src/core/state/prefab-registry.js',
       roots: ['App.state.prefabRegistry'],
-      keys: ['prototypes', 'normalizePrefab', 'ensurePrefabRegistered', 'getPrefabById', 'prefabVariant'],
+      keys: ['prototypes', 'normalizePrefab', 'normalizeRenderUpdateMode', 'getPrefabRenderUpdateMode', 'ensurePrefabRegistered', 'getPrefabById', 'prefabVariant'],
       writeApis: ['registerPrefab', 'replacePrefabById', 'setSelectedPrototypeIndex', 'setSelectedPrefabId', 'refreshPrototypeSelection'],
       readPaths: ['App.state.prefabRegistry.getPrototypes()', 'App.state.prefabRegistry.summarize()', 'App.state.selectors.getSelectedPrefab()', 'App.state.selectors.getSelectedPrefabViewModel()'],
       notes: '编辑器回流、Habbo 导入、asset 扫描的高频 prefab 写路径已开始统一。'

@@ -1763,6 +1763,7 @@ async function buildHabboPrefabDefinition(runtime, options) {
     asset: options.asset || (safeType + '.swf'),
     base: base,
     renderMode: (spriteDirections || habboLayerDirections) ? 'sprite_proxy' : 'hybrid',
+    renderUpdateMode: 'dynamic',
     anchor: floorAnchor,
     voxels: makeRectVoxels(proxyDims.x, proxyDims.y, proxyDims.z, base),
     sprite: spriteDirections && spriteDirections['0'] ? Object.assign({}, spriteDirections['0']) : null,

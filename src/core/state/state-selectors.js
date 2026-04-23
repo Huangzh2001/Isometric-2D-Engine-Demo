@@ -168,6 +168,7 @@
       id: String(selected.id || ''),
       name: String(selected.name || selected.id || ''),
       renderMode: String(selected.renderMode || 'voxel'),
+      renderUpdateMode: String(selected.renderUpdateMode || 'static'),
       voxels: Array.isArray(selected.voxels) ? selected.voxels.length : 0,
       dims: { w: Number(selected.w) || 0, d: Number(selected.d) || 0, h: Number(selected.h) || 0 },
       custom: !!selected.custom,

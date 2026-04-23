@@ -362,7 +362,7 @@ function isMainEditorViewAnimatingForLogic() {
   return false;
 }
 
-function getMainEditorViewRotationValue() {
+function getSafeMainEditorViewRotationValue() {
 try {
   var controller = window.App && window.App.controllers ? window.App.controllers.main || null : null;
   if (controller && typeof controller.getMainEditorVisualRotation === 'function') return ((Number(controller.getMainEditorVisualRotation('presentation.render.logic')) || 0) % 4 + 4) % 4;
@@ -395,7 +395,7 @@ return prefabVariant(p, (editor && typeof editor.previewFacing === 'number') ? e
 function iso(x, y, z = 0) {
 var api = getMainViewRotationCoreApi();
 if (api && typeof api.worldToScreenWithViewRotation === 'function') {
-  return api.worldToScreenWithViewRotation({ x: x, y: y, z: z }, getMainEditorViewRotationValue(), getMainViewProjectionConfig());
+  return api.worldToScreenWithViewRotation({ x: x, y: y, z: z }, getSafeMainEditorViewRotationValue(), getMainViewProjectionConfig());
 }
 return {
   x: settings.originX + camera.x + (x - y) * settings.tileW / 2,
@@ -406,7 +406,7 @@ return {
 function screenToFloor(sx, sy) {
 var api = getMainViewRotationCoreApi();
 if (api && typeof api.screenToWorldWithViewRotation === 'function') {
-  var world = api.screenToWorldWithViewRotation({ x: sx, y: sy, z: 0 }, getMainEditorViewRotationValue(), getMainViewProjectionConfig());
+  var world = api.screenToWorldWithViewRotation({ x: sx, y: sy, z: 0 }, getSafeMainEditorViewRotationValue(), getMainViewProjectionConfig());
   return { x: world.x, y: world.y };
 }
 var dx = (sx - settings.originX - camera.x) / (settings.tileW / 2);
@@ -533,7 +533,7 @@ function getMainCameraShadowSourceBoxes() {
 try {
   var cullingApi = typeof window !== 'undefined' ? window.__MAIN_CAMERA_CULLING_API__ : null;
   if (cullingApi && typeof cullingApi.getScope === 'function' && typeof cullingApi.filterBoxesForShadowSource === 'function') {
-    var rotation = getMainEditorViewRotationValue();
+    var rotation = getSafeMainEditorViewRotationValue();
     return cullingApi.filterBoxesForShadowSource(boxes, cullingApi.getScope(rotation));
   }
 } catch (_) {}
@@ -1561,7 +1561,7 @@ try {
 }
 }
 
-function getMainEditorViewRotationValue() {
+function getSafeMainEditorViewRotationValue() {
 try {
   var controller = window.App && window.App.controllers ? window.App.controllers.main || null : null;
   if (controller && typeof controller.getMainEditorVisualRotation === 'function') return ((Number(controller.getMainEditorVisualRotation('presentation.render.logic')) || 0) % 4 + 4) % 4;
@@ -1594,7 +1594,7 @@ return prefabVariant(p, (editor && typeof editor.previewFacing === 'number') ? e
 function iso(x, y, z = 0) {
 var api = getMainViewRotationCoreApi();
 if (api && typeof api.worldToScreenWithViewRotation === 'function') {
-  return api.worldToScreenWithViewRotation({ x: x, y: y, z: z }, getMainEditorViewRotationValue(), getMainViewProjectionConfig());
+  return api.worldToScreenWithViewRotation({ x: x, y: y, z: z }, getSafeMainEditorViewRotationValue(), getMainViewProjectionConfig());
 }
 return {
   x: settings.originX + camera.x + (x - y) * settings.tileW / 2,
@@ -1605,7 +1605,7 @@ return {
 function screenToFloor(sx, sy) {
 var api = getMainViewRotationCoreApi();
 if (api && typeof api.screenToWorldWithViewRotation === 'function') {
-  var world = api.screenToWorldWithViewRotation({ x: sx, y: sy, z: 0 }, getMainEditorViewRotationValue(), getMainViewProjectionConfig());
+  var world = api.screenToWorldWithViewRotation({ x: sx, y: sy, z: 0 }, getSafeMainEditorViewRotationValue(), getMainViewProjectionConfig());
   return { x: world.x, y: world.y };
 }
 var dx = (sx - settings.originX - camera.x) / (settings.tileW / 2);

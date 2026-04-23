@@ -62,23 +62,32 @@
     meta = meta || {};
     order = Array.isArray(order) ? order : [];
     var seenDrawHits = Object.create(null);
+    var drawStartAt = (typeof perfNow === 'function') ? perfNow() : Date.now();
+    var staticPacketCount = 0;
+    var dynamicRenderableCount = 0;
     adapterApi.__inDrawRenderableOrder = true;
     try {
       debugState.renderStep = 'draw-renderables';
       for (var i = 0; i < order.length; i++) {
         var r = order[i];
+        var isStaticWorldPacket = !!(r && r.kind === 'static-world-face-packet');
+        if (isStaticWorldPacket) staticPacketCount += 1;
+        else dynamicRenderableCount += 1;
         debugState.lastRenderable = String(i + 1) + '/' + String(order.length) + ':' + String((r && r.kind) || 'unknown') + ':' + String((r && r.id) || 'no-id');
         try {
-          if (r) {
+          if (r && !isStaticWorldPacket) {
             r.currentViewRotation = r.currentViewRotation != null ? r.currentViewRotation : ((meta && typeof meta.currentViewRotation === 'number') ? meta.currentViewRotation : (r.cacheViewRotation != null ? r.cacheViewRotation : 0));
             r.framePlanId = r.framePlanId || meta.framePlanId || null;
             r.__drawIndex = i;
           }
           if (r && typeof r.draw === 'function') r.draw();
           else if (r && r.kind === 'voxel') drawCachedVoxelRenderable(r);
+          else if (isStaticWorldPacket && typeof drawStaticWorldFacePacket === 'function') {
+            drawStaticWorldFacePacket(r);
+          }
           else throw new Error('missing draw for renderable ' + String(r && r.id));
           if (r && typeof drawFaceDebugOverlayRenderable === 'function') drawFaceDebugOverlayRenderable(r, i);
-          if (r && (r.instanceId || r.prefabId)) {
+          if (!isStaticWorldPacket && r && (r.instanceId || r.prefabId)) {
             var drawKey = [String(r.framePlanId || 'frameplan:none'), String(r.renderPath || r.kind || 'unknown'), String(r.instanceId || r.id || 'none')].join('|');
             if (!seenDrawHits[drawKey]) {
               seenDrawHits[drawKey] = true;
@@ -87,7 +96,7 @@
                 cacheViewRotation: r.cacheViewRotation != null ? Number(r.cacheViewRotation) : null,
                 instanceId: r.instanceId || null,
                 prefabId: r.prefabId || null,
-                renderPath: r.renderPath || (r.kind === 'voxel' ? 'static-cache' : 'dynamic-renderables'),
+                renderPath: r.renderPath || (r.kind === 'voxel' ? 'static-cache' : (r.kind === 'static-world-face-packet' ? 'static-world-chunk-cache' : 'dynamic-renderables')),
                 framePlanId: r.framePlanId || null,
                 cacheSignature: r.cacheSignature || null,
                 renderSourceId: r.id || null,
@@ -104,6 +113,36 @@
           throw err;
         }
       }
+      var drawMs = Number(Math.max(0, ((typeof perfNow === 'function') ? perfNow() : Date.now()) - drawStartAt).toFixed ? Math.max(0, ((typeof perfNow === 'function') ? perfNow() : Date.now()) - drawStartAt).toFixed(3) : Math.max(0, ((typeof perfNow === 'function') ? perfNow() : Date.now()) - drawStartAt));
+      try {
+        if (typeof __lastFrameDrawMs !== 'undefined') __lastFrameDrawMs = drawMs;
+        if (typeof __lastFrameDrawStats !== 'undefined') {
+          __lastFrameDrawStats = {
+            drawMs: drawMs,
+            renderableCount: Number(order.length || 0),
+            staticPacketCount: Number(staticPacketCount || 0),
+            dynamicRenderableCount: Number(dynamicRenderableCount || 0)
+          };
+        }
+        if (typeof maybeLogFrameWorkBreakdown === 'function' && typeof __lastMainRenderableBuildStats !== 'undefined' && __lastMainRenderableBuildStats) {
+          maybeLogFrameWorkBreakdown({
+            cameraX: Number(typeof camera !== 'undefined' && camera && camera.x || 0),
+            cameraY: Number(typeof camera !== 'undefined' && camera && camera.y || 0),
+            zoom: Number(__lastMainRenderableBuildStats.zoom || (typeof getMainEditorZoomValueForRender === 'function' ? getMainEditorZoomValueForRender() : 1)),
+            visibleChunkCount: Number(__lastMainRenderableBuildStats.visibleChunkCount || __lastMainRenderableBuildStats.visibleStaticChunkCount || 0),
+            visibleStaticChunkCount: Number(__lastMainRenderableBuildStats.visibleStaticChunkCount || 0),
+            visibleStaticPacketCount: Number(__lastMainRenderableBuildStats.visibleStaticPacketCount || 0),
+            staticPacketMergeMs: Number(__lastMainRenderableBuildStats.staticPacketMergeMs || 0),
+            staticPacketProjectMs: Number(__lastMainRenderableBuildStats.staticPacketProjectMs || 0),
+            staticPacketSortMs: Number(__lastMainRenderableBuildStats.staticPacketSortMs || 0),
+            staticPacketDrawPrepMs: Number(__lastMainRenderableBuildStats.staticPacketDrawPrepMs || 0),
+            dynamicObjectCount: Number(__lastMainRenderableBuildStats.dynamicObjectCount || 0),
+            dynamicObjectBuildMs: Number(__lastMainRenderableBuildStats.dynamicBuildMs || 0),
+            finalDrawMs: Number(drawMs || 0),
+            frameBuildMs: Number(__lastMainRenderableBuildStats.frameBuildMs || 0)
+          });
+        }
+      } catch (_) {}
       return order;
     } finally {
       adapterApi.__inDrawRenderableOrder = false;

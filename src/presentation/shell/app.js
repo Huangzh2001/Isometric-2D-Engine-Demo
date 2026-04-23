@@ -327,6 +327,9 @@ function loop(now) {
       if (mainController && typeof mainController.tickMainEditorViewRotationAnimation === 'function') {
         mainController.tickMainEditorViewRotationAnimation(now, 'src/presentation/shell/app.js:loop');
       }
+      if (mainController && typeof mainController.tickMainEditorTerrainApply === 'function') {
+        mainController.tickMainEditorTerrainApply(now, 'src/presentation/shell/app.js:loop');
+      }
     } catch (_) {}
     updateEndMs = perfNow();
     renderStartMs = perfNow();
