@@ -322,8 +322,16 @@ function logResolvedEntryInfo() {
   if (APP_ENTRY_INFO.href) detailLog('entry-info: href=' + APP_ENTRY_INFO.href);
 }
 
+function isCameraInteractionLogBufferActive() {
+  try {
+    return !!(typeof window !== 'undefined' && window.__CAMERA_INTERACTION_LOG_BUFFER_STATE && window.__CAMERA_INTERACTION_LOG_BUFFER_STATE.active);
+  } catch (_) {}
+  return false;
+}
+
 function flushDebugLogUI(force) {
   force = !!force;
+  if (!force && isCameraInteractionLogBufferActive()) return;
   var localUi = getLoggingUi();
   if (!localUi || !localUi.debugLog) return;
   var now = (typeof performance !== 'undefined' && typeof performance.now === 'function') ? performance.now() : Date.now();
@@ -335,6 +343,7 @@ function flushDebugLogUI(force) {
 }
 
 function scheduleDebugLogUIFlush() {
+  if (isCameraInteractionLogBufferActive()) return;
   if (logFlushScheduled) return;
   logFlushScheduled = true;
   var cb = function () { flushDebugLogUI(true); };
@@ -575,6 +584,7 @@ function pushStructuredShadowLog(tag, payload, force) {
 }
 
 function beginRenderFrameDebug(label, extra) {
+  if (isCameraInteractionLogBufferActive()) return;
   var frame = (typeof debugState !== 'undefined' && debugState && typeof debugState.frame === 'number') ? debugState.frame : -1;
   if (renderDebugState.lastFrame !== frame) {
     renderDebugState.lastFrame = frame;

@@ -605,15 +605,18 @@
 
   function addInstance(instance, meta) {
     if (!instance) return null;
+    var previousInstancesCount = Array.isArray(instances) ? instances.length : 0;
     instances.push(instance);
-    rebuildSceneBoxes('addInstance', meta);
+    var didApplyIncremental = appendInstanceBoxesIncrementally(instance, meta, { instancesBefore: previousInstancesCount });
+    if (!didApplyIncremental) rebuildSceneBoxes('addInstance', meta);
     recomputeDerivedIdentifiers('addInstance');
     recordWrite('addInstance', {
       source: meta && meta.source ? String(meta.source) : 'unknown',
       instanceId: instance.instanceId || null,
       prefabId: instance.prefabId || null,
       instances: instances.length,
-      boxes: boxes.length
+      boxes: boxes.length,
+      incremental: didApplyIncremental === true
     });
     return instance;
   }
@@ -660,20 +663,122 @@
     try { return window.__PLACEMENT_CORE_API__ || null; } catch (_) { return null; }
   }
 
+  function emitSceneCommitProfile(payload) {
+    var line = '[SCENE-COMMIT-PROFILE] ';
+    try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
+    try {
+      if (typeof pushLog === 'function') pushLog(line);
+      else if (typeof console !== 'undefined' && console.log) console.log(line);
+    } catch (_) {}
+    return line;
+  }
+
+  function getExpandInstanceToBoxesApi() {
+    try {
+      var placementCore = getPlacementCoreApi();
+      if (placementCore && typeof placementCore.expandInstanceToBoxes === 'function') return placementCore.expandInstanceToBoxes;
+    } catch (_) {}
+    try { if (typeof expandInstanceToBoxes === 'function') return expandInstanceToBoxes; } catch (_) {}
+    try { if (typeof window.expandInstanceToBoxes === 'function') return window.expandInstanceToBoxes; } catch (_) {}
+    return null;
+  }
+
+  function expandBoxesForOwnedMutation(instance, meta) {
+    if (!instance || typeof instance !== 'object') return [];
+    var expand = getExpandInstanceToBoxesApi();
+    if (typeof expand !== 'function') return [];
+    try {
+      return expand(instance, true, {
+        source: meta && meta.source ? String(meta.source) : 'scene-session:expandBoxesForOwnedMutation'
+      }) || [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function invalidateShadowsForSceneMutation(reason) {
+    try {
+      if (typeof invalidateShadowGeometryCache === 'function') invalidateShadowGeometryCache(reason || 'scene-session-mutation');
+    } catch (_) {}
+  }
+
+  function appendInstanceBoxesIncrementally(instance, meta, counts) {
+    var startAt = perfMs();
+    var previousBoxes = Array.isArray(boxes) ? boxes.slice() : [];
+    var addedBoxes = expandBoxesForOwnedMutation(instance, meta);
+    if (!Array.isArray(addedBoxes) || !addedBoxes.length) return false;
+    boxes = previousBoxes.concat(addedBoxes);
+    updateOccupancyCacheFromBoxDiff({
+      previousBoxes: previousBoxes,
+      nextBoxes: boxes,
+      reason: meta && meta.source ? String(meta.source) : 'scene-session:addInstance',
+      source: meta && meta.source ? String(meta.source) : 'scene-session:addInstance'
+    });
+    invalidateShadowsForSceneMutation(meta && meta.source ? String(meta.source) : 'scene-session:addInstance');
+    emitSceneCommitProfile({
+      reason: meta && meta.source ? String(meta.source) : 'scene-session:addInstance',
+      step: 'incrementalAddInstance',
+      instancesBefore: counts && typeof counts.instancesBefore === 'number' ? counts.instancesBefore : Math.max(0, Number(instances.length || 0) - 1),
+      instancesAfter: Number(instances.length || 0),
+      boxesBefore: Number(previousBoxes.length || 0),
+      boxesAfter: Number(boxes.length || 0),
+      addedBoxCount: Number(addedBoxes.length || 0),
+      occupancyUpdateMs: Number((occupancyCacheState.lastUpdate && occupancyCacheState.lastUpdate.durationMs) || 0),
+      totalMs: Number(Math.max(0, perfMs() - startAt).toFixed(3))
+    });
+    return true;
+  }
+
+  function removeInstanceBoxesIncrementally(instanceId, meta, counts) {
+    var startAt = perfMs();
+    var previousBoxes = Array.isArray(boxes) ? boxes.slice() : [];
+    if (!previousBoxes.length) return false;
+    var nextBoxes = previousBoxes.filter(function (box) { return !box || box.instanceId !== instanceId; });
+    if (nextBoxes.length === previousBoxes.length) return false;
+    boxes = nextBoxes;
+    updateOccupancyCacheFromBoxDiff({
+      previousBoxes: previousBoxes,
+      nextBoxes: boxes,
+      reason: meta && meta.source ? String(meta.source) : 'scene-session:removeInstanceById',
+      source: meta && meta.source ? String(meta.source) : 'scene-session:removeInstanceById'
+    });
+    invalidateShadowsForSceneMutation(meta && meta.source ? String(meta.source) : 'scene-session:removeInstanceById');
+    emitSceneCommitProfile({
+      reason: meta && meta.source ? String(meta.source) : 'scene-session:removeInstanceById',
+      step: 'incrementalRemoveInstance',
+      instancesBefore: counts && typeof counts.instancesBefore === 'number' ? counts.instancesBefore : Number((instances.length || 0) + 1),
+      instancesAfter: Number(instances.length || 0),
+      boxesBefore: Number(previousBoxes.length || 0),
+      boxesAfter: Number(boxes.length || 0),
+      removedBoxCount: Number(previousBoxes.length - nextBoxes.length || 0),
+      occupancyUpdateMs: Number((occupancyCacheState.lastUpdate && occupancyCacheState.lastUpdate.durationMs) || 0),
+      totalMs: Number(Math.max(0, perfMs() - startAt).toFixed(3))
+    });
+    return true;
+  }
+
   function removeInstanceByIdOwned(instanceId, meta) {
-    instances = (instances || []).filter(function (inst) { return inst.instanceId !== instanceId; });
+    var previousInstancesCount = Array.isArray(instances) ? instances.length : 0;
+    var nextInstances = (instances || []).filter(function (inst) { return inst.instanceId !== instanceId; });
+    var didRemoveInstance = nextInstances.length !== previousInstancesCount;
+    instances = nextInstances;
     if (typeof clearSelectedInstance === 'function' && typeof inspectorState !== 'undefined' && inspectorState && inspectorState.selectedInstanceId === instanceId) {
       try { clearSelectedInstance({ source: meta && meta.source ? String(meta.source) : 'scene-session:removeInstanceById' }); } catch (_) {}
     }
-    rebuildSceneBoxes('removeInstanceByIdOwned', meta);
+    var didApplyIncremental = false;
+    if (didRemoveInstance) {
+      didApplyIncremental = removeInstanceBoxesIncrementally(instanceId, meta, { instancesBefore: previousInstancesCount });
+    }
+    if (!didApplyIncremental) rebuildSceneBoxes('removeInstanceByIdOwned', meta);
     recomputeDerivedIdentifiers('removeInstanceById');
     recordWrite('removeInstance', {
       source: meta && meta.source ? String(meta.source) : 'unknown',
       instanceId: instanceId || null,
       instances: instances.length,
-      boxes: boxes.length
+      boxes: boxes.length,
+      incremental: didApplyIncremental === true
     });
-    return true;
+    return didRemoveInstance || didApplyIncremental;
   }
 
   function removeLooseBoxById(boxId, meta) {

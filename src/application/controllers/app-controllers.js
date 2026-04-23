@@ -1036,7 +1036,8 @@
     if (runtimeApi && typeof runtimeApi.patchEditorCameraSettings === 'function') {
       runtimeApi.patchEditorCameraSettings({ zoom: zoom }, { source: requestSource });
     }
-    markMainCameraRenderLayersDirty('main-camera-zoom');
+    var skipLayerDirtyForReuse = requestSource.indexOf('wheel-zoom-reuse') >= 0 || requestSource.indexOf('pinch-zoom-reuse') >= 0;
+    if (!skipLayerDirtyForReuse) markMainCameraRenderLayersDirty('main-camera-zoom');
     logMainCameraZoomChange(requestSource);
     return getMainEditorCameraSettings(requestSource);
   }

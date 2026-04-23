@@ -2993,18 +2993,53 @@ function mergeSortedRenderables(staticRenderables, dynamicRenderables) {
 }
 
 function drawFloor(scope) {
+  var floorLoopStartAt = perfNow();
+  var isoTotalMs = 0;
+  var lightingTotalMs = 0;
+  var drawPolyTotalMs = 0;
+  var tileCount = 0;
   for (let y = 0; y < settings.gridH; y++) {
     for (let x = 0; x < settings.gridW; x++) {
+      var isoStartAt = perfNow();
       const p0 = iso(x, y, 0), p1 = iso(x + 1, y, 0), p2 = iso(x + 1, y + 1, 0), p3 = iso(x, y + 1, 0);
+      isoTotalMs += Math.max(0, perfNow() - isoStartAt);
+      var lightingStartAt = perfNow();
       const base = (x + y) % 2 === 0 ? '#33415a' : '#29344b';
       const lit = rgbToCss(litColor(hexToRgb(base), { x: x + 0.5, y: y + 0.5, z: 0 }, { x: 0, y: 0, z: 1 }));
+      lightingTotalMs += Math.max(0, perfNow() - lightingStartAt);
+      var drawPolyStartAt = perfNow();
       drawPoly([p0, p1, p2, p3], lit, 'rgba(255,255,255,.05)');
+      drawPolyTotalMs += Math.max(0, perfNow() - drawPolyStartAt);
+      tileCount += 1;
     }
   }
+  var outlineStartAt = perfNow();
   const a = iso(0,0,0), b = iso(settings.gridW,0,0), c = iso(settings.gridW,settings.gridH,0), d = iso(0,settings.gridH,0);
   ctx.strokeStyle = 'rgba(255,255,255,.14)'; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.lineTo(c.x,c.y); ctx.lineTo(d.x,d.y); ctx.closePath(); ctx.stroke();
+  var outlineMs = Math.max(0, perfNow() - outlineStartAt);
+  var floorTotalWallMs = Math.max(0, perfNow() - floorLoopStartAt);
+  var floorCanvasDrawWallMs = Math.max(0, drawPolyTotalMs + outlineMs);
+  var floorLoopWallMs = Math.max(0, floorTotalWallMs - isoTotalMs - lightingTotalMs - floorCanvasDrawWallMs);
+  try {
+    if (typeof window !== 'undefined') {
+      window.__LAST_DRAW_FLOOR_BREAKDOWN__ = {
+        floorTotalWallMs: Number(floorTotalWallMs.toFixed(3)),
+        floorLoopWallMs: Number(floorLoopWallMs.toFixed(3)),
+        floorProjectionWallMs: Number(isoTotalMs.toFixed(3)),
+        floorColorMaterialWallMs: Number(lightingTotalMs.toFixed(3)),
+        floorCanvasDrawWallMs: Number(floorCanvasDrawWallMs.toFixed(3)),
+        floorTileCount: Number(tileCount || 0)
+      };
+    }
+  } catch (_) {}
+  recordRenderFunctionTiming('render.renderBaseWorldPasses.drawFloor.gridLoop', floorTotalWallMs, { floorTileCount: Number(tileCount || 0) });
+  recordRenderFunctionTiming('render.renderBaseWorldPasses.drawFloor.isoProjection', isoTotalMs, { floorTileCount: Number(tileCount || 0) });
+  recordRenderFunctionTiming('render.renderBaseWorldPasses.drawFloor.lighting', lightingTotalMs, { floorTileCount: Number(tileCount || 0) });
+  recordRenderFunctionTiming('render.renderBaseWorldPasses.drawFloor.drawPoly', drawPolyTotalMs, { floorTileCount: Number(tileCount || 0) });
+  recordRenderFunctionTiming('render.renderBaseWorldPasses.drawFloor.outline', outlineMs, { floorTileCount: Number(tileCount || 0) });
 }
+
 
 function playerPlacementAABB() {
   return getPlayerProxyBox();
@@ -4240,9 +4275,46 @@ function computeMainEditorViewportWorldBounds(currentViewRotation, zoom) {
   return { minX: Math.floor(minX), minY: Math.floor(minY), maxX: Math.ceil(maxX), maxY: Math.ceil(maxY), source: 'viewport-corners' };
 }
 
-function countWorldVisibilityForScope(scope) {
+function getMainCameraInteractionStateForRender() {
+  if (typeof window === 'undefined' || !window.__CAMERA_INTERACTION_LOG_BUFFER_STATE) return null;
+  var state = window.__CAMERA_INTERACTION_LOG_BUFFER_STATE;
+  return state && state.active === true ? state : null;
+}
+
+function getMainCameraVisibilityCountDefaultsForRender(terrainModel) {
+  var terrainColumnCount = terrainModel && terrainModel.lastSummary && Number.isFinite(Number(terrainModel.lastSummary.generatedCellCount))
+    ? Math.max(0, Math.round(Number(terrainModel.lastSummary.generatedCellCount) || 0))
+    : 0;
+  var terrainVisible = __terrainRuntimeSummary && Number.isFinite(Number(__terrainRuntimeSummary.visibleColumnCount))
+    ? Math.max(0, Math.round(Number(__terrainRuntimeSummary.visibleColumnCount) || 0))
+    : 0;
+  return {
+    visibleTerrainCount: terrainVisible,
+    visibleVoxelCount: 0,
+    visibleObjectCount: 0,
+    culledTerrainCount: Math.max(0, terrainColumnCount - terrainVisible),
+    culledVoxelCount: 0,
+    culledObjectCount: 0,
+    visibilityCountSamplingEnabled: __visibilityCountSamplingEnabled === true,
+    countsDeferredDuringInteraction: true,
+    countsSource: 'interaction-deferred'
+  };
+}
+
+function countWorldVisibilityForScope(scope, options) {
+  options = options || {};
   var bounds = scope && scope.cullingWorldBounds ? scope.cullingWorldBounds : null;
-  var terrainModel = getTerrainRuntimeModelForRender();
+  var terrainModel = options.terrainModel || getTerrainRuntimeModelForRender();
+  var interactionState = options.interactionState || getMainCameraInteractionStateForRender();
+  if (interactionState) {
+    if (__mainCameraScopeCountsCache.counts) {
+      return Object.assign({}, __mainCameraScopeCountsCache.counts, {
+        countsDeferredDuringInteraction: true,
+        countsSource: 'interaction-reuse-cache'
+      });
+    }
+    return getMainCameraVisibilityCountDefaultsForRender(terrainModel);
+  }
   var cacheKey = JSON.stringify({
     bounds: bounds,
     terrainBatchId: terrainModel && terrainModel.activeTerrainBatchId ? terrainModel.activeTerrainBatchId : null,
@@ -4253,14 +4325,12 @@ function countWorldVisibilityForScope(scope) {
     lightCount: Array.isArray(lights) ? lights.length : 0
   });
   if (__mainCameraScopeCountsCache.key === cacheKey && __mainCameraScopeCountsCache.counts) {
-    return __mainCameraScopeCountsCache.counts;
+    return Object.assign({}, __mainCameraScopeCountsCache.counts, {
+      countsDeferredDuringInteraction: false,
+      countsSource: 'cache-hit'
+    });
   }
-  var terrainColumnCount = terrainModel && terrainModel.lastSummary && Number.isFinite(Number(terrainModel.lastSummary.generatedCellCount))
-    ? Math.max(0, Math.round(Number(terrainModel.lastSummary.generatedCellCount) || 0))
-    : 0;
-  var terrainVisible = __terrainRuntimeSummary && Number.isFinite(Number(__terrainRuntimeSummary.visibleColumnCount))
-    ? Math.max(0, Math.round(Number(__terrainRuntimeSummary.visibleColumnCount) || 0))
-    : 0;
+  var defaults = getMainCameraVisibilityCountDefaultsForRender(terrainModel);
   var voxels = 0, voxelsVisible = 0;
   for (var i = 0; i < boxes.length; i++) {
     var box = boxes[i];
@@ -4276,13 +4346,15 @@ function countWorldVisibilityForScope(scope) {
     if (!instBounds || worldBoundsIntersectXY({ minX: instBounds.minX, minY: instBounds.minY, maxX: instBounds.maxX, maxY: instBounds.maxY }, bounds)) objectVisible += 1;
   }
   var counts = {
-    visibleTerrainCount: terrainVisible,
+    visibleTerrainCount: defaults.visibleTerrainCount,
     visibleVoxelCount: voxelsVisible,
     visibleObjectCount: objectVisible,
-    culledTerrainCount: Math.max(0, terrainColumnCount - terrainVisible),
+    culledTerrainCount: defaults.culledTerrainCount,
     culledVoxelCount: Math.max(0, voxels - voxelsVisible),
     culledObjectCount: Math.max(0, objectTotal - objectVisible),
-    visibilityCountSamplingEnabled: __visibilityCountSamplingEnabled === true
+    visibilityCountSamplingEnabled: __visibilityCountSamplingEnabled === true,
+    countsDeferredDuringInteraction: false,
+    countsSource: 'full-scan'
   };
   __mainCameraScopeCountsCache = { key: cacheKey, counts: counts };
   return counts;
@@ -4293,14 +4365,21 @@ function getMainCameraRenderScope(currentViewRotation) {
   var settingsForRender = getMainEditorCameraSettingsForRender();
   var zoom = getMainEditorZoomValueForRender();
   var terrainModel = getTerrainRuntimeModelForRender();
+  var interactionState = getMainCameraInteractionStateForRender();
   var cacheKey = [currentViewRotation, zoom, settingsForRender.cameraCullingEnabled !== false, Number(settingsForRender.cullingMargin || 0), Number(camera.x || 0), Number(camera.y || 0), VIEW_W, VIEW_H, terrainModel && terrainModel.activeTerrainBatchId ? terrainModel.activeTerrainBatchId : 'none', terrainModel && terrainModel.width || 0, terrainModel && terrainModel.height || 0].join('|');
   if (__mainCameraScopeCache.scope && __mainCameraScopeCache.key === cacheKey) {
-    logItemRotationPrototype('camera-scope-cache-summary', { cacheReused: true, cacheKeyExcludesFrameCounter: true, visibilityCountSamplingEnabled: (__mainCameraScopeCountsCache.counts && __mainCameraScopeCountsCache.counts.visibilityCountSamplingEnabled) === true });
+    logItemRotationPrototype('camera-scope-cache-summary', {
+      cacheReused: true,
+      cacheKeyExcludesFrameCounter: true,
+      visibilityCountSamplingEnabled: (__mainCameraScopeCountsCache.counts && __mainCameraScopeCountsCache.counts.visibilityCountSamplingEnabled) === true,
+      countsDeferredDuringInteraction: (__mainCameraScopeCountsCache.counts && __mainCameraScopeCountsCache.counts.countsDeferredDuringInteraction) === true,
+      countsSource: __mainCameraScopeCountsCache.counts && __mainCameraScopeCountsCache.counts.countsSource || 'cache-hit'
+    });
     return __mainCameraScopeCache.scope;
   }
   var viewportWorldBounds = computeMainEditorViewportWorldBounds(currentViewRotation, zoom);
   var cullingWorldBounds = expandWorldBounds(viewportWorldBounds, getMainEditorCullingMarginForRender());
-  var counts = countWorldVisibilityForScope({ cullingWorldBounds: cullingWorldBounds });
+  var counts = countWorldVisibilityForScope({ cullingWorldBounds: cullingWorldBounds }, { terrainModel: terrainModel, interactionState: interactionState });
   var scope = {
     currentViewRotation: currentViewRotation,
     zoom: zoom,
@@ -4321,7 +4400,9 @@ function getMainCameraRenderScope(currentViewRotation) {
     visibleObjectCount: counts.visibleObjectCount,
     culledTerrainCount: counts.culledTerrainCount,
     culledVoxelCount: counts.culledVoxelCount,
-    culledObjectCount: counts.culledObjectCount
+    culledObjectCount: counts.culledObjectCount,
+    countsDeferredDuringInteraction: counts.countsDeferredDuringInteraction === true,
+    countsSource: counts.countsSource || 'unknown'
   };
   logItemRotationPrototype('main-camera-viewport-culling-check', {
     currentViewRotation: currentViewRotation,
@@ -4333,7 +4414,9 @@ function getMainCameraRenderScope(currentViewRotation) {
     visibleObjectCount: scope.visibleObjectCount,
     culledTerrainCount: scope.culledTerrainCount,
     culledVoxelCount: scope.culledVoxelCount,
-    culledObjectCount: scope.culledObjectCount
+    culledObjectCount: scope.culledObjectCount,
+    countsDeferredDuringInteraction: scope.countsDeferredDuringInteraction === true,
+    countsSource: scope.countsSource || 'unknown'
   });
   logItemRotationPrototype('main-camera-zoom-unification-check', {
     cameraZoomValue: zoom,
@@ -4344,7 +4427,13 @@ function getMainCameraRenderScope(currentViewRotation) {
     blocksUseUnifiedZoom: true
   });
   __mainCameraScopeCache = { key: cacheKey, scope: scope };
-  logItemRotationPrototype('camera-scope-cache-summary', { cacheReused: false, cacheKeyExcludesFrameCounter: true, visibilityCountSamplingEnabled: counts.visibilityCountSamplingEnabled === true });
+  logItemRotationPrototype('camera-scope-cache-summary', {
+    cacheReused: false,
+    cacheKeyExcludesFrameCounter: true,
+    visibilityCountSamplingEnabled: counts.visibilityCountSamplingEnabled === true,
+    countsDeferredDuringInteraction: counts.countsDeferredDuringInteraction === true,
+    countsSource: counts.countsSource || 'unknown'
+  });
   return scope;
 }
 
@@ -6136,51 +6225,81 @@ function drawPlacementPreview() {
 function buildRenderables() {
   beginRenderFrameDiagnosticState();
   const buildStartAt = perfNow();
+  const viewRotationInfoStartAt = perfNow();
   const viewRotationInfo = getSafeMainEditorViewRotation(null);
+  recordRenderFunctionTiming('render.buildMainFrameRenderables.getSafeMainEditorViewRotation', perfNow() - viewRotationInfoStartAt);
+  const cameraScopeStartAt = perfNow();
   const cameraScope = getMainCameraRenderScope(viewRotationInfo.viewRotation);
+  recordRenderFunctionTiming('render.buildMainFrameRenderables.getMainCameraRenderScope', perfNow() - cameraScopeStartAt, { frameViewRotation: Number(viewRotationInfo && viewRotationInfo.viewRotation || 0) });
+  const terrainModelStartAt = perfNow();
   const terrainModel = getTerrainRuntimeModelForRender();
+  recordRenderFunctionTiming('render.buildMainFrameRenderables.getTerrainRuntimeModelForRender', perfNow() - terrainModelStartAt);
   const terrainBuildStartAt = perfNow();
   const terrainBuild = { renderables: [], stats: { terrainCellCount: 0, terrainColumnCount: 0, terrainExpandedVoxelInstanceCount: 0, terrainUsesColumnModel: false, visibleColumnCount: 0, visibleChunkCount: 0, culledColumnCount: 0, culledChunkCount: 0, terrainBuildWasScoped: false, logicalVoxelCountEstimated: 0, visibleTopFaceCount: 0, visibleSideFaceCount: 0, internalVoxelSkippedCount: 0, hiddenInternalSurfaceSkippedCount: 0, renderableCount: 0, buildMode: 'shared-block-pipeline' } };
   const terrainBuildMs = Math.max(0, perfNow() - terrainBuildStartAt);
+  recordRenderFunctionTiming('render.buildMainFrameRenderables.terrainBuildPlaceholder', terrainBuildMs);
+  const staticCacheStartAt = perfNow();
   rebuildStaticBoxRenderCacheIfNeeded();
+  recordRenderFunctionTiming('render.buildMainFrameRenderables.rebuildStaticBoxRenderCacheIfNeeded', perfNow() - staticCacheStartAt);
   const afterStaticCacheAt = perfNow();
   const staticRenderablesAll = staticBoxRenderCache.renderables || [];
   const dynamicRenderables = [];
   const surfaceStats = __lastSurfaceCacheStats || { visibleTopFaceCount: 0, visibleSideFaceCount: 0, hiddenInternalSurfaceSkippedCount: 0, terrainColumnCount: 0, logicalVoxelCountEstimated: 0, voxelFurnitureProcessedCount: 0, surfaceOnlyRenderingEnabled: true, visibleChunkCount: 0, rebuiltChunkCountThisFrame: 0, reusedChunkCountThisFrame: 0, visibleStaticPacketCount: 0, packetMergeMs: 0 };
+  const occupancySnapshotStartAt = perfNow();
   const occupancySnapshot = getSceneOccupancySnapshotForRender('render:buildRenderables');
+  recordRenderFunctionTiming('render.buildMainFrameRenderables.getSceneOccupancySnapshotForRender', perfNow() - occupancySnapshotStartAt);
   const visibleOcc = occupancySnapshot && occupancySnapshot.map && typeof occupancySnapshot.map.has === 'function' ? occupancySnapshot.map : new Map();
   const occupancyCacheVersion = occupancySnapshot && occupancySnapshot.cacheVersion != null ? Number(occupancySnapshot.cacheVersion || 0) : 0;
   const occupancyRebuiltThisFrame = __lastRenderFrameOccupancyVersion != null && Number(__lastRenderFrameOccupancyVersion || 0) !== occupancyCacheVersion;
   let occupiedKeySet = null;
+  const dynamicSplitStartAt = perfNow();
   const dynamicInstanceSplit = getDynamicInstanceSplitForRender(instances);
+  recordRenderFunctionTiming('render.buildMainFrameRenderables.getDynamicInstanceSplitForRender', perfNow() - dynamicSplitStartAt, { totalInstancesForSplit: Number(instances && instances.length || 0) });
   const dynamicCandidates = Array.isArray(dynamicInstanceSplit.dynamicInstances) ? dynamicInstanceSplit.dynamicInstances : [];
   const dynamicFilterStartAt = perfNow();
   const visibleDynamicInstances = filterInstancesForMainCameraScope(dynamicCandidates, cameraScope);
   const dynamicFilterMs = Math.max(0, perfNow() - dynamicFilterStartAt);
+  recordRenderFunctionTiming('render.buildMainFrameRenderables.filterInstancesForMainCameraScope', dynamicFilterMs, { dynamicCandidateCount: Number(dynamicCandidates.length || 0), visibleDynamicInstanceCount: Number(visibleDynamicInstances.length || 0) });
   const shouldForceExactVisibleSummary = (__terrainFirstFrameWindow && __terrainFirstFrameWindow.remaining > 0) || (perfNow() - Number(__lastRenderFrameSummaryLogAt || 0)) >= 1000;
+  const visibleSummaryStartAt = perfNow();
   const visibleInstanceSummary = getVisibleInstanceSummaryForRender(cameraScope, visibleDynamicInstances, dynamicInstanceSplit, shouldForceExactVisibleSummary);
+  recordRenderFunctionTiming('render.buildMainFrameRenderables.getVisibleInstanceSummaryForRender', perfNow() - visibleSummaryStartAt, { visibleInstanceCount: Number(visibleInstanceSummary && visibleInstanceSummary.visibleInstances || 0) });
 
   const dynamicBuildStartAt = perfNow();
+  var debugFaceBuildMs = 0;
+  var habboVoxelFilterMs = 0;
+  var habboVoxelBuildMs = 0;
+  var spriteSortBuildMs = 0;
+  var spriteRenderableBuildMs = 0;
   for (const inst of visibleDynamicInstances) {
     const prefab = getPrefabById(inst.prefabId);
     if (prefab && isFiveFaceDebugPrefab(prefab) && prefabDrawsVoxels(prefab)) {
       if (!occupiedKeySet) occupiedKeySet = createOccupiedKeySetFromOccupancy(visibleOcc);
+      const debugFaceStartAt = perfNow();
       const placedFaces = buildPlacedDebugInstanceFaceRenderables(inst, prefab, occupiedKeySet, viewRotationInfo);
+      debugFaceBuildMs += Math.max(0, perfNow() - debugFaceStartAt);
       for (const item of placedFaces) dynamicRenderables.push(item);
     } else if (prefab && prefab.kind === 'habbo_import' && prefabDrawsVoxels(prefab)) {
       const shift = getHabboInstanceVisualShift(inst, prefab);
+      const habboFilterStartAt = perfNow();
       const instBoxes = filterBoxesForMainCameraScope(boxes.filter(function (b) { return b.instanceId === inst.instanceId; }), cameraScope);
+      habboVoxelFilterMs += Math.max(0, perfNow() - habboFilterStartAt);
       for (const cell of instBoxes) {
+        const habboVoxelBuildStartAt = perfNow();
         const item = buildShiftedVoxelRenderable({ x: cell.x, y: cell.y, z: cell.z, box: cell, base: cell.base }, visibleOcc, shift, 'habbo-voxel-' + inst.instanceId);
+        habboVoxelBuildMs += Math.max(0, perfNow() - habboVoxelBuildStartAt);
         if (item) dynamicRenderables.push(item);
       }
     }
     if (prefabHasSprite(prefab)) {
+      const spriteSortStartAt = perfNow();
       const spriteSort = computeSpriteRenderableSort(inst, prefab);
+      spriteSortBuildMs += Math.max(0, perfNow() - spriteSortStartAt);
       if (inst.__lastSpriteOcclusion !== spriteSort.occlusion) {
         inst.__lastSpriteOcclusion = spriteSort.occlusion;
         detailLog(`sprite-sort: ${inst.instanceId} prefab=${prefab.id} mode=${getSpriteProxySortMode(prefab)} occlusion=${spriteSort.occlusion} sortKey=${spriteSort.sortKey.toFixed(4)}`);
       }
+      const spriteRenderableStartAt = perfNow();
       dynamicRenderables.push({
         id: 'sprite-' + inst.instanceId,
         kind: 'prefab-sprite',
@@ -6198,12 +6317,22 @@ function buildRenderables() {
           if (!drawn && !prefabDrawsVoxels(prefab)) drawInstanceProxyBoxes(inst, 0.82);
         },
       });
+      spriteRenderableBuildMs += Math.max(0, perfNow() - spriteRenderableStartAt);
     }
   }
 
+  recordRenderFunctionTiming('render.buildMainFrameRenderables.dynamicLoop.total', Math.max(0, perfNow() - dynamicBuildStartAt), { visibleDynamicInstanceCount: Number(visibleDynamicInstances.length || 0) });
+  recordRenderFunctionTiming('render.buildMainFrameRenderables.dynamicLoop.buildPlacedDebugInstanceFaceRenderables', debugFaceBuildMs);
+  recordRenderFunctionTiming('render.buildMainFrameRenderables.dynamicLoop.filterHabboInstanceBoxes', habboVoxelFilterMs);
+  recordRenderFunctionTiming('render.buildMainFrameRenderables.dynamicLoop.buildShiftedVoxelRenderable', habboVoxelBuildMs);
+  recordRenderFunctionTiming('render.buildMainFrameRenderables.dynamicLoop.computeSpriteRenderableSort', spriteSortBuildMs);
+  recordRenderFunctionTiming('render.buildMainFrameRenderables.dynamicLoop.pushSpriteRenderable', spriteRenderableBuildMs);
+
+  var playerSliceBuildMs = 0;
   if (SHOW_PLAYER && pointWithinWorldBoundsXY(player.x, player.y, cameraScope.cullingWorldBounds)) {
     const playerLine = player.x + player.y + 0.001;
     for (const s of getPlayerSlices()) {
+      var playerSliceStartAt = perfNow();
       var playerSortMeta = (getDomainSceneCoreApi() && typeof getDomainSceneCoreApi().computePlayerSliceRenderableSort === 'function')
         ? getDomainSceneCoreApi().computePlayerSliceRenderableSort({ slice: s, player: player, viewRotation: normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation) })
         : Object.assign({ tie: 500000 + s.z * 1000 }, computeViewAwareSortMeta({ x: player.x, y: player.y, z: s.z }, 0, normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation)));
@@ -6216,20 +6345,26 @@ function buildRenderables() {
         worldY: Number(player.y || 0),
         draw: () => drawPlayerSlice(s),
       });
+      playerSliceBuildMs += Math.max(0, perfNow() - playerSliceStartAt);
     }
   }
+  recordRenderFunctionTiming('render.buildMainFrameRenderables.playerSlices', playerSliceBuildMs, { playerSliceCount: Number(SHOW_PLAYER ? getPlayerSlices().length || 0 : 0) });
 
+  const dynamicSortStartAt = perfNow();
   dynamicRenderables.sort(compareRenderablesByDomain);
+  recordRenderFunctionTiming('render.buildMainFrameRenderables.dynamicRenderables.sort', perfNow() - dynamicSortStartAt, { dynamicRenderableCount: Number(dynamicRenderables.length || 0) });
   const dynamicObjectBuildMs = Math.max(0, perfNow() - dynamicBuildStartAt);
   const mergeStartAt = perfNow();
   const staticRenderables = staticRenderablesAll;
   const dynamicRenderablesCulled = dynamicRenderables;
   const renderables = mergeSortedRenderables(staticRenderables, dynamicRenderablesCulled);
+  recordRenderFunctionTiming('render.buildMainFrameRenderables.mergeSortedRenderables', perfNow() - mergeStartAt, { staticRenderableCount: Number(staticRenderables.length || 0), dynamicRenderableCount: Number(dynamicRenderablesCulled.length || 0), mergedRenderableCount: Number(renderables.length || 0) });
   const staticPacketDrawPrepMs = 0;
   const mergeMs = Math.max(0, perfNow() - mergeStartAt);
   const beforeVisibilityAt = perfNow();
   const visibleLightsForStats = getMainCameraVisibleLightsForRender(viewRotationInfo.viewRotation);
   const afterVisibilityAt = perfNow();
+  recordRenderFunctionTiming('render.buildMainFrameRenderables.getMainCameraVisibleLightsForRender', afterVisibilityAt - beforeVisibilityAt, { visibleLightCount: Number(visibleLightsForStats && visibleLightsForStats.length || 0) });
   const staticCacheFrameState = getCurrentRenderFrameStaticCacheState();
   const staticCacheRebuiltThisFrame = staticCacheFrameState && staticCacheFrameState.rebuilt === true;
   const staticCacheBuildMs = Number(staticCacheFrameState && staticCacheFrameState.buildMs || 0);
@@ -6463,6 +6598,14 @@ function buildRenderables() {
     renderablesBeforeCulling: Number(__lastMainRenderableBuildStats.renderablesBeforeCulling || 0),
     renderablesAfterCulling: Number(__lastMainRenderableBuildStats.renderablesAfterCulling || 0)
   });
+  recordRenderFunctionTiming('render.buildMainFrameRenderables.summary', Math.max(0, perfNow() - buildStartAt), {
+    totalRenderableCount: Number(renderables.length || 0),
+    staticRenderableCount: Number(staticRenderables.length || 0),
+    dynamicRenderableCount: Number(dynamicRenderablesCulled.length || 0),
+    visibleStaticPacketCountForSummary: Number(surfaceStats.visibleStaticPacketCount || 0),
+    visibleChunkCountForSummary: Number(surfaceStats.visibleChunkCount || 0)
+  });
+
   if (verboseLog) {
     const sec = Math.floor(time);
     if (sec !== lastRenderLogSecond) {
@@ -6494,25 +6637,177 @@ function clearAndPaintMainBackground() {
   ctx.fillRect(0, 0, VIEW_W, VIEW_H);
 }
 
+function ensureRenderFunctionBreakdownBucket() {
+  if (typeof window === 'undefined') return null;
+  try {
+    window.__RENDER_FUNCTION_BREAKDOWN__ = window.__RENDER_FUNCTION_BREAKDOWN__ || { timings: {}, counts: {}, extras: {} };
+    return window.__RENDER_FUNCTION_BREAKDOWN__;
+  } catch (_) { return null; }
+}
+
+function recordRenderFunctionTiming(name, ms, extra) {
+  var bucket = ensureRenderFunctionBreakdownBucket();
+  if (!bucket || !name) return;
+  bucket.timings = bucket.timings || {};
+  bucket.counts = bucket.counts || {};
+  bucket.timings[name] = Number(Number(ms || 0).toFixed(3));
+  bucket.counts[name] = Number(bucket.counts[name] || 0) + 1;
+  if (extra && typeof extra === 'object') {
+    bucket.extras = bucket.extras || {};
+    Object.keys(extra).forEach(function (key) {
+      var value = extra[key];
+      if (value == null || typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean') bucket.extras[key] = value;
+    });
+  }
+}
+
+function accumulateRenderFunctionTiming(name, ms, extra) {
+  var bucket = ensureRenderFunctionBreakdownBucket();
+  if (!bucket || !name) return;
+  bucket.timings = bucket.timings || {};
+  bucket.counts = bucket.counts || {};
+  var prev = Number(bucket.timings[name] || 0);
+  bucket.timings[name] = Number((prev + Number(ms || 0)).toFixed(3));
+  bucket.counts[name] = Number(bucket.counts[name] || 0) + 1;
+  if (extra && typeof extra === 'object') {
+    bucket.extras = bucket.extras || {};
+    Object.keys(extra).forEach(function (key) {
+      var value = extra[key];
+      if (value == null || typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean') bucket.extras[key] = value;
+    });
+  }
+}
+
+
+function setLastBaseWorldPassesBreakdown(payload) {
+  try {
+    if (typeof window !== 'undefined') window.__LAST_BASEWORLD_PASSES_BREAKDOWN__ = payload || null;
+  } catch (_) {}
+}
+
+function getLastDrawFloorBreakdown() {
+  try {
+    if (typeof window !== 'undefined' && window.__LAST_DRAW_FLOOR_BREAKDOWN__) return window.__LAST_DRAW_FLOOR_BREAKDOWN__;
+  } catch (_) {}
+  return null;
+}
+
 function renderBaseWorldPasses() {
-  var currentViewRotation = normalizeMainEditorViewRotationValue(getSafeMainEditorViewRotation(null).viewRotation);
-  var scope = getMainCameraRenderScope(currentViewRotation);
-  var visibleLights = getMainCameraVisibleLightsForRender(currentViewRotation);
+  var fnStartAt = perfNow();
+  var preSetupStartAt = fnStartAt;
+  var currentViewRotation = 0;
+  var scope = null;
+  var visibleLights = null;
+  var preSetupViewRotationStartAt = perfNow();
+  currentViewRotation = normalizeMainEditorViewRotationValue(getSafeMainEditorViewRotation(null).viewRotation);
+  var baseWorldPassesPreSetupViewRotationWallMs = Math.max(0, perfNow() - preSetupViewRotationStartAt);
+  var preSetupScopeStartAt = perfNow();
+  scope = getMainCameraRenderScope(currentViewRotation);
+  var baseWorldPassesPreSetupScopeWallMs = Math.max(0, perfNow() - preSetupScopeStartAt);
+  var preSetupVisibleLightsStartAt = perfNow();
+  visibleLights = getMainCameraVisibleLightsForRender(currentViewRotation);
+  var baseWorldPassesPreSetupVisibleLightsWallMs = Math.max(0, perfNow() - preSetupVisibleLightsStartAt);
+  var preSetupOverrideStartAt = perfNow();
   if (typeof window !== 'undefined') window.__MAIN_CAMERA_VISIBLE_LIGHTS_OVERRIDE__ = visibleLights;
+  var baseWorldPassesPreSetupOverrideWallMs = Math.max(0, perfNow() - preSetupOverrideStartAt);
+  var drawFloorStartAt = perfNow();
+  var baseWorldPassesPreSetupWallMs = Math.max(0, drawFloorStartAt - preSetupStartAt);
+  var baseWorldPassesPreSetupKnownWallMs = Number(baseWorldPassesPreSetupViewRotationWallMs || 0) + Number(baseWorldPassesPreSetupScopeWallMs || 0) + Number(baseWorldPassesPreSetupVisibleLightsWallMs || 0) + Number(baseWorldPassesPreSetupOverrideWallMs || 0);
+  var baseWorldPassesPreSetupResidualWallMs = Math.max(0, baseWorldPassesPreSetupWallMs - baseWorldPassesPreSetupKnownWallMs);
   debugState.renderStep = 'floor';
   drawFloor(scope);
+  var drawFloorWallMs = Math.max(0, perfNow() - drawFloorStartAt);
+  var drawFloorBreakdown = getLastDrawFloorBreakdown() || getActiveBaseWorldActualPathProfile() || null;
+  recordRenderFunctionTiming('render.renderBaseWorldPasses.drawFloor', drawFloorWallMs, { visibleLights: Number(Array.isArray(visibleLights) ? visibleLights.length : 0) });
   debugState.renderStep = 'light-shadows';
-  renderLightingShadows();
+  var lightingStartAt = perfNow();
+  var lightingEnabledForShadowPass = (typeof isLightingSystemEnabled === 'function') ? isLightingSystemEnabled() : true;
+  var showShadowsForShadowPass = !!(typeof lightState !== 'undefined' && lightState && lightState.showShadows);
+  if (lightingEnabledForShadowPass && showShadowsForShadowPass) {
+    renderLightingShadows();
+  }
+  var lightingWallMs = Math.max(0, perfNow() - lightingStartAt);
+  recordRenderFunctionTiming('render.renderBaseWorldPasses.renderLightingShadows', lightingWallMs, {
+    skipped: !(lightingEnabledForShadowPass && showShadowsForShadowPass),
+    lightingEnabled: !!lightingEnabledForShadowPass,
+    showShadows: !!showShadowsForShadowPass
+  });
+  var frontLinesWallMs = 0;
   if (showFrontLines) {
     debugState.renderStep = 'front-lines';
+    var frontLinesStartAt = perfNow();
     drawFrontLines();
+    frontLinesWallMs = Math.max(0, perfNow() - frontLinesStartAt);
+    recordRenderFunctionTiming('render.renderBaseWorldPasses.drawFrontLines', frontLinesWallMs);
   }
-  if (SHOW_PLAYER && assetsReady) preparePlayerSpriteFrame();
+  var spritePrepWallMs = 0;
+  if (SHOW_PLAYER && assetsReady) {
+    var spritePrepStartAt = perfNow();
+    preparePlayerSpriteFrame();
+    spritePrepWallMs = Math.max(0, perfNow() - spritePrepStartAt);
+    recordRenderFunctionTiming('render.renderBaseWorldPasses.preparePlayerSpriteFrame', spritePrepWallMs);
+  }
+  var totalWallMs = Math.max(0, perfNow() - fnStartAt);
+  var floorLoopWallMs = Number(drawFloorBreakdown && drawFloorBreakdown.floorLoopWallMs || 0);
+  var floorProjectionWallMs = Number(drawFloorBreakdown && drawFloorBreakdown.floorProjectionWallMs || 0);
+  var floorColorMaterialWallMs = Number(drawFloorBreakdown && drawFloorBreakdown.floorColorMaterialWallMs || 0);
+  var floorCanvasDrawWallMs = Number(drawFloorBreakdown && drawFloorBreakdown.floorCanvasDrawWallMs || 0);
+  var floorLayerReusedDuringInteraction = !!(drawFloorBreakdown && drawFloorBreakdown.floorLayerReusedDuringInteraction);
+  var floorLayerRebuildWallMs = Number(drawFloorBreakdown && drawFloorBreakdown.floorLayerRebuildWallMs || 0);
+  var floorLayerBlitWallMs = Number(drawFloorBreakdown && drawFloorBreakdown.floorLayerBlitWallMs || 0);
+  var floorVisibleChunkCount = Number(drawFloorBreakdown && drawFloorBreakdown.floorVisibleChunkCount || 0);
+  var floorBuiltChunkCountThisFrame = Number(drawFloorBreakdown && drawFloorBreakdown.floorBuiltChunkCountThisFrame || 0);
+  var floorMissingChunkCountBefore = Number(drawFloorBreakdown && drawFloorBreakdown.floorMissingChunkCountBefore || 0);
+  var floorMissingChunkCountAfter = Number(drawFloorBreakdown && drawFloorBreakdown.floorMissingChunkCountAfter || 0);
+  var floorBuiltTileCountThisFrame = Number(drawFloorBreakdown && drawFloorBreakdown.floorBuiltTileCountThisFrame || 0);
+  var floorChunkSize = Number(drawFloorBreakdown && drawFloorBreakdown.floorChunkSize || 0);
+  var floorVersionTag = String(drawFloorBreakdown && drawFloorBreakdown.floorVersionTag || 'floor-static-chunk-v1');
+  var baseWorldActualBranch = String(drawFloorBreakdown && drawFloorBreakdown.baseWorldActualBranch || 'unknown');
+  var baseWorldPassesPlayerSpritePrepWallMs = Number(spritePrepWallMs || 0);
+  var knownForResidual = Number(baseWorldPassesPreSetupWallMs || 0) + floorLoopWallMs + floorProjectionWallMs + floorColorMaterialWallMs + floorCanvasDrawWallMs + baseWorldPassesPlayerSpritePrepWallMs;
+  var baseWorldPassesPostFinalizeWallMs = 0;
+  var baseWorldPassesResidualWallMs = Math.max(0, totalWallMs - knownForResidual - baseWorldPassesPostFinalizeWallMs);
+  setLastBaseWorldPassesBreakdown({
+    baseWorldPassesWallMs: Number(totalWallMs.toFixed(3)),
+    baseWorldPassesPreSetupWallMs: Number(baseWorldPassesPreSetupWallMs.toFixed(3)),
+    baseWorldPassesPreSetupViewRotationWallMs: Number(baseWorldPassesPreSetupViewRotationWallMs.toFixed(3)),
+    baseWorldPassesPreSetupScopeWallMs: Number(baseWorldPassesPreSetupScopeWallMs.toFixed(3)),
+    baseWorldPassesPreSetupVisibleLightsWallMs: Number(baseWorldPassesPreSetupVisibleLightsWallMs.toFixed(3)),
+    baseWorldPassesPreSetupOverrideWallMs: Number(baseWorldPassesPreSetupOverrideWallMs.toFixed(3)),
+    baseWorldPassesPreSetupResidualWallMs: Number(baseWorldPassesPreSetupResidualWallMs.toFixed(3)),
+    baseWorldPassesFloorLoopWallMs: Number(floorLoopWallMs.toFixed(3)),
+    baseWorldPassesFloorProjectionWallMs: Number(floorProjectionWallMs.toFixed(3)),
+    baseWorldPassesFloorColorMaterialWallMs: Number(floorColorMaterialWallMs.toFixed(3)),
+    baseWorldPassesFloorCanvasDrawWallMs: Number(floorCanvasDrawWallMs.toFixed(3)),
+    baseWorldPassesPlayerSpritePrepWallMs: Number(baseWorldPassesPlayerSpritePrepWallMs.toFixed(3)),
+    baseWorldPassesPostFinalizeWallMs: Number(baseWorldPassesPostFinalizeWallMs.toFixed(3)),
+    baseWorldPassesResidualWallMs: Number(baseWorldPassesResidualWallMs.toFixed(3)),
+    drawFloorWallMs: Number(drawFloorWallMs.toFixed(3)),
+    lightingWallMs: Number(lightingWallMs.toFixed(3)),
+    frontLinesWallMs: Number(frontLinesWallMs.toFixed(3)),
+    currentViewRotation: Number(currentViewRotation || 0),
+    visibleLightCount: Number(Array.isArray(visibleLights) ? visibleLights.length : 0),
+    floorLayerReusedDuringInteraction: floorLayerReusedDuringInteraction,
+    floorLayerRebuildWallMs: Number(floorLayerRebuildWallMs.toFixed(3)),
+    floorLayerBlitWallMs: Number(floorLayerBlitWallMs.toFixed(3)),
+    floorVisibleChunkCount: floorVisibleChunkCount,
+    floorBuiltChunkCountThisFrame: floorBuiltChunkCountThisFrame,
+    floorMissingChunkCountBefore: floorMissingChunkCountBefore,
+    floorMissingChunkCountAfter: floorMissingChunkCountAfter,
+    floorBuiltTileCountThisFrame: floorBuiltTileCountThisFrame,
+    floorChunkSize: floorChunkSize,
+    floorVersionTag: floorVersionTag,
+    baseWorldActualBranch: baseWorldActualBranch
+  });
+  recordRenderFunctionTiming('render.renderBaseWorldPasses.total', totalWallMs, { currentViewRotation: Number(currentViewRotation || 0) });
 }
 
 function buildMainFrameRenderables() {
+  var fnStartAt = perfNow();
   debugState.renderStep = 'build-renderables';
+  var buildRenderablesStartAt = perfNow();
   const order = buildRenderables();
+  recordRenderFunctionTiming('render.buildMainFrameRenderables.buildRenderables', perfNow() - buildRenderablesStartAt, { renderableCount: Number(order && order.length || 0) });
   var currentViewRotation = normalizeMainEditorViewRotationValue(getSafeMainEditorViewRotation(null).viewRotation);
   for (const item of order) {
     if (!item || typeof item !== 'object') continue;
@@ -6522,6 +6817,7 @@ function buildMainFrameRenderables() {
     if (!item.drawScreenPosition) item.drawScreenPosition = deriveRenderableDrawPosition(item);
   }
   if (debugState.frame < 5 || verboseLog) detailLog(`render:buildRenderables count=${order.length} first10=${order.slice(0, 10).map(r => r.id).join(',')}`);
+  recordRenderFunctionTiming('render.buildMainFrameRenderables.total', perfNow() - fnStartAt, { renderableCount: Number(order && order.length || 0) });
   return order;
 }
 
@@ -6649,8 +6945,11 @@ function drawMainFrameOverlays() {
 }
 
 function drawMainHudPassLocal() {
+  var fnStartAt = perfNow();
   debugState.renderStep = 'hud';
+  var refreshStartAt = perfNow();
   refreshInspectorPanels();
+  recordRenderFunctionTiming('render.drawMainHudPassLocal.refreshInspectorPanels', perfNow() - refreshStartAt);
   ctx.fillStyle = 'rgba(255,255,255,.92)'; ctx.font = '14px sans-serif';
   const proto = currentProto();
   const modeLabel = editor.mode === 'view' ? '不编辑/拖动画面' : (editor.mode === 'delete' ? '删除物件' : '建立物件');
@@ -6670,6 +6969,7 @@ function drawMainHudPassLocal() {
     var probeLabel = shadowProbeState.activeMarker ? shadowProbeMarkerLabel(shadowProbeState.activeMarker) : 'none';
     ctx.fillText('阴影探针: M=标记模式 P=记录当前帧 N=清除  模式=' + (shadowProbeState.markMode ? 'ON' : 'OFF') + '  当前=' + probeLabel, 18, showDebug ? 116 : 94);
   }
+  recordRenderFunctionTiming('render.drawMainHudPassLocal.total', perfNow() - fnStartAt);
 }
 
 function drawMainHudPass() {
@@ -6754,6 +7054,7 @@ function bindRendererPassApi() {
     owner: 'src/presentation/render/render.js',
     clearAndPaintMainBackground: clearAndPaintMainBackground,
     renderBaseWorldPasses: renderBaseWorldPasses,
+    getLastBaseWorldPassesBreakdown: function () { try { return (typeof window !== 'undefined' && window.__LAST_BASEWORLD_PASSES_BREAKDOWN__) ? window.__LAST_BASEWORLD_PASSES_BREAKDOWN__ : null; } catch (_) { return null; } },
     buildMainFrameRenderables: buildMainFrameRenderables,
     drawMainFrameRenderables: drawMainFrameRenderables,
     drawMainFrameOverlays: drawMainFrameOverlays,
@@ -6781,74 +7082,88 @@ function bindRendererPassApi() {
 
 function buildRendererFramePlan() {
   var buildStartAtFramePlan = perfNow();
+  var interactionState = getMainCameraInteractionStateForRender();
+  var interactionFastPath = !!interactionState;
+  var buildMainRenderablesStartAt = perfNow();
   var order = buildMainFrameRenderables();
+  recordRenderFunctionTiming('render.buildRendererFramePlan.buildMainFrameRenderables', perfNow() - buildMainRenderablesStartAt, {
+    renderableCount: Number(order && order.length || 0),
+    interactionFastPath: interactionFastPath === true
+  });
   var currentViewRotation = normalizeMainEditorViewRotationValue(getSafeMainEditorViewRotation(null).viewRotation);
   var framePlanId = 'frameplan-' + String(++__mainFramePlanSeq);
   var framePlanSignature = [currentViewRotation, order.length, __lastMainRenderableBuildStats.staticRenderableCount, __lastMainRenderableBuildStats.dynamicRenderableCount].join('|');
-  for (var i = 0; i < order.length; i++) {
-    if (!order[i] || typeof order[i] !== 'object') continue;
-    order[i].framePlanId = framePlanId;
-    order[i].framePlanSignature = framePlanSignature;
-  }
-  logItemRotationPrototype('main-render-frameplan-rebuilt', {
-    currentViewRotation: currentViewRotation,
-    framePlanId: framePlanId,
-    framePlanSignature: framePlanSignature,
-    renderableCount: order.length,
-    staticRenderableCount: __lastMainRenderableBuildStats.staticRenderableCount,
-    dynamicRenderableCount: __lastMainRenderableBuildStats.dynamicRenderableCount,
-    reason: 'buildFramePlan'
-  });
-  logItemRotationPrototype('main-view-rotation-source-check', buildMainViewRotationSourceCheckPayload(currentViewRotation, staticBoxRenderCache && typeof staticBoxRenderCache.viewRotation === 'number' ? staticBoxRenderCache.viewRotation : currentViewRotation, typeof staticBoxGeometrySignature === 'function' ? staticBoxGeometrySignature() : null));
-  logRenderOrderDiagnostics(framePlanId, framePlanSignature, currentViewRotation, order);
-  logMainViewRotationVisualConsumerCheck(currentViewRotation);
-  logMainViewRotationRenderConsumerMode(currentViewRotation);
-  logItemRotationPrototype('main-camera-render-scope-check', {
-    framePlanId: framePlanId,
-    zoom: __lastMainRenderableBuildStats.zoom != null ? Number(__lastMainRenderableBuildStats.zoom) : getMainEditorZoomValueForRender(),
-    cameraCullingEnabled: __lastMainRenderableBuildStats.cameraCullingEnabled !== false,
-    renderablesBeforeCulling: Number(__lastMainRenderableBuildStats.renderablesBeforeCulling || order.length),
-    renderablesAfterCulling: Number(__lastMainRenderableBuildStats.renderablesAfterCulling || order.length),
-    cullingApplied: (__lastMainRenderableBuildStats.cameraCullingEnabled !== false) && Number(__lastMainRenderableBuildStats.renderablesAfterCulling || order.length) <= Number(__lastMainRenderableBuildStats.renderablesBeforeCulling || order.length)
-  });
-  if (isMainEditorViewAnimatingForRender()) {
-    logItemRotationPrototype('main-view-rotation-visible-frame-check', {
-      visualRotation: normalizeMainEditorViewRotationValue(currentViewRotation),
-      discreteViewRotation: normalizeMainEditorViewRotationValue(readLegacyMainEditorViewRotation() != null ? readLegacyMainEditorViewRotation() : currentViewRotation),
+  if (!interactionFastPath) {
+    for (var i = 0; i < order.length; i++) {
+      if (!order[i] || typeof order[i] !== 'object') continue;
+      order[i].framePlanId = framePlanId;
+      order[i].framePlanSignature = framePlanSignature;
+    }
+    logItemRotationPrototype('main-render-frameplan-rebuilt', {
+      currentViewRotation: currentViewRotation,
       framePlanId: framePlanId,
-      floorFrameBuiltFrom: 'visualRotation',
-      voxelFrameBuiltFrom: 'visualRotation',
-      lightsFrameBuiltFrom: 'visualRotation',
-      shadowsFrameBuiltFrom: 'visualRotation'
+      framePlanSignature: framePlanSignature,
+      renderableCount: order.length,
+      staticRenderableCount: __lastMainRenderableBuildStats.staticRenderableCount,
+      dynamicRenderableCount: __lastMainRenderableBuildStats.dynamicRenderableCount,
+      reason: 'buildFramePlan'
     });
+    logItemRotationPrototype('main-view-rotation-source-check', buildMainViewRotationSourceCheckPayload(currentViewRotation, staticBoxRenderCache && typeof staticBoxRenderCache.viewRotation === 'number' ? staticBoxRenderCache.viewRotation : currentViewRotation, typeof staticBoxGeometrySignature === 'function' ? staticBoxGeometrySignature() : null));
+    logRenderOrderDiagnostics(framePlanId, framePlanSignature, currentViewRotation, order);
+    logMainViewRotationVisualConsumerCheck(currentViewRotation);
+    logMainViewRotationRenderConsumerMode(currentViewRotation);
+    logItemRotationPrototype('main-camera-render-scope-check', {
+      framePlanId: framePlanId,
+      zoom: __lastMainRenderableBuildStats.zoom != null ? Number(__lastMainRenderableBuildStats.zoom) : getMainEditorZoomValueForRender(),
+      cameraCullingEnabled: __lastMainRenderableBuildStats.cameraCullingEnabled !== false,
+      renderablesBeforeCulling: Number(__lastMainRenderableBuildStats.renderablesBeforeCulling || order.length),
+      renderablesAfterCulling: Number(__lastMainRenderableBuildStats.renderablesAfterCulling || order.length),
+      cullingApplied: (__lastMainRenderableBuildStats.cameraCullingEnabled !== false) && Number(__lastMainRenderableBuildStats.renderablesAfterCulling || order.length) <= Number(__lastMainRenderableBuildStats.renderablesBeforeCulling || order.length)
+    });
+    if (isMainEditorViewAnimatingForRender()) {
+      logItemRotationPrototype('main-view-rotation-visible-frame-check', {
+        visualRotation: normalizeMainEditorViewRotationValue(currentViewRotation),
+        discreteViewRotation: normalizeMainEditorViewRotationValue(readLegacyMainEditorViewRotation() != null ? readLegacyMainEditorViewRotation() : currentViewRotation),
+        framePlanId: framePlanId,
+        floorFrameBuiltFrom: 'visualRotation',
+        voxelFrameBuiltFrom: 'visualRotation',
+        lightsFrameBuiltFrom: 'visualRotation',
+        shadowsFrameBuiltFrom: 'visualRotation'
+      });
+    }
+    if (__lastRenderVisibilityStats) {
+      var framePlanBuildMs = Math.max(0, perfNow() - buildStartAtFramePlan);
+      logItemRotationPrototype('render-build-cost-summary', {
+        terrainBuildMs: Number(__lastRenderVisibilityStats.terrainBuildMs || 0),
+        staticBuildMs: Number(__lastRenderVisibilityStats.staticBuildMs || 0),
+        dynamicBuildMs: Number(__lastRenderVisibilityStats.dynamicBuildMs || 0),
+        framePlanBuildMs: framePlanBuildMs,
+        renderablesBeforeCulling: Number(__lastMainRenderableBuildStats.renderablesBeforeCulling || 0),
+        renderablesAfterCulling: Number(__lastMainRenderableBuildStats.renderablesAfterCulling || order.length)
+      });
+      logItemRotationPrototype('render-performance-summary', {
+        framePlanBuildMs: framePlanBuildMs,
+        renderSourceBuildMs: Number(__lastRenderVisibilityStats.renderSourceBuildMs || 0),
+        visibilityFilterMs: Number(__lastRenderVisibilityStats.visibilityFilterMs || 0),
+        finalRenderableCount: Number(__lastMainRenderableBuildStats.renderablesAfterCulling || order.length),
+        cameraZoom: Number(__lastMainRenderableBuildStats.zoom || getMainEditorZoomValueForRender()),
+        currentViewRotation: normalizeMainEditorViewRotationValue(currentViewRotation)
+      });
+      __lastRenderResourceSummary = Object.assign({}, __lastRenderResourceSummary || {}, {
+        framePlanBuildMs: framePlanBuildMs,
+        finalRenderableCount: Number(__lastMainRenderableBuildStats.renderablesAfterCulling || order.length),
+        terrainBatchDrawCount: Number(__lastRenderVisibilityStats.terrainBatchDrawCount || 0),
+        terrainVisibleFaceCount: Number(__lastRenderVisibilityStats.terrainVisibleFaceCount || 0),
+        terrainVisibleChunkCount: Number(__lastRenderVisibilityStats.terrainVisibleChunkCount || 0)
+      });
+      logItemRotationPrototype('render-resource-summary', __lastRenderResourceSummary);
+    }
   }
-  if (__lastRenderVisibilityStats) {
-    var framePlanBuildMs = Math.max(0, perfNow() - buildStartAtFramePlan);
-    logItemRotationPrototype('render-build-cost-summary', {
-      terrainBuildMs: Number(__lastRenderVisibilityStats.terrainBuildMs || 0),
-      staticBuildMs: Number(__lastRenderVisibilityStats.staticBuildMs || 0),
-      dynamicBuildMs: Number(__lastRenderVisibilityStats.dynamicBuildMs || 0),
-      framePlanBuildMs: framePlanBuildMs,
-      renderablesBeforeCulling: Number(__lastMainRenderableBuildStats.renderablesBeforeCulling || 0),
-      renderablesAfterCulling: Number(__lastMainRenderableBuildStats.renderablesAfterCulling || order.length)
-    });
-    logItemRotationPrototype('render-performance-summary', {
-      framePlanBuildMs: framePlanBuildMs,
-      renderSourceBuildMs: Number(__lastRenderVisibilityStats.renderSourceBuildMs || 0),
-      visibilityFilterMs: Number(__lastRenderVisibilityStats.visibilityFilterMs || 0),
-      finalRenderableCount: Number(__lastMainRenderableBuildStats.renderablesAfterCulling || order.length),
-      cameraZoom: Number(__lastMainRenderableBuildStats.zoom || getMainEditorZoomValueForRender()),
-      currentViewRotation: normalizeMainEditorViewRotationValue(currentViewRotation)
-    });
-    __lastRenderResourceSummary = Object.assign({}, __lastRenderResourceSummary || {}, {
-      framePlanBuildMs: framePlanBuildMs,
-      finalRenderableCount: Number(__lastMainRenderableBuildStats.renderablesAfterCulling || order.length),
-      terrainBatchDrawCount: Number(__lastRenderVisibilityStats.terrainBatchDrawCount || 0),
-      terrainVisibleFaceCount: Number(__lastRenderVisibilityStats.terrainVisibleFaceCount || 0),
-      terrainVisibleChunkCount: Number(__lastRenderVisibilityStats.terrainVisibleChunkCount || 0)
-    });
-    logItemRotationPrototype('render-resource-summary', __lastRenderResourceSummary);
-  }
+  recordRenderFunctionTiming('render.buildRendererFramePlan.total', perfNow() - buildStartAtFramePlan, {
+    framePlanId: framePlanId,
+    renderableCount: Number(order && order.length || 0),
+    interactionFastPath: interactionFastPath === true
+  });
   return {
     id: framePlanId,
     signature: framePlanSignature,
@@ -6938,6 +7253,74 @@ function drawPolyOn(targetCtx, points, fill, stroke = 'rgba(0,0,0,.22)', width =
   if (stroke) { targetCtx.strokeStyle = stroke; targetCtx.lineWidth = width; targetCtx.stroke(); }
 }
 
+
+function getActiveBaseWorldActualPathProfile() {
+  try {
+    if (typeof window !== 'undefined' && window.__ACTIVE_BASEWORLD_ACTUAL_PATH_PROFILE__) return window.__ACTIVE_BASEWORLD_ACTUAL_PATH_PROFILE__;
+  } catch (_) {}
+  return null;
+}
+
+function writeBaseWorldActualPathProfile(partial) {
+  var profile = getActiveBaseWorldActualPathProfile();
+  if (!profile || !partial || typeof partial !== 'object') return profile;
+  Object.keys(partial).forEach(function (key) {
+    profile[key] = partial[key];
+  });
+  return profile;
+}
+
+function completeFloorLayerBreakdown(partial) {
+  var data = Object.assign({
+    rebuilt: false,
+    skippedByInteractionBudget: false,
+    floorLayerRebuildWallMs: 0,
+    floorLayerPreSetupWallMs: 0,
+    floorLayerLoopWallMs: 0,
+    floorLayerProjectionWallMs: 0,
+    floorLayerColorMaterialWallMs: 0,
+    floorLayerCanvasDrawWallMs: 0,
+    floorLayerPostFinalizeWallMs: 0,
+    floorLayerResidualWallMs: 0,
+    floorLayerReuseCameraDX: 0,
+    floorLayerReuseCameraDY: 0,
+    floorLayerReuseScale: 1,
+    floorLayerBuiltCameraX: 0,
+    floorLayerBuiltCameraY: 0,
+    floorLayerBuiltZoom: 1,
+    floorLayerBlitWallMs: 0,
+    floorLayerActualBranch: 'unknown',
+    floorVisibleChunkCount: 0,
+    floorBuiltChunkCountThisFrame: 0,
+    floorMissingChunkCountBefore: 0,
+    floorMissingChunkCountAfter: 0,
+    floorBuiltTileCountThisFrame: 0,
+    floorChunkSize: 0,
+    floorVersionTag: 'floor-static-chunk-v1'
+  }, partial || {});
+  writeBaseWorldActualPathProfile({
+    baseWorldActualBranch: data.floorLayerActualBranch,
+    floorLayerReusedDuringInteraction: !!data.skippedByInteractionBudget,
+    floorLayerRebuildWallMs: Number(data.floorLayerRebuildWallMs || 0),
+    floorLayerBlitWallMs: Number(data.floorLayerBlitWallMs || 0),
+    floorLoopWallMs: Number(data.floorLayerLoopWallMs || 0),
+    floorProjectionWallMs: Number(data.floorLayerProjectionWallMs || 0),
+    floorColorMaterialWallMs: Number(data.floorLayerColorMaterialWallMs || 0),
+    floorCanvasDrawWallMs: Number(data.floorLayerCanvasDrawWallMs || 0),
+    floorPreSetupWallMs: Number(data.floorLayerPreSetupWallMs || 0),
+    floorPostFinalizeWallMs: Number(data.floorLayerPostFinalizeWallMs || 0),
+    floorResidualWallMs: Number(data.floorLayerResidualWallMs || 0),
+    floorVisibleChunkCount: Number(data.floorVisibleChunkCount || 0),
+    floorBuiltChunkCountThisFrame: Number(data.floorBuiltChunkCountThisFrame || 0),
+    floorMissingChunkCountBefore: Number(data.floorMissingChunkCountBefore || 0),
+    floorMissingChunkCountAfter: Number(data.floorMissingChunkCountAfter || 0),
+    floorBuiltTileCountThisFrame: Number(data.floorBuiltTileCountThisFrame || 0),
+    floorChunkSize: Number(data.floorChunkSize || 0),
+    floorVersionTag: data.floorVersionTag || 'floor-static-chunk-v1'
+  });
+  return data;
+}
+
 function ensureFloorLayerCanvas() {
   if (!floorLayerCanvas) {
     floorLayerCanvas = document.createElement('canvas');
@@ -6955,70 +7338,445 @@ function ensureFloorLayerCanvas() {
   return floorLayerCtx;
 }
 
-function rebuildFloorLayerIfNeeded(force = false) {
-  var currentViewRotation = normalizeMainEditorViewRotationValue(getSafeMainEditorViewRotation(null).viewRotation);
-  var sig = floorLayerSignature();
-  var previousViewRotation = typeof floorLayerCache.viewRotation === 'number' ? floorLayerCache.viewRotation : currentViewRotation;
-  var needsRebuild = force || floorLayerCache.dirty || floorLayerCache.signature !== sig || !floorLayerCanvas;
-  if (!needsRebuild) return false;
+function getActiveCameraInteractionTypeForFloorLayer() {
+  try { return window && window.__habboActiveCameraInteractionType ? String(window.__habboActiveCameraInteractionType) : null; } catch (_) { return null; }
+}
 
-  var now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-  if (!force && isInteractiveRenderPressure() && !isMainEditorViewAnimatingForRender() && floorLayerCache.signature && (now - floorLayerCache.lastBuiltAt) < FLOOR_LAYER_INTERACTION_MS) {
-    return false;
+function getCameraSettleReuseStateForFloorLayer() {
+  try { return window && window.__habboCameraSettleReuseState ? window.__habboCameraSettleReuseState : null; } catch (_) { return null; }
+}
+
+function shouldDeferFloorLayerSettleCommit(currentViewRotation) {
+  if (!floorLayerCanvas || !floorLayerCache || !floorLayerCache.signature) return false;
+  if (Number(floorLayerCache.viewRotation || currentViewRotation) !== Number(currentViewRotation || 0)) return false;
+  var settleState = getCameraSettleReuseStateForFloorLayer();
+  if (!settleState || String(settleState.lastEndedType || '') !== 'zoom') return false;
+  var nowMs = perfNow();
+  if (Number(settleState.deferCommitUntilMs || 0) <= nowMs) return false;
+  var activeType = getActiveCameraInteractionTypeForFloorLayer();
+  return !activeType || activeType === 'drag' || activeType === 'pan' || activeType === 'pinch';
+}
+
+function shouldForceFloorLayerInteractionReuse(currentViewRotation) {
+  var activeType = getActiveCameraInteractionTypeForFloorLayer();
+  if (activeType !== 'zoom' && !shouldDeferFloorLayerSettleCommit(currentViewRotation)) return false;
+  if (!floorLayerCanvas || !floorLayerCache || !floorLayerCache.signature) return false;
+  return Number(floorLayerCache.viewRotation || currentViewRotation) === Number(currentViewRotation || 0);
+}
+
+function getFloorChunkSizeForLayer() {
+  try {
+    var staticWorldCacheApi = getSharedStaticWorldChunkCacheApiForRender();
+    if (staticWorldCacheApi && typeof staticWorldCacheApi.getChunkSize === 'function') {
+      var chunkSize = Math.max(1, Math.round(Number(staticWorldCacheApi.getChunkSize() || 16) || 16));
+      return chunkSize;
+    }
+  } catch (_) {}
+  return 16;
+}
+
+function ensureFloorChunkCacheState(chunkSize) {
+  var targetChunkSize = Math.max(1, Math.round(Number(chunkSize || 16) || 16));
+  if (!floorLayerCache || typeof floorLayerCache !== 'object') floorLayerCache = { dirty: true };
+  if (!(floorLayerCache.chunks instanceof Map)) floorLayerCache.chunks = new Map();
+  if (!Array.isArray(floorLayerCache.visibleChunkKeys)) floorLayerCache.visibleChunkKeys = [];
+  if (Number(floorLayerCache.chunkSize || 0) !== targetChunkSize) {
+    floorLayerCache.chunkSize = targetChunkSize;
+    floorLayerCache.chunks = new Map();
+    floorLayerCache.visibleChunkKeys = [];
+    floorLayerCache.viewSignature = '';
+    floorLayerCache.dirty = true;
   }
+  return floorLayerCache;
+}
 
-  var parsedSignature = null;
-  try { parsedSignature = sig ? JSON.parse(sig) : null; } catch (_) { parsedSignature = null; }
-  var targetCtx = ensureFloorLayerCanvas();
-  targetCtx.clearRect(0, 0, VIEW_W, VIEW_H);
-  var scope = getMainCameraRenderScope(currentViewRotation);
-  var floorBounds = scope && scope.cameraCullingEnabled !== false ? scope.cullingWorldBounds : null;
-  var startY = floorBounds ? Math.max(0, Math.floor(floorBounds.minY)) : 0;
-  var endY = floorBounds ? Math.min(settings.gridH, Math.ceil(floorBounds.maxY)) : settings.gridH;
-  var startX = floorBounds ? Math.max(0, Math.floor(floorBounds.minX)) : 0;
-  var endX = floorBounds ? Math.min(settings.gridW, Math.ceil(floorBounds.maxX)) : settings.gridW;
-  for (let y = startY; y < endY; y++) {
-    for (let x = startX; x < endX; x++) {
-      const p0 = iso(x, y, 0), p1 = iso(x + 1, y, 0), p2 = iso(x + 1, y + 1, 0), p3 = iso(x, y + 1, 0);
-      const base = (x + y) % 2 === 0 ? '#33415a' : '#29344b';
-      const lit = rgbToCss(litColor(hexToRgb(base), { x: x + 0.5, y: y + 0.5, z: 0 }, { x: 0, y: 0, z: 1 }));
-      drawPolyOn(targetCtx, [p0, p1, p2, p3], lit, 'rgba(255,255,255,.05)');
+function getFloorChunkKeyForLayer(chunkX, chunkY) {
+  return String(chunkX) + ',' + String(chunkY);
+}
+
+function parseFloorChunkKeyForLayer(chunkKey) {
+  var raw = String(chunkKey || '0,0').split(',');
+  return {
+    chunkX: Math.round(Number(raw[0] || 0) || 0),
+    chunkY: Math.round(Number(raw[1] || 0) || 0)
+  };
+}
+
+function computeVisibleFloorChunkKeysForLayer(scope, chunkSize) {
+  var size = Math.max(1, Math.round(Number(chunkSize || 16) || 16));
+  var maxChunkX = Math.max(0, Math.ceil(Number(settings.gridW || 0) / size) - 1);
+  var maxChunkY = Math.max(0, Math.ceil(Number(settings.gridH || 0) / size) - 1);
+  var bounds = scope && scope.cameraCullingEnabled !== false && scope.cullingWorldBounds
+    ? scope.cullingWorldBounds
+    : { minX: 0, minY: 0, maxX: Number(settings.gridW || 0), maxY: Number(settings.gridH || 0) };
+  var paddingChunks = 1;
+  var minChunkX = Math.max(0, Math.floor((Number(bounds.minX || 0) - paddingChunks * size) / size));
+  var minChunkY = Math.max(0, Math.floor((Number(bounds.minY || 0) - paddingChunks * size) / size));
+  var maxVisibleChunkX = Math.min(maxChunkX, Math.floor((Number(bounds.maxX || 0) + paddingChunks * size - 1) / size));
+  var maxVisibleChunkY = Math.min(maxChunkY, Math.floor((Number(bounds.maxY || 0) + paddingChunks * size - 1) / size));
+  var centerX = (Number(bounds.minX || 0) + Number(bounds.maxX || 0)) * 0.5;
+  var centerY = (Number(bounds.minY || 0) + Number(bounds.maxY || 0)) * 0.5;
+  var keys = [];
+  for (var chunkX = minChunkX; chunkX <= maxVisibleChunkX; chunkX++) {
+    for (var chunkY = minChunkY; chunkY <= maxVisibleChunkY; chunkY++) {
+      keys.push({
+        key: getFloorChunkKeyForLayer(chunkX, chunkY),
+        sortDistance: Math.abs((chunkX + 0.5) * size - centerX) + Math.abs((chunkY + 0.5) * size - centerY)
+      });
     }
   }
-  const a = iso(0, 0, 0), b = iso(settings.gridW, 0, 0), c = iso(settings.gridW, settings.gridH, 0), d = iso(0, settings.gridH, 0);
+  keys.sort(function (left, right) { return Number(left.sortDistance || 0) - Number(right.sortDistance || 0); });
+  return keys.map(function (entry) { return entry.key; });
+}
+
+function buildFloorLayerViewSignatureForLayer(currentCameraX, currentCameraY, visibleChunkKeys, currentViewRotation) {
+  return JSON.stringify({
+    cameraX: Number((currentCameraX || 0).toFixed(3)),
+    cameraY: Number((currentCameraY || 0).toFixed(3)),
+    viewRotation: Number(currentViewRotation || 0),
+    visibleChunkKeys: Array.isArray(visibleChunkKeys) ? visibleChunkKeys.slice() : []
+  });
+}
+
+function buildFloorChunkEntryForLayer(chunkKey, currentViewRotation, contentSignature) {
+  var chunkSize = getFloorChunkSizeForLayer();
+  var parsed = parseFloorChunkKeyForLayer(chunkKey);
+  var minX = Math.max(0, parsed.chunkX * chunkSize);
+  var minY = Math.max(0, parsed.chunkY * chunkSize);
+  var maxX = Math.min(Number(settings.gridW || 0), minX + chunkSize);
+  var maxY = Math.min(Number(settings.gridH || 0), minY + chunkSize);
+  var tiles = [];
+  var minScreenX = Infinity;
+  var minScreenY = Infinity;
+  var maxScreenX = -Infinity;
+  var maxScreenY = -Infinity;
+  for (var y = minY; y < maxY; y++) {
+    for (var x = minX; x < maxX; x++) {
+      var points = screenPointsFromWorldFaceNoCamera([
+        { x: x, y: y, z: 0 },
+        { x: x + 1, y: y, z: 0 },
+        { x: x + 1, y: y + 1, z: 0 },
+        { x: x, y: y + 1, z: 0 }
+      ], currentViewRotation);
+      for (var p = 0; p < points.length; p++) {
+        var pt = points[p];
+        if (!pt) continue;
+        if (pt.x < minScreenX) minScreenX = pt.x;
+        if (pt.y < minScreenY) minScreenY = pt.y;
+        if (pt.x > maxScreenX) maxScreenX = pt.x;
+        if (pt.y > maxScreenY) maxScreenY = pt.y;
+      }
+      var base = (x + y) % 2 === 0 ? '#33415a' : '#29344b';
+      var lit = rgbToCss(litColor(hexToRgb(base), { x: x + 0.5, y: y + 0.5, z: 0 }, { x: 0, y: 0, z: 1 }));
+      tiles.push({ points: points, fill: lit });
+    }
+  }
+  if (!tiles.length || !isFinite(minScreenX) || !isFinite(minScreenY) || !isFinite(maxScreenX) || !isFinite(maxScreenY)) {
+    return {
+      key: chunkKey,
+      chunkX: parsed.chunkX,
+      chunkY: parsed.chunkY,
+      minX: minX,
+      minY: minY,
+      maxX: maxX,
+      maxY: maxY,
+      contentSignature: String(contentSignature || ''),
+      canvas: null,
+      screenBoundsNoCamera: { x: 0, y: 0, w: 0, h: 0 },
+      tileCount: 0,
+      lastBuiltAt: perfNow()
+    };
+  }
+  var padding = 4;
+  var width = Math.max(1, Math.ceil((maxScreenX - minScreenX) + padding * 2));
+  var height = Math.max(1, Math.ceil((maxScreenY - minScreenY) + padding * 2));
+  var canvasEl = document.createElement('canvas');
+  canvasEl.width = Math.max(1, Math.round(width * dpr));
+  canvasEl.height = Math.max(1, Math.round(height * dpr));
+  var localCtx = canvasEl.getContext('2d');
+  localCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  localCtx.imageSmoothingEnabled = true;
+  localCtx.translate(-minScreenX + padding, -minScreenY + padding);
+  for (var i = 0; i < tiles.length; i++) {
+    var tile = tiles[i];
+    drawPolyOn(localCtx, tile.points, tile.fill, 'rgba(255,255,255,.05)');
+  }
+  return {
+    key: chunkKey,
+    chunkX: parsed.chunkX,
+    chunkY: parsed.chunkY,
+    minX: minX,
+    minY: minY,
+    maxX: maxX,
+    maxY: maxY,
+    contentSignature: String(contentSignature || ''),
+    canvas: canvasEl,
+    screenBoundsNoCamera: {
+      x: minScreenX - padding,
+      y: minScreenY - padding,
+      w: width,
+      h: height
+    },
+    tileCount: tiles.length,
+    lastBuiltAt: perfNow()
+  };
+}
+
+function drawFloorOutlineToLayer(targetCtx, currentCameraX, currentCameraY, currentViewRotation) {
+  var outline = screenPointsFromWorldFaceNoCamera([
+    { x: 0, y: 0, z: 0 },
+    { x: Number(settings.gridW || 0), y: 0, z: 0 },
+    { x: Number(settings.gridW || 0), y: Number(settings.gridH || 0), z: 0 },
+    { x: 0, y: Number(settings.gridH || 0), z: 0 }
+  ], currentViewRotation);
+  if (!outline.length) return;
   targetCtx.strokeStyle = 'rgba(255,255,255,.14)';
   targetCtx.lineWidth = 2;
   targetCtx.beginPath();
-  targetCtx.moveTo(a.x, a.y); targetCtx.lineTo(b.x, b.y); targetCtx.lineTo(c.x, c.y); targetCtx.lineTo(d.x, d.y); targetCtx.closePath(); targetCtx.stroke();
+  targetCtx.moveTo(outline[0].x + currentCameraX, outline[0].y + currentCameraY);
+  for (var i = 1; i < outline.length; i++) targetCtx.lineTo(outline[i].x + currentCameraX, outline[i].y + currentCameraY);
+  targetCtx.closePath();
+  targetCtx.stroke();
+}
 
-  floorLayerCache.signature = sig;
-  floorLayerCache.cacheSignature = sig;
+function rebuildFloorLayerIfNeeded(force = false) {
+  var rebuildStartAt = perfNow();
+  var currentViewRotation = normalizeMainEditorViewRotationValue(getSafeMainEditorViewRotation(null).viewRotation);
+  var currentZoomForLayer = Number(getMainEditorZoomValueForRender()) || 1;
+  var currentCameraXForLayer = Number(camera && camera.x || 0);
+  var currentCameraYForLayer = Number(camera && camera.y || 0);
+  var activeType = getActiveCameraInteractionTypeForFloorLayer();
+  var forceInteractionReuse = !force && shouldForceFloorLayerInteractionReuse(currentViewRotation);
+  if (forceInteractionReuse && floorLayerCanvas && floorLayerCache.signature && Number(floorLayerCache.viewRotation || currentViewRotation) === Number(currentViewRotation || 0)) {
+    var builtZoomForReuse = Number(floorLayerCache.buildZoom || currentZoomForLayer) || 1;
+    return completeFloorLayerBreakdown({
+      rebuilt: false,
+      skippedByInteractionBudget: true,
+      floorLayerReuseCameraDX: Number((currentCameraXForLayer - Number(floorLayerCache.buildCameraX || 0)).toFixed(3)),
+      floorLayerReuseCameraDY: Number((currentCameraYForLayer - Number(floorLayerCache.buildCameraY || 0)).toFixed(3)),
+      floorLayerReuseScale: Number((currentZoomForLayer / builtZoomForReuse).toFixed(4)),
+      floorLayerBuiltCameraX: Number(floorLayerCache.buildCameraX || 0),
+      floorLayerBuiltCameraY: Number(floorLayerCache.buildCameraY || 0),
+      floorLayerBuiltZoom: builtZoomForReuse,
+      floorLayerActualBranch: (activeType === 'zoom')
+        ? 'floor-layer-cache-reuse-zoom-lock'
+        : 'floor-layer-cache-reuse-zoom-settle-defer'
+    });
+  }
+
+  var contentSignature = floorLayerSignature();
+  var previousViewRotation = typeof floorLayerCache.viewRotation === 'number' ? floorLayerCache.viewRotation : currentViewRotation;
+  var scope = getMainCameraRenderScope(currentViewRotation);
+  var chunkSize = getFloorChunkSizeForLayer();
+  ensureFloorChunkCacheState(chunkSize);
+  var preSetupStartAt = perfNow();
+  var targetCtx = ensureFloorLayerCanvas();
+  var visibleChunkKeys = computeVisibleFloorChunkKeysForLayer(scope, chunkSize);
+  var viewSignature = buildFloorLayerViewSignatureForLayer(currentCameraXForLayer, currentCameraYForLayer, visibleChunkKeys, currentViewRotation);
+  var contentChanged = force || floorLayerCache.dirty || floorLayerCache.signature !== contentSignature || Number(floorLayerCache.viewRotation || currentViewRotation) !== Number(currentViewRotation || 0);
+  if (contentChanged) {
+    floorLayerCache.chunks = new Map();
+    floorLayerCache.visibleChunkKeys = [];
+    floorLayerCache.viewSignature = '';
+  }
+  var preSetupEndAt = perfNow();
+
+  var interactiveChunkBudget = !force && (activeType === 'drag' || activeType === 'pan' || activeType === 'pinch' || isInteractiveRenderPressure());
+  var buildBudgetValue = interactiveChunkBudget ? 1 : Math.max(1, visibleChunkKeys.length);
+  if (!floorLayerCache.chunks || floorLayerCache.chunks.size === 0) buildBudgetValue = Math.max(1, visibleChunkKeys.length);
+
+  var floorProjectionWallMs = 0;
+  var floorColorMaterialWallMs = 0;
+  var floorCanvasDrawWallMs = 0;
+  var floorLoopStartAt = perfNow();
+  var visibleEntries = [];
+  var builtChunkCountThisFrame = 0;
+  var missingChunkCountBefore = 0;
+  var missingChunkCountAfter = 0;
+  var builtTileCountThisFrame = 0;
+  for (var i = 0; i < visibleChunkKeys.length; i++) {
+    var chunkKey = visibleChunkKeys[i];
+    var entry = floorLayerCache.chunks.get(chunkKey) || null;
+    if (!entry || entry.contentSignature !== contentSignature) {
+      missingChunkCountBefore += 1;
+      if (builtChunkCountThisFrame < buildBudgetValue) {
+        var buildStartAt = perfNow();
+        entry = buildFloorChunkEntryForLayer(chunkKey, currentViewRotation, contentSignature);
+        floorProjectionWallMs += Math.max(0, perfNow() - buildStartAt);
+        floorLayerCache.chunks.set(chunkKey, entry);
+        builtChunkCountThisFrame += 1;
+        builtTileCountThisFrame += Number(entry && entry.tileCount || 0);
+      } else {
+        missingChunkCountAfter += 1;
+        continue;
+      }
+    }
+    if (entry) visibleEntries.push(entry);
+  }
+  var composeStartAt = perfNow();
+  targetCtx.clearRect(0, 0, VIEW_W, VIEW_H);
+  for (var entryIndex = 0; entryIndex < visibleEntries.length; entryIndex++) {
+    var visibleEntry = visibleEntries[entryIndex];
+    if (!visibleEntry || !visibleEntry.canvas) continue;
+    var bounds = visibleEntry.screenBoundsNoCamera || { x: 0, y: 0, w: 0, h: 0 };
+    targetCtx.drawImage(visibleEntry.canvas, bounds.x + currentCameraXForLayer, bounds.y + currentCameraYForLayer, bounds.w, bounds.h);
+  }
+  floorCanvasDrawWallMs += Math.max(0, perfNow() - composeStartAt);
+  floorColorMaterialWallMs += Number(floorCanvasDrawWallMs || 0);
+  drawFloorOutlineToLayer(targetCtx, currentCameraXForLayer, currentCameraYForLayer, currentViewRotation);
+  var floorLoopEndAt = perfNow();
+  var floorLoopWallMs = Math.max(0, floorLoopEndAt - floorLoopStartAt);
+
+  var postFinalizeStartAt = perfNow();
+  floorLayerCache.signature = contentSignature;
+  floorLayerCache.contentSignature = contentSignature;
+  floorLayerCache.cacheSignature = contentSignature;
+  floorLayerCache.viewSignature = viewSignature;
   floorLayerCache.viewRotation = currentViewRotation;
-  floorLayerCache.lastBuiltAt = now;
+  floorLayerCache.lastBuiltAt = perfNow();
   floorLayerCache.dirty = false;
+  floorLayerCache.buildCameraX = currentCameraXForLayer;
+  floorLayerCache.buildCameraY = currentCameraYForLayer;
+  floorLayerCache.buildZoom = currentZoomForLayer;
+  floorLayerCache.visibleChunkKeys = visibleChunkKeys.slice();
   logItemRotationPrototype('main-floor-rotation-cache-check', {
     previousViewRotation: normalizeMainEditorViewRotationValue(previousViewRotation),
     nextViewRotation: currentViewRotation,
-    floorCacheInvalidated: true,
-    floorCacheRebuilt: true,
-    floorSignatureIncludesViewRotation: !!(parsedSignature && typeof parsedSignature.viewRotation === 'number'),
-    floorDrawUsedCurrentViewRotation: true
+    floorCacheInvalidated: !!contentChanged,
+    floorCacheRebuilt: builtChunkCountThisFrame > 0,
+    floorSignatureIncludesViewRotation: true,
+    floorSignatureIncludesCamera: false,
+    floorDrawUsedCurrentViewRotation: true,
+    floorVisibleChunkCount: visibleChunkKeys.length,
+    floorBuiltChunkCountThisFrame: builtChunkCountThisFrame,
+    floorMissingChunkCountAfter: missingChunkCountAfter,
+    floorChunkSize: chunkSize,
+    floorVersionTag: 'floor-static-chunk-v1'
   });
-  noteLayerRebuild('floor', `interactive=${isInteractiveRenderPressure()} lights=${lights.length} grid=${settings.gridW}x${settings.gridH} viewRotation=${currentViewRotation}`);
-  return true;
+  noteLayerRebuild('floor', 'chunked static-world-aligned visible=' + String(visibleChunkKeys.length) + ' built=' + String(builtChunkCountThisFrame) + ' missing=' + String(missingChunkCountAfter) + ' chunkSize=' + String(chunkSize));
+  var postFinalizeEndAt = perfNow();
+
+  var floorLayerRebuildWallMs = Math.max(0, perfNow() - rebuildStartAt);
+  var floorLayerPreSetupWallMs = Math.max(0, preSetupEndAt - preSetupStartAt);
+  var floorLayerPostFinalizeWallMs = Math.max(0, postFinalizeEndAt - postFinalizeStartAt);
+  var floorLayerResidualWallMs = Math.max(0, floorLayerRebuildWallMs - floorLayerPreSetupWallMs - floorLoopWallMs - floorLayerPostFinalizeWallMs);
+  var floorLayerActualBranch = builtChunkCountThisFrame > 0
+    ? (missingChunkCountAfter > 0 ? 'floor-layer-static-chunk-composite-build-deferred' : 'floor-layer-static-chunk-composite-build')
+    : (contentChanged ? 'floor-layer-static-chunk-composite-content-hit' : 'floor-layer-static-chunk-composite');
+  return completeFloorLayerBreakdown({
+    rebuilt: builtChunkCountThisFrame > 0,
+    floorLayerRebuildWallMs: floorLayerRebuildWallMs,
+    floorLayerPreSetupWallMs: floorLayerPreSetupWallMs,
+    floorLayerLoopWallMs: floorLoopWallMs,
+    floorLayerProjectionWallMs: floorProjectionWallMs,
+    floorLayerColorMaterialWallMs: floorColorMaterialWallMs,
+    floorLayerCanvasDrawWallMs: floorCanvasDrawWallMs,
+    floorLayerPostFinalizeWallMs: floorLayerPostFinalizeWallMs,
+    floorLayerResidualWallMs: floorLayerResidualWallMs,
+    floorLayerReuseCameraDX: 0,
+    floorLayerReuseCameraDY: 0,
+    floorLayerReuseScale: 1,
+    floorLayerBuiltCameraX: currentCameraXForLayer,
+    floorLayerBuiltCameraY: currentCameraYForLayer,
+    floorLayerBuiltZoom: currentZoomForLayer,
+    floorLayerActualBranch: floorLayerActualBranch,
+    floorVisibleChunkCount: visibleChunkKeys.length,
+    floorBuiltChunkCountThisFrame: builtChunkCountThisFrame,
+    floorMissingChunkCountBefore: missingChunkCountBefore,
+    floorMissingChunkCountAfter: missingChunkCountAfter,
+    floorBuiltTileCountThisFrame: builtTileCountThisFrame,
+    floorChunkSize: chunkSize,
+    floorVersionTag: 'floor-static-chunk-v1'
+  });
 }
 
 function drawFloor() {
-  rebuildFloorLayerIfNeeded();
+  var floorDrawStartAt = perfNow();
+  var rebuildBreakdown = rebuildFloorLayerIfNeeded() || null;
+  var blitStartAt = perfNow();
+  var blitWallMs = 0;
+  var reuseDX = Number(rebuildBreakdown && rebuildBreakdown.floorLayerReuseCameraDX || 0);
+  var reuseDY = Number(rebuildBreakdown && rebuildBreakdown.floorLayerReuseCameraDY || 0);
+  var reuseScale = Number(rebuildBreakdown && rebuildBreakdown.floorLayerReuseScale || 1);
+  var builtCameraX = Number(rebuildBreakdown && rebuildBreakdown.floorLayerBuiltCameraX || 0);
+  var builtCameraY = Number(rebuildBreakdown && rebuildBreakdown.floorLayerBuiltCameraY || 0);
   if (floorLayerCanvas) {
-    ctx.drawImage(floorLayerCanvas, 0, 0, VIEW_W, VIEW_H);
+    if (rebuildBreakdown && rebuildBreakdown.skippedByInteractionBudget) {
+      ctx.save();
+      if (Math.abs(reuseScale - 1) > 0.001) {
+        var anchorX = Number(settings && settings.originX || 0) + builtCameraX;
+        var anchorY = Number(settings && settings.originY || 0) + builtCameraY;
+        ctx.translate(anchorX + reuseDX, anchorY + reuseDY);
+        ctx.scale(reuseScale, reuseScale);
+        ctx.translate(-anchorX, -anchorY);
+        ctx.drawImage(floorLayerCanvas, 0, 0, VIEW_W, VIEW_H);
+      } else {
+        ctx.drawImage(floorLayerCanvas, reuseDX, reuseDY, VIEW_W, VIEW_H);
+      }
+      ctx.restore();
+    } else {
+      ctx.drawImage(floorLayerCanvas, 0, 0, VIEW_W, VIEW_H);
+    }
+    blitWallMs = Math.max(0, perfNow() - blitStartAt);
     logItemRotationPrototype('main-floor-draw-hit', {
       currentViewRotation: normalizeMainEditorViewRotationValue(getSafeMainEditorViewRotation(null).viewRotation),
       floorRenderPath: 'floor-layer-cache',
       floorCacheSignature: floorLayerCache && floorLayerCache.cacheSignature ? floorLayerCache.cacheSignature : floorLayerCache.signature,
-      floorDrawUsedCurrentViewRotation: !!(floorLayerCache && typeof floorLayerCache.viewRotation === 'number' && floorLayerCache.viewRotation === normalizeMainEditorViewRotationValue(getSafeMainEditorViewRotation(null).viewRotation))
+      floorDrawUsedCurrentViewRotation: !!(floorLayerCache && typeof floorLayerCache.viewRotation === 'number' && floorLayerCache.viewRotation === normalizeMainEditorViewRotationValue(getSafeMainEditorViewRotation(null).viewRotation)),
+      floorLayerReusedDuringInteraction: !!(rebuildBreakdown && rebuildBreakdown.skippedByInteractionBudget),
+      floorLayerReuseCameraDX: reuseDX,
+      floorLayerReuseCameraDY: reuseDY,
+      floorLayerReuseScale: reuseScale
     });
   }
+  var drawFloorWallMs = Math.max(0, perfNow() - floorDrawStartAt);
+  var floorLoopWallMs = Number(rebuildBreakdown && rebuildBreakdown.floorLayerLoopWallMs || 0);
+  var floorProjectionWallMs = Number(rebuildBreakdown && rebuildBreakdown.floorLayerProjectionWallMs || 0);
+  var floorColorMaterialWallMs = Number(rebuildBreakdown && rebuildBreakdown.floorLayerColorMaterialWallMs || 0);
+  var floorCanvasDrawWallMs = Number(rebuildBreakdown && rebuildBreakdown.floorLayerCanvasDrawWallMs || 0) + Number(blitWallMs || 0);
+  var breakdown = {
+    baseWorldActualBranch: String(rebuildBreakdown && rebuildBreakdown.floorLayerActualBranch || 'floor-layer-cache-unknown'),
+    drawFloorWallMs: Number(drawFloorWallMs.toFixed(3)),
+    floorLoopWallMs: Number(floorLoopWallMs.toFixed(3)),
+    floorProjectionWallMs: Number(floorProjectionWallMs.toFixed(3)),
+    floorColorMaterialWallMs: Number(floorColorMaterialWallMs.toFixed(3)),
+    floorCanvasDrawWallMs: Number(floorCanvasDrawWallMs.toFixed(3)),
+    floorPreSetupWallMs: Number(rebuildBreakdown && rebuildBreakdown.floorLayerPreSetupWallMs || 0),
+    floorPostFinalizeWallMs: Number(rebuildBreakdown && rebuildBreakdown.floorLayerPostFinalizeWallMs || 0),
+    floorResidualWallMs: Number(rebuildBreakdown && rebuildBreakdown.floorLayerResidualWallMs || 0),
+    floorLayerRebuildWallMs: Number(rebuildBreakdown && rebuildBreakdown.floorLayerRebuildWallMs || 0),
+    floorLayerBlitWallMs: Number(blitWallMs.toFixed(3)),
+    floorLayerRebuilt: !!(rebuildBreakdown && rebuildBreakdown.rebuilt),
+    floorLayerSkippedByInteractionBudget: !!(rebuildBreakdown && rebuildBreakdown.skippedByInteractionBudget),
+    floorLayerReusedDuringInteraction: !!(rebuildBreakdown && rebuildBreakdown.skippedByInteractionBudget),
+    floorLayerReuseCameraDX: Number(reuseDX.toFixed(3)),
+    floorLayerReuseCameraDY: Number(reuseDY.toFixed(3)),
+    floorLayerReuseScale: Number(reuseScale.toFixed(4)),
+    floorVisibleChunkCount: Number(rebuildBreakdown && rebuildBreakdown.floorVisibleChunkCount || 0),
+    floorBuiltChunkCountThisFrame: Number(rebuildBreakdown && rebuildBreakdown.floorBuiltChunkCountThisFrame || 0),
+    floorMissingChunkCountBefore: Number(rebuildBreakdown && rebuildBreakdown.floorMissingChunkCountBefore || 0),
+    floorMissingChunkCountAfter: Number(rebuildBreakdown && rebuildBreakdown.floorMissingChunkCountAfter || 0),
+    floorBuiltTileCountThisFrame: Number(rebuildBreakdown && rebuildBreakdown.floorBuiltTileCountThisFrame || 0),
+    floorChunkSize: Number(rebuildBreakdown && rebuildBreakdown.floorChunkSize || 0),
+    floorVersionTag: String(rebuildBreakdown && rebuildBreakdown.floorVersionTag || 'floor-static-chunk-v1')
+  };
+  writeBaseWorldActualPathProfile({
+    baseWorldActualBranch: breakdown.baseWorldActualBranch,
+    floorLayerReusedDuringInteraction: !!breakdown.floorLayerReusedDuringInteraction,
+    floorLayerRebuildWallMs: Number(breakdown.floorLayerRebuildWallMs || 0),
+    floorLayerBlitWallMs: Number(breakdown.floorLayerBlitWallMs || 0),
+    floorLoopWallMs: Number(breakdown.floorLoopWallMs || 0),
+    floorProjectionWallMs: Number(breakdown.floorProjectionWallMs || 0),
+    floorColorMaterialWallMs: Number(breakdown.floorColorMaterialWallMs || 0),
+    floorCanvasDrawWallMs: Number(breakdown.floorCanvasDrawWallMs || 0),
+    floorPreSetupWallMs: Number(breakdown.floorPreSetupWallMs || 0),
+    floorPostFinalizeWallMs: Number(breakdown.floorPostFinalizeWallMs || 0),
+    floorResidualWallMs: Number(breakdown.floorResidualWallMs || 0),
+    drawFloorWallMs: Number(breakdown.drawFloorWallMs || 0)
+  });
+  try {
+    if (typeof window !== 'undefined') window.__LAST_DRAW_FLOOR_BREAKDOWN__ = breakdown;
+  } catch (_) {}
 }
 
 
@@ -7473,14 +8231,92 @@ function drawCachedVoxelFaceRenderable(item) {
   drawFaceShadowOverlays(ctx, item.points || [], item.shadowOverlays || []);
 }
 
+function buildPath2DFromPoints(points) {
+  if (typeof Path2D === 'undefined') return null;
+  var pts = Array.isArray(points) ? points : [];
+  if (pts.length < 3) return null;
+  var path = new Path2D();
+  path.moveTo(Number(pts[0].x || 0), Number(pts[0].y || 0));
+  for (var i = 1; i < pts.length; i++) path.lineTo(Number(pts[i].x || 0), Number(pts[i].y || 0));
+  path.closePath();
+  return path;
+}
+
+function buildStaticWorldPacketProjectionCacheKey(packet, viewRotation) {
+  return [
+    Number(viewRotation || 0),
+    Number(settings && settings.tileW || 0),
+    Number(settings && settings.tileH || 0),
+    Number(settings && settings.originX || 0),
+    Number(settings && settings.originY || 0),
+    String(packet && packet.fill || ''),
+    String(packet && packet.stroke || ''),
+    Number(packet && packet.width || 1),
+    Array.isArray(packet && packet.worldPts) ? packet.worldPts.length : 0,
+    Array.isArray(packet && packet.shadowOverlaysWorld) ? packet.shadowOverlaysWorld.length : 0,
+    packet && packet.id ? String(packet.id) : ''
+  ].join('|');
+}
+
+function getStaticWorldPacketProjectedGeometry(packet, viewRotation) {
+  if (!packet) return null;
+  var cacheKey = buildStaticWorldPacketProjectionCacheKey(packet, viewRotation);
+  var cached = packet.__projectedDrawCache || null;
+  if (cached && cached.key === cacheKey) {
+    packet.__lastStaticPacketCacheState = {
+      geometryCacheHit: true,
+      overlayCacheHit: true,
+      overlayCount: Array.isArray(cached.overlaysNoCamera) ? cached.overlaysNoCamera.length : 0
+    };
+    return cached;
+  }
+  var pointsNoCamera = screenPointsFromWorldFaceNoCamera(packet.worldPts || [], viewRotation);
+  var overlaysNoCamera = Array.isArray(packet.shadowOverlaysWorld) && packet.shadowOverlaysWorld.length
+    ? worldShadowOverlaysToNoCamera(packet.shadowOverlaysWorld || [], viewRotation)
+    : [];
+  cached = {
+    key: cacheKey,
+    pointsNoCamera: pointsNoCamera,
+    overlaysNoCamera: overlaysNoCamera,
+    path2d: buildPath2DFromPoints(pointsNoCamera)
+  };
+  packet.__projectedDrawCache = cached;
+  packet.__lastStaticPacketCacheState = {
+    geometryCacheHit: false,
+    overlayCacheHit: false,
+    overlayCount: overlaysNoCamera.length
+  };
+  return cached;
+}
+
 function drawStaticWorldFacePacket(packet) {
   if (!packet) return;
   var offsetX = Number(camera && camera.x || 0);
   var offsetY = Number(camera && camera.y || 0);
   var currentViewRotation = normalizeMainEditorViewRotationValue(getSafeMainEditorViewRotation(null).viewRotation);
-  var pointsNoCamera = screenPointsFromWorldFaceNoCamera(packet.worldPts || [], currentViewRotation);
+  var projected = getStaticWorldPacketProjectedGeometry(packet, currentViewRotation);
+  var pointsNoCamera = projected && Array.isArray(projected.pointsNoCamera) ? projected.pointsNoCamera : [];
+  if (!pointsNoCamera.length) return;
+  if (projected && projected.path2d) {
+    ctx.save();
+    if (offsetX || offsetY) ctx.translate(offsetX, offsetY);
+    if (packet.fill) {
+      ctx.fillStyle = packet.fill;
+      ctx.fill(projected.path2d);
+    }
+    if (packet.stroke) {
+      ctx.strokeStyle = packet.stroke;
+      ctx.lineWidth = packet.width || 1;
+      ctx.stroke(projected.path2d);
+    }
+    if (Array.isArray(projected.overlaysNoCamera) && projected.overlaysNoCamera.length) {
+      drawFaceShadowOverlaysNoCamera(ctx, pointsNoCamera, projected.overlaysNoCamera, 0, 0);
+    }
+    ctx.restore();
+    return;
+  }
   drawPolyWithOffset(pointsNoCamera, offsetX, offsetY, packet.fill, packet.stroke, packet.width || 1);
-  drawFaceShadowOverlaysNoCamera(ctx, pointsNoCamera, worldShadowOverlaysToNoCamera(packet.shadowOverlaysWorld || [], currentViewRotation), offsetX, offsetY);
+  drawFaceShadowOverlaysNoCamera(ctx, pointsNoCamera, projected && projected.overlaysNoCamera ? projected.overlaysNoCamera : worldShadowOverlaysToNoCamera(packet.shadowOverlaysWorld || [], currentViewRotation), offsetX, offsetY);
 }
 
 function buildStaticVoxelFaceRenderable(baseRenderable, face, faceIndex, viewRotation) {

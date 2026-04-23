@@ -92,10 +92,38 @@ function drawLightingAxes() {
 }
 
 function renderLightingShadows() {
+  var lightingEnabled = (typeof isLightingSystemEnabled === 'function') ? isLightingSystemEnabled() : true;
+  var shadowsEnabled = !!(typeof lightState !== 'undefined' && lightState && lightState.showShadows);
+  if (!lightingEnabled || !shadowsEnabled) {
+    lightingRenderRoute('render-shadows:skipped');
+    if (typeof beginShadowPassDebug === 'function') beginShadowPassDebug('renderLightingShadows', {
+      route: 'lighting-render.renderLightingShadows',
+      skipped: true,
+      lightingEnabled: !!lightingEnabled,
+      showShadows: !!shadowsEnabled
+    });
+    if (typeof endShadowPassDebug === 'function') endShadowPassDebug('renderLightingShadows', {
+      route: 'lighting-render.renderLightingShadows',
+      skipped: true,
+      lightingEnabled: !!lightingEnabled,
+      showShadows: !!shadowsEnabled
+    });
+    return 0;
+  }
   lightingRenderRoute('render-shadows');
-  if (typeof beginShadowPassDebug === 'function') beginShadowPassDebug('renderLightingShadows', { route: 'lighting-render.renderLightingShadows' });
+  if (typeof beginShadowPassDebug === 'function') beginShadowPassDebug('renderLightingShadows', {
+    route: 'lighting-render.renderLightingShadows',
+    skipped: false,
+    lightingEnabled: !!lightingEnabled,
+    showShadows: !!shadowsEnabled
+  });
   var result = drawLightShadows();
-  if (typeof endShadowPassDebug === 'function') endShadowPassDebug('renderLightingShadows', { route: 'lighting-render.renderLightingShadows' });
+  if (typeof endShadowPassDebug === 'function') endShadowPassDebug('renderLightingShadows', {
+    route: 'lighting-render.renderLightingShadows',
+    skipped: false,
+    lightingEnabled: !!lightingEnabled,
+    showShadows: !!shadowsEnabled
+  });
   return result;
 }
 

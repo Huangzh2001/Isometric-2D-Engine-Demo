@@ -2077,7 +2077,18 @@ var SHADOW_LAYER_INTERACTION_MS = 28;
 var STATIC_BOX_LAYER_INTERACTION_MS = 28;
 var floorLayerCanvas = null;
 var floorLayerCtx = null;
-var floorLayerCache = { signature: '', cacheSignature: '', viewRotation: 0, lastBuiltAt: 0, dirty: true };
+var floorLayerCache = {
+  signature: '',
+  cacheSignature: '',
+  viewRotation: 0,
+  lastBuiltAt: 0,
+  dirty: true,
+  chunkSize: 16,
+  contentSignature: '',
+  viewSignature: '',
+  visibleChunkKeys: [],
+  chunks: null,
+};
 var staticShadowCanvas = null;
 var staticShadowCtx = null;
 var staticShadowCache = { signature: '', lastBuiltAt: 0, dirty: true };
@@ -2100,7 +2111,9 @@ function sigNum(v, digits = 3) {
 }
 
 function isInteractiveRenderPressure() {
-  return !!(mouse.draggingView || lightState.dragAxis || player.moving || editor.mode === 'drag');
+  var interactionType = null;
+  try { interactionType = window && window.__habboActiveCameraInteractionType ? String(window.__habboActiveCameraInteractionType) : null; } catch (_) { interactionType = null; }
+  return !!(mouse.draggingView || lightState.dragAxis || player.moving || editor.mode === 'drag' || interactionType === 'zoom' || interactionType === 'pinch' || interactionType === 'pan');
 }
 
 
@@ -2175,13 +2188,9 @@ function floorLayerSignature() {
     tileH: sigNum(settings.tileH),
     originX: sigNum(settings.originX),
     originY: sigNum(settings.originY),
-    cameraX: sigNum(camera.x),
-    cameraY: sigNum(camera.y),
     viewRotation: rotationInfo.viewRotation,
     rotationSource: rotationInfo.source,
     zoom: sigNum(cameraSettings.zoom, 3),
-    cameraCullingEnabled: cameraSettings.cameraCullingEnabled !== false,
-    cullingMargin: sigNum(cameraSettings.cullingMargin, 2),
     ambient: sigNum(settings.ambient),
     lights: lights.map(serializeLightForLayer),
     lightingEnabled: !!(lightState && lightState.enabled !== false),

@@ -301,6 +301,593 @@ function callPlacementBridge(action, args, detail) {
   return null;
 }
 
+function emitFullFrameWalltime(payload) {
+  var line = '[FULL-FRAME-WALLTIME] ';
+  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
+  try {
+    if (typeof pushLog === 'function') pushLog(line);
+    else if (typeof console !== 'undefined' && console.log) console.log(line);
+  } catch (_) {}
+  return line;
+}
+
+function maybeEmitFullFrameWalltime(payload) {
+  var safe = payload && typeof payload === 'object' ? payload : {};
+  loop.__fullFrameProfileState = loop.__fullFrameProfileState || { at: 0, sig: '' };
+  var nowMs = perfNow();
+  var sig = [
+    Number(safe.totalFrameWallMs || 0).toFixed(1),
+    Number(safe.renderMs || 0).toFixed(1),
+    Number(safe.visibleChunkCount || 0),
+    Number(safe.visibleStaticPacketCount || 0),
+    Number(safe.rebuiltChunkCountThisFrame || 0),
+    Number(safe.reusedChunkCountThisFrame || 0)
+  ].join('|');
+  if ((nowMs - loop.__fullFrameProfileState.at) < 250 && loop.__fullFrameProfileState.sig === sig) return false;
+  loop.__fullFrameProfileState = { at: nowMs, sig: sig };
+  emitFullFrameWalltime(safe);
+  return true;
+}
+
+
+function emitCameraInteractionProfile(payload) {
+  var line = '[CAMERA-INTERACTION-PROFILE] ';
+  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
+  pushBufferedCameraInteractionLine(line);
+  return line;
+}
+
+function emitCameraInteractionPipelineBreakdown(payload) {
+  var line = '[CAMERA-INTERACTION-PIPELINE-BREAKDOWN] ';
+  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
+  pushBufferedCameraInteractionLine(line);
+  return line;
+}
+
+
+function emitCameraInteractionBaseworldBreakdown(payload) {
+  var line = '[CAMERA-INTERACTION-BASEWORLD-BREAKDOWN] ';
+  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
+  pushBufferedCameraInteractionLine(line);
+  return line;
+}
+
+function emitBaseworldActualBranchHit(payload) {
+  var line = '[BASEWORLD-ACTUAL-BRANCH-HIT] ';
+  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
+  pushBufferedCameraInteractionLine(line);
+  return line;
+}
+
+function emitCameraInteractionActiveDebughookBreakdown(payload) {
+  var line = '[CAMERA-INTERACTION-ACTIVE-DEBUGHOOK-BREAKDOWN] ';
+  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
+  pushBufferedCameraInteractionLine(line);
+  return line;
+}
+
+function emitCameraInteractionPipelineCalls(payload) {
+  var line = '[CAMERA-INTERACTION-PIPELINE-CALLS] ';
+  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
+  pushBufferedCameraInteractionLine(line);
+  return line;
+}
+
+function emitCameraInteractionSummary(payload) {
+  var line = '[CAMERA-INTERACTION-SUMMARY] ';
+  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
+  flushBufferedCameraInteractionLines();
+  try {
+    if (typeof pushLog === 'function') pushLog(line);
+    else if (typeof console !== 'undefined' && console.log) console.log(line);
+  } catch (_) {}
+  return line;
+}
+
+var __cameraInteractionProfile = {
+  seq: 0,
+  active: false,
+  interactionId: null,
+  interactionType: null,
+  frameCount: 0,
+  maxFrames: 36,
+  idleWindowMs: 450,
+  lastActivityMs: 0,
+  pendingCameraInteractionUpdateMs: 0,
+  pendingUiAndInspectorMs: 0,
+  sums: null,
+  maxInteractionFrameWallMs: 0,
+  maxRenderPipelineCallCount: 0,
+  maxRenderPipelineAccumulatedMs: 0
+};
+
+var __cameraSettleReuseState = {
+  lastEndedType: null,
+  lastEndedInteractionId: null,
+  deferCommitUntilMs: 0,
+  reason: null
+};
+if (typeof window !== 'undefined') window.__habboCameraSettleReuseState = __cameraSettleReuseState;
+
+function scheduleCameraSettleReuseDelay(interactionType, interactionId, reason) {
+  if (String(interactionType || '') !== 'zoom') return __cameraSettleReuseState;
+  var nowMs = perfNow();
+  var delayMs = 180;
+  __cameraSettleReuseState.lastEndedType = 'zoom';
+  __cameraSettleReuseState.lastEndedInteractionId = interactionId || null;
+  __cameraSettleReuseState.deferCommitUntilMs = Math.max(Number(__cameraSettleReuseState.deferCommitUntilMs || 0), nowMs + delayMs);
+  __cameraSettleReuseState.reason = String(reason || 'zoom-settle-delay');
+  try { window.__habboCameraSettleReuseState = __cameraSettleReuseState; } catch (_) {}
+  return __cameraSettleReuseState;
+}
+
+
+var __cameraInteractionLogBufferState = {
+  active: false,
+  interactionId: null,
+  interactionType: null,
+  lines: []
+};
+if (typeof window !== 'undefined') window.__CAMERA_INTERACTION_LOG_BUFFER_STATE = __cameraInteractionLogBufferState;
+
+function beginCameraInteractionLogBuffer(interactionId, interactionType) {
+  __cameraInteractionLogBufferState.active = true;
+  __cameraInteractionLogBufferState.interactionId = interactionId || null;
+  __cameraInteractionLogBufferState.interactionType = interactionType || null;
+  __cameraInteractionLogBufferState.lines = [];
+}
+
+function endCameraInteractionLogBuffer() {
+  __cameraInteractionLogBufferState.active = false;
+  __cameraInteractionLogBufferState.interactionId = null;
+  __cameraInteractionLogBufferState.interactionType = null;
+}
+
+function pushBufferedCameraInteractionLine(line) {
+  if (!line) return;
+  if (!__cameraInteractionLogBufferState.active) {
+    try {
+      if (typeof pushLog === 'function') pushLog(line);
+      else if (typeof console !== 'undefined' && console.log) console.log(line);
+    } catch (_) {}
+    return;
+  }
+  __cameraInteractionLogBufferState.lines.push(String(line));
+}
+
+function flushBufferedCameraInteractionLines() {
+  if (!__cameraInteractionLogBufferState.lines || !__cameraInteractionLogBufferState.lines.length) return;
+  var copy = __cameraInteractionLogBufferState.lines.slice();
+  __cameraInteractionLogBufferState.lines.length = 0;
+  for (var i = 0; i < copy.length; i++) {
+    try {
+      if (typeof pushLog === 'function') pushLog(copy[i]);
+      else if (typeof console !== 'undefined' && console.log) console.log(copy[i]);
+    } catch (_) {}
+  }
+}
+
+function createCameraInteractionSums() {
+  return {
+    interactionFrameWallMs: 0,
+    cameraInteractionUpdateMs: 0,
+    terrainApplyTickMs: 0,
+    renderPipelineMs: 0,
+    uiAndInspectorMs: 0,
+    otherMainThreadMs: 0,
+    baseWorldPassesMs: 0,
+    baseWorldPassesWallMs: 0,
+    baseWorldPassesPreSetupWallMs: 0,
+    baseWorldPassesPreSetupViewRotationWallMs: 0,
+    baseWorldPassesPreSetupScopeWallMs: 0,
+    baseWorldPassesPreSetupVisibleLightsWallMs: 0,
+    baseWorldPassesPreSetupOverrideWallMs: 0,
+    baseWorldPassesPreSetupResidualWallMs: 0,
+    baseWorldPassesFloorLoopWallMs: 0,
+    baseWorldPassesFloorProjectionWallMs: 0,
+    baseWorldPassesFloorColorMaterialWallMs: 0,
+    baseWorldPassesFloorCanvasDrawWallMs: 0,
+    baseWorldPassesPlayerSpritePrepWallMs: 0,
+    baseWorldPassesPostFinalizeWallMs: 0,
+    baseWorldPassesResidualWallMs: 0,
+    floorLayerReusedDuringInteractionCount: 0,
+    floorLayerRebuildWallMs: 0,
+    floorLayerBlitWallMs: 0,
+    buildFramePlanMs: 0,
+    drawRenderableOrderMs: 0,
+    drawOverlayPassesMs: 0,
+    drawHudPassMs: 0,
+    renderPipelineCallCount: 0,
+    renderPipelineAccumulatedMs: 0,
+    renderPipelineMaxSingleCallMs: 0,
+    pipelineKnownAccountedMs: 0,
+    pipelineUnaccountedMs: 0,
+    pipelineClearAndBackgroundMs: 0,
+    pipelineClearAndBackgroundWallMs: 0,
+    pipelineBaseWorldPassesMs: 0,
+    pipelineBaseWorldPassesWallMs: 0,
+    pipelineBuildFramePlanMs: 0,
+    pipelineBuildFramePlanWallMs: 0,
+    pipelineDrawRenderableOrderMs: 0,
+    pipelineDrawRenderableOrderWallMs: 0,
+    pipelineDrawOverlayPassesMs: 0,
+    pipelineDrawOverlayPassesWallMs: 0,
+    pipelineDrawHudPassMs: 0,
+    pipelineDrawHudPassWallMs: 0,
+    pipelinePrePassSetupMs: 0,
+    pipelinePrePassSetupWallMs: 0,
+    pipelinePostPassFinalizeMs: 0,
+    pipelinePostPassFinalizeWallMs: 0,
+    pipelineAdapterGlueMs: 0,
+    pipelineDebugHookMs: 0,
+    rendererActiveCallWallMs: 0,
+    runFramePipelineWallMs: 0,
+    rendererActiveMinusPipelineMs: 0,
+    pipelineOuterGapMs: 0,
+    pipelineInnerGapMs: 0,
+    activePreRunFramePipelineWallMs: 0,
+    activePostRunFramePipelineWallMs: 0,
+    activeWrapperGlueWallMs: 0,
+    activeDebugHookWallMs: 0,
+    activeDebugHookPreFlushWallMs: 0,
+    activeDebugHookLogFlushWallMs: 0,
+    activeDebugHookProfilerBookkeepingWallMs: 0,
+    activeDebugHookRendererBookkeepingWallMs: 0,
+    activeDebugHookCanvasSyncWallMs: 0,
+    activeDebugHookBrowserSyncWallMs: 0,
+    activeDebugHookPostFlushWallMs: 0,
+    activeDebugHookResidualWallMs: 0
+  };
+}
+
+function startCameraInteractionProfile(interactionType) {
+  var state = __cameraInteractionProfile;
+  var nowMs = perfNow();
+  var previousInteractionType = state.active ? state.interactionType : null;
+  var previousInteractionId = state.active ? state.interactionId : null;
+  if (!state.active || state.interactionType !== interactionType) {
+    if (previousInteractionType && previousInteractionType !== interactionType) scheduleCameraSettleReuseDelay(previousInteractionType, previousInteractionId, 'interaction-switch:' + String(interactionType || 'interaction'));
+    state.seq += 1;
+    state.active = true;
+    state.interactionId = String(interactionType || 'interaction') + '-' + String(state.seq);
+    state.interactionType = interactionType || 'interaction';
+    state.frameCount = 0;
+    state.sums = createCameraInteractionSums();
+    state.maxInteractionFrameWallMs = 0;
+    state.maxRenderPipelineCallCount = 0;
+    state.maxRenderPipelineAccumulatedMs = 0;
+    state.maxRendererActiveCallWallMs = 0;
+    state.maxRunFramePipelineWallMs = 0;
+    state.maxBaseWorldPassesWallMs = 0;
+    state.pendingCameraInteractionUpdateMs = 0;
+    state.pendingUiAndInspectorMs = 0;
+    beginCameraInteractionLogBuffer(state.interactionId, state.interactionType);
+  }
+  state.lastActivityMs = nowMs;
+  syncActiveCameraInteractionTypeForReuse();
+  if (interactionType && interactionType !== 'zoom') clearRendererZoomPreview('camera-interaction:' + String(interactionType));
+  if (__cameraInteractionLogBufferState.active !== true || __cameraInteractionLogBufferState.interactionId !== state.interactionId) beginCameraInteractionLogBuffer(state.interactionId, state.interactionType);
+  return state.interactionId;
+}
+
+function markCameraInteractionActivity(interactionType) {
+  var state = __cameraInteractionProfile;
+  if (!state.active) return startCameraInteractionProfile(interactionType);
+  if (interactionType && state.interactionType !== interactionType) {
+    return startCameraInteractionProfile(interactionType);
+  }
+  state.lastActivityMs = perfNow();
+  syncActiveCameraInteractionTypeForReuse();
+  return state.interactionId;
+}
+
+function addCameraInteractionTiming(field, deltaMs) {
+  var state = __cameraInteractionProfile;
+  if (!state.active) return;
+  var value = Number(deltaMs || 0);
+  if (!isFinite(value) || value <= 0) return;
+  if (field === 'cameraInteractionUpdateMs') state.pendingCameraInteractionUpdateMs += value;
+  else if (field === 'uiAndInspectorMs') state.pendingUiAndInspectorMs += value;
+}
+
+function syncActiveCameraInteractionTypeForReuse() {
+  try {
+    var active = !!(__cameraInteractionProfile && __cameraInteractionProfile.active);
+    window.__habboActiveCameraInteractionType = active
+      ? (__cameraInteractionProfile.interactionType || null)
+      : null;
+    window.__habboActiveCameraInteractionId = active
+      ? (__cameraInteractionProfile.interactionId || null)
+      : null;
+    window.__habboCameraSettleReuseState = __cameraSettleReuseState;
+  } catch (_) {}
+}
+
+function clearRendererZoomPreview(reason) {
+  try {
+    var rendererApi = getNamespacePath('renderer.active') || getNamespacePath('renderer.canvas2d') || (window.App && window.App.renderer && (window.App.renderer.active || window.App.renderer.canvas2d));
+    if (rendererApi && typeof rendererApi.clearZoomPreviewState === 'function') rendererApi.clearZoomPreviewState(reason || 'interaction-cancel');
+  } catch (_) {}
+}
+
+function endCameraInteractionProfileSoon() {
+  var state = __cameraInteractionProfile;
+  if (!state.active) return;
+  state.lastActivityMs = Math.min(state.lastActivityMs || perfNow(), perfNow() - state.idleWindowMs - 1);
+}
+
+function consumeCameraInteractionPendingTimings() {
+  var state = __cameraInteractionProfile;
+  var consumed = {
+    cameraInteractionUpdateMs: Number(state.pendingCameraInteractionUpdateMs || 0),
+    uiAndInspectorMs: Number(state.pendingUiAndInspectorMs || 0)
+  };
+  state.pendingCameraInteractionUpdateMs = 0;
+  state.pendingUiAndInspectorMs = 0;
+  return consumed;
+}
+
+function finalizeCameraInteractionProfile() {
+  var state = __cameraInteractionProfile;
+  if (!state.active || !state.sums || state.frameCount <= 0) {
+    scheduleCameraSettleReuseDelay(state.interactionType, state.interactionId, 'interaction-finalize-empty');
+    state.active = false;
+    state.interactionId = null;
+    state.interactionType = null;
+    syncActiveCameraInteractionTypeForReuse();
+    state.sums = null;
+    state.pendingCameraInteractionUpdateMs = 0;
+    state.pendingUiAndInspectorMs = 0;
+    state.maxRenderPipelineCallCount = 0;
+    state.maxRenderPipelineAccumulatedMs = 0;
+    return;
+  }
+  var denom = state.frameCount > 0 ? state.frameCount : 1;
+  endCameraInteractionLogBuffer();
+  scheduleCameraSettleReuseDelay(state.interactionType, state.interactionId, 'interaction-finalize');
+  emitCameraInteractionSummary({
+    interactionId: state.interactionId,
+    interactionType: state.interactionType,
+    frameCount: state.frameCount,
+    avgInteractionFrameWallMs: Number((state.sums.interactionFrameWallMs / denom).toFixed(3)),
+    maxInteractionFrameWallMs: Number((state.maxInteractionFrameWallMs || 0).toFixed(3)),
+    avgCameraInteractionUpdateMs: Number((state.sums.cameraInteractionUpdateMs / denom).toFixed(3)),
+    avgTerrainApplyTickMs: Number((state.sums.terrainApplyTickMs / denom).toFixed(3)),
+    avgRenderPipelineMs: Number((state.sums.renderPipelineMs / denom).toFixed(3)),
+    avgUiAndInspectorMs: Number((state.sums.uiAndInspectorMs / denom).toFixed(3)),
+    avgOtherMainThreadMs: Number((state.sums.otherMainThreadMs / denom).toFixed(3)),
+    avgBaseWorldPassesMs: Number((state.sums.baseWorldPassesMs / denom).toFixed(3)),
+    avgBaseWorldPassesWallMs: Number((state.sums.baseWorldPassesWallMs / denom).toFixed(3)),
+    maxBaseWorldPassesWallMs: Number((state.maxBaseWorldPassesWallMs || 0).toFixed(3)),
+    avgBaseWorldPassesPreSetupWallMs: Number((state.sums.baseWorldPassesPreSetupWallMs / denom).toFixed(3)),
+    avgBaseWorldPassesPreSetupViewRotationWallMs: Number((state.sums.baseWorldPassesPreSetupViewRotationWallMs / denom).toFixed(3)),
+    avgBaseWorldPassesPreSetupScopeWallMs: Number((state.sums.baseWorldPassesPreSetupScopeWallMs / denom).toFixed(3)),
+    avgBaseWorldPassesPreSetupVisibleLightsWallMs: Number((state.sums.baseWorldPassesPreSetupVisibleLightsWallMs / denom).toFixed(3)),
+    avgBaseWorldPassesPreSetupOverrideWallMs: Number((state.sums.baseWorldPassesPreSetupOverrideWallMs / denom).toFixed(3)),
+    avgBaseWorldPassesPreSetupResidualWallMs: Number((state.sums.baseWorldPassesPreSetupResidualWallMs / denom).toFixed(3)),
+    avgBaseWorldPassesFloorLoopWallMs: Number((state.sums.baseWorldPassesFloorLoopWallMs / denom).toFixed(3)),
+    avgBaseWorldPassesFloorProjectionWallMs: Number((state.sums.baseWorldPassesFloorProjectionWallMs / denom).toFixed(3)),
+    avgBaseWorldPassesFloorColorMaterialWallMs: Number((state.sums.baseWorldPassesFloorColorMaterialWallMs / denom).toFixed(3)),
+    avgBaseWorldPassesFloorCanvasDrawWallMs: Number((state.sums.baseWorldPassesFloorCanvasDrawWallMs / denom).toFixed(3)),
+    avgBaseWorldPassesPlayerSpritePrepWallMs: Number((state.sums.baseWorldPassesPlayerSpritePrepWallMs / denom).toFixed(3)),
+    avgBaseWorldPassesPostFinalizeWallMs: Number((state.sums.baseWorldPassesPostFinalizeWallMs / denom).toFixed(3)),
+    avgBaseWorldPassesResidualWallMs: Number((state.sums.baseWorldPassesResidualWallMs / denom).toFixed(3)),
+    floorLayerReusedDuringInteractionCount: Number(state.sums.floorLayerReusedDuringInteractionCount || 0),
+    avgFloorLayerRebuildWallMs: Number((state.sums.floorLayerRebuildWallMs / denom).toFixed(3)),
+    avgFloorLayerBlitWallMs: Number((state.sums.floorLayerBlitWallMs / denom).toFixed(3)),
+    avgBuildFramePlanMs: Number((state.sums.buildFramePlanMs / denom).toFixed(3)),
+    avgDrawRenderableOrderMs: Number((state.sums.drawRenderableOrderMs / denom).toFixed(3)),
+    avgDrawOverlayPassesMs: Number((state.sums.drawOverlayPassesMs / denom).toFixed(3)),
+    avgDrawHudPassMs: Number((state.sums.drawHudPassMs / denom).toFixed(3)),
+    avgRenderPipelineCallCount: Number((state.sums.renderPipelineCallCount / denom).toFixed(3)),
+    maxRenderPipelineCallCount: Number((state.maxRenderPipelineCallCount || 0).toFixed(3)),
+    avgRenderPipelineAccumulatedMs: Number((state.sums.renderPipelineAccumulatedMs / denom).toFixed(3)),
+    maxRenderPipelineAccumulatedMs: Number((state.maxRenderPipelineAccumulatedMs || 0).toFixed(3)),
+    avgRendererActiveCallWallMs: Number((state.sums.rendererActiveCallWallMs / denom).toFixed(3)),
+    maxRendererActiveCallWallMs: Number((state.maxRendererActiveCallWallMs || 0).toFixed(3)),
+    avgRunFramePipelineWallMs: Number((state.sums.runFramePipelineWallMs / denom).toFixed(3)),
+    maxRunFramePipelineWallMs: Number((state.maxRunFramePipelineWallMs || 0).toFixed(3)),
+    avgRendererActiveMinusPipelineMs: Number((state.sums.rendererActiveMinusPipelineMs / denom).toFixed(3)),
+    avgPipelineOuterGapMs: Number((state.sums.pipelineOuterGapMs / denom).toFixed(3)),
+    avgPipelineInnerGapMs: Number((state.sums.pipelineInnerGapMs / denom).toFixed(3)),
+    avgActivePreRunFramePipelineWallMs: Number((state.sums.activePreRunFramePipelineWallMs / denom).toFixed(3)),
+    avgActivePostRunFramePipelineWallMs: Number((state.sums.activePostRunFramePipelineWallMs / denom).toFixed(3)),
+    avgActiveWrapperGlueWallMs: Number((state.sums.activeWrapperGlueWallMs / denom).toFixed(3)),
+    avgActiveDebugHookWallMs: Number((state.sums.activeDebugHookWallMs / denom).toFixed(3)),
+    avgActiveDebugHookPreFlushWallMs: Number((state.sums.activeDebugHookPreFlushWallMs / denom).toFixed(3)),
+    avgActiveDebugHookLogFlushWallMs: Number((state.sums.activeDebugHookLogFlushWallMs / denom).toFixed(3)),
+    avgActiveDebugHookProfilerBookkeepingWallMs: Number((state.sums.activeDebugHookProfilerBookkeepingWallMs / denom).toFixed(3)),
+    avgActiveDebugHookRendererBookkeepingWallMs: Number((state.sums.activeDebugHookRendererBookkeepingWallMs / denom).toFixed(3)),
+    avgActiveDebugHookCanvasSyncWallMs: Number((state.sums.activeDebugHookCanvasSyncWallMs / denom).toFixed(3)),
+    avgActiveDebugHookBrowserSyncWallMs: Number((state.sums.activeDebugHookBrowserSyncWallMs / denom).toFixed(3)),
+    avgActiveDebugHookPostFlushWallMs: Number((state.sums.activeDebugHookPostFlushWallMs / denom).toFixed(3)),
+    avgActiveDebugHookResidualWallMs: Number((state.sums.activeDebugHookResidualWallMs / denom).toFixed(3)),
+    avgPipelineKnownAccountedMs: Number((state.sums.pipelineKnownAccountedMs / denom).toFixed(3)),
+    avgPipelineUnaccountedMs: Number((state.sums.pipelineUnaccountedMs / denom).toFixed(3)),
+    avgPipelineBaseWorldPassesMs: Number((state.sums.pipelineBaseWorldPassesMs / denom).toFixed(3)),
+    avgPipelineBaseWorldPassesWallMs: Number((state.sums.pipelineBaseWorldPassesWallMs / denom).toFixed(3)),
+    avgPipelineBuildFramePlanMs: Number((state.sums.pipelineBuildFramePlanMs / denom).toFixed(3)),
+    avgPipelineBuildFramePlanWallMs: Number((state.sums.pipelineBuildFramePlanWallMs / denom).toFixed(3)),
+    avgPipelineDrawRenderableOrderMs: Number((state.sums.pipelineDrawRenderableOrderMs / denom).toFixed(3)),
+    avgPipelineDrawRenderableOrderWallMs: Number((state.sums.pipelineDrawRenderableOrderWallMs / denom).toFixed(3)),
+    avgPipelineDrawOverlayPassesMs: Number((state.sums.pipelineDrawOverlayPassesMs / denom).toFixed(3)),
+    avgPipelineDrawOverlayPassesWallMs: Number((state.sums.pipelineDrawOverlayPassesWallMs / denom).toFixed(3)),
+    avgPipelineDrawHudPassMs: Number((state.sums.pipelineDrawHudPassMs / denom).toFixed(3)),
+    avgPipelineDrawHudPassWallMs: Number((state.sums.pipelineDrawHudPassWallMs / denom).toFixed(3)),
+    avgPipelinePrePassSetupMs: Number((state.sums.pipelinePrePassSetupMs / denom).toFixed(3)),
+    avgPipelinePrePassSetupWallMs: Number((state.sums.pipelinePrePassSetupWallMs / denom).toFixed(3)),
+    avgPipelinePostPassFinalizeMs: Number((state.sums.pipelinePostPassFinalizeMs / denom).toFixed(3)),
+    avgPipelinePostPassFinalizeWallMs: Number((state.sums.pipelinePostPassFinalizeWallMs / denom).toFixed(3)),
+    avgPipelineAdapterGlueMs: Number((state.sums.pipelineAdapterGlueMs / denom).toFixed(3)),
+    avgPipelineDebugHookMs: Number((state.sums.pipelineDebugHookMs / denom).toFixed(3))
+  });
+  state.active = false;
+  state.interactionId = null;
+  state.interactionType = null;
+  syncActiveCameraInteractionTypeForReuse();
+  state.frameCount = 0;
+  state.sums = null;
+  state.maxInteractionFrameWallMs = 0;
+  state.maxRenderPipelineCallCount = 0;
+  state.maxRenderPipelineAccumulatedMs = 0;
+  state.maxRendererActiveCallWallMs = 0;
+  state.maxRunFramePipelineWallMs = 0;
+  state.maxBaseWorldPassesWallMs = 0;
+  state.pendingCameraInteractionUpdateMs = 0;
+  state.pendingUiAndInspectorMs = 0;
+}
+
+function maybeEmitCameraInteractionProfile(payload) {
+  var state = __cameraInteractionProfile;
+  if (!state.active || !payload || typeof payload !== 'object') return false;
+  state.frameCount += 1;
+  if (!state.sums) state.sums = createCameraInteractionSums();
+  var numericKeys = [
+    'interactionFrameWallMs','cameraInteractionUpdateMs','terrainApplyTickMs','renderPipelineMs','uiAndInspectorMs','otherMainThreadMs',
+    'baseWorldPassesMs','baseWorldPassesWallMs','baseWorldPassesPreSetupWallMs','baseWorldPassesPreSetupViewRotationWallMs','baseWorldPassesPreSetupScopeWallMs','baseWorldPassesPreSetupVisibleLightsWallMs','baseWorldPassesPreSetupOverrideWallMs','baseWorldPassesPreSetupResidualWallMs','baseWorldPassesFloorLoopWallMs','baseWorldPassesFloorProjectionWallMs','baseWorldPassesFloorColorMaterialWallMs','baseWorldPassesFloorCanvasDrawWallMs','baseWorldPassesPlayerSpritePrepWallMs','baseWorldPassesPostFinalizeWallMs','baseWorldPassesResidualWallMs','floorLayerReusedDuringInteractionCount','floorLayerRebuildWallMs','floorLayerBlitWallMs','buildFramePlanMs','drawRenderableOrderMs','drawOverlayPassesMs','drawHudPassMs',
+    'renderPipelineCallCount','renderPipelineAccumulatedMs','rendererActiveCallWallMs','runFramePipelineWallMs','rendererActiveMinusPipelineMs','pipelineOuterGapMs','pipelineInnerGapMs','activePreRunFramePipelineWallMs','activePostRunFramePipelineWallMs','activeWrapperGlueWallMs','activeDebugHookWallMs','activeDebugHookPreFlushWallMs','activeDebugHookLogFlushWallMs','activeDebugHookProfilerBookkeepingWallMs','activeDebugHookRendererBookkeepingWallMs','activeDebugHookCanvasSyncWallMs','activeDebugHookBrowserSyncWallMs','activeDebugHookPostFlushWallMs','activeDebugHookResidualWallMs','pipelineKnownAccountedMs','pipelineUnaccountedMs',
+    'pipelineClearAndBackgroundMs','pipelineClearAndBackgroundWallMs','pipelineBaseWorldPassesMs','pipelineBaseWorldPassesWallMs','pipelineBuildFramePlanMs','pipelineBuildFramePlanWallMs','pipelineDrawRenderableOrderMs','pipelineDrawRenderableOrderWallMs',
+    'pipelineDrawOverlayPassesMs','pipelineDrawOverlayPassesWallMs','pipelineDrawHudPassMs','pipelineDrawHudPassWallMs','pipelinePrePassSetupMs','pipelinePrePassSetupWallMs','pipelinePostPassFinalizeMs','pipelinePostPassFinalizeWallMs',
+    'pipelineAdapterGlueMs','pipelineDebugHookMs'
+  ];
+  numericKeys.forEach(function (key) {
+    state.sums[key] += Number(payload[key] || 0);
+  });
+  state.maxInteractionFrameWallMs = Math.max(state.maxInteractionFrameWallMs || 0, Number(payload.interactionFrameWallMs || 0));
+  state.maxRenderPipelineCallCount = Math.max(state.maxRenderPipelineCallCount || 0, Number(payload.renderPipelineCallCount || 0));
+  state.maxRenderPipelineAccumulatedMs = Math.max(state.maxRenderPipelineAccumulatedMs || 0, Number(payload.renderPipelineAccumulatedMs || 0));
+  state.maxRendererActiveCallWallMs = Math.max(state.maxRendererActiveCallWallMs || 0, Number(payload.rendererActiveCallWallMs || 0));
+  state.maxRunFramePipelineWallMs = Math.max(state.maxRunFramePipelineWallMs || 0, Number(payload.runFramePipelineWallMs || 0));
+  state.maxBaseWorldPassesWallMs = Math.max(state.maxBaseWorldPassesWallMs || 0, Number(payload.baseWorldPassesWallMs || 0));
+  emitCameraInteractionProfile(payload);
+  if (Number(payload.renderPipelineCallCount || 0) > 1 && payload.pipelineCalls && payload.pipelineCalls.length) {
+    emitCameraInteractionPipelineCalls({
+      interactionId: payload.interactionId,
+      interactionType: payload.interactionType,
+      frameIndex: payload.frameIndex,
+      renderPipelineCallCount: Number(payload.renderPipelineCallCount || 0),
+      calls: payload.pipelineCalls.slice(0, 5)
+    });
+  }
+  emitBaseworldActualBranchHit({
+    interactionId: payload.interactionId,
+    interactionType: payload.interactionType,
+    frameIndex: payload.frameIndex,
+    branch: payload.baseWorldActualBranch || 'unknown'
+  });
+
+  emitCameraInteractionBaseworldBreakdown({
+    interactionId: payload.interactionId,
+    interactionType: payload.interactionType,
+    frameIndex: payload.frameIndex,
+    interactionFrameWallMs: payload.interactionFrameWallMs,
+    rendererActiveCallWallMs: Number(payload.rendererActiveCallWallMs || 0),
+    runFramePipelineWallMs: Number(payload.runFramePipelineWallMs || 0),
+    baseWorldPassesMs: Number(payload.baseWorldPassesMs || 0),
+    baseWorldPassesWallMs: Number(payload.baseWorldPassesWallMs || 0),
+    baseWorldPassesPreSetupWallMs: Number(payload.baseWorldPassesPreSetupWallMs || 0),
+    baseWorldPassesPreSetupViewRotationWallMs: Number(payload.baseWorldPassesPreSetupViewRotationWallMs || 0),
+    baseWorldPassesPreSetupScopeWallMs: Number(payload.baseWorldPassesPreSetupScopeWallMs || 0),
+    baseWorldPassesPreSetupVisibleLightsWallMs: Number(payload.baseWorldPassesPreSetupVisibleLightsWallMs || 0),
+    baseWorldPassesPreSetupOverrideWallMs: Number(payload.baseWorldPassesPreSetupOverrideWallMs || 0),
+    baseWorldPassesPreSetupResidualWallMs: Number(payload.baseWorldPassesPreSetupResidualWallMs || 0),
+    baseWorldPassesFloorLoopWallMs: Number(payload.baseWorldPassesFloorLoopWallMs || 0),
+    baseWorldPassesFloorProjectionWallMs: Number(payload.baseWorldPassesFloorProjectionWallMs || 0),
+    baseWorldPassesFloorColorMaterialWallMs: Number(payload.baseWorldPassesFloorColorMaterialWallMs || 0),
+    baseWorldPassesFloorCanvasDrawWallMs: Number(payload.baseWorldPassesFloorCanvasDrawWallMs || 0),
+    baseWorldPassesPlayerSpritePrepWallMs: Number(payload.baseWorldPassesPlayerSpritePrepWallMs || 0),
+    baseWorldPassesPostFinalizeWallMs: Number(payload.baseWorldPassesPostFinalizeWallMs || 0),
+    baseWorldPassesResidualWallMs: Number(payload.baseWorldPassesResidualWallMs || 0),
+    floorLayerReusedDuringInteraction: payload.floorLayerReusedDuringInteraction === true,
+    floorLayerRebuildWallMs: payload.floorLayerRebuildWallMs == null ? null : Number(payload.floorLayerRebuildWallMs || 0),
+    floorLayerBlitWallMs: payload.floorLayerBlitWallMs == null ? null : Number(payload.floorLayerBlitWallMs || 0),
+    baseWorldActualBranch: payload.baseWorldActualBranch || null,
+    buildFramePlanMs: Number(payload.buildFramePlanMs || 0),
+    drawRenderableOrderMs: Number(payload.drawRenderableOrderMs || 0),
+    visibleChunkCount: payload.visibleChunkCount,
+    visibleStaticPacketCount: payload.visibleStaticPacketCount,
+    staticCacheRebuiltThisFrame: payload.staticCacheRebuiltThisFrame,
+    rebuiltChunkCountThisFrame: payload.rebuiltChunkCountThisFrame,
+    reusedChunkCountThisFrame: payload.reusedChunkCountThisFrame
+  });
+
+  emitCameraInteractionActiveDebughookBreakdown({
+    interactionId: payload.interactionId,
+    interactionType: payload.interactionType,
+    frameIndex: payload.frameIndex,
+    interactionFrameWallMs: payload.interactionFrameWallMs,
+    rendererActiveCallWallMs: Number(payload.rendererActiveCallWallMs || 0),
+    runFramePipelineWallMs: Number(payload.runFramePipelineWallMs || 0),
+    activeDebugHookWallMs: Number(payload.activeDebugHookWallMs || 0),
+    activeDebugHookPreFlushWallMs: Number(payload.activeDebugHookPreFlushWallMs || 0),
+    activeDebugHookLogFlushWallMs: Number(payload.activeDebugHookLogFlushWallMs || 0),
+    activeDebugHookProfilerBookkeepingWallMs: Number(payload.activeDebugHookProfilerBookkeepingWallMs || 0),
+    activeDebugHookRendererBookkeepingWallMs: Number(payload.activeDebugHookRendererBookkeepingWallMs || 0),
+    activeDebugHookCanvasSyncWallMs: Number(payload.activeDebugHookCanvasSyncWallMs || 0),
+    activeDebugHookBrowserSyncWallMs: Number(payload.activeDebugHookBrowserSyncWallMs || 0),
+    activeDebugHookPostFlushWallMs: Number(payload.activeDebugHookPostFlushWallMs || 0),
+    activeDebugHookResidualWallMs: Number(payload.activeDebugHookResidualWallMs || 0),
+    rendererActiveMinusPipelineMs: Number(payload.rendererActiveMinusPipelineMs || 0),
+    pipelineOuterGapMs: Number(payload.pipelineOuterGapMs || 0),
+    visibleChunkCount: payload.visibleChunkCount,
+    visibleStaticPacketCount: payload.visibleStaticPacketCount,
+    staticCacheRebuiltThisFrame: payload.staticCacheRebuiltThisFrame,
+    rebuiltChunkCountThisFrame: payload.rebuiltChunkCountThisFrame,
+    reusedChunkCountThisFrame: payload.reusedChunkCountThisFrame
+  });
+  
+  emitCameraInteractionPipelineBreakdown({
+    interactionId: payload.interactionId,
+    interactionType: payload.interactionType,
+    frameIndex: payload.frameIndex,
+    interactionFrameWallMs: payload.interactionFrameWallMs,
+    renderPipelineMs: payload.renderPipelineMs,
+    renderPipelineCallCount: Number(payload.renderPipelineCallCount || 0),
+    renderPipelineAccumulatedMs: Number(payload.renderPipelineAccumulatedMs || 0),
+    renderPipelineMaxSingleCallMs: Number(payload.renderPipelineMaxSingleCallMs || 0),
+    rendererActiveCallWallMs: Number(payload.rendererActiveCallWallMs || 0),
+    runFramePipelineWallMs: Number(payload.runFramePipelineWallMs || 0),
+    rendererActiveMinusPipelineMs: Number(payload.rendererActiveMinusPipelineMs || 0),
+    pipelineOuterGapMs: Number(payload.pipelineOuterGapMs || 0),
+    pipelineInnerGapMs: Number(payload.pipelineInnerGapMs || 0),
+    activePreRunFramePipelineWallMs: Number(payload.activePreRunFramePipelineWallMs || 0),
+    activePostRunFramePipelineWallMs: Number(payload.activePostRunFramePipelineWallMs || 0),
+    activeWrapperGlueWallMs: Number(payload.activeWrapperGlueWallMs || 0),
+    activeDebugHookWallMs: Number(payload.activeDebugHookWallMs || 0),
+    activeDebugHookPreFlushWallMs: Number(payload.activeDebugHookPreFlushWallMs || 0),
+    activeDebugHookLogFlushWallMs: Number(payload.activeDebugHookLogFlushWallMs || 0),
+    activeDebugHookProfilerBookkeepingWallMs: Number(payload.activeDebugHookProfilerBookkeepingWallMs || 0),
+    activeDebugHookRendererBookkeepingWallMs: Number(payload.activeDebugHookRendererBookkeepingWallMs || 0),
+    activeDebugHookCanvasSyncWallMs: Number(payload.activeDebugHookCanvasSyncWallMs || 0),
+    activeDebugHookBrowserSyncWallMs: Number(payload.activeDebugHookBrowserSyncWallMs || 0),
+    activeDebugHookPostFlushWallMs: Number(payload.activeDebugHookPostFlushWallMs || 0),
+    activeDebugHookResidualWallMs: Number(payload.activeDebugHookResidualWallMs || 0),
+    pipelineKnownAccountedMs: Number(payload.pipelineKnownAccountedMs || 0),
+    pipelineUnaccountedMs: Number(payload.pipelineUnaccountedMs || 0),
+    pipelineClearAndBackgroundMs: Number(payload.pipelineClearAndBackgroundMs || 0),
+    pipelineBaseWorldPassesMs: Number(payload.pipelineBaseWorldPassesMs || 0),
+    pipelineBuildFramePlanMs: Number(payload.pipelineBuildFramePlanMs || 0),
+    pipelineDrawRenderableOrderMs: Number(payload.pipelineDrawRenderableOrderMs || 0),
+    pipelineDrawOverlayPassesMs: Number(payload.pipelineDrawOverlayPassesMs || 0),
+    pipelineDrawHudPassMs: Number(payload.pipelineDrawHudPassMs || 0),
+    pipelinePrePassSetupMs: Number(payload.pipelinePrePassSetupMs || 0),
+    pipelinePostPassFinalizeMs: Number(payload.pipelinePostPassFinalizeMs || 0),
+    pipelineAdapterGlueMs: Number(payload.pipelineAdapterGlueMs || 0),
+    pipelineDebugHookMs: Number(payload.pipelineDebugHookMs || 0),
+    visibleChunkCount: payload.visibleChunkCount,
+    visibleStaticPacketCount: payload.visibleStaticPacketCount,
+    staticCacheRebuiltThisFrame: payload.staticCacheRebuiltThisFrame,
+    rebuiltChunkCountThisFrame: payload.rebuiltChunkCountThisFrame,
+    reusedChunkCountThisFrame: payload.reusedChunkCountThisFrame
+  });
+  var nowMs = perfNow();
+  if (state.frameCount >= state.maxFrames || (nowMs - Number(state.lastActivityMs || 0)) > state.idleWindowMs) {
+    finalizeCameraInteractionProfile();
+  }
+  return true;
+}
+
+
 
 function loop(now) {
   debugState.frame += 1;
@@ -318,9 +905,12 @@ function loop(now) {
   let renderStartMs = loopStartMs;
   let updateEndMs = loopStartMs;
   let renderEndMs = loopStartMs;
+  let afterRenderStartMs = loopStartMs;
+  let loopEndMs = loopStartMs;
   try {
     if (debugState.frame <= 5 || verboseLog) detailLog(`loop:start frame=${debugState.frame} now=${now.toFixed(2)} dt=${dt.toFixed(4)}`);
     updateStartMs = perfNow();
+    var terrainApplyTickMs = 0;
     update(dt);
     try {
       var mainController = window.App && window.App.controllers ? window.App.controllers.main || null : null;
@@ -328,17 +918,167 @@ function loop(now) {
         mainController.tickMainEditorViewRotationAnimation(now, 'src/presentation/shell/app.js:loop');
       }
       if (mainController && typeof mainController.tickMainEditorTerrainApply === 'function') {
+        var __terrainApplyTickStartMs = perfNow();
         mainController.tickMainEditorTerrainApply(now, 'src/presentation/shell/app.js:loop');
+        terrainApplyTickMs = perfNow() - __terrainApplyTickStartMs;
       }
     } catch (_) {}
     updateEndMs = perfNow();
     renderStartMs = perfNow();
     var rendererApi = getNamespacePath('renderer.active') || getNamespacePath('renderer.canvas2d') || (window.App && window.App.renderer && (window.App.renderer.active || window.App.renderer.canvas2d));
+    try {
+      if (rendererApi && typeof rendererApi.resetInteractionPipelineCapture === 'function') {
+        rendererApi.resetInteractionPipelineCapture({
+          active: !!__cameraInteractionProfile.active,
+          interactionId: __cameraInteractionProfile.interactionId,
+          interactionType: __cameraInteractionProfile.interactionType,
+          frameIndex: Number((__cameraInteractionProfile.frameCount || 0) + 1)
+        });
+      }
+    } catch (_) {}
+    var rendererActiveCallWallMs = 0;
+    var __rendererOuterStartMs = perfNow();
     if (rendererApi && typeof rendererApi.renderFrame === 'function') rendererApi.renderFrame({ now: now, frame: debugState.frame, source: 'src/presentation/shell/app.js:loop' });
     else render();
+    rendererActiveCallWallMs = perfNow() - __rendererOuterStartMs;
     renderEndMs = perfNow();
+    afterRenderStartMs = perfNow();
     recordPerfSample(renderEndMs - loopStartMs, updateEndMs - updateStartMs, renderEndMs - renderStartMs);
     flushPerfSummary(false);
+    loopEndMs = perfNow();
+    try {
+      var rendererProfileApi = getNamespacePath('renderer.active') || getNamespacePath('renderer.canvas2d') || (window.App && window.App.renderer && (window.App.renderer.active || window.App.renderer.canvas2d));
+      var lastPipeline = rendererProfileApi && rendererProfileApi.__lastPipelineBreakdown ? rendererProfileApi.__lastPipelineBreakdown : {};
+      var lastDrawLoop = rendererProfileApi && rendererProfileApi.__lastDrawLoopBreakdown ? rendererProfileApi.__lastDrawLoopBreakdown : {};
+      var interactionPipeline = (rendererProfileApi && typeof rendererProfileApi.consumeInteractionPipelineCapture === 'function')
+        ? (rendererProfileApi.consumeInteractionPipelineCapture() || {})
+        : {};
+      var mainStats = (typeof __lastMainRenderableBuildStats !== 'undefined' && __lastMainRenderableBuildStats) ? __lastMainRenderableBuildStats : {};
+      var __fullFramePayload = {
+        totalFrameWallMs: Number((loopEndMs - loopStartMs).toFixed(3)),
+        beforeRenderMs: Number((updateEndMs - updateStartMs).toFixed(3)),
+        renderMs: Number((renderEndMs - renderStartMs).toFixed(3)),
+        afterRenderMs: Number((loopEndMs - afterRenderStartMs).toFixed(3)),
+        debugLogFlushMs: 0,
+        debugPanelDomAppendMs: 0,
+        inspectorRefreshMs: 0,
+        uiSyncMs: 0,
+        miscMainThreadMs: 0,
+        visibleChunkCount: Number(mainStats.visibleChunkCount || mainStats.visibleStaticChunkCount || 0),
+        visibleStaticPacketCount: Number(mainStats.visibleStaticPacketCount || lastDrawLoop.staticPacketCount || 0),
+        rebuiltChunkCountThisFrame: Number(mainStats.rebuiltChunkCountThisFrame || 0),
+        reusedChunkCountThisFrame: Number(mainStats.reusedChunkCountThisFrame || 0),
+        staticCacheRebuiltThisFrame: mainStats.staticCacheRebuiltThisFrame === true,
+        drawRenderableOrderMs: Number(lastPipeline.drawRenderableOrderMs || 0),
+        baseWorldPassesMs: Number(lastPipeline.baseWorldPassesMs || 0),
+        totalPipelineMs: Number(lastPipeline.totalPipelineMs || 0)
+      };
+      maybeEmitFullFrameWalltime(__fullFramePayload);
+      var __interactionPending = consumeCameraInteractionPendingTimings();
+      var __interactionFrameWallMs = Number((loopEndMs - loopStartMs).toFixed(3));
+      var __interactionRenderPipelineMs = Number((renderEndMs - renderStartMs).toFixed(3));
+      var __interactionTerrainApplyTickMs = Number(terrainApplyTickMs || 0);
+      var __interactionCameraUpdateMs = Number(__interactionPending.cameraInteractionUpdateMs || 0);
+      var __interactionUiAndInspectorMs = Number(__interactionPending.uiAndInspectorMs || 0);
+      var __interactionOtherMainThreadMs = Number((__interactionFrameWallMs - __interactionCameraUpdateMs - __interactionTerrainApplyTickMs - __interactionRenderPipelineMs - __interactionUiAndInspectorMs).toFixed(3));
+      if (__interactionOtherMainThreadMs < 0) __interactionOtherMainThreadMs = 0;
+      var __runFramePipelineWallMs = Number(interactionPipeline.runFramePipelineWallMs || 0);
+      var __rendererActiveCallWallMs = Number(rendererActiveCallWallMs || 0);
+      var __rendererActiveMinusPipelineMs = Number((__rendererActiveCallWallMs - __runFramePipelineWallMs).toFixed(3));
+      if (__rendererActiveMinusPipelineMs < 0) __rendererActiveMinusPipelineMs = 0;
+      var __pipelineOuterGapMs = Number((__interactionRenderPipelineMs - __runFramePipelineWallMs).toFixed(3));
+      if (__pipelineOuterGapMs < 0) __pipelineOuterGapMs = 0;
+      var __pipelineInnerGapMs = Number((__runFramePipelineWallMs - Number(interactionPipeline.renderPipelineAccumulatedMs || 0)).toFixed(3));
+      if (__pipelineInnerGapMs < 0) __pipelineInnerGapMs = 0;
+      var __activePreRunFramePipelineWallMs = Number(interactionPipeline.activePreRunFramePipelineWallMs || 0);
+      var __activePostRunFramePipelineWallMs = Number(interactionPipeline.activePostRunFramePipelineWallMs || 0);
+      var __activeWrapperGlueWallMs = Number(interactionPipeline.activeWrapperGlueWallMs || 0);
+      var __activeDebugHookWallMs = Number(interactionPipeline.activeDebugHookWallMs || 0);
+      maybeEmitCameraInteractionProfile({
+        interactionId: __cameraInteractionProfile.interactionId,
+        interactionType: __cameraInteractionProfile.interactionType,
+        frameIndex: Number((__cameraInteractionProfile.frameCount || 0) + 1),
+        cameraX: Number((camera && camera.x) || 0),
+        cameraY: Number((camera && camera.y) || 0),
+        zoom: Number((settings && settings.worldDisplayScale) || 1),
+        interactionFrameWallMs: __interactionFrameWallMs,
+        cameraInteractionUpdateMs: Number(__interactionCameraUpdateMs.toFixed(3)),
+        terrainApplyTickMs: Number(__interactionTerrainApplyTickMs.toFixed(3)),
+        renderPipelineMs: Number(__interactionRenderPipelineMs.toFixed(3)),
+        uiAndInspectorMs: Number(__interactionUiAndInspectorMs.toFixed(3)),
+        otherMainThreadMs: Number(__interactionOtherMainThreadMs.toFixed(3)),
+        baseWorldPassesMs: Number(lastPipeline.baseWorldPassesMs || 0),
+        baseWorldPassesWallMs: Number(interactionPipeline.baseWorldPassesWallMs || interactionPipeline.pipelineBaseWorldPassesWallMs || 0),
+        baseWorldPassesPreSetupWallMs: Number(interactionPipeline.baseWorldPassesPreSetupWallMs || 0),
+        baseWorldPassesPreSetupViewRotationWallMs: Number(interactionPipeline.baseWorldPassesPreSetupViewRotationWallMs || 0),
+        baseWorldPassesPreSetupScopeWallMs: Number(interactionPipeline.baseWorldPassesPreSetupScopeWallMs || 0),
+        baseWorldPassesPreSetupVisibleLightsWallMs: Number(interactionPipeline.baseWorldPassesPreSetupVisibleLightsWallMs || 0),
+        baseWorldPassesPreSetupOverrideWallMs: Number(interactionPipeline.baseWorldPassesPreSetupOverrideWallMs || 0),
+        baseWorldPassesPreSetupResidualWallMs: Number(interactionPipeline.baseWorldPassesPreSetupResidualWallMs || 0),
+        baseWorldPassesFloorLoopWallMs: Number(interactionPipeline.baseWorldPassesFloorLoopWallMs || 0),
+        baseWorldPassesFloorProjectionWallMs: Number(interactionPipeline.baseWorldPassesFloorProjectionWallMs || 0),
+        baseWorldPassesFloorColorMaterialWallMs: Number(interactionPipeline.baseWorldPassesFloorColorMaterialWallMs || 0),
+        baseWorldPassesFloorCanvasDrawWallMs: Number(interactionPipeline.baseWorldPassesFloorCanvasDrawWallMs || 0),
+        baseWorldPassesPlayerSpritePrepWallMs: Number(interactionPipeline.baseWorldPassesPlayerSpritePrepWallMs || 0),
+        baseWorldPassesPostFinalizeWallMs: Number(interactionPipeline.baseWorldPassesPostFinalizeWallMs || 0),
+        baseWorldPassesResidualWallMs: Number(interactionPipeline.baseWorldPassesResidualWallMs || 0),
+        floorLayerReusedDuringInteraction: Number(interactionPipeline.floorLayerReusedDuringInteractionCount || 0) > 0,
+        floorLayerReusedDuringInteractionCount: Number(interactionPipeline.floorLayerReusedDuringInteractionCount || 0),
+        floorLayerRebuildWallMs: interactionPipeline.floorLayerRebuildWallMs == null ? null : Number(interactionPipeline.floorLayerRebuildWallMs || 0),
+        floorLayerBlitWallMs: interactionPipeline.floorLayerBlitWallMs == null ? null : Number(interactionPipeline.floorLayerBlitWallMs || 0),
+        baseWorldActualBranch: interactionPipeline.baseWorldActualBranch || null,
+        buildFramePlanMs: Number(lastPipeline.buildFramePlanMs || 0),
+        drawRenderableOrderMs: Number(lastPipeline.drawRenderableOrderMs || 0),
+        drawOverlayPassesMs: Number(lastPipeline.drawOverlayPassesMs || 0),
+        drawHudPassMs: Number(lastPipeline.drawHudPassMs || 0),
+        renderPipelineCallCount: Number(interactionPipeline.renderPipelineCallCount || 0),
+        renderPipelineAccumulatedMs: Number(interactionPipeline.renderPipelineAccumulatedMs || 0),
+        renderPipelineMaxSingleCallMs: Number(interactionPipeline.renderPipelineMaxSingleCallMs || 0),
+        rendererActiveCallWallMs: Number(__rendererActiveCallWallMs.toFixed(3)),
+        runFramePipelineWallMs: Number(__runFramePipelineWallMs.toFixed(3)),
+        rendererActiveMinusPipelineMs: Number(__rendererActiveMinusPipelineMs.toFixed(3)),
+        pipelineOuterGapMs: Number(__pipelineOuterGapMs.toFixed(3)),
+        pipelineInnerGapMs: Number(__pipelineInnerGapMs.toFixed(3)),
+        activePreRunFramePipelineWallMs: Number(__activePreRunFramePipelineWallMs.toFixed(3)),
+        activePostRunFramePipelineWallMs: Number(__activePostRunFramePipelineWallMs.toFixed(3)),
+        activeWrapperGlueWallMs: Number(__activeWrapperGlueWallMs.toFixed(3)),
+        activeDebugHookWallMs: Number(__activeDebugHookWallMs.toFixed(3)),
+        activeDebugHookPreFlushWallMs: Number(interactionPipeline.activeDebugHookPreFlushWallMs || 0),
+        activeDebugHookLogFlushWallMs: Number(interactionPipeline.activeDebugHookLogFlushWallMs || 0),
+        activeDebugHookProfilerBookkeepingWallMs: Number(interactionPipeline.activeDebugHookProfilerBookkeepingWallMs || 0),
+        activeDebugHookRendererBookkeepingWallMs: Number(interactionPipeline.activeDebugHookRendererBookkeepingWallMs || 0),
+        activeDebugHookCanvasSyncWallMs: Number(interactionPipeline.activeDebugHookCanvasSyncWallMs || 0),
+        activeDebugHookBrowserSyncWallMs: Number(interactionPipeline.activeDebugHookBrowserSyncWallMs || 0),
+        activeDebugHookPostFlushWallMs: Number(interactionPipeline.activeDebugHookPostFlushWallMs || 0),
+        activeDebugHookResidualWallMs: Number(interactionPipeline.activeDebugHookResidualWallMs || 0),
+        pipelineKnownAccountedMs: Number(interactionPipeline.pipelineKnownAccountedMs || 0),
+        pipelineUnaccountedMs: Number(interactionPipeline.pipelineUnaccountedMs || 0),
+        pipelineClearAndBackgroundMs: Number(interactionPipeline.pipelineClearAndBackgroundMs || 0),
+        pipelineClearAndBackgroundWallMs: Number(interactionPipeline.pipelineClearAndBackgroundWallMs || 0),
+        pipelineBaseWorldPassesMs: Number(interactionPipeline.pipelineBaseWorldPassesMs || 0),
+        pipelineBaseWorldPassesWallMs: Number(interactionPipeline.pipelineBaseWorldPassesWallMs || 0),
+        pipelineBuildFramePlanMs: Number(interactionPipeline.pipelineBuildFramePlanMs || 0),
+        pipelineBuildFramePlanWallMs: Number(interactionPipeline.pipelineBuildFramePlanWallMs || 0),
+        pipelineDrawRenderableOrderMs: Number(interactionPipeline.pipelineDrawRenderableOrderMs || 0),
+        pipelineDrawRenderableOrderWallMs: Number(interactionPipeline.pipelineDrawRenderableOrderWallMs || 0),
+        pipelineDrawOverlayPassesMs: Number(interactionPipeline.pipelineDrawOverlayPassesMs || 0),
+        pipelineDrawOverlayPassesWallMs: Number(interactionPipeline.pipelineDrawOverlayPassesWallMs || 0),
+        pipelineDrawHudPassMs: Number(interactionPipeline.pipelineDrawHudPassMs || 0),
+        pipelineDrawHudPassWallMs: Number(interactionPipeline.pipelineDrawHudPassWallMs || 0),
+        pipelinePrePassSetupMs: Number(interactionPipeline.pipelinePrePassSetupMs || 0),
+        pipelinePrePassSetupWallMs: Number(interactionPipeline.pipelinePrePassSetupWallMs || 0),
+        pipelinePostPassFinalizeMs: Number(interactionPipeline.pipelinePostPassFinalizeMs || 0),
+        pipelinePostPassFinalizeWallMs: Number(interactionPipeline.pipelinePostPassFinalizeWallMs || 0),
+        pipelineAdapterGlueMs: Number(interactionPipeline.pipelineAdapterGlueMs || 0),
+        pipelineDebugHookMs: Number(interactionPipeline.pipelineDebugHookMs || 0),
+        pipelineCalls: Array.isArray(interactionPipeline.calls) ? interactionPipeline.calls.slice(0, 5) : [],
+        visibleChunkCount: Number(mainStats.visibleChunkCount || mainStats.visibleStaticChunkCount || 0),
+        visibleStaticPacketCount: Number(mainStats.visibleStaticPacketCount || lastDrawLoop.staticPacketCount || 0),
+        staticCacheRebuiltThisFrame: mainStats.staticCacheRebuiltThisFrame === true,
+        rebuiltChunkCountThisFrame: Number(mainStats.rebuiltChunkCountThisFrame || 0),
+        reusedChunkCountThisFrame: Number(mainStats.reusedChunkCountThisFrame || 0)
+      });
+    } catch (_) {}
     if (debugState.frame <= 5 || verboseLog) detailLog(`loop:done frame=${debugState.frame}`);
   } catch (err) {
     const detail = formatErrorDetails(err?.message || 'loop failed', 'loop', 0, 0, err);
@@ -372,12 +1112,15 @@ safeListen(canvas, 'mousemove', (e) => {
   if (mouse.draggingView && editor.mode === 'view' && !lightState.dragAxis) {
     const dx = mouse.x - mouse.panStartX;
     const dy = mouse.y - mouse.panStartY;
+    markCameraInteractionActivity('drag');
+    var __cameraUpdateStartMs = perfNow();
     if (window.App && window.App.state && window.App.state.runtimeState && typeof window.App.state.runtimeState.setCamera === 'function') {
       window.App.state.runtimeState.setCamera({ x: mouse.cameraStartX + dx, y: mouse.cameraStartY + dy }, { source: 'app:mousemove.pan-view' });
     } else {
       camera.x = mouse.cameraStartX + dx;
       camera.y = mouse.cameraStartY + dy;
     }
+    addCameraInteractionTiming('cameraInteractionUpdateMs', perfNow() - __cameraUpdateStartMs);
   }
 }, 'canvas:mousemove');
 safeListen(canvas, 'mouseenter', (e) => {
@@ -414,10 +1157,17 @@ safeListen(canvas, 'wheel', (e) => {
     return;
   }
 
+  startCameraInteractionProfile('zoom');
+  markCameraInteractionActivity('zoom');
   var anchorWorld = screenToFloor(sx, sy);
   var factor = e.deltaY < 0 ? 1.1 : 0.9;
-  if (applyWorldDisplayScale(settings.worldDisplayScale * factor, anchorWorld, { x: sx, y: sy })) {
+  clearRendererZoomPreview('wheel-zoom-reuse');
+  var __zoomStartMs = perfNow();
+  if (applyWorldDisplayScale(settings.worldDisplayScale * factor, anchorWorld, { x: sx, y: sy, source: 'wheel-zoom-reuse' })) {
+    addCameraInteractionTiming('cameraInteractionUpdateMs', perfNow() - __zoomStartMs);
     e.preventDefault();
+  } else {
+    addCameraInteractionTiming('cameraInteractionUpdateMs', perfNow() - __zoomStartMs);
   }
 }, 'canvas:wheel');
 safeListen(canvas, 'mousedown', (e) => {
@@ -455,6 +1205,7 @@ safeListen(canvas, 'mousedown', (e) => {
   }
 
   if (editor.mode === 'view') {
+    startCameraInteractionProfile('drag');
     mouse.draggingView = true;
     mouse.panStartX = mouse.x;
     mouse.panStartY = mouse.y;
@@ -529,11 +1280,30 @@ safeListen(window, 'mouseup', () => {
       }
     }
   }
+  endCameraInteractionProfileSoon();
   mouse.draggingView = false;
   lightState.dragAxis = null;
   lightState.dragStartMouse = null;
   lightState.dragStartLight = null;
 }, 'window:mouseup');
+
+safeListen(canvas, 'touchstart', function (e) {
+  try {
+    if (!e || !e.touches) return;
+    if (e.touches.length >= 2) startCameraInteractionProfile('pinch');
+    else if (e.touches.length === 1) startCameraInteractionProfile('pan');
+    markCameraInteractionActivity(e.touches.length >= 2 ? 'pinch' : 'pan');
+  } catch (_) {}
+}, 'canvas:touchstart');
+safeListen(canvas, 'touchmove', function (e) {
+  try {
+    if (!e || !e.touches) return;
+    markCameraInteractionActivity(e.touches.length >= 2 ? 'pinch' : 'pan');
+  } catch (_) {}
+}, 'canvas:touchmove');
+safeListen(canvas, 'touchend', function () {
+  endCameraInteractionProfileSoon();
+}, 'canvas:touchend');
 safeListen(canvas, 'contextmenu', (e) => e.preventDefault(), 'canvas:contextmenu');
 
 safeListen(window, 'keydown', (e) => {

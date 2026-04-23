@@ -155,24 +155,28 @@ function requestUnifiedWorldZoom(nextZoom, source) {
 
 function applyWorldDisplayScale(nextDisplayScale, anchorWorld = null, anchorScreen = null, options = null) {
   var opts = options && typeof options === 'object' ? options : {};
+  var requestSource = String(opts.source || 'ui:applyWorldDisplayScale');
+  var isReuseFirstInteractionZoom = requestSource.indexOf('wheel-zoom-reuse') >= 0 || requestSource.indexOf('pinch-zoom-reuse') >= 0;
   var prevDisplayScale = getUnifiedWorldZoomValue();
   nextDisplayScale = clamp(Number(nextDisplayScale) || prevDisplayScale || 1, 0.5, 2.4);
   if (opts.forceApply !== true && Math.abs(nextDisplayScale - prevDisplayScale) < 0.0001) return false;
-  var appliedZoom = requestUnifiedWorldZoom(nextDisplayScale, opts.source || 'ui:applyWorldDisplayScale');
+  var appliedZoom = requestUnifiedWorldZoom(nextDisplayScale, requestSource);
   if (ui.tileScale) ui.tileScale.value = String(Number(appliedZoom.toFixed(2)));
   if (anchorWorld && anchorScreen && Number.isFinite(anchorWorld.x) && Number.isFinite(anchorWorld.y) && Number.isFinite(anchorScreen.x) && Number.isFinite(anchorScreen.y)) {
     var anchored = iso(anchorWorld.x, anchorWorld.y, anchorWorld.z || 0);
     var nextCamera = { x: camera.x + (anchorScreen.x - anchored.x), y: camera.y + (anchorScreen.y - anchored.y) };
-    if (window.App && window.App.state && window.App.state.runtimeState && typeof window.App.state.runtimeState.setCamera === 'function') window.App.state.runtimeState.setCamera(nextCamera, { source: 'ui:applyWorldDisplayScale' });
+    if (window.App && window.App.state && window.App.state.runtimeState && typeof window.App.state.runtimeState.setCamera === 'function') window.App.state.runtimeState.setCamera(nextCamera, { source: requestSource });
     else {
       camera.x = nextCamera.x;
       camera.y = nextCamera.y;
     }
   }
-  invalidateShadowGeometryCache('world-zoom');
-  refreshInspectorPanels();
-  if (editor.mode === 'place' || editor.mode === 'drag') updatePreview();
-  pushLog(`world-zoom: displayScale=${Number(settings.worldDisplayScale || appliedZoom).toFixed(2)} tileScale=${Number(settings.tileScale || appliedZoom).toFixed(2)} runtimeZoom=${Number(appliedZoom).toFixed(2)} camera=(${camera.x.toFixed(1)},${camera.y.toFixed(1)})`);
+  if (!isReuseFirstInteractionZoom) {
+    invalidateShadowGeometryCache('world-zoom');
+    refreshInspectorPanels();
+    if (editor.mode === 'place' || editor.mode === 'drag') updatePreview();
+    pushLog(`world-zoom: displayScale=${Number(settings.worldDisplayScale || appliedZoom).toFixed(2)} tileScale=${Number(settings.tileScale || appliedZoom).toFixed(2)} runtimeZoom=${Number(appliedZoom).toFixed(2)} camera=(${camera.x.toFixed(1)},${camera.y.toFixed(1)})`);
+  }
   return true;
 }
 
