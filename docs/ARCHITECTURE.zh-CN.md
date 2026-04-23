@@ -218,13 +218,13 @@
 |---|---|
 | `index.html` | 主程序入口 |
 | `START_V18_ONLY.html` | 素材编辑器入口 |
-| `src/state.js` | 全局状态、prefab/scene 相关基础对象、部分资源管理 |
-| `src/scene-storage/scene-storage.js` | 场景存储与恢复逻辑（抽离后的独立模块） |
-| `src/ui.js` | 主程序 UI 控件与面板同步 |
-| `src/logic.js` | 坐标、碰撞、遮挡、阴影等逻辑计算 |
-| `src/render.js` | 场景绘制与渲染 |
-| `src/app.js` | 主循环、事件接线、初始化与调度 |
-| `src/editor-unified-v18.js` | 素材编辑器核心逻辑 |
+| `src/infrastructure/legacy/state.js` | 全局状态、prefab/scene 相关基础对象、部分资源管理 |
+| `src/infrastructure/storage/scene-storage.js` | 场景存储与恢复逻辑（抽离后的独立模块） |
+| `src/presentation/ui/ui.js` | 主程序 UI 控件与面板同步 |
+| `src/presentation/render/logic.js` | 坐标、碰撞、遮挡、阴影等逻辑计算 |
+| `src/presentation/render/render.js` | 场景绘制与渲染 |
+| `src/presentation/shell/app.js` | 主循环、事件接线、初始化与调度 |
+| `src/presentation/editor/editor-unified-v18.js` | 素材编辑器核心逻辑 |
 | `local_server.py` | 本地文件服务与场景 / prefab / Habbo API |
 
 ---

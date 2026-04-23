@@ -1,7 +1,7 @@
 # Placement fail-fast cleanup / ownership validation
 
 ## Goal
-Ensure all critical placement exports resolve through `src/placement/placement.js` only.
+Ensure all critical placement exports resolve through `src/application/placement/placement.js` only.
 
 ## Changes allowed
 - Add owner markers to critical placement exports.

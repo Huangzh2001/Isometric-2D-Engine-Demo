@@ -1,0 +1,3975 @@
+// v1 split file generated from original monolithic app.js
+// 注意：此文件为保持行为稳定的第一刀拆分，允许存在少量跨层函数。
+
+
+function lightForward(light) {
+var yaw = degToRad(light.angle || 0);
+var pitch = degToRad(light.pitch || 55);
+var cp = Math.cos(pitch);
+var sp = Math.sin(pitch);
+return normalize3({ x: Math.cos(yaw) * cp, y: Math.sin(yaw) * cp, z: -sp });
+}
+
+function lightIncoming(light) {
+var f = lightForward(light);
+return { x: -f.x, y: -f.y, z: -f.z };
+}
+
+function areaSampleOffsets(light) {
+var size = Math.max(0.15, light.size || 1.2);
+var s = size * 0.55;
+var fastMode = shouldUseFastShadowSampling();
+if (fastMode) {
+  return [
+    { x: 0, y: 0 },
+    { x: s * 0.75, y: 0 },
+    { x: -s * 0.75, y: 0 },
+  ];
+}
+
+var offsets = [
+  { x: 0, y: 0 },
+  { x: s, y: 0 },
+  { x: -s, y: 0 },
+  { x: 0, y: s },
+  { x: 0, y: -s },
+];
+if ((light.softness || 0) > 0.55 && !shouldUseMediumAreaSampling()) {
+  offsets.push(
+    { x: s * 0.7, y: s * 0.7 },
+    { x: -s * 0.7, y: s * 0.7 },
+    { x: s * 0.7, y: -s * 0.7 },
+    { x: -s * 0.7, y: -s * 0.7 },
+  );
+}
+return offsets;
+}
+
+
+function worldRadiusFromPixels(px) {
+return px / Math.max(52, settings.tileW * 0.85);
+}
+
+function distanceAttenuation(light, point) {
+var dx = point.x - light.x;
+var dy = point.y - light.y;
+var dz = point.z - light.z;
+var dist = Math.hypot(dx, dy, dz);
+var radiusWorld = worldRadiusFromPixels(light.radius || 240);
+var t = clamp(1 - dist / Math.max(0.001, radiusWorld), 0, 1);
+return t * t;
+}
+
+function spotlightFalloff(light, point) {
+if (light.type !== 'spot') return 1;
+var toPoint = normalize3({ x: point.x - light.x, y: point.y - light.y, z: point.z - light.z });
+var forward = lightForward(light);
+var cosTheta = dot3(toPoint, forward);
+var outer = degToRad(Math.max(2, light.spread || 34) * 0.5);
+var inner = outer * (1 - clamp((light.softness || 0.3) * 0.75, 0.02, 0.75));
+var cosOuter = Math.cos(outer);
+var cosInner = Math.cos(inner);
+if (cosTheta <= cosOuter) return 0;
+if (cosTheta >= cosInner) return 1;
+var t = clamp((cosTheta - cosOuter) / Math.max(1e-5, cosInner - cosOuter), 0, 1);
+return t * t * (3 - 2 * t);
+}
+
+function evaluateSingleLight(light, point, normal) {
+normalizeLight(light);
+var lightRgb = hexToRgb(light.color);
+
+if (light.type === 'directional') {
+  const L = lightIncoming(light);
+  const lambert = Math.max(0, dot3(normal, L));
+  return { raw: lambert * light.intensity, rgb: lightRgb };
+}
+
+var L = normalize3({ x: light.x - point.x, y: light.y - point.y, z: light.z - point.z });
+var lambert = Math.max(0, dot3(normal, L));
+var raw = lambert * distanceAttenuation(light, point) * light.intensity;
+if (light.type === 'spot') raw *= spotlightFalloff(light, point);
+return { raw, rgb: lightRgb };
+}
+
+function evaluateLight(light, point, normal) {
+if (light.type !== 'area') return evaluateSingleLight(light, point, normal);
+var offsets = areaSampleOffsets(light);
+var raw = 0;
+var rgbAccum = { r: 0, g: 0, b: 0 };
+for (const o of offsets) {
+  const sample = { ...light, type: 'point', x: light.x + o.x, y: light.y + o.y };
+  const part = evaluateSingleLight(sample, point, normal);
+  raw += part.raw;
+  rgbAccum.r += part.rgb.r;
+  rgbAccum.g += part.rgb.g;
+  rgbAccum.b += part.rgb.b;
+}
+var n = offsets.length || 1;
+return {
+  raw: raw / n,
+  rgb: { r: rgbAccum.r / n, g: rgbAccum.g / n, b: rgbAccum.b / n },
+};
+}
+
+function spriteLightAt(point) {
+var brightness = 0.35 + settings.ambient * 1.35;
+var tintAccum = { r: 0, g: 0, b: 0 };
+var weight = 0;
+for (const light of getLightingRenderLights()) {
+  const liftedPoint = { x: point.x, y: point.y, z: point.z + 0.3 };
+  const evalUp = evaluateLight(light, liftedPoint, { x: 0, y: 0, z: 1 });
+  const raw = evalUp.raw;
+  brightness += raw * 1.05;
+  tintAccum.r += evalUp.rgb.r * raw;
+  tintAccum.g += evalUp.rgb.g * raw;
+  tintAccum.b += evalUp.rgb.b * raw;
+  weight += raw;
+}
+return {
+  brightness: clamp(brightness, 0.28, 1.9),
+  tint: weight > 0 ? { r: tintAccum.r / weight, g: tintAccum.g / weight, b: tintAccum.b / weight } : { r: 255, g: 255, b: 255 },
+  weight,
+};
+}
+
+function baseFaceColors(base) {
+var rgb = hexToRgb(base);
+return {
+  top: mixColor(rgb, { r: 255, g: 255, b: 255 }, 0.14),
+  east: mulColor(rgb, 0.92),
+  south: mulColor(rgb, 0.75),
+  line: 'rgba(0,0,0,.16)',
+};
+}
+
+function litColor(baseRgb, center, normal) {
+var accum = mulColor(baseRgb, 0.18 + settings.ambient * 0.9);
+for (const light of getLightingRenderLights()) {
+  const evald = evaluateLight(light, center, normal);
+  const t = clamp(evald.raw, 0, 1.35);
+  const warmed = mixColor(baseRgb, evald.rgb, clamp(t * 0.9, 0, 0.9));
+  accum = addColor(accum, mulColor(warmed, t));
+}
+return accum;
+}
+
+function projectGroundPoint(light, point, samplePoint = null) {
+if (light.type === 'directional') {
+  const dir = lightForward(light);
+  if (dir.z >= -0.02) return null;
+  const t = point.z / (-dir.z);
+  return { x: point.x + dir.x * t, y: point.y + dir.y * t, z: 0 };
+}
+var source = samplePoint || light;
+var dz = source.z - point.z;
+if (dz <= 0.05) return null;
+var t = point.z / dz;
+return { x: point.x + (point.x - source.x) * t, y: point.y + (point.y - source.y) * t, z: 0 };
+}
+
+function shadowAlphaForLight(light, receiverPoint) {
+var globalAlpha = clamp(Number(lightState.shadowAlpha ?? 1), 0, 1);
+var opacityScale = Math.max(0, Number(lightState.shadowOpacityScale ?? 1));
+if (globalAlpha <= 0 || opacityScale <= 0 || !lightState.showShadows) return 0;
+
+var alpha;
+if (light.type === 'directional') alpha = clamp(0.05 + light.intensity * 0.07, 0.04, 0.16);
+else if (light.type === 'spot') alpha = clamp((0.04 + light.intensity * 0.09) * (0.65 + spotlightFalloff(light, receiverPoint) * 0.7), 0.03, 0.2);
+else if (light.type === 'area') alpha = clamp(0.03 + light.intensity * 0.05, 0.02, 0.11);
+else alpha = clamp(0.05 + light.intensity * 0.08, 0.04, 0.18);
+
+var scaled = clamp(alpha * opacityScale, 0, 1);
+var capped = Math.min(lightState.highContrastShadow ? 0.95 : 0.7, scaled * globalAlpha);
+return clamp(capped, 0, 1);
+}
+
+function shadowFillCss(alpha) {
+var a = clamp(alpha, 0, 0.95);
+if (lightState.highContrastShadow) {
+  return rgbToCss(hexToRgb(lightState.shadowDebugColor || '#ff2a6d'), a);
+}
+return `rgba(0,0,0,${a})`;
+}
+
+function shadowStrokeCss(alpha) {
+var a = clamp(alpha, 0, 0.95);
+if (lightState.highContrastShadow) {
+  return rgbToCss(hexToRgb(lightState.shadowDebugColor || '#ff2a6d'), Math.min(1, a + 0.22));
+}
+return `rgba(0,0,0,${Math.min(0.35, a + 0.08)})`;
+}
+
+
+function convexHull2(points) {
+if (points.length <= 1) return points.slice();
+var pts = points.slice().sort((a,b)=> a.x === b.x ? a.y - b.y : a.x - b.x);
+var cross = (o,a,b) => (a.x-o.x)*(b.y-o.y) - (a.y-o.y)*(b.x-o.x);
+var lower = [];
+for (const p of pts) {
+  while (lower.length >= 2 && cross(lower[lower.length-2], lower[lower.length-1], p) <= 0) lower.pop();
+  lower.push(p);
+}
+var upper = [];
+for (let i = pts.length - 1; i >= 0; i--) {
+  const p = pts[i];
+  while (upper.length >= 2 && cross(upper[upper.length-2], upper[upper.length-1], p) <= 0) upper.pop();
+  upper.push(p);
+}
+lower.pop(); upper.pop();
+return lower.concat(upper);
+}
+
+function boxShadowWorldPoints(box) {
+return [
+  { x: box.x, y: box.y, z: box.z },
+  { x: box.x + box.w, y: box.y, z: box.z },
+  { x: box.x + box.w, y: box.y + box.d, z: box.z },
+  { x: box.x, y: box.y + box.d, z: box.z },
+  { x: box.x, y: box.y, z: box.z + box.h },
+  { x: box.x + box.w, y: box.y, z: box.z + box.h },
+  { x: box.x + box.w, y: box.y + box.d, z: box.z + box.h },
+  { x: box.x, y: box.y + box.d, z: box.z + box.h },
+];
+}
+
+function drawProjectedShadow(worldPts, light, receiverPoint, debugTag = '') {
+if (!lightState.showShadows) return;
+normalizeLight(light);
+var emitShadow = (projected, alpha) => {
+  if (alpha <= 0.0001) return;
+  if (!projected.length) return;
+  const hull = convexHull2(projected.map(p => ({ x: p.x, y: p.y })));
+  if (hull.length < 3) return;
+  var unionCtx = ensureShadowPolyUnionCanvas();
+  unionCtx.clearRect(0, 0, VIEW_W, VIEW_H);
+  unionCtx.globalCompositeOperation = 'source-over';
+  var worldHull = hull.map(function (p) { return { x: p.x, y: p.y, z: 0 }; });
+  var screenHull = hull.map(function (p) { return iso(p.x, p.y, 0); });
+  var fadeDebug = {};
+  fillShadowPolyWithDistanceFade(unionCtx, screenHull, worldHull, receiverPoint || null, light, alpha, fadeDebug);
+  ctx.save();
+  drawUnionShadowCanvasToTarget(ctx, alpha);
+  if (lightState.highContrastShadow) {
+    ctx.strokeStyle = shadowStrokeCss(clamp(alpha * Number(fadeDebug.factorFar || 1), 0, 0.95));
+    ctx.lineWidth = 0.7;
+    ctx.beginPath();
+    ctx.moveTo(screenHull[0].x, screenHull[0].y);
+    for (let i = 1; i < screenHull.length; i++) ctx.lineTo(screenHull[i].x, screenHull[i].y);
+    ctx.closePath();
+    ctx.stroke();
+  }
+  ctx.restore();
+  if (typeof logStaticShadowEmitDebug === 'function') logStaticShadowEmitDebug({
+    alphaBase: clamp(alpha, 0, 0.95),
+    alphaNear: clamp(alpha * Number(fadeDebug.factorNear || 1), 0, 0.95),
+    alphaFar: clamp(alpha * Number(fadeDebug.factorFar || 1), 0, 0.95),
+    fadeReason: fadeDebug.reason || 'none',
+    fadeMode: fadeDebug.mode || 'solid',
+    fadeDistanceNear: Number(fadeDebug.distanceNear || 0),
+    fadeDistanceFar: Number(fadeDebug.distanceFar || 0),
+    gradientStart: fadeDebug.gradientStart || null,
+    gradientEnd: fadeDebug.gradientEnd || null,
+    edgeFadeEnabled: !!lightState.shadowEdgeFadeEnabled,
+    edgeFadePx: Number(lightState.shadowEdgeFadePx || 0),
+    target: 'main-player',
+    lightId: light.id || light.name || 'light',
+    lightType: light.type || 'unknown',
+    component: debugTag || 'projected-shadow',
+    casterCenter: receiverPoint || null,
+    worldPolys: [worldHull],
+    screenPolys: [screenHull]
+  });
+  if (verboseLog && debugState.frame <= 6) {
+    detailLog(`shadow:${debugTag || 'shape'} light=${light.name}/${light.type} hullN=${hull.length} alpha=${alpha.toFixed(3)} near=${(alpha * Number(fadeDebug.factorNear || 1)).toFixed(3)} far=${(alpha * Number(fadeDebug.factorFar || 1)).toFixed(3)} mode=${String(fadeDebug.mode || 'solid')}`);
+  }
+};
+if (light.type === 'area') {
+  const offsets = areaSampleOffsets(light);
+  const baseAlpha = shadowAlphaForLight(light, receiverPoint) / Math.max(1, offsets.length) * (1.2 + light.softness * 0.8);
+  for (const o of offsets) {
+    const sample = { ...light, x: light.x + o.x, y: light.y + o.y, z: light.z };
+    const projected = worldPts.map(p => projectGroundPoint(light, p, sample)).filter(Boolean);
+    emitShadow(projected, baseAlpha);
+  }
+  return;
+}
+var projected = worldPts.map(p => projectGroundPoint(light, p)).filter(Boolean);
+var a = shadowAlphaForLight(light, receiverPoint);
+emitShadow(projected, a);
+}
+
+function drawWorldShadowPolygon(worldPoly, alpha) {
+if (!worldPoly || worldPoly.length < 3 || alpha <= 0.0001) return;
+var screenPoly = worldPoly.map(function (p) { return iso(p.x, p.y, p.z); });
+drawPoly(screenPoly, shadowFillCss(alpha), lightState.highContrastShadow ? shadowStrokeCss(alpha) : null);
+}
+
+function drawPlayerShadow(shadowLights = null) {
+if (!SHOW_PLAYER) return;
+if (!lightState.showShadows) return;
+
+var activeShadowLights = shadowLights || getShadowDebugRenderLights();
+var proxy = getPlayerProxyBox();
+var worldPts = boxShadowWorldPoints(proxy);
+var center = getPlayerShadowCenter();
+for (const light of activeShadowLights) drawProjectedShadow(worldPts, light, center, 'player-proxy');
+
+var bounds = getPlayerGroundBounds();
+var foot = iso(player.x, player.y, 0);
+var widthPx = Math.max(10, bounds.maxX - bounds.minX);
+var heightPx = Math.max(6, bounds.maxY - bounds.minY);
+var contactAlpha = clamp(0.12 + settings.ambient * 0.20, 0.10, 0.24);
+for (const light of activeShadowLights) {
+  contactAlpha += clamp(evaluateLight(light, { x: player.x, y: player.y, z: 0.12 }, { x: 0, y: 0, z: 1 }).raw * 0.025, 0, 0.045);
+}
+ctx.save();
+ctx.translate(foot.x, foot.y + 4);
+ctx.scale(Math.max(0.75, widthPx / 26), Math.max(0.42, heightPx / 18));
+ctx.fillStyle = `rgba(0,0,0,${clamp(contactAlpha, 0.10, 0.30)})`;
+ctx.beginPath();
+ctx.arc(0, 0, 13, 0, Math.PI * 2);
+ctx.fill();
+ctx.restore();
+
+if (showDebug) {
+  const pts = cubePoints(proxy.x, proxy.y, proxy.z, proxy.w, proxy.d, proxy.h);
+  drawPoly([pts.p001, pts.p101, pts.p111, pts.p011], 'rgba(255,210,120,.05)', 'rgba(255,210,120,.82)');
+  drawPoly([pts.p101, pts.p111, pts.p110, pts.p100], null, 'rgba(255,210,120,.55)');
+  drawPoly([pts.p011, pts.p111, pts.p110, pts.p010], null, 'rgba(255,210,120,.55)');
+}
+}
+
+function getMainViewRotationCoreApi() {
+try {
+  return (window.App && window.App.domain && window.App.domain.viewRotationCore)
+    ? window.App.domain.viewRotationCore
+    : (window.__VIEW_ROTATION_CORE__ || null);
+} catch (_) {
+  return window.__VIEW_ROTATION_CORE__ || null;
+}
+}
+
+function isMainEditorViewAnimatingForLogic() {
+  try {
+    var controller = window.App && window.App.controllers ? window.App.controllers.main || null : null;
+    if (controller && typeof controller.isMainEditorViewRotating === 'function') return !!controller.isMainEditorViewRotating('presentation.render.logic');
+  } catch (_) {}
+  try {
+    var runtimeApi = window.App && window.App.state ? window.App.state.runtimeState || null : null;
+    return !!(runtimeApi && runtimeApi.editor && runtimeApi.editor.isViewRotating);
+  } catch (_) {}
+  return false;
+}
+
+function getMainEditorViewRotationValue() {
+try {
+  var controller = window.App && window.App.controllers ? window.App.controllers.main || null : null;
+  if (controller && typeof controller.getMainEditorVisualRotation === 'function') return ((Number(controller.getMainEditorVisualRotation('presentation.render.logic')) || 0) % 4 + 4) % 4;
+  if (controller && typeof controller.getMainEditorViewRotation === 'function') return ((Number(controller.getMainEditorViewRotation('presentation.render.logic')) || 0) % 4 + 4) % 4;
+} catch (_) {}
+try {
+  var runtimeState = window.App && window.App.state ? window.App.state.runtimeState || null : null;
+  if (runtimeState && runtimeState.editor && typeof runtimeState.editor.rotation === 'number') return ((Number(runtimeState.editor.rotation) || 0) % 4 + 4) % 4;
+} catch (_) {}
+return 0;
+}
+
+function getMainViewProjectionConfig() {
+return {
+  tileW: settings.tileW,
+  tileH: settings.tileH,
+  originX: settings.originX,
+  originY: settings.originY,
+  cameraX: camera.x,
+  cameraY: camera.y,
+  worldBoundsOrOrigin: { cols: settings.gridW || settings.worldCols, rows: settings.gridH || settings.worldRows }
+};
+}
+
+function currentProto() {
+var p = currentPrefab();
+return prefabVariant(p, (editor && typeof editor.previewFacing === 'number') ? editor.previewFacing : 0);
+}
+
+function iso(x, y, z = 0) {
+var api = getMainViewRotationCoreApi();
+if (api && typeof api.worldToScreenWithViewRotation === 'function') {
+  return api.worldToScreenWithViewRotation({ x: x, y: y, z: z }, getMainEditorViewRotationValue(), getMainViewProjectionConfig());
+}
+return {
+  x: settings.originX + camera.x + (x - y) * settings.tileW / 2,
+  y: settings.originY + camera.y + (x + y) * settings.tileH / 2 - z * settings.tileH,
+};
+}
+
+function screenToFloor(sx, sy) {
+var api = getMainViewRotationCoreApi();
+if (api && typeof api.screenToWorldWithViewRotation === 'function') {
+  var world = api.screenToWorldWithViewRotation({ x: sx, y: sy, z: 0 }, getMainEditorViewRotationValue(), getMainViewProjectionConfig());
+  return { x: world.x, y: world.y };
+}
+var dx = (sx - settings.originX - camera.x) / (settings.tileW / 2);
+var dy = (sy - settings.originY - camera.y) / (settings.tileH / 2);
+return { x: (dx + dy) / 2, y: (dy - dx) / 2 };
+}
+
+function shadeHex(hex, delta) {
+var v = hex.replace('#', '');
+var n = parseInt(v, 16);
+var r = (n >> 16) + delta;
+var g = ((n >> 8) & 255) + delta;
+var b = (n & 255) + delta;
+r = clamp(r, 0, 255); g = clamp(g, 0, 255); b = clamp(b, 0, 255);
+return `rgb(${r},${g},${b})`;
+}
+
+function hexToRgb(hex) {
+var v = hex.replace('#', '');
+var n = parseInt(v, 16);
+return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+function rgbToCss(rgb, a = 1) {
+return `rgba(${Math.round(rgb.r)}, ${Math.round(rgb.g)}, ${Math.round(rgb.b)}, ${a})`;
+}
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+function mixColor(rgb, target, t) {
+return {
+  r: lerp(rgb.r, target.r, t),
+  g: lerp(rgb.g, target.g, t),
+  b: lerp(rgb.b, target.b, t),
+};
+}
+
+function mulColor(rgb, k) {
+return {
+  r: clamp(rgb.r * k, 0, 255),
+  g: clamp(rgb.g * k, 0, 255),
+  b: clamp(rgb.b * k, 0, 255),
+};
+}
+
+function addColor(a, b) {
+return {
+  r: clamp(a.r + b.r, 0, 255),
+  g: clamp(a.g + b.g, 0, 255),
+  b: clamp(a.b + b.b, 0, 255),
+};
+}
+
+function normalize3(v) {
+var len = Math.hypot(v.x, v.y, v.z) || 1;
+return { x: v.x / len, y: v.y / len, z: v.z / len };
+}
+
+function dot3(a, b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+
+function drawLightGlow() {
+if (!lightState.showGlow) return;
+for (const light of getLightingRenderLights()) {
+  normalizeLight(light);
+  const p = iso(light.x, light.y, light.z);
+  const rgb = hexToRgb(light.color);
+
+  if (light.type === 'directional') {
+    const incoming = lightIncoming(light);
+    const g = ctx.createLinearGradient(
+      VIEW_W * 0.5 - incoming.x * VIEW_W * 0.75,
+      VIEW_H * 0.5 - incoming.y * VIEW_H * 0.55,
+      VIEW_W * 0.5 + incoming.x * VIEW_W * 0.75,
+      VIEW_H * 0.5 + incoming.y * VIEW_H * 0.55,
+    );
+    g.addColorStop(0, rgbToCss(rgb, clamp(light.intensity * 0.14, 0, 0.18)));
+    g.addColorStop(0.55, rgbToCss(rgb, 0.03));
+    g.addColorStop(1, rgbToCss(rgb, 0));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    continue;
+  }
+
+  if (light.type === 'area') {
+    const size = 12 + (light.size || 1) * 10;
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.fillStyle = rgbToCss(rgb, clamp(0.18 * light.intensity, 0, 0.3));
+    ctx.strokeStyle = rgbToCss(rgb, 0.65);
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.rect(-size, -size * 0.55, size * 2, size * 1.1);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  const glow = ctx.createRadialGradient(p.x, p.y, 6, p.x, p.y, light.radius);
+  glow.addColorStop(0, rgbToCss(rgb, clamp(0.18 * light.intensity, 0, 0.32)));
+  glow.addColorStop(0.35, rgbToCss(rgb, clamp(0.08 * light.intensity, 0, 0.22)));
+  glow.addColorStop(1, rgbToCss(rgb, 0));
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+}
+}
+
+
+var shadowGeomCache = {
+signature: '',
+components: [],
+occupancy: new Map(),
+totalVoxels: 0,
+totalFaces: 0,
+};
+var mergedReceiverCache = {
+signature: '',
+facesByOwner: new Map(),
+};
+var shadowChainPrimaryCache = new Map();
+var shadowMaskCanvas = null;
+var shadowMaskCtx = null;
+
+function getMainCameraShadowSourceBoxes() {
+try {
+  var cullingApi = typeof window !== 'undefined' ? window.__MAIN_CAMERA_CULLING_API__ : null;
+  if (cullingApi && typeof cullingApi.getScope === 'function' && typeof cullingApi.filterBoxesForShadowSource === 'function') {
+    var rotation = getMainEditorViewRotationValue();
+    return cullingApi.filterBoxesForShadowSource(boxes, cullingApi.getScope(rotation));
+  }
+} catch (_) {}
+return boxes;
+}
+
+function boxesShadowSignature() {
+var shadowBoxes = getMainCameraShadowSourceBoxes();
+return shadowBoxes
+  .slice()
+  .sort((a, b) => a.id - b.id)
+  .map(b => [b.id, b.x, b.y, b.z, b.w, b.d, b.h].join(':'))
+  .join('|');
+}
+
+function shadowVoxelKey(x, y, z) {
+return `${x}|${y}|${z}`;
+}
+
+function shadowFaceKey(face) {
+var p = face.pts[0];
+return `${face.kind}|${p.x}|${p.y}|${p.z}`;
+}
+
+function buildShadowComponents() {
+var signature = boxesShadowSignature();
+if (shadowGeomCache.signature === signature && shadowGeomCache.components.length) {
+  if (verboseLog && debugState.frame <= 3) {
+    detailLog(`shadow-components: cache-hit components=${shadowGeomCache.components.length} voxels=${shadowGeomCache.totalVoxels} faces=${shadowGeomCache.totalFaces}`);
+  }
+  return shadowGeomCache.components;
+}
+
+var occupancy = new Map();
+var shadowSourceBoxes = getMainCameraShadowSourceBoxes();
+for (const box of shadowSourceBoxes) {
+  const x0 = Math.round(box.x), x1 = Math.round(box.x + box.w);
+  const y0 = Math.round(box.y), y1 = Math.round(box.y + box.d);
+  const z0 = Math.round(box.z), z1 = Math.round(box.z + box.h);
+  for (let x = x0; x < x1; x++) {
+    for (let y = y0; y < y1; y++) {
+      for (let z = z0; z < z1; z++) {
+        const key = shadowVoxelKey(x, y, z);
+        if (!occupancy.has(key)) occupancy.set(key, { x, y, z, boxIds: [box.id] });
+        else occupancy.get(key).boxIds.push(box.id);
+      }
+    }
+  }
+}
+
+var dirs = [
+  { dx: 1, dy: 0, dz: 0 },
+  { dx: -1, dy: 0, dz: 0 },
+  { dx: 0, dy: 1, dz: 0 },
+  { dx: 0, dy: -1, dz: 0 },
+  { dx: 0, dy: 0, dz: 1 },
+  { dx: 0, dy: 0, dz: -1 },
+];
+
+var visited = new Set();
+var components = [];
+for (const cell of occupancy.values()) {
+  const startKey = shadowVoxelKey(cell.x, cell.y, cell.z);
+  if (visited.has(startKey)) continue;
+  const queue = [cell];
+  visited.add(startKey);
+  const cells = [];
+  const boxIdSet = new Set();
+  let minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+  while (queue.length) {
+    const cur = queue.pop();
+    cells.push(cur);
+    for (const id of cur.boxIds || []) boxIdSet.add(id);
+    minX = Math.min(minX, cur.x); minY = Math.min(minY, cur.y); minZ = Math.min(minZ, cur.z);
+    maxX = Math.max(maxX, cur.x + 1); maxY = Math.max(maxY, cur.y + 1); maxZ = Math.max(maxZ, cur.z + 1);
+    for (const d of dirs) {
+      const nk = shadowVoxelKey(cur.x + d.dx, cur.y + d.dy, cur.z + d.dz);
+      if (!occupancy.has(nk) || visited.has(nk)) continue;
+      visited.add(nk);
+      queue.push(occupancy.get(nk));
+    }
+  }
+
+  const faceMap = new Map();
+  const pushFace = (kind, pts, normal, voxel) => {
+    const face = { kind, pts, normal, voxel };
+    faceMap.set(shadowFaceKey(face), face);
+  };
+
+  for (const v of cells) {
+    const x = v.x, y = v.y, z = v.z;
+    if (!occupancy.has(shadowVoxelKey(x, y, z + 1))) {
+      pushFace('top', [
+        { x, y, z: z + 1 },
+        { x: x + 1, y, z: z + 1 },
+        { x: x + 1, y: y + 1, z: z + 1 },
+        { x, y: y + 1, z: z + 1 },
+      ], { x: 0, y: 0, z: 1 }, v);
+    }
+    if (!occupancy.has(shadowVoxelKey(x + 1, y, z))) {
+      pushFace('xp', [
+        { x: x + 1, y, z },
+        { x: x + 1, y: y + 1, z },
+        { x: x + 1, y: y + 1, z: z + 1 },
+        { x: x + 1, y, z: z + 1 },
+      ], { x: 1, y: 0, z: 0 }, v);
+    }
+    if (!occupancy.has(shadowVoxelKey(x - 1, y, z))) {
+      pushFace('xn', [
+        { x, y, z },
+        { x, y, z: z + 1 },
+        { x, y: y + 1, z: z + 1 },
+        { x, y: y + 1, z },
+      ], { x: -1, y: 0, z: 0 }, v);
+    }
+    if (!occupancy.has(shadowVoxelKey(x, y + 1, z))) {
+      pushFace('yp', [
+        { x, y: y + 1, z },
+        { x: x + 1, y: y + 1, z },
+        { x: x + 1, y: y + 1, z: z + 1 },
+        { x, y: y + 1, z: z + 1 },
+      ], { x: 0, y: 1, z: 0 }, v);
+    }
+    if (!occupancy.has(shadowVoxelKey(x, y - 1, z))) {
+      pushFace('yn', [
+        { x, y, z },
+        { x, y, z: z + 1 },
+        { x: x + 1, y, z: z + 1 },
+        { x: x + 1, y, z },
+      ], { x: 0, y: -1, z: 0 }, v);
+    }
+  }
+
+  const faces = [...faceMap.values()];
+  const component = {
+    kind: 'component',
+    cells,
+    boxIds: [...boxIdSet].sort((a, b) => a - b),
+    faces,
+    bounds: { minX, minY, minZ, maxX, maxY, maxZ },
+    center: { x: (minX + maxX) * 0.5, y: (minY + maxY) * 0.5, z: (minZ + maxZ) * 0.5 },
+    debugTag: `comp(${[...boxIdSet].sort((a, b) => a - b).map(id => `#${id}`).join(',')})`,
+  };
+  components.push(component);
+}
+
+shadowGeomCache.signature = signature;
+shadowGeomCache.components = components;
+shadowGeomCache.occupancy = occupancy;
+shadowGeomCache.totalVoxels = occupancy.size;
+shadowGeomCache.totalFaces = components.reduce((sum, c) => sum + c.faces.length, 0);
+
+detailLog(`shadow-components: rebuilt components=${components.length} voxels=${occupancy.size} faces=${shadowGeomCache.totalFaces}`);
+if (verboseLog || debugState.frame <= 2) {
+  components.forEach((comp, idx) => {
+    detailLog(`shadow-component[${idx}] boxes=${comp.boxIds.join(',')} voxels=${comp.cells.length} faces=${comp.faces.length} bounds=(${comp.bounds.minX},${comp.bounds.minY},${comp.bounds.minZ})->(${comp.bounds.maxX},${comp.bounds.maxY},${comp.bounds.maxZ})`);
+  });
+}
+return components;
+}
+
+
+function mergedReceiverOwnerKey(box) {
+return box && box.instanceId != null ? String(box.instanceId) : null;
+}
+
+function mergedFacePlaneCoord(kind, pts) {
+  if (!pts || !pts.length) return '0';
+  var v = kind === 'east' ? pts[0].x : (kind === 'south' ? pts[0].y : pts[0].z);
+  return Number(v || 0).toFixed(4);
+}
+
+function buildMergedReceiverFacesImpl() {
+  var signature = boxesShadowSignature();
+  if (mergedReceiverCache.signature === signature && mergedReceiverCache.facesByOwner && mergedReceiverCache.facesByOwner.size) {
+    return mergedReceiverCache.facesByOwner;
+  }
+  var ownerOcc = new Map();
+  var ownerBounds = new Map();
+  for (const box of boxes) {
+    var ownerKey = mergedReceiverOwnerKey(box);
+    if (!ownerKey) continue;
+    if (!ownerOcc.has(ownerKey)) ownerOcc.set(ownerKey, new Map());
+    if (!ownerBounds.has(ownerKey)) ownerBounds.set(ownerKey, { minX: Infinity, minY: Infinity, minZ: Infinity, maxX: -Infinity, maxY: -Infinity, maxZ: -Infinity, boxIds: [] });
+    var occ = ownerOcc.get(ownerKey);
+    var b = ownerBounds.get(ownerKey);
+    b.minX = Math.min(b.minX, box.x); b.minY = Math.min(b.minY, box.y); b.minZ = Math.min(b.minZ, box.z);
+    b.maxX = Math.max(b.maxX, box.x + box.w); b.maxY = Math.max(b.maxY, box.y + box.d); b.maxZ = Math.max(b.maxZ, box.z + box.h);
+    b.boxIds.push(box.id);
+    var x0 = Math.round(box.x), x1 = Math.round(box.x + box.w);
+    var y0 = Math.round(box.y), y1 = Math.round(box.y + box.d);
+    var z0 = Math.round(box.z), z1 = Math.round(box.z + box.h);
+    for (let x = x0; x < x1; x++) for (let y = y0; y < y1; y++) for (let z = z0; z < z1; z++) occ.set(shadowVoxelKey(x,y,z), {x:x,y:y,z:z});
+  }
+  function patchPts(kind, planeCoord, minA, maxA, minB, maxB) {
+    if (kind === 'east') return [
+      { x: planeCoord, y: minA, z: minB },
+      { x: planeCoord, y: maxA, z: minB },
+      { x: planeCoord, y: maxA, z: maxB },
+      { x: planeCoord, y: minA, z: maxB },
+    ];
+    if (kind === 'south') return [
+      { x: minA, y: planeCoord, z: minB },
+      { x: maxA, y: planeCoord, z: minB },
+      { x: maxA, y: planeCoord, z: maxB },
+      { x: minA, y: planeCoord, z: maxB },
+    ];
+    return [
+      { x: minA, y: minB, z: planeCoord },
+      { x: maxA, y: minB, z: planeCoord },
+      { x: maxA, y: maxB, z: planeCoord },
+      { x: minA, y: maxB, z: planeCoord },
+    ];
+  }
+  var facesByOwner = new Map();
+  for (const [ownerKey, occ] of ownerOcc.entries()) {
+    var cellsByPlane = new Map();
+    function addCell(kind, planeCoord, a, b) {
+      var key = kind + '|' + Number(planeCoord).toFixed(4);
+      if (!cellsByPlane.has(key)) cellsByPlane.set(key, { kind: kind, planeCoord: planeCoord, cells: new Map(), normal: kind==='east'?{x:1,y:0,z:0}:kind==='south'?{x:0,y:1,z:0}:{x:0,y:0,z:1} });
+      cellsByPlane.get(key).cells.set(a + '|' + b, { a:a, b:b });
+    }
+    for (const cell of occ.values()) {
+      var x = cell.x, y = cell.y, z = cell.z;
+      if (!occ.has(shadowVoxelKey(x+1,y,z))) addCell('east', x+1, y, z);
+      if (!occ.has(shadowVoxelKey(x,y+1,z))) addCell('south', y+1, x, z);
+      if (!occ.has(shadowVoxelKey(x,y,z+1))) addCell('top', z+1, x, y);
+    }
+    var entry = { bounds: ownerBounds.get(ownerKey), byKey: new Map() };
+    for (const plane of cellsByPlane.values()) {
+      var visited = new Set();
+      var patchIndex = 0;
+      for (const c of plane.cells.values()) {
+        var sk = c.a + '|' + c.b;
+        if (visited.has(sk)) continue;
+        patchIndex += 1;
+        var q = [c];
+        visited.add(sk);
+        var minA = Infinity, maxA = -Infinity, minB = Infinity, maxB = -Infinity;
+        while (q.length) {
+          var cur = q.pop();
+          if (cur.a < minA) minA = cur.a;
+          if (cur.a + 1 > maxA) maxA = cur.a + 1;
+          if (cur.b < minB) minB = cur.b;
+          if (cur.b + 1 > maxB) maxB = cur.b + 1;
+          var ns = [ [cur.a+1, cur.b], [cur.a-1, cur.b], [cur.a, cur.b+1], [cur.a, cur.b-1] ];
+          for (var i = 0; i < ns.length; i++) {
+            var nk = ns[i][0] + '|' + ns[i][1];
+            if (!plane.cells.has(nk) || visited.has(nk)) continue;
+            visited.add(nk);
+            q.push(plane.cells.get(nk));
+          }
+        }
+        var pts = patchPts(plane.kind, plane.planeCoord, minA, maxA, minB, maxB);
+        entry.byKey.set(plane.kind + '|' + Number(plane.planeCoord).toFixed(4) + '|p' + patchIndex, {
+          kind: plane.kind,
+          planeCoord: plane.planeCoord,
+          normal: plane.normal,
+          pts: pts,
+          bounds: { minA:minA, maxA:maxA, minB:minB, maxB:maxB },
+          patchId: patchIndex,
+        });
+      }
+    }
+    facesByOwner.set(ownerKey, entry);
+  }
+  mergedReceiverCache.signature = signature;
+  mergedReceiverCache.facesByOwner = facesByOwner;
+  if (shadowDebugDetailed) {
+    for (const [ownerKey, entry] of facesByOwner.entries()) {
+      shadowDebugLog('merged-recv owner=' + ownerKey + ' bounds=' + boundsText3Shadow(entry.bounds) + ' planes=' + entry.byKey.size);
+    }
+  }
+  return facesByOwner;
+}
+
+function getMergedReceiverFaceImpl(ownerInstanceId, receiverKind, fallbackFacePts, fallbackNormal) {
+  var ownerKey = ownerInstanceId != null ? String(ownerInstanceId) : null;
+  if (!ownerKey) return { kind: receiverKind, normal: fallbackNormal, pts: fallbackFacePts, merged: false };
+  var facesByOwner = buildMergedReceiverFacesImpl();
+  var entry = facesByOwner.get(ownerKey);
+  if (!entry || !entry.byKey) {
+    return { kind: receiverKind, normal: fallbackNormal, pts: fallbackFacePts, merged: false };
+  }
+  var planePrefix = receiverKind + '|' + mergedFacePlaneCoord(receiverKind, fallbackFacePts) + '|';
+  var center = faceReceiverCenter(fallbackFacePts);
+  var best = null, bestDist = Infinity;
+  for (const [k, face] of entry.byKey.entries()) {
+    if (!k.startsWith(planePrefix)) continue;
+    var b = polyBounds3(face.pts);
+    var inside = false;
+    if (receiverKind === 'east') inside = center.y >= b.minY - 1e-4 && center.y <= b.maxY + 1e-4 && center.z >= b.minZ - 1e-4 && center.z <= b.maxZ + 1e-4;
+    else if (receiverKind === 'south') inside = center.x >= b.minX - 1e-4 && center.x <= b.maxX + 1e-4 && center.z >= b.minZ - 1e-4 && center.z <= b.maxZ + 1e-4;
+    else inside = center.x >= b.minX - 1e-4 && center.x <= b.maxX + 1e-4 && center.y >= b.minY - 1e-4 && center.y <= b.maxY + 1e-4;
+    var fc = faceReceiverCenter(face.pts);
+    var d = Math.abs(fc.x-center.x)+Math.abs(fc.y-center.y)+Math.abs(fc.z-center.z);
+    if (inside && d < bestDist) { best = { key:k, face:face }; bestDist = d; }
+    else if (!best && d < bestDist) { best = { key:k, face:face }; bestDist = d; }
+  }
+  if (!best || !best.face || !best.face.pts) {
+    return { kind: receiverKind, normal: fallbackNormal, pts: fallbackFacePts, merged: false, bounds: entry.bounds };
+  }
+  return { kind: receiverKind, normal: best.face.normal, pts: best.face.pts, merged: true, bounds: entry.bounds, planeKey: best.key, patchId: best.face.patchId || 0 };
+}
+
+var buildMergedReceiverFacesPatched = buildMergedReceiverFacesImpl;
+var getMergedReceiverFacePatched = getMergedReceiverFaceImpl;
+
+function invalidateShadowGeometryCache(reason = 'unknown') {
+shadowGeomCache.signature = '';
+shadowGeomCache.components = [];
+shadowGeomCache.occupancy = new Map();
+shadowGeomCache.totalVoxels = 0;
+shadowGeomCache.totalFaces = 0;
+mergedReceiverCache.signature = '';
+mergedReceiverCache.facesByOwner = new Map();
+detailLog(`shadow-components: invalidated reason=${reason}`);
+}
+
+function ensureShadowMaskCanvas() {
+if (!shadowMaskCanvas) {
+  shadowMaskCanvas = document.createElement('canvas');
+  shadowMaskCtx = shadowMaskCanvas.getContext('2d');
+}
+if (shadowMaskCanvas.width !== Math.round(VIEW_W * dpr) || shadowMaskCanvas.height !== Math.round(VIEW_H * dpr)) {
+  shadowMaskCanvas.width = Math.round(VIEW_W * dpr);
+  shadowMaskCanvas.height = Math.round(VIEW_H * dpr);
+  shadowMaskCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  shadowMaskCtx.imageSmoothingEnabled = true;
+  detailLog(`shadow-mask: resize backing=${shadowMaskCanvas.width}x${shadowMaskCanvas.height}`);
+}
+return shadowMaskCtx;
+}
+
+function clearShadowMask() {
+var mctx = ensureShadowMaskCanvas();
+mctx.clearRect(0, 0, VIEW_W, VIEW_H);
+return mctx;
+}
+
+function drawMaskPoly(mctx, points, fill, stroke = null, width = 1) {
+if (!points || points.length < 3) return;
+mctx.beginPath();
+mctx.moveTo(points[0].x, points[0].y);
+for (let i = 1; i < points.length; i++) mctx.lineTo(points[i].x, points[i].y);
+mctx.closePath();
+if (fill) {
+  mctx.fillStyle = fill;
+  mctx.fill();
+}
+if (stroke) {
+  mctx.strokeStyle = stroke;
+  mctx.lineWidth = width;
+  mctx.stroke();
+}
+}
+
+function lightSamplePolygonAlpha(light, receiverPoint) {
+return shadowAlphaForLight(light, receiverPoint || { x: settings.gridW * 0.5, y: settings.gridH * 0.5, z: 0 });
+}
+
+function projectFaceToGround(facePts, light, samplePoint = null) {
+var projected = [];
+for (const p of facePts) {
+  const gp = projectGroundPoint(light, p, samplePoint);
+  if (!gp) return null;
+  projected.push(gp);
+}
+return projected;
+}
+
+function faceReceivesLight(face, light, samplePoint = null) {
+if (light.type === 'directional') {
+  const incoming = lightIncoming(light);
+  return dot3(face.normal, incoming) > 1e-4;
+}
+var source = samplePoint || light;
+var c = {
+  x: (face.pts[0].x + face.pts[1].x + face.pts[2].x + face.pts[3].x) * 0.25,
+  y: (face.pts[0].y + face.pts[1].y + face.pts[2].y + face.pts[3].y) * 0.25,
+  z: (face.pts[0].z + face.pts[1].z + face.pts[2].z + face.pts[3].z) * 0.25,
+};
+var L = normalize3({ x: source.x - c.x, y: source.y - c.y, z: source.z - c.z });
+if (light.type === 'spot' && spotlightFalloff(light, c) <= 1e-4) return false;
+return dot3(face.normal, L) > 1e-4;
+}
+
+
+function segmentIntersectsAABB(start, end, min, max) {
+var dir = { x: end.x - start.x, y: end.y - start.y, z: end.z - start.z };
+var tmin = 0;
+var tmax = 1;
+for (const axis of ['x', 'y', 'z']) {
+  const s = start[axis];
+  const d = dir[axis];
+  const mn = min[axis];
+  const mx = max[axis];
+  if (Math.abs(d) < 1e-8) {
+    if (s <= mn || s >= mx) return false;
+    continue;
+  }
+  let t1 = (mn - s) / d;
+  let t2 = (mx - s) / d;
+  if (t1 > t2) t1, t2 = t2, t1
+  tmin = Math.max(tmin, t1);
+  tmax = Math.min(tmax, t2);
+  if (tmax <= tmin) return false;
+}
+return tmax > 1e-5 && tmin < 1 - 1e-5;
+}
+
+function segmentIntersectsAABB(start, end, min, max) {
+var dir = { x: end.x - start.x, y: end.y - start.y, z: end.z - start.z };
+var tmin = 0;
+var tmax = 1;
+for (const axis of ['x', 'y', 'z']) {
+  const s = start[axis];
+  const d = dir[axis];
+  const mn = min[axis];
+  const mx = max[axis];
+  if (Math.abs(d) < 1e-8) {
+    if (s <= mn || s >= mx) return false;
+    continue;
+  }
+  let t1 = (mn - s) / d;
+  let t2 = (mx - s) / d;
+  if (t1 > t2) {
+    const tmp = t1; t1 = t2; t2 = tmp;
+  }
+  tmin = Math.max(tmin, t1);
+  tmax = Math.min(tmax, t2);
+  if (tmax <= tmin) return false;
+}
+return tmax > 1e-5 && tmin < 1 - 1e-5;
+}
+
+function shadowRayTargetForLight(light, receiverPoint, samplePoint = null) {
+if (light.type === 'directional') {
+  const incoming = lightIncoming(light);
+  const far = Math.max(settings.gridW, settings.gridH) * 4 + 32;
+  return {
+    x: receiverPoint.x + incoming.x * far,
+    y: receiverPoint.y + incoming.y * far,
+    z: Math.max(0.08, receiverPoint.z + incoming.z * far),
+  };
+}
+var src = samplePoint || light;
+return {
+  x: src.x,
+  y: src.y,
+  z: Math.max(0.08, src.z),
+};
+}
+
+function pointInShadowByOccupancy(receiverPoint, light, samplePoint, components) {
+var start = { x: receiverPoint.x, y: receiverPoint.y, z: 0.02 };
+var end = shadowRayTargetForLight(light, receiverPoint, samplePoint);
+if (end.z <= start.z + 1e-4) end.z = start.z + 0.08;
+
+for (const comp of components) {
+  const b = comp.bounds;
+  const min = { x: b.minX, y: b.minY, z: b.minZ };
+  const max = { x: b.maxX, y: b.maxY, z: b.maxZ };
+  if (!segmentIntersectsAABB(start, end, min, max)) continue;
+  for (const cell of comp.cells) {
+    if (segmentIntersectsAABB(start, end, { x: cell.x, y: cell.y, z: cell.z }, { x: cell.x + 1, y: cell.y + 1, z: cell.z + 1 })) {
+      return { hit: true, boxIds: comp.boxIds, cell };
+    }
+  }
+}
+return { hit: false };
+}
+
+function computeFloorScreenBounds() {
+var pts = [
+  iso(0, 0, 0),
+  iso(settings.gridW, 0, 0),
+  iso(settings.gridW, settings.gridH, 0),
+  iso(0, settings.gridH, 0),
+];
+var xs = pts.map(p => p.x);
+var ys = pts.map(p => p.y);
+return {
+  minX: Math.max(0, Math.floor(Math.min(...xs)) - 2),
+  maxX: Math.min(VIEW_W, Math.ceil(Math.max(...xs)) + 2),
+  minY: Math.max(0, Math.floor(Math.min(...ys)) - 2),
+  maxY: Math.min(VIEW_H, Math.ceil(Math.max(...ys)) + 2),
+};
+}
+
+function drawShadowMaskForLightSample(components, light, sampleIndex, sampleCount, samplePoint = null, sampleAlpha = 0) {
+if (sampleAlpha <= 0.0001 || !components.length) return;
+var mctx = clearShadowMask();
+var bounds = computeFloorScreenBounds();
+var step = lightState.highContrastShadow ? 2 : 3;
+var lowW = Math.max(1, Math.ceil((bounds.maxX - bounds.minX) / step));
+var lowH = Math.max(1, Math.ceil((bounds.maxY - bounds.minY) / step));
+var lowCanvas = document.createElement('canvas');
+lowCanvas.width = lowW;
+lowCanvas.height = lowH;
+var lctx = lowCanvas.getContext('2d', { willReadFrequently: true });
+var img = lctx.createImageData(lowW, lowH);
+var data = img.data;
+var fillRgb = lightState.highContrastShadow ? hexToRgb(lightState.shadowDebugColor || '#ff2a6d') : { r: 0, g: 0, b: 0 };
+
+var tested = 0;
+var hits = 0;
+var skippedOut = 0;
+var broadHits = 0;
+var lastHit = null;
+
+for (let j = 0; j < lowH; j++) {
+  for (let i = 0; i < lowW; i++) {
+    const sx = bounds.minX + (i + 0.5) * step;
+    const sy = bounds.minY + (j + 0.5) * step;
+    const w = screenToFloor(sx, sy);
+    if (w.x < 0 || w.y < 0 || w.x > settings.gridW || w.y > settings.gridH) {
+      skippedOut += 1;
+      continue;
+    }
+    tested += 1;
+    const hitInfo = pointInShadowByOccupancy({ x: w.x, y: w.y, z: 0 }, light, samplePoint, components);
+    if (!hitInfo.hit) continue;
+    broadHits += 1;
+    hits += 1;
+    lastHit = hitInfo;
+    const idx = (j * lowW + i) * 4;
+    data[idx] = fillRgb.r;
+    data[idx + 1] = fillRgb.g;
+    data[idx + 2] = fillRgb.b;
+    data[idx + 3] = 255;
+  }
+}
+
+lctx.putImageData(img, 0, 0);
+mctx.save();
+mctx.imageSmoothingEnabled = true;
+mctx.drawImage(lowCanvas, bounds.minX, bounds.minY, lowW * step, lowH * step);
+if (lightState.highContrastShadow && hits > 0) {
+  mctx.strokeStyle = shadowStrokeCss(sampleAlpha);
+  mctx.lineWidth = 0.75;
+  mctx.strokeRect(bounds.minX, bounds.minY, lowW * step, lowH * step);
+}
+mctx.restore();
+
+ctx.save();
+ctx.globalAlpha = clamp(sampleAlpha, 0, 1);
+ctx.drawImage(shadowMaskCanvas, 0, 0, VIEW_W, VIEW_H);
+ctx.restore();
+
+if (verboseLog || debugState.frame <= 4) {
+  const hitTag = lastHit ? ` hitCell=(${lastHit.cell.x},${lastHit.cell.y},${lastHit.cell.z}) boxes=${lastHit.boxIds.join(',')}` : '';
+  detailLog(`shadow-raymask: light=${light.name}/${light.type} sample=${sampleIndex + 1}/${sampleCount} tested=${tested} hits=${hits} skippedOut=${skippedOut} step=${step} alpha=${sampleAlpha.toFixed(3)}${hitTag}`);
+}
+}
+
+function groundReceiverFaceWorld() {
+  return [
+    { x: 0, y: 0, z: 0 },
+    { x: settings.gridW, y: 0, z: 0 },
+    { x: settings.gridW, y: settings.gridH, z: 0 },
+    { x: 0, y: settings.gridH, z: 0 },
+  ];
+}
+
+function drawWorldShadowPolygons(polys, alpha) {
+  if (!polys || !polys.length || alpha <= 0.0001) return;
+  ctx.save();
+  ctx.fillStyle = shadowFillCss(alpha);
+  if (lightState.highContrastShadow) {
+    ctx.strokeStyle = shadowStrokeCss(alpha);
+    ctx.lineWidth = 0.7;
+  }
+  for (const poly of polys) {
+    if (!poly || poly.length < 3) continue;
+    const screen = poly.map(function (p) { return iso(p.x, p.y, p.z); });
+    ctx.beginPath();
+    ctx.moveTo(screen[0].x, screen[0].y);
+    for (let i = 1; i < screen.length; i++) ctx.lineTo(screen[i].x, screen[i].y);
+    ctx.closePath();
+    ctx.fill();
+    if (lightState.highContrastShadow) ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawComponentShadows() {
+if (!lightState.showShadows) return;
+var components = buildShadowComponents();
+if (!components.length) return;
+var floorFace = [
+  { x: 0, y: 0, z: 0 },
+  { x: settings.gridW, y: 0, z: 0 },
+  { x: settings.gridW, y: settings.gridH, z: 0 },
+  { x: 0, y: settings.gridH, z: 0 },
+];
+var planePoint = floorFace[0];
+var planeNormal = { x: 0, y: 0, z: 1 };
+for (const light of getLightingRenderLights()) {
+  normalizeLight(light);
+  if (shadowDebugDetailed) shadowDebugLog('ground-pass light=' + (light.name || light.id || 'light') + ' type=' + light.type + ' dir=' + fmt3Shadow(light.type === 'directional' ? lightForward(light) : {x: light.x, y: light.y, z: light.z}));
+  if (light.type === 'area') {
+    const offsets = areaSampleOffsets(light);
+    const receiverRef = components[0]?.center || { x: settings.gridW * 0.5, y: settings.gridH * 0.5, z: 0 };
+    const baseAlpha = lightSamplePolygonAlpha(light, receiverRef) / Math.max(1, offsets.length) * (1.1 + light.softness * 0.7);
+    for (const o of offsets) {
+      const sample = { ...light, x: light.x + o.x, y: light.y + o.y, z: light.z };
+      for (const comp of components) {
+        var projected = projectComponentOntoPlanePolygon(comp, planePoint, planeNormal, light, sample);
+        if (!projected || projected.length < 3) continue;
+        var clipped = clipWorldPolyToFacePlane(projected, floorFace, planeNormal);
+        if (!clipped || clipped.length < 3) continue;
+        drawWorldShadowPolygon(clipped, baseAlpha);
+        if (shadowDebugDetailed) shadowDebugLog('ground hit light=' + (light.name || light.id || 'light') + ' comp=' + comp.debugTag + ' alpha=' + baseAlpha.toFixed(3) + ' bounds=' + boundsText3Shadow(polyBounds3(clipped)) + ' worldPts=' + samplePointsText3Shadow(clipped, 8));
+      }
+    }
+    continue;
+  }
+  const receiverRef = components[0]?.center || { x: settings.gridW * 0.5, y: settings.gridH * 0.5, z: 0 };
+  const alpha = lightSamplePolygonAlpha(light, receiverRef);
+  for (const comp of components) {
+    var projected = projectComponentOntoPlanePolygon(comp, planePoint, planeNormal, light, null);
+    if (!projected || projected.length < 3) continue;
+    var clipped = clipWorldPolyToFacePlane(projected, floorFace, planeNormal);
+    if (!clipped || clipped.length < 3) continue;
+    drawWorldShadowPolygon(clipped, alpha);
+    if (shadowDebugDetailed) shadowDebugLog('ground hit light=' + (light.name || light.id || 'light') + ' comp=' + comp.debugTag + ' alpha=' + alpha.toFixed(3) + ' bounds=' + boundsText3Shadow(polyBounds3(clipped)) + ' worldPts=' + samplePointsText3Shadow(clipped, 8));
+  }
+}
+}
+
+function drawLightShadows() {
+if (!lightState.showShadows) return;
+drawComponentShadows();
+drawPlayerShadow();
+}
+
+function drawLightBulb(light, active = false) {
+var p = iso(light.x, light.y, light.z);
+var stem = iso(light.x, light.y, Math.max(0, light.z + 0.48));
+var rgb = hexToRgb(light.color);
+
+ctx.strokeStyle = active ? 'rgba(255,255,255,.82)' : 'rgba(255,255,255,.34)';
+ctx.lineWidth = active ? 2.2 : 1.4;
+ctx.beginPath(); ctx.moveTo(stem.x, stem.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+
+var halo = ctx.createRadialGradient(p.x, p.y, 2, p.x, p.y, active ? 26 : 17);
+halo.addColorStop(0, rgbToCss(rgb, active ? 0.92 : 0.68));
+halo.addColorStop(1, rgbToCss(rgb, 0));
+ctx.fillStyle = halo;
+ctx.beginPath(); ctx.arc(p.x, p.y, active ? 26 : 17, 0, Math.PI * 2); ctx.fill();
+
+ctx.fillStyle = rgbToCss(rgb, 1);
+ctx.beginPath(); ctx.arc(p.x, p.y, active ? 7 : 5, 0, Math.PI * 2); ctx.fill();
+
+if (active) {
+  ctx.strokeStyle = 'rgba(255,255,255,.85)';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(p.x, p.y, 10.5, 0, Math.PI * 2); ctx.stroke();
+}
+}
+
+function drawLightAxes() {
+if (!lightState.showAxes) return;
+var axes = [
+  { axis: 'x', color: '#ff5f6d', label: 'X' },
+  { axis: 'y', color: '#59d98e', label: 'Y' },
+  { axis: 'z', color: '#6fb1ff', label: 'Z' },
+];
+for (const { axis, color, label } of axes) {
+  const { base, target } = axisHandle(axis);
+  const hovered = lightState.hoverAxis === axis || lightState.dragAxis === axis;
+  ctx.strokeStyle = hovered ? color : color + 'cc';
+  ctx.lineWidth = hovered ? 4 : 3;
+  ctx.beginPath(); ctx.moveTo(base.x, base.y); ctx.lineTo(target.x, target.y); ctx.stroke();
+  ctx.fillStyle = hovered ? color : color + 'dd';
+  ctx.beginPath(); ctx.arc(target.x, target.y, hovered ? 9 : 7, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 12px system-ui';
+  ctx.fillText(label, target.x + 9, target.y - 8);
+}
+}
+
+function degToRad(v) { return v * Math.PI / 180; }
+
+function lightForward(light) {
+var yaw = degToRad(light.angle || 0);
+var pitch = degToRad(light.pitch || 55);
+var cp = Math.cos(pitch);
+var sp = Math.sin(pitch);
+return normalize3({ x: Math.cos(yaw) * cp, y: Math.sin(yaw) * cp, z: -sp });
+}
+
+function lightIncoming(light) {
+var f = lightForward(light);
+return { x: -f.x, y: -f.y, z: -f.z };
+}
+
+function areaSampleOffsets(light) {
+var size = Math.max(0.15, light.size || 1.2);
+var s = size * 0.55;
+var fastMode = shouldUseFastShadowSampling();
+if (fastMode) {
+  return [
+    { x: 0, y: 0 },
+    { x: s * 0.75, y: 0 },
+    { x: -s * 0.75, y: 0 },
+  ];
+}
+
+var offsets = [
+  { x: 0, y: 0 },
+  { x: s, y: 0 },
+  { x: -s, y: 0 },
+  { x: 0, y: s },
+  { x: 0, y: -s },
+];
+if ((light.softness || 0) > 0.55 && !shouldUseMediumAreaSampling()) {
+  offsets.push(
+    { x: s * 0.7, y: s * 0.7 },
+    { x: -s * 0.7, y: s * 0.7 },
+    { x: s * 0.7, y: -s * 0.7 },
+    { x: -s * 0.7, y: -s * 0.7 },
+  );
+}
+return offsets;
+}
+
+
+function worldRadiusFromPixels(px) {
+return px / Math.max(52, settings.tileW * 0.85);
+}
+
+function distanceAttenuation(light, point) {
+var dx = point.x - light.x;
+var dy = point.y - light.y;
+var dz = point.z - light.z;
+var dist = Math.hypot(dx, dy, dz);
+var radiusWorld = worldRadiusFromPixels(light.radius || 240);
+var t = clamp(1 - dist / Math.max(0.001, radiusWorld), 0, 1);
+return t * t;
+}
+
+function spotlightFalloff(light, point) {
+if (light.type !== 'spot') return 1;
+var toPoint = normalize3({ x: point.x - light.x, y: point.y - light.y, z: point.z - light.z });
+var forward = lightForward(light);
+var cosTheta = dot3(toPoint, forward);
+var outer = degToRad(Math.max(2, light.spread || 34) * 0.5);
+var inner = outer * (1 - clamp((light.softness || 0.3) * 0.75, 0.02, 0.75));
+var cosOuter = Math.cos(outer);
+var cosInner = Math.cos(inner);
+if (cosTheta <= cosOuter) return 0;
+if (cosTheta >= cosInner) return 1;
+var t = clamp((cosTheta - cosOuter) / Math.max(1e-5, cosInner - cosOuter), 0, 1);
+return t * t * (3 - 2 * t);
+}
+
+function evaluateSingleLight(light, point, normal) {
+normalizeLight(light);
+var lightRgb = hexToRgb(light.color);
+
+if (light.type === 'directional') {
+  const L = lightIncoming(light);
+  const lambert = Math.max(0, dot3(normal, L));
+  return { raw: lambert * light.intensity, rgb: lightRgb };
+}
+
+var L = normalize3({ x: light.x - point.x, y: light.y - point.y, z: light.z - point.z });
+var lambert = Math.max(0, dot3(normal, L));
+var raw = lambert * distanceAttenuation(light, point) * light.intensity;
+if (light.type === 'spot') raw *= spotlightFalloff(light, point);
+return { raw, rgb: lightRgb };
+}
+
+function evaluateLight(light, point, normal) {
+if (light.type !== 'area') return evaluateSingleLight(light, point, normal);
+var offsets = areaSampleOffsets(light);
+var raw = 0;
+var rgbAccum = { r: 0, g: 0, b: 0 };
+for (const o of offsets) {
+  const sample = { ...light, type: 'point', x: light.x + o.x, y: light.y + o.y };
+  const part = evaluateSingleLight(sample, point, normal);
+  raw += part.raw;
+  rgbAccum.r += part.rgb.r;
+  rgbAccum.g += part.rgb.g;
+  rgbAccum.b += part.rgb.b;
+}
+var n = offsets.length || 1;
+return {
+  raw: raw / n,
+  rgb: { r: rgbAccum.r / n, g: rgbAccum.g / n, b: rgbAccum.b / n },
+};
+}
+
+function spriteLightAt(point) {
+var brightness = 0.35 + settings.ambient * 1.35;
+var tintAccum = { r: 0, g: 0, b: 0 };
+var weight = 0;
+for (const light of getLightingRenderLights()) {
+  const liftedPoint = { x: point.x, y: point.y, z: point.z + 0.3 };
+  const evalUp = evaluateLight(light, liftedPoint, { x: 0, y: 0, z: 1 });
+  const raw = evalUp.raw;
+  brightness += raw * 1.05;
+  tintAccum.r += evalUp.rgb.r * raw;
+  tintAccum.g += evalUp.rgb.g * raw;
+  tintAccum.b += evalUp.rgb.b * raw;
+  weight += raw;
+}
+return {
+  brightness: clamp(brightness, 0.28, 1.9),
+  tint: weight > 0 ? { r: tintAccum.r / weight, g: tintAccum.g / weight, b: tintAccum.b / weight } : { r: 255, g: 255, b: 255 },
+  weight,
+};
+}
+
+function baseFaceColors(base) {
+var rgb = hexToRgb(base);
+return {
+  top: mixColor(rgb, { r: 255, g: 255, b: 255 }, 0.14),
+  east: mulColor(rgb, 0.92),
+  south: mulColor(rgb, 0.75),
+  line: 'rgba(0,0,0,.16)',
+};
+}
+
+function litColor(baseRgb, center, normal) {
+var accum = mulColor(baseRgb, 0.18 + settings.ambient * 0.9);
+for (const light of getLightingRenderLights()) {
+  const evald = evaluateLight(light, center, normal);
+  const t = clamp(evald.raw, 0, 1.35);
+  const warmed = mixColor(baseRgb, evald.rgb, clamp(t * 0.9, 0, 0.9));
+  accum = addColor(accum, mulColor(warmed, t));
+}
+return accum;
+}
+
+function projectGroundPoint(light, point, samplePoint = null) {
+if (light.type === 'directional') {
+  const dir = lightForward(light);
+  if (dir.z >= -0.02) return null;
+  const t = point.z / (-dir.z);
+  return { x: point.x + dir.x * t, y: point.y + dir.y * t, z: 0 };
+}
+var source = samplePoint || light;
+var dz = source.z - point.z;
+if (dz <= 0.05) return null;
+var t = point.z / dz;
+return { x: point.x + (point.x - source.x) * t, y: point.y + (point.y - source.y) * t, z: 0 };
+}
+
+function shadowAlphaForLight(light, receiverPoint) {
+var globalAlpha = clamp(Number(lightState.shadowAlpha ?? 1), 0, 1);
+var opacityScale = Math.max(0, Number(lightState.shadowOpacityScale ?? 1));
+if (globalAlpha <= 0 || opacityScale <= 0 || !lightState.showShadows) return 0;
+
+var alpha;
+if (light.type === 'directional') alpha = clamp(0.05 + light.intensity * 0.07, 0.04, 0.16);
+else if (light.type === 'spot') alpha = clamp((0.04 + light.intensity * 0.09) * (0.65 + spotlightFalloff(light, receiverPoint) * 0.7), 0.03, 0.2);
+else if (light.type === 'area') alpha = clamp(0.03 + light.intensity * 0.05, 0.02, 0.11);
+else alpha = clamp(0.05 + light.intensity * 0.08, 0.04, 0.18);
+
+var scaled = clamp(alpha * opacityScale, 0, 1);
+var capped = Math.min(lightState.highContrastShadow ? 0.95 : 0.7, scaled * globalAlpha);
+return clamp(capped, 0, 1);
+}
+
+function shadowFillCss(alpha) {
+var a = clamp(alpha, 0, 0.95);
+if (lightState.highContrastShadow) {
+  return rgbToCss(hexToRgb(lightState.shadowDebugColor || '#ff2a6d'), a);
+}
+return `rgba(0,0,0,${a})`;
+}
+
+function shadowStrokeCss(alpha) {
+var a = clamp(alpha, 0, 0.95);
+if (lightState.highContrastShadow) {
+  return rgbToCss(hexToRgb(lightState.shadowDebugColor || '#ff2a6d'), Math.min(1, a + 0.22));
+}
+return `rgba(0,0,0,${Math.min(0.35, a + 0.08)})`;
+}
+
+
+function convexHull2(points) {
+if (points.length <= 1) return points.slice();
+var pts = points.slice().sort((a,b)=> a.x === b.x ? a.y - b.y : a.x - b.x);
+var cross = (o,a,b) => (a.x-o.x)*(b.y-o.y) - (a.y-o.y)*(b.x-o.x);
+var lower = [];
+for (const p of pts) {
+  while (lower.length >= 2 && cross(lower[lower.length-2], lower[lower.length-1], p) <= 0) lower.pop();
+  lower.push(p);
+}
+var upper = [];
+for (let i = pts.length - 1; i >= 0; i--) {
+  const p = pts[i];
+  while (upper.length >= 2 && cross(upper[upper.length-2], upper[upper.length-1], p) <= 0) upper.pop();
+  upper.push(p);
+}
+lower.pop(); upper.pop();
+return lower.concat(upper);
+}
+
+function boxShadowWorldPoints(box) {
+return [
+  { x: box.x, y: box.y, z: box.z },
+  { x: box.x + box.w, y: box.y, z: box.z },
+  { x: box.x + box.w, y: box.y + box.d, z: box.z },
+  { x: box.x, y: box.y + box.d, z: box.z },
+  { x: box.x, y: box.y, z: box.z + box.h },
+  { x: box.x + box.w, y: box.y, z: box.z + box.h },
+  { x: box.x + box.w, y: box.y + box.d, z: box.z + box.h },
+  { x: box.x, y: box.y + box.d, z: box.z + box.h },
+];
+}
+
+function drawProjectedShadow(worldPts, light, receiverPoint, debugTag = '') {
+if (!lightState.showShadows) return;
+normalizeLight(light);
+var emitShadow = (projected, alpha) => {
+  if (alpha <= 0.0001) return;
+  if (!projected.length) return;
+  const hull = convexHull2(projected.map(p => ({ x: p.x, y: p.y })));
+  if (hull.length < 3) return;
+  var unionCtx = ensureShadowPolyUnionCanvas();
+  unionCtx.clearRect(0, 0, VIEW_W, VIEW_H);
+  unionCtx.globalCompositeOperation = 'source-over';
+  var worldHull = hull.map(function (p) { return { x: p.x, y: p.y, z: 0 }; });
+  var screenHull = hull.map(function (p) { return iso(p.x, p.y, 0); });
+  var fadeDebug = {};
+  fillShadowPolyWithDistanceFade(unionCtx, screenHull, worldHull, receiverPoint || null, light, alpha, fadeDebug);
+  ctx.save();
+  drawUnionShadowCanvasToTarget(ctx, alpha);
+  if (lightState.highContrastShadow) {
+    ctx.strokeStyle = shadowStrokeCss(clamp(alpha * Number(fadeDebug.factorFar || 1), 0, 0.95));
+    ctx.lineWidth = 0.7;
+    ctx.beginPath();
+    ctx.moveTo(screenHull[0].x, screenHull[0].y);
+    for (let i = 1; i < screenHull.length; i++) ctx.lineTo(screenHull[i].x, screenHull[i].y);
+    ctx.closePath();
+    ctx.stroke();
+  }
+  ctx.restore();
+  if (typeof logStaticShadowEmitDebug === 'function') logStaticShadowEmitDebug({
+    alphaBase: clamp(alpha, 0, 0.95),
+    alphaNear: clamp(alpha * Number(fadeDebug.factorNear || 1), 0, 0.95),
+    alphaFar: clamp(alpha * Number(fadeDebug.factorFar || 1), 0, 0.95),
+    fadeReason: fadeDebug.reason || 'none',
+    fadeMode: fadeDebug.mode || 'solid',
+    fadeDistanceNear: Number(fadeDebug.distanceNear || 0),
+    fadeDistanceFar: Number(fadeDebug.distanceFar || 0),
+    gradientStart: fadeDebug.gradientStart || null,
+    gradientEnd: fadeDebug.gradientEnd || null,
+    edgeFadeEnabled: !!lightState.shadowEdgeFadeEnabled,
+    edgeFadePx: Number(lightState.shadowEdgeFadePx || 0),
+    target: 'main-player',
+    lightId: light.id || light.name || 'light',
+    lightType: light.type || 'unknown',
+    component: debugTag || 'projected-shadow',
+    casterCenter: receiverPoint || null,
+    worldPolys: [worldHull],
+    screenPolys: [screenHull]
+  });
+  if (verboseLog && debugState.frame <= 6) {
+    detailLog(`shadow:${debugTag || 'shape'} light=${light.name}/${light.type} hullN=${hull.length} alpha=${alpha.toFixed(3)} near=${(alpha * Number(fadeDebug.factorNear || 1)).toFixed(3)} far=${(alpha * Number(fadeDebug.factorFar || 1)).toFixed(3)} mode=${String(fadeDebug.mode || 'solid')}`);
+  }
+};
+if (light.type === 'area') {
+  const offsets = areaSampleOffsets(light);
+  const baseAlpha = shadowAlphaForLight(light, receiverPoint) / Math.max(1, offsets.length) * (1.2 + light.softness * 0.8);
+  for (const o of offsets) {
+    const sample = { ...light, x: light.x + o.x, y: light.y + o.y, z: light.z };
+    const projected = worldPts.map(p => projectGroundPoint(light, p, sample)).filter(Boolean);
+    emitShadow(projected, baseAlpha);
+  }
+  return;
+}
+var projected = worldPts.map(p => projectGroundPoint(light, p)).filter(Boolean);
+var a = shadowAlphaForLight(light, receiverPoint);
+emitShadow(projected, a);
+}
+
+function drawPlayerShadow(shadowLights = null) {
+if (!SHOW_PLAYER) return;
+if (!lightState.showShadows) return;
+
+var activeShadowLights = shadowLights || getShadowDebugRenderLights();
+var proxy = getPlayerProxyBox();
+var worldPts = boxShadowWorldPoints(proxy);
+var center = getPlayerShadowCenter();
+for (const light of activeShadowLights) drawProjectedShadow(worldPts, light, center, 'player-proxy');
+
+var bounds = getPlayerGroundBounds();
+var foot = iso(player.x, player.y, 0);
+var widthPx = Math.max(10, bounds.maxX - bounds.minX);
+var heightPx = Math.max(6, bounds.maxY - bounds.minY);
+var contactAlpha = clamp(0.12 + settings.ambient * 0.20, 0.10, 0.24);
+for (const light of activeShadowLights) {
+  contactAlpha += clamp(evaluateLight(light, { x: player.x, y: player.y, z: 0.12 }, { x: 0, y: 0, z: 1 }).raw * 0.025, 0, 0.045);
+}
+ctx.save();
+ctx.translate(foot.x, foot.y + 4);
+ctx.scale(Math.max(0.75, widthPx / 26), Math.max(0.42, heightPx / 18));
+ctx.fillStyle = `rgba(0,0,0,${clamp(contactAlpha, 0.10, 0.30)})`;
+ctx.beginPath();
+ctx.arc(0, 0, 13, 0, Math.PI * 2);
+ctx.fill();
+ctx.restore();
+
+if (showDebug) {
+  const pts = cubePoints(proxy.x, proxy.y, proxy.z, proxy.w, proxy.d, proxy.h);
+  drawPoly([pts.p001, pts.p101, pts.p111, pts.p011], 'rgba(255,210,120,.05)', 'rgba(255,210,120,.82)');
+  drawPoly([pts.p101, pts.p111, pts.p110, pts.p100], null, 'rgba(255,210,120,.55)');
+  drawPoly([pts.p011, pts.p111, pts.p110, pts.p010], null, 'rgba(255,210,120,.55)');
+}
+}
+
+function getMainViewRotationCoreApi() {
+try {
+  return (window.App && window.App.domain && window.App.domain.viewRotationCore)
+    ? window.App.domain.viewRotationCore
+    : (window.__VIEW_ROTATION_CORE__ || null);
+} catch (_) {
+  return window.__VIEW_ROTATION_CORE__ || null;
+}
+}
+
+function getMainEditorViewRotationValue() {
+try {
+  var controller = window.App && window.App.controllers ? window.App.controllers.main || null : null;
+  if (controller && typeof controller.getMainEditorVisualRotation === 'function') return ((Number(controller.getMainEditorVisualRotation('presentation.render.logic')) || 0) % 4 + 4) % 4;
+  if (controller && typeof controller.getMainEditorViewRotation === 'function') return ((Number(controller.getMainEditorViewRotation('presentation.render.logic')) || 0) % 4 + 4) % 4;
+} catch (_) {}
+try {
+  var runtimeState = window.App && window.App.state ? window.App.state.runtimeState || null : null;
+  if (runtimeState && runtimeState.editor && typeof runtimeState.editor.rotation === 'number') return ((Number(runtimeState.editor.rotation) || 0) % 4 + 4) % 4;
+} catch (_) {}
+return 0;
+}
+
+function getMainViewProjectionConfig() {
+return {
+  tileW: settings.tileW,
+  tileH: settings.tileH,
+  originX: settings.originX,
+  originY: settings.originY,
+  cameraX: camera.x,
+  cameraY: camera.y,
+  worldBoundsOrOrigin: { cols: settings.gridW || settings.worldCols, rows: settings.gridH || settings.worldRows }
+};
+}
+
+function currentProto() {
+var p = currentPrefab();
+return prefabVariant(p, (editor && typeof editor.previewFacing === 'number') ? editor.previewFacing : 0);
+}
+
+function iso(x, y, z = 0) {
+var api = getMainViewRotationCoreApi();
+if (api && typeof api.worldToScreenWithViewRotation === 'function') {
+  return api.worldToScreenWithViewRotation({ x: x, y: y, z: z }, getMainEditorViewRotationValue(), getMainViewProjectionConfig());
+}
+return {
+  x: settings.originX + camera.x + (x - y) * settings.tileW / 2,
+  y: settings.originY + camera.y + (x + y) * settings.tileH / 2 - z * settings.tileH,
+};
+}
+
+function screenToFloor(sx, sy) {
+var api = getMainViewRotationCoreApi();
+if (api && typeof api.screenToWorldWithViewRotation === 'function') {
+  var world = api.screenToWorldWithViewRotation({ x: sx, y: sy, z: 0 }, getMainEditorViewRotationValue(), getMainViewProjectionConfig());
+  return { x: world.x, y: world.y };
+}
+var dx = (sx - settings.originX - camera.x) / (settings.tileW / 2);
+var dy = (sy - settings.originY - camera.y) / (settings.tileH / 2);
+return { x: (dx + dy) / 2, y: (dy - dx) / 2 };
+}
+
+function shadeHex(hex, delta) {
+var v = hex.replace('#', '');
+var n = parseInt(v, 16);
+var r = (n >> 16) + delta;
+var g = ((n >> 8) & 255) + delta;
+var b = (n & 255) + delta;
+r = clamp(r, 0, 255); g = clamp(g, 0, 255); b = clamp(b, 0, 255);
+return `rgb(${r},${g},${b})`;
+}
+
+function hexToRgb(hex) {
+var v = hex.replace('#', '');
+var n = parseInt(v, 16);
+return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+function rgbToCss(rgb, a = 1) {
+return `rgba(${Math.round(rgb.r)}, ${Math.round(rgb.g)}, ${Math.round(rgb.b)}, ${a})`;
+}
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+function mixColor(rgb, target, t) {
+return {
+  r: lerp(rgb.r, target.r, t),
+  g: lerp(rgb.g, target.g, t),
+  b: lerp(rgb.b, target.b, t),
+};
+}
+
+function mulColor(rgb, k) {
+return {
+  r: clamp(rgb.r * k, 0, 255),
+  g: clamp(rgb.g * k, 0, 255),
+  b: clamp(rgb.b * k, 0, 255),
+};
+}
+
+function addColor(a, b) {
+return {
+  r: clamp(a.r + b.r, 0, 255),
+  g: clamp(a.g + b.g, 0, 255),
+  b: clamp(a.b + b.b, 0, 255),
+};
+}
+
+function normalize3(v) {
+var len = Math.hypot(v.x, v.y, v.z) || 1;
+return { x: v.x / len, y: v.y / len, z: v.z / len };
+}
+
+function dot3(a, b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+
+function drawLightGlow() {
+if (!lightState.showGlow) return;
+for (const light of getLightingRenderLights()) {
+  normalizeLight(light);
+  const p = iso(light.x, light.y, light.z);
+  const rgb = hexToRgb(light.color);
+
+  if (light.type === 'directional') {
+    const incoming = lightIncoming(light);
+    const g = ctx.createLinearGradient(
+      VIEW_W * 0.5 - incoming.x * VIEW_W * 0.75,
+      VIEW_H * 0.5 - incoming.y * VIEW_H * 0.55,
+      VIEW_W * 0.5 + incoming.x * VIEW_W * 0.75,
+      VIEW_H * 0.5 + incoming.y * VIEW_H * 0.55,
+    );
+    g.addColorStop(0, rgbToCss(rgb, clamp(light.intensity * 0.14, 0, 0.18)));
+    g.addColorStop(0.55, rgbToCss(rgb, 0.03));
+    g.addColorStop(1, rgbToCss(rgb, 0));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    continue;
+  }
+
+  if (light.type === 'area') {
+    const size = 12 + (light.size || 1) * 10;
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.fillStyle = rgbToCss(rgb, clamp(0.18 * light.intensity, 0, 0.3));
+    ctx.strokeStyle = rgbToCss(rgb, 0.65);
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.rect(-size, -size * 0.55, size * 2, size * 1.1);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  const glow = ctx.createRadialGradient(p.x, p.y, 6, p.x, p.y, light.radius);
+  glow.addColorStop(0, rgbToCss(rgb, clamp(0.18 * light.intensity, 0, 0.32)));
+  glow.addColorStop(0.35, rgbToCss(rgb, clamp(0.08 * light.intensity, 0, 0.22)));
+  glow.addColorStop(1, rgbToCss(rgb, 0));
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+}
+}
+
+function buildShadowCasters() {
+var groups = new Map();
+for (const box of boxes) {
+  const key = `${box.x}|${box.y}|${box.w}|${box.d}`;
+  if (!groups.has(key)) groups.set(key, []);
+  groups.get(key).push(box);
+}
+
+var casters = [];
+for (const stack of groups.values()) {
+  if (stack.length === 1) {
+    const box = stack[0];
+    casters.push({
+      kind: 'box',
+      box,
+      worldPts: boxShadowWorldPoints(box),
+      center: { x: box.x + box.w * 0.5, y: box.y + box.d * 0.5, z: box.z + box.h * 0.5 },
+      debugTag: `box#${box.id}`,
+    });
+    continue;
+  }
+
+  stack.sort((a, b) => a.z - b.z);
+  const baseZ = Math.min(...stack.map(b => b.z));
+  const topZ = Math.max(...stack.map(b => b.z + b.h));
+  const ref = stack[0];
+  const merged = { x: ref.x, y: ref.y, z: baseZ, w: ref.w, d: ref.d, h: topZ - baseZ };
+  casters.push({
+    kind: 'stack',
+    boxes: stack.slice(),
+    worldPts: boxShadowWorldPoints(merged),
+    center: { x: merged.x + merged.w * 0.5, y: merged.y + merged.d * 0.5, z: merged.z + merged.h * 0.5 },
+    debugTag: `stack(${stack.map(b => `#${b.id}`).join(',')})`,
+  });
+}
+return casters;
+}
+
+function shadowLightVectorAtPoint(light, point, samplePoint = null) {
+normalizeLight(light);
+if (light.type === 'directional') return normalize3(lightIncoming(light));
+var src = samplePoint || light;
+return normalize3({ x: src.x - point.x, y: src.y - point.y, z: src.z - point.z });
+}
+
+function projectGroundPointStable(light, point, samplePoint = null) {
+if (light.type === 'directional') {
+  const dir = lightForward(light);
+  if (dir.z >= -0.02) return null;
+  const t = point.z / (-dir.z);
+  return { x: point.x + dir.x * t, y: point.y + dir.y * t, z: 0 };
+}
+var src0 = samplePoint || light;
+var src = { x: src0.x, y: src0.y, z: Math.max(src0.z, point.z + 0.35) };
+var dz = src.z - point.z;
+if (dz <= 1e-4) return null;
+var t = point.z / dz;
+return { x: point.x + (point.x - src.x) * t, y: point.y + (point.y - src.y) * t, z: 0 };
+}
+
+function faceCenter(face) {
+var n = face.pts.length || 1;
+var x = 0, y = 0, z = 0;
+for (const p of face.pts) {
+  x += p.x; y += p.y; z += p.z;
+}
+return { x: x / n, y: y / n, z: z / n };
+}
+
+function collectShadowFacePolys(component, light, samplePoint = null) {
+var polys = [];
+for (const face of component.faces || []) {
+  const center = faceCenter(face);
+  const toLight = shadowLightVectorAtPoint(light, center, samplePoint);
+  const facing = dot3(face.normal, toLight);
+  if (facing <= 0.02) continue;
+  const projected = face.pts.map(pt => projectGroundPointStable(light, pt, samplePoint)).filter(Boolean);
+  if (projected.length < 3) continue;
+  polys.push(projected);
+}
+return polys;
+}
+
+
+var shadowPolyUnionCanvas = null;
+var shadowPolyUnionCtx = null;
+
+function ensureShadowPolyUnionCanvas() {
+if (!shadowPolyUnionCanvas) {
+  shadowPolyUnionCanvas = document.createElement('canvas');
+  shadowPolyUnionCtx = shadowPolyUnionCanvas.getContext('2d');
+}
+if (shadowPolyUnionCanvas.width !== VIEW_W || shadowPolyUnionCanvas.height !== VIEW_H) {
+  shadowPolyUnionCanvas.width = VIEW_W;
+  shadowPolyUnionCanvas.height = VIEW_H;
+}
+return shadowPolyUnionCtx;
+}
+
+
+var shadowPolyBlurCanvas = null;
+var shadowPolyBlurCtx = null;
+var shadowFeatherCompositeCanvas = null;
+var shadowFeatherCompositeCtx = null;
+
+function ensureShadowPolyBlurCanvas() {
+if (!shadowPolyBlurCanvas) {
+  shadowPolyBlurCanvas = document.createElement('canvas');
+  shadowPolyBlurCtx = shadowPolyBlurCanvas.getContext('2d');
+}
+if (shadowPolyBlurCanvas.width !== VIEW_W || shadowPolyBlurCanvas.height !== VIEW_H) {
+  shadowPolyBlurCanvas.width = VIEW_W;
+  shadowPolyBlurCanvas.height = VIEW_H;
+}
+return shadowPolyBlurCtx;
+}
+
+function ensureShadowFeatherCompositeCanvas() {
+if (!shadowFeatherCompositeCanvas) {
+  shadowFeatherCompositeCanvas = document.createElement('canvas');
+  shadowFeatherCompositeCtx = shadowFeatherCompositeCanvas.getContext('2d');
+}
+if (shadowFeatherCompositeCanvas.width !== VIEW_W || shadowFeatherCompositeCanvas.height !== VIEW_H) {
+  shadowFeatherCompositeCanvas.width = VIEW_W;
+  shadowFeatherCompositeCanvas.height = VIEW_H;
+}
+return shadowFeatherCompositeCtx;
+}
+
+function buildFeatheredShadowCanvas(fadePx) {
+  var blurCtx = ensureShadowPolyBlurCanvas();
+  var compCtx = ensureShadowFeatherCompositeCanvas();
+  blurCtx.clearRect(0, 0, VIEW_W, VIEW_H);
+  blurCtx.save();
+  blurCtx.filter = 'blur(' + Number(fadePx || 0).toFixed(2) + 'px)';
+  blurCtx.drawImage(shadowPolyUnionCanvas, 0, 0, VIEW_W, VIEW_H);
+  blurCtx.restore();
+  compCtx.clearRect(0, 0, VIEW_W, VIEW_H);
+  compCtx.drawImage(shadowPolyBlurCanvas, 0, 0, VIEW_W, VIEW_H);
+  return shadowFeatherCompositeCanvas;
+}
+
+function distance3Shadow(a, b) {
+  var dx = Number((a && a.x) || 0) - Number((b && b.x) || 0);
+  var dy = Number((a && a.y) || 0) - Number((b && b.y) || 0);
+  var dz = Number((a && a.z) || 0) - Number((b && b.z) || 0);
+  return Math.sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+function shadowDistanceFadeValueForDistance(distanceValue, rate, minFactor) {
+  var d = Math.max(0, Number(distanceValue || 0));
+  var k = Math.max(0, Number(rate || 0));
+  var minF = clamp(Number(minFactor != null ? minFactor : SHADOW_DISTANCE_FADE_DEFAULT_MIN), 0, 1);
+  if (k <= 0.0001) return 1;
+  return clamp(minF + (1 - minF) * Math.exp(-k * d), minF, 1);
+}
+
+function flattenShadowGradientSamples(screenPolys, worldPolys) {
+  var samples = [];
+  var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  var polyCount = Math.min(Array.isArray(screenPolys) ? screenPolys.length : 0, Array.isArray(worldPolys) ? worldPolys.length : 0);
+  for (var pi = 0; pi < polyCount; pi++) {
+    var spoly = screenPolys[pi] || [];
+    var wpoly = worldPolys[pi] || [];
+    var n = Math.min(spoly.length, wpoly.length);
+    for (var i = 0; i < n; i++) {
+      var sp = spoly[i];
+      var wp = wpoly[i];
+      if (!sp || !wp) continue;
+      var sx = Number(sp.x || 0);
+      var sy = Number(sp.y || 0);
+      if (sx < minX) minX = sx;
+      if (sy < minY) minY = sy;
+      if (sx > maxX) maxX = sx;
+      if (sy > maxY) maxY = sy;
+      samples.push({ screen: { x: sx, y: sy }, world: { x: Number(wp.x || 0), y: Number(wp.y || 0), z: Number(wp.z || 0) } });
+    }
+  }
+  return {
+    samples: samples,
+    bounds: {
+      minX: isFinite(minX) ? minX : 0,
+      minY: isFinite(minY) ? minY : 0,
+      maxX: isFinite(maxX) ? maxX : 0,
+      maxY: isFinite(maxY) ? maxY : 0
+    }
+  };
+}
+
+function buildShadowDistanceGradientDataForPolys(screenPolys, worldPolys, casterCenter, light, debugOut = null) {
+  if (!lightState.shadowDistanceFadeEnabled) {
+    if (debugOut) debugOut.reason = 'disabled';
+    return null;
+  }
+  if (!casterCenter || !Array.isArray(screenPolys) || !Array.isArray(worldPolys) || !screenPolys.length || !worldPolys.length) {
+    if (debugOut) debugOut.reason = 'missing-input';
+    return null;
+  }
+  if (light && light.type === 'directional') {
+    if (debugOut) debugOut.reason = 'directional-skip';
+    return null;
+  }
+  var rate = Math.max(0, Number(lightState.shadowDistanceFadeRate || 0));
+  var minFactor = clamp(Number(lightState.shadowDistanceFadeMin != null ? lightState.shadowDistanceFadeMin : SHADOW_DISTANCE_FADE_DEFAULT_MIN), 0, 1);
+  if (rate <= 0.0001) {
+    if (debugOut) debugOut.reason = 'rate-zero';
+    return null;
+  }
+
+  var packed = flattenShadowGradientSamples(screenPolys, worldPolys);
+  var samples = packed.samples;
+  if (!samples.length) {
+    if (debugOut) debugOut.reason = 'no-samples';
+    return null;
+  }
+
+  var dMin = Infinity;
+  var dMax = -Infinity;
+  for (var si = 0; si < samples.length; si++) {
+    var dv = distance3Shadow(casterCenter, samples[si].world);
+    samples[si].distance = dv;
+    if (dv < dMin) dMin = dv;
+    if (dv > dMax) dMax = dv;
+  }
+  var span = dMax - dMin;
+  if (!(span > 1e-5)) {
+    if (debugOut) debugOut.reason = 'distance-flat';
+    return null;
+  }
+
+  function centroidForThreshold(threshold, pickNear) {
+    var sx = 0, sy = 0, count = 0;
+    for (var ii = 0; ii < samples.length; ii++) {
+      var sample = samples[ii];
+      var ok = pickNear ? (sample.distance <= threshold) : (sample.distance >= threshold);
+      if (!ok) continue;
+      sx += sample.screen.x;
+      sy += sample.screen.y;
+      count += 1;
+    }
+    if (!count) return null;
+    return { x: sx / count, y: sy / count };
+  }
+
+  var nearThreshold = dMin + span * 0.24;
+  var farThreshold = dMax - span * 0.24;
+  var start = centroidForThreshold(nearThreshold, true);
+  var end = centroidForThreshold(farThreshold, false);
+  if (!start || !end) {
+    var nearSample = samples[0];
+    var farSample = samples[0];
+    for (var sj = 1; sj < samples.length; sj++) {
+      if (samples[sj].distance < nearSample.distance) nearSample = samples[sj];
+      if (samples[sj].distance > farSample.distance) farSample = samples[sj];
+    }
+    start = { x: nearSample.screen.x, y: nearSample.screen.y };
+    end = { x: farSample.screen.x, y: farSample.screen.y };
+  }
+
+  var dx = end.x - start.x;
+  var dy = end.y - start.y;
+  var len = Math.sqrt(dx * dx + dy * dy);
+  if (len <= 1e-5) {
+    if (debugOut) debugOut.reason = 'screen-flat';
+    return null;
+  }
+
+  var extendNear = 6;
+  var extendFar = 8;
+  start = { x: start.x - dx / len * extendNear, y: start.y - dy / len * extendNear };
+  end = { x: end.x + dx / len * extendFar, y: end.y + dy / len * extendFar };
+
+  var plateau = 0.14;
+  var stopTs = [0, 0.08, 0.16, 0.32, 0.52, 0.74, 1];
+  var stops = [];
+  for (var s = 0; s < stopTs.length; s++) {
+    var tt = stopTs[s];
+    var relT = tt <= plateau ? 0 : ((tt - plateau) / Math.max(1e-5, 1 - plateau));
+    var relDistance = span * relT;
+    var factor = tt <= plateau ? 1 : shadowDistanceFadeValueForDistance(relDistance, rate, minFactor);
+    stops.push({ t: tt, factor: factor, distance: relDistance });
+  }
+
+  if (debugOut) {
+    debugOut.reason = 'applied';
+    debugOut.mode = 'distance-gradient-relative-union';
+    debugOut.distanceNear = 0;
+    debugOut.distanceFar = span;
+    debugOut.absoluteDistanceNear = dMin;
+    debugOut.absoluteDistanceFar = dMax;
+    debugOut.factorNear = stops[0].factor;
+    debugOut.factorFar = stops[stops.length - 1].factor;
+    debugOut.gradientStart = start;
+    debugOut.gradientEnd = end;
+    debugOut.rate = rate;
+    debugOut.minFactor = minFactor;
+    debugOut.plateau = plateau;
+    debugOut.sampleCount = samples.length;
+    debugOut.polyCount = screenPolys.length;
+  }
+
+  return {
+    start: start,
+    end: end,
+    stops: stops,
+    distanceNear: 0,
+    distanceFar: span,
+    absoluteDistanceNear: dMin,
+    absoluteDistanceFar: dMax,
+    factorNear: stops[0].factor,
+    factorFar: stops[stops.length - 1].factor,
+    bounds: packed.bounds
+  };
+}
+
+function fillShadowUnionWithDistanceFade(targetCtx, screenPolys, worldPolys, casterCenter, light, baseAlpha, debugOut = null) {
+  if (!Array.isArray(screenPolys) || !screenPolys.length) return false;
+  var validPolys = [];
+  for (var pi = 0; pi < screenPolys.length; pi++) {
+    var poly = screenPolys[pi];
+    if (poly && poly.length >= 3) validPolys.push(poly);
+  }
+  if (!validPolys.length) return false;
+
+  targetCtx.beginPath();
+  for (var vi = 0; vi < validPolys.length; vi++) {
+    var vpoly = validPolys[vi];
+    targetCtx.moveTo(vpoly[0].x, vpoly[0].y);
+    for (var i = 1; i < vpoly.length; i++) targetCtx.lineTo(vpoly[i].x, vpoly[i].y);
+    targetCtx.closePath();
+  }
+
+  var baseA = clamp(Number(baseAlpha != null ? baseAlpha : 1), 0, 0.95);
+  var gradientData = buildShadowDistanceGradientDataForPolys(validPolys, worldPolys || [], casterCenter, light, debugOut);
+  if (!gradientData) {
+    targetCtx.fillStyle = lightState.highContrastShadow ? rgbToCss(hexToRgb(lightState.shadowDebugColor || '#ff2a6d'), baseA) : 'rgba(0,0,0,' + baseA.toFixed(4) + ')';
+    targetCtx.fill();
+    return false;
+  }
+
+  var grad = targetCtx.createLinearGradient(gradientData.start.x, gradientData.start.y, gradientData.end.x, gradientData.end.y);
+  for (var s = 0; s < gradientData.stops.length; s++) {
+    var stop = gradientData.stops[s];
+    var alphaStop = clamp(baseA * Number(stop.factor || 0), 0, 0.95);
+    grad.addColorStop(stop.t, lightState.highContrastShadow ? rgbToCss(hexToRgb(lightState.shadowDebugColor || '#ff2a6d'), alphaStop) : 'rgba(0,0,0,' + alphaStop.toFixed(4) + ')');
+  }
+
+  var b = gradientData.bounds || { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+  targetCtx.save();
+  targetCtx.clip();
+  targetCtx.fillStyle = grad;
+  targetCtx.fillRect(b.minX - 4, b.minY - 4, (b.maxX - b.minX) + 8, (b.maxY - b.minY) + 8);
+  targetCtx.restore();
+  return true;
+}
+
+function fillShadowPolyWithDistanceFade(targetCtx, screenPoly, worldPoly, casterCenter, light, baseAlpha, debugOut = null) {
+  return fillShadowUnionWithDistanceFade(targetCtx, [screenPoly], [worldPoly], casterCenter, light, baseAlpha, debugOut);
+}
+
+function drawUnionShadowCanvasToTarget(targetCtx, alphaForStroke) {
+  var edgeFadeOn = !!(lightState.shadowEdgeFadeEnabled && Number(lightState.shadowEdgeFadePx || 0) > 0.01);
+  if (edgeFadeOn) {
+    targetCtx.drawImage(buildFeatheredShadowCanvas(Number(lightState.shadowEdgeFadePx || 0)), 0, 0, VIEW_W, VIEW_H);
+  } else {
+    targetCtx.drawImage(shadowPolyUnionCanvas, 0, 0, VIEW_W, VIEW_H);
+  }
+}
+
+function drawProjectedComponentShadow(component, light) {
+if (!lightState.showShadows) return;
+normalizeLight(light);
+var receiverPoint = component.center || { x: settings.gridW * 0.5, y: settings.gridH * 0.5, z: 0 };
+
+var emitPolys = (polys, alpha, tag = '') => {
+  if (alpha <= 0.0001 || !polys.length) return;
+
+  const unionCtx = ensureShadowPolyUnionCanvas();
+  unionCtx.clearRect(0, 0, VIEW_W, VIEW_H);
+  unionCtx.globalCompositeOperation = 'source-over';
+  unionCtx.fillStyle = lightState.highContrastShadow
+    ? rgbToCss(hexToRgb(lightState.shadowDebugColor || '#ff2a6d'), 1)
+    : 'rgba(0,0,0,1)';
+
+  const screenPolys = [];
+  for (const poly of polys) {
+    const scr = poly.map(p => iso(p.x, p.y, 0));
+    if (scr.length < 3) continue;
+    screenPolys.push(scr);
+    unionCtx.beginPath();
+    unionCtx.moveTo(scr[0].x, scr[0].y);
+    for (let i = 1; i < scr.length; i++) unionCtx.lineTo(scr[i].x, scr[i].y);
+    unionCtx.closePath();
+    unionCtx.fill();
+  }
+  if (!screenPolys.length) return;
+
+  ctx.save();
+  ctx.globalAlpha = clamp(alpha, 0, 0.95);
+  ctx.drawImage(shadowPolyUnionCanvas, 0, 0);
+  ctx.restore();
+
+  if (lightState.highContrastShadow) {
+    ctx.save();
+    ctx.strokeStyle = shadowStrokeCss(alpha);
+    ctx.lineWidth = 0.7;
+    for (const scr of screenPolys) {
+      ctx.beginPath();
+      ctx.moveTo(scr[0].x, scr[0].y);
+      for (let i = 1; i < scr.length; i++) ctx.lineTo(scr[i].x, scr[i].y);
+      ctx.closePath();
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  if (verboseLog && debugState.frame <= 6) {
+    detailLog(`shadow-comp:${component.debugTag || tag || 'component'} light=${light.name}/${light.type} polys=${screenPolys.length} alpha=${alpha.toFixed(3)} union=offscreen`);
+  }
+};
+
+if (light.type === 'area') {
+  const offsets = areaSampleOffsets(light);
+  const baseAlpha = shadowAlphaForLight(light, receiverPoint) / Math.max(1, offsets.length) * (1.05 + light.softness * 0.65);
+  offsets.forEach((o) => {
+    const sample = { ...light, x: light.x + o.x, y: light.y + o.y, z: light.z };
+    const polys = collectShadowFacePolys(component, light, sample);
+    emitPolys(polys, baseAlpha, component.debugTag);
+  });
+  return;
+}
+
+var polys = collectShadowFacePolys(component, light, null);
+emitPolys(polys, shadowAlphaForLight(light, receiverPoint), component.debugTag);
+}
+
+function getShadowDebugRenderLights() {
+  var renderLights = (typeof getLightingRenderLights === 'function') ? getLightingRenderLights() : lights;
+  if (!renderLights || !renderLights.length) return renderLights;
+  if (!shadowDebugDetailed) return renderLights;
+  var pickedPoint = null;
+  var pickedDir = null;
+  for (const l of renderLights) {
+    if (!pickedPoint && l.type === 'point') pickedPoint = l;
+    if (!pickedPoint && !pickedDir && (l.type === 'spot' || l.type === 'area')) pickedPoint = l;
+    if (!pickedDir && l.type === 'directional') pickedDir = l;
+  }
+  var subset = [];
+  if (pickedPoint) subset.push(pickedPoint);
+  if (pickedDir) subset.push(pickedDir);
+  return subset.length ? subset : renderLights;
+}
+
+function shadowLightTag(light) {
+  return String(light.name || light.id || 'light') + '/' + String(light.type || 'unknown') + '@' + fmt3Shadow({ x: light.x || 0, y: light.y || 0, z: light.z || 0 });
+}
+
+function logShadowLightSet(lights, scope) {
+  if (!shadowDebugDetailed) return;
+  var tags = (lights || []).map(shadowLightTag);
+  shadowDebugLog('light-set scope=' + String(scope || 'shadow') + ' count=' + String(tags.length) + ' lights=' + tags.join(' | '), true);
+}
+
+function drawLightShadows() {
+if (!lightState.showShadows) return;
+var components = buildShadowComponents();
+var shadowLights = getShadowDebugRenderLights();
+logShadowLightSet(shadowLights, 'drawLightShadows');
+for (const comp of components) {
+  if (verboseLog && debugState.frame <= 3) {
+    detailLog(`shadow-component ${comp.debugTag} faces=${comp.faces.length} cells=${comp.cells.length}`);
+  }
+  for (const light of shadowLights) drawProjectedComponentShadow(comp, light);
+}
+drawPlayerShadow(shadowLights);
+}
+
+
+// --- v1.3 static-shadow-layer override ---
+
+// Keep a single authoritative implementation for merged receiver building.
+// Older duplicate definitions below previously overwrote the patch-aware version
+// and caused stacked voxels / connected patches to regress.
+function buildMergedReceiverFaces() {
+  return buildMergedReceiverFacesPatched();
+}
+
+function getMergedReceiverFace(ownerInstanceId, receiverKind, fallbackFacePts, fallbackNormal) {
+  return getMergedReceiverFacePatched(ownerInstanceId, receiverKind, fallbackFacePts, fallbackNormal);
+}
+
+function invalidateShadowGeometryCache(reason = 'unknown') {
+  shadowGeomCache.signature = '';
+  shadowGeomCache.components = [];
+  shadowGeomCache.occupancy = new Map();
+  shadowGeomCache.totalVoxels = 0;
+  shadowGeomCache.totalFaces = 0;
+  mergedReceiverCache.signature = '';
+  mergedReceiverCache.facesByOwner = new Map();
+  markStaticShadowLayerDirty(`shadow-geom:${reason}`);
+  detailLog(`shadow-components: invalidated reason=${reason}`);
+}
+
+function ensureStaticShadowLayerCanvas() {
+  if (!staticShadowCanvas) {
+    staticShadowCanvas = document.createElement('canvas');
+    staticShadowCtx = staticShadowCanvas.getContext('2d');
+  }
+  var backingW = Math.round(VIEW_W * dpr);
+  var backingH = Math.round(VIEW_H * dpr);
+  if (staticShadowCanvas.width !== backingW || staticShadowCanvas.height !== backingH) {
+    staticShadowCanvas.width = backingW;
+    staticShadowCanvas.height = backingH;
+    staticShadowCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    staticShadowCtx.imageSmoothingEnabled = true;
+    staticShadowCache.dirty = true;
+  }
+  return staticShadowCtx;
+}
+
+function drawProjectedComponentShadow(component, light, targetCtx = ctx) {
+  if (!lightState.showShadows) return;
+  normalizeLight(light);
+  var receiverPoint = component.center || { x: settings.gridW * 0.5, y: settings.gridH * 0.5, z: 0 };
+
+  var emitPolys = (polys, alpha, tag = '') => {
+    if (alpha <= 0.0001 || !polys.length) return;
+    const unionCtx = ensureShadowPolyUnionCanvas();
+    unionCtx.clearRect(0, 0, VIEW_W, VIEW_H);
+    unionCtx.globalCompositeOperation = 'source-over';
+    const screenPolys = [];
+    for (const poly of polys) {
+      const scr = poly.map(p => iso(p.x, p.y, 0));
+      if (scr.length < 3) continue;
+      screenPolys.push(scr);
+    }
+    if (!screenPolys.length) return;
+    var fadeDebug = {};
+    fillShadowUnionWithDistanceFade(unionCtx, screenPolys, polys, receiverPoint || null, light, alpha, fadeDebug);
+
+    targetCtx.save();
+    drawUnionShadowCanvasToTarget(targetCtx, alpha);
+
+    if (lightState.highContrastShadow) {
+      targetCtx.strokeStyle = shadowStrokeCss(clamp(alpha * Number((fadeDebug && fadeDebug.factorFar) || 1), 0, 0.95));
+      targetCtx.lineWidth = 0.7;
+      for (const scr of screenPolys) {
+        targetCtx.beginPath();
+        targetCtx.moveTo(scr[0].x, scr[0].y);
+        for (let i = 1; i < scr.length; i++) targetCtx.lineTo(scr[i].x, scr[i].y);
+        targetCtx.closePath();
+        targetCtx.stroke();
+      }
+    }
+    targetCtx.restore();
+
+    if (typeof logStaticShadowEmitDebug === 'function') logStaticShadowEmitDebug({
+      alphaBase: clamp(alpha, 0, 0.95),
+      alphaNear: clamp(alpha * Number((fadeDebug && fadeDebug.factorNear) || 1), 0, 0.95),
+      alphaFar: clamp(alpha * Number((fadeDebug && fadeDebug.factorFar) || 1), 0, 0.95),
+      fadeReason: (fadeDebug && fadeDebug.reason) || 'none',
+      fadeMode: (fadeDebug && fadeDebug.mode) || 'solid',
+      fadeDistanceNear: Number((fadeDebug && fadeDebug.distanceNear) || 0),
+      fadeDistanceFar: Number((fadeDebug && fadeDebug.distanceFar) || 0),
+      gradientStart: (fadeDebug && fadeDebug.gradientStart) || null,
+      gradientEnd: (fadeDebug && fadeDebug.gradientEnd) || null,
+      edgeFadeEnabled: !!lightState.shadowEdgeFadeEnabled,
+      edgeFadePx: Number(lightState.shadowEdgeFadePx || 0),
+      target: targetCtx === ctx ? 'main' : 'cache',
+      lightId: light.id || light.name || 'light',
+      lightType: light.type || 'unknown',
+      component: component.debugTag || tag || 'component',
+      casterCenter: receiverPoint || null,
+      worldPolys: polys,
+      screenPolys: screenPolys,
+      polyCount: screenPolys.length
+    });
+
+    if (verboseLog && debugState.frame <= 6) {
+      detailLog(`shadow-comp:${component.debugTag || tag || 'component'} light=${light.name}/${light.type} polys=${screenPolys.length} alpha=${alpha.toFixed(3)} near=${(alpha * Number((fadeDebug && fadeDebug.factorNear) || 1)).toFixed(3)} far=${(alpha * Number((fadeDebug && fadeDebug.factorFar) || 1)).toFixed(3)} target=${targetCtx === ctx ? 'main' : 'cache'}`);
+    }
+  };
+
+  if (light.type === 'area') {
+    const offsets = areaSampleOffsets(light);
+    const baseAlpha = shadowAlphaForLight(light, receiverPoint) / Math.max(1, offsets.length) * (1.05 + light.softness * 0.65);
+    offsets.forEach((o) => {
+      const sample = { ...light, x: light.x + o.x, y: light.y + o.y, z: light.z };
+      const polys = collectShadowFacePolys(component, light, sample);
+      emitPolys(polys, baseAlpha, component.debugTag);
+    });
+    return;
+  }
+
+  var polys = collectShadowFacePolys(component, light, null);
+  emitPolys(polys, shadowAlphaForLight(light, receiverPoint), component.debugTag);
+}
+
+function rebuildStaticShadowLayerIfNeeded(force = false) {
+  if (!lightState.showShadows) return;
+
+  var sig = staticShadowLayerSignature();
+  var needsRebuild = force || staticShadowCache.dirty || staticShadowCache.signature !== sig || !staticShadowCanvas;
+  if (!needsRebuild) return;
+
+  var now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+  if (!force && isInteractiveRenderPressure() && !isMainEditorViewAnimatingForLogic() && staticShadowCache.signature && (now - staticShadowCache.lastBuiltAt) < SHADOW_LAYER_INTERACTION_MS) {
+    return;
+  }
+
+  var targetCtx = ensureStaticShadowLayerCanvas();
+  targetCtx.clearRect(0, 0, VIEW_W, VIEW_H);
+  var components = buildShadowComponents();
+  for (const comp of components) {
+    for (const light of getLightingRenderLights()) drawProjectedComponentShadow(comp, light, targetCtx);
+  }
+  staticShadowCache.signature = sig;
+  staticShadowCache.lastBuiltAt = now;
+  staticShadowCache.dirty = false;
+  noteLayerRebuild('static-shadow', `interactive=${isInteractiveRenderPressure()} comps=${components.length} lights=${lights.length}`);
+}
+
+
+
+function faceQuadPoint(facePts, u, v) {
+  if (!facePts || facePts.length < 4) return { x: 0, y: 0, z: 0 };
+  var p00 = facePts[0], p10 = facePts[1], p11 = facePts[2], p01 = facePts[3];
+  var ax = p00.x + (p10.x - p00.x) * u;
+  var ay = p00.y + (p10.y - p00.y) * u;
+  var az = p00.z + (p10.z - p00.z) * u;
+  var bx = p01.x + (p11.x - p01.x) * u;
+  var by = p01.y + (p11.y - p01.y) * u;
+  var bz = p01.z + (p11.z - p01.z) * u;
+  return { x: ax + (bx - ax) * v, y: ay + (by - ay) * v, z: az + (bz - az) * v };
+}
+
+function faceReceiverCenter(facePts) {
+  var n = Math.max(1, (facePts && facePts.length) || 0);
+  var x = 0, y = 0, z = 0;
+  for (const p of (facePts || [])) {
+    x += p.x; y += p.y; z += p.z;
+  }
+  return { x: x / n, y: y / n, z: z / n };
+}
+
+function buildFaceReceiverSamples(facePts, normal) {
+  var isTop = Math.abs((normal && normal.z) || 0) > 0.5;
+  var inset = isTop ? 0.22 : 0.18;
+  var coords = [
+    [0.50, 0.50],
+    [inset, inset],
+    [1 - inset, inset],
+    [inset, 1 - inset],
+    [1 - inset, 1 - inset],
+  ];
+  var out = [];
+  for (const pair of coords) {
+    var p = faceQuadPoint(facePts, pair[0], pair[1]);
+    out.push({
+      x: p.x + ((normal && normal.x) || 0) * 0.035,
+      y: p.y + ((normal && normal.y) || 0) * 0.035,
+      z: Math.max(0.02, p.z + ((normal && normal.z) || 0) * 0.035),
+    });
+  }
+  return out;
+}
+
+function componentTouchesOwnerInstance(comp, ownerInstanceId) {
+  if (!ownerInstanceId || !comp || !comp.boxIds) return false;
+  for (const boxId of comp.boxIds) {
+    var box = boxes.find(function (b) { return b.id === boxId; });
+    if (box && box.instanceId === ownerInstanceId) return true;
+  }
+  return false;
+}
+
+function pointInShadowByOccupancyFiltered(receiverPoint, light, samplePoint, components, ownerInstanceId = null) {
+  var start = {
+    x: receiverPoint.x,
+    y: receiverPoint.y,
+    z: Math.max(0.02, receiverPoint.z),
+  };
+  var end = shadowRayTargetForLight(light, receiverPoint, samplePoint);
+  if (Math.abs(end.x - start.x) < 1e-6 && Math.abs(end.y - start.y) < 1e-6 && Math.abs(end.z - start.z) < 1e-6) {
+    return { hit: false };
+  }
+  if (Math.abs(end.z - start.z) < 1e-4) end.z = start.z + 0.08;
+
+  for (const comp of components) {
+    if (componentTouchesOwnerInstance(comp, ownerInstanceId)) continue;
+    const b = comp.bounds;
+    const min = { x: b.minX, y: b.minY, z: b.minZ };
+    const max = { x: b.maxX, y: b.maxY, z: b.maxZ };
+    if (!segmentIntersectsAABB(start, end, min, max)) continue;
+    for (const cell of comp.cells) {
+      if (segmentIntersectsAABB(start, end, { x: cell.x, y: cell.y, z: cell.z }, { x: cell.x + 1, y: cell.y + 1, z: cell.z + 1 })) {
+        return { hit: true, boxIds: comp.boxIds, cell: cell };
+      }
+    }
+  }
+  return { hit: false };
+}
+
+function estimateFaceShadowAmount(facePts, normal, ownerInstanceId = null) {
+  if (!lightState.showShadows || !isLightingSystemEnabled()) return 0;
+  var renderLights = getShadowDebugRenderLights();
+  if (!renderLights || !renderLights.length) return 0;
+  var components = buildShadowComponents();
+  if (!components || !components.length) return 0;
+
+  var center = faceReceiverCenter(facePts);
+  var receiverFace = { pts: facePts, normal: normal };
+  var samples = buildFaceReceiverSamples(facePts, normal);
+  var alpha = 0;
+
+  for (const light of renderLights) {
+    if (!faceReceivesLight(receiverFace, light, null)) continue;
+    if (light.type === 'area') {
+      var offsets = areaSampleOffsets(light);
+      var total = 0;
+      var hits = 0;
+      for (const o of offsets) {
+        var sampleLight = { x: light.x + o.x, y: light.y + o.y, z: light.z };
+        if (!faceReceivesLight(receiverFace, light, sampleLight)) continue;
+        for (const sp of samples) {
+          total += 1;
+          if (pointInShadowByOccupancyFiltered(sp, light, sampleLight, components, ownerInstanceId).hit) hits += 1;
+        }
+      }
+      if (total > 0 && hits > 0) alpha += shadowAlphaForLight(light, center) * (hits / total);
+      continue;
+    }
+
+    var hitCount = 0;
+    for (const sp of samples) {
+      if (pointInShadowByOccupancyFiltered(sp, light, null, components, ownerInstanceId).hit) hitCount += 1;
+    }
+    if (hitCount > 0) alpha += shadowAlphaForLight(light, center) * (hitCount / samples.length);
+  }
+
+  return clamp(alpha * 1.1, 0, 0.78);
+}
+
+function litFaceColor(baseRgb, facePts, normal, ownerInstanceId = null) {
+  var center = faceReceiverCenter(facePts);
+  return litColor(baseRgb, center, normal);
+}
+
+function faceShadowGridSpec(normal) {
+  var isTop = Math.abs((normal && normal.z) || 0) > 0.5;
+  return isTop ? { u: 6, v: 6, inset: 0.04 } : { u: 5, v: 6, inset: 0.03 };
+}
+
+function buildPatchReceiverSamples(facePts, u0, u1, v0, v1, normal) {
+  var isTop = Math.abs((normal && normal.z) || 0) > 0.5;
+  var coords = isTop
+    ? [[0.5, 0.5], [0.22, 0.22], [0.78, 0.22], [0.22, 0.78], [0.78, 0.78]]
+    : [[0.5, 0.5], [0.28, 0.26], [0.72, 0.26], [0.28, 0.74], [0.72, 0.74]];
+  var out = [];
+  for (const pair of coords) {
+    var u = u0 + (u1 - u0) * pair[0];
+    var v = v0 + (v1 - v0) * pair[1];
+    var p = faceQuadPoint(facePts, u, v);
+    out.push({
+      x: p.x + ((normal && normal.x) || 0) * 0.035,
+      y: p.y + ((normal && normal.y) || 0) * 0.035,
+      z: Math.max(0.02, p.z + ((normal && normal.z) || 0) * 0.035),
+    });
+  }
+  return out;
+}
+
+function estimatePatchShadowAmount(facePts, normal, ownerInstanceId, u0, u1, v0, v1, components, renderLights) {
+  var center = faceQuadPoint(facePts, (u0 + u1) * 0.5, (v0 + v1) * 0.5);
+  var patchPts = [
+    faceQuadPoint(facePts, u0, v0),
+    faceQuadPoint(facePts, u1, v0),
+    faceQuadPoint(facePts, u1, v1),
+    faceQuadPoint(facePts, u0, v1),
+  ];
+  var receiverFace = { pts: patchPts, normal: normal };
+  var samples = buildPatchReceiverSamples(facePts, u0, u1, v0, v1, normal);
+  var alpha = 0;
+  for (const light of renderLights) {
+    if (!faceReceivesLight(receiverFace, light, null)) continue;
+    if (light.type === 'area') {
+      var offsets = areaSampleOffsets(light);
+      var total = 0;
+      var hits = 0;
+      for (const o of offsets) {
+        var sampleLight = { x: light.x + o.x, y: light.y + o.y, z: light.z };
+        if (!faceReceivesLight(receiverFace, light, sampleLight)) continue;
+        for (const sp of samples) {
+          total += 1;
+          if (pointInShadowByOccupancyFiltered(sp, light, sampleLight, components, ownerInstanceId).hit) hits += 1;
+        }
+      }
+      if (total > 0 && hits > 0) alpha += shadowAlphaForLight(light, center) * (hits / total);
+      continue;
+    }
+    var hitCount = 0;
+    for (const sp of samples) {
+      if (pointInShadowByOccupancyFiltered(sp, light, null, components, ownerInstanceId).hit) hitCount += 1;
+    }
+    if (hitCount > 0) alpha += shadowAlphaForLight(light, center) * (hitCount / samples.length);
+  }
+  return clamp(alpha * 1.08, 0, 0.86);
+}
+
+function buildFaceShadowPatches(facePts, normal, ownerInstanceId = null) {
+  if (!lightState.showShadows || !isLightingSystemEnabled()) return [];
+  var renderLights = getShadowDebugRenderLights();
+  if (!renderLights || !renderLights.length) return [];
+  var components = buildShadowComponents();
+  if (!components || !components.length) return [];
+
+  var spec = faceShadowGridSpec(normal);
+  var patches = [];
+  for (var iu = 0; iu < spec.u; iu++) {
+    for (var iv = 0; iv < spec.v; iv++) {
+      var u0 = iu / spec.u, u1 = (iu + 1) / spec.u;
+      var v0 = iv / spec.v, v1 = (iv + 1) / spec.v;
+      if (spec.inset > 0) {
+        var du = (u1 - u0) * spec.inset;
+        var dv = (v1 - v0) * spec.inset;
+        u0 += du; u1 -= du; v0 += dv; v1 -= dv;
+      }
+      var alpha = estimatePatchShadowAmount(facePts, normal, ownerInstanceId, u0, u1, v0, v1, components, renderLights);
+      if (alpha <= 0.018) continue;
+      patches.push({
+        pts: [
+          faceQuadPoint(facePts, u0, v0),
+          faceQuadPoint(facePts, u1, v0),
+          faceQuadPoint(facePts, u1, v1),
+          faceQuadPoint(facePts, u0, v1),
+        ],
+        alpha: alpha,
+      });
+    }
+  }
+  return patches;
+}
+
+function drawLightShadows() {
+  if (!lightState.showShadows) return;
+  rebuildStaticShadowLayerIfNeeded();
+  if (staticShadowCanvas) ctx.drawImage(staticShadowCanvas, 0, 0, VIEW_W, VIEW_H);
+  drawPlayerShadow();
+}
+
+
+// --- v1.5 geometric shadow-volume receiver override ---
+function litFaceColor(baseRgb, facePts, normal, ownerInstanceId = null) {
+  var center = faceReceiverCenter(facePts);
+  return litColor(baseRgb, center, normal);
+}
+
+function shadowProjectionDirection(light, point, samplePoint = null) {
+  normalizeLight(light);
+  if (light.type === 'directional') return normalize3(lightForward(light));
+  var src = samplePoint || light;
+  return normalize3({ x: point.x - src.x, y: point.y - src.y, z: point.z - src.z });
+}
+
+function cross3Shadow(a, b) {
+  return {
+    x: a.y * b.z - a.z * b.y,
+    y: a.z * b.x - a.x * b.z,
+    z: a.x * b.y - a.y * b.x,
+  };
+}
+
+function almostSamePoint3(a, b, eps = 1e-4) {
+  return Math.abs(a.x - b.x) <= eps && Math.abs(a.y - b.y) <= eps && Math.abs(a.z - b.z) <= eps;
+}
+
+function orderPlanePolygon(points, planeNormal) {
+  if (!points || points.length < 3) return points || [];
+  var c = centroid3(points);
+  var ref = Math.abs(planeNormal.z || 0) < 0.9 ? { x: 0, y: 0, z: 1 } : { x: 1, y: 0, z: 0 };
+  var u = normalize3(cross3Shadow(ref, planeNormal));
+  if ((u.x*u.x + u.y*u.y + u.z*u.z) < 1e-8) u = normalize3(cross3Shadow({ x: 0, y: 1, z: 0 }, planeNormal));
+  var v = normalize3(cross3Shadow(planeNormal, u));
+  return points.slice().sort(function (a, b) {
+    var av = { x: a.x - c.x, y: a.y - c.y, z: a.z - c.z };
+    var bv = { x: b.x - c.x, y: b.y - c.y, z: b.z - c.z };
+    var aa = Math.atan2(dot3(av, v), dot3(av, u));
+    var ba = Math.atan2(dot3(bv, v), dot3(bv, u));
+    return aa - ba;
+  });
+}
+
+function segmentPlaneIntersection(a, b, planePoint, planeNormal, eps = 1e-6) {
+  var da = dot3(planeNormal, { x: a.x - planePoint.x, y: a.y - planePoint.y, z: a.z - planePoint.z });
+  var db = dot3(planeNormal, { x: b.x - planePoint.x, y: b.y - planePoint.y, z: b.z - planePoint.z });
+  if (Math.abs(da) <= eps && Math.abs(db) <= eps) return [a, b];
+  if (Math.abs(da) <= eps) return [a];
+  if (Math.abs(db) <= eps) return [b];
+  if (da * db > 0) return [];
+  var t = da / (da - db);
+  if (!isFinite(t) || t < -eps || t > 1 + eps) return [];
+  return [{
+    x: a.x + (b.x - a.x) * t,
+    y: a.y + (b.y - a.y) * t,
+    z: a.z + (b.z - a.z) * t,
+  }];
+}
+
+function boundsCorners3(bounds) {
+  return [
+    { x: bounds.minX, y: bounds.minY, z: bounds.minZ },
+    { x: bounds.maxX, y: bounds.minY, z: bounds.minZ },
+    { x: bounds.maxX, y: bounds.maxY, z: bounds.minZ },
+    { x: bounds.minX, y: bounds.maxY, z: bounds.minZ },
+    { x: bounds.minX, y: bounds.minY, z: bounds.maxZ },
+    { x: bounds.maxX, y: bounds.minY, z: bounds.maxZ },
+    { x: bounds.maxX, y: bounds.maxY, z: bounds.maxZ },
+    { x: bounds.minX, y: bounds.maxY, z: bounds.maxZ },
+  ];
+}
+
+function boundsEdgePairs3() {
+  return [
+    [0, 1], [1, 2], [2, 3], [3, 0],
+    [4, 5], [5, 6], [6, 7], [7, 4],
+    [0, 4], [1, 5], [2, 6], [3, 7],
+  ];
+}
+
+function shadowVolumeEdgePairs() {
+  return [
+    [0, 1], [1, 2], [2, 3], [3, 0],
+    [4, 5], [5, 6], [6, 7], [7, 4],
+    [0, 4], [1, 5], [2, 6], [3, 7],
+    [8, 9], [9, 10], [10, 11], [11, 8],
+    [12, 13], [13, 14], [14, 15], [15, 12],
+    [8, 12], [9, 13], [10, 14], [11, 15],
+    [0, 8], [1, 9], [2, 10], [3, 11],
+    [4, 12], [5, 13], [6, 14], [7, 15],
+  ];
+}
+
+function shadowExtrusionLength() {
+  return Math.max(settings.gridW || 0, settings.gridH || 0, 12) * 4 + 32;
+}
+
+function buildComponentShadowVolume(comp, light, samplePoint = null) {
+  if (!comp || !comp.bounds) return null;
+  var corners = boundsCorners3(comp.bounds);
+  var far = shadowExtrusionLength();
+  var extruded = corners.map(function (p) {
+    var d = shadowProjectionDirection(light, p, samplePoint);
+    return {
+      x: p.x + d.x * far,
+      y: p.y + d.y * far,
+      z: p.z + d.z * far,
+    };
+  });
+  return corners.concat(extruded);
+}
+
+function projectPointToPlaneAlongShadow(light, point, planePoint, planeNormal, samplePoint = null, eps = 1e-6) {
+  var d = shadowProjectionDirection(light, point, samplePoint);
+  var denom = dot3(planeNormal, d);
+  if (Math.abs(denom) <= eps) return null;
+  var t = dot3(planeNormal, {
+    x: planePoint.x - point.x,
+    y: planePoint.y - point.y,
+    z: planePoint.z - point.z,
+  }) / denom;
+  if (!isFinite(t)) return null;
+  if (light && light.type === 'directional') {
+    if (t < -eps) return null;
+  } else {
+    // For point lights, the receiver plane can lie either beyond the caster (t >= 0)
+    // or between the light and the caster (-1 <= t < 0). Reject only points behind the light.
+    if (t < -1 + eps) return null;
+  }
+  return {
+    x: point.x + d.x * t,
+    y: point.y + d.y * t,
+    z: point.z + d.z * t,
+  };
+}
+
+function convexHullPlanePoints(points2) {
+  if (!points2 || points2.length < 3) return points2 || [];
+  return convexHull2(points2.map(function (p) { return { x: p.x, y: p.y }; }));
+}
+
+function shadowCornerProjectionDebug(comp, planePoint, planeNormal, light, samplePoint = null) {
+  if (!comp || !comp.bounds) return null;
+  var basis = planeBasisFromNormal(planeNormal);
+  var corners = boundsCorners3(comp.bounds);
+  var rows = [];
+  for (var i = 0; i < corners.length; i++) {
+    var c = corners[i];
+    var d = shadowProjectionDirection(light, c, samplePoint);
+    var proj = projectPointToPlaneAlongShadow(light, c, planePoint, planeNormal, samplePoint);
+    rows.push({
+      index: i,
+      src: c,
+      dir: d,
+      proj: proj,
+      uv: proj ? projectPointToPlane2D(proj, planePoint, basis) : null,
+    });
+  }
+  return { basis: basis, rows: rows };
+}
+
+function shadowRowsText(rows) {
+  return (rows || []).map(function (r) {
+    return '#'+r.index+':src=' + fmt3Shadow(r.src) + ' dir=' + fmt3Shadow(r.dir) + ' proj=' + (r.proj ? fmt3Shadow(r.proj) : 'null') + ' uv=' + (r.uv ? fmt2Shadow(r.uv) : 'null');
+  }).join(' | ');
+}
+
+function projectComponentOntoPlanePolygon(comp, planePoint, planeNormal, light, samplePoint = null) {
+  if (!comp || !comp.bounds) return null;
+  var corners = boundsCorners3(comp.bounds);
+  var basis = planeBasisFromNormal(planeNormal);
+  var pts2 = [];
+  for (var i = 0; i < corners.length; i++) {
+    var proj = projectPointToPlaneAlongShadow(light, corners[i], planePoint, planeNormal, samplePoint);
+    if (!proj) continue;
+    var uv = projectPointToPlane2D(proj, planePoint, basis);
+    pts2.push(uv);
+  }
+  if (pts2.length < 3) return null;
+  var hull2 = convexHullPlanePoints(pts2);
+  if (!hull2 || hull2.length < 3) return null;
+  return hull2.map(function (p) { return unprojectPointFromPlane2D(p, planePoint, basis); });
+}
+
+
+function topBoundsCorners3(bounds) {
+  return [
+    { x: bounds.minX, y: bounds.minY, z: bounds.maxZ },
+    { x: bounds.maxX, y: bounds.minY, z: bounds.maxZ },
+    { x: bounds.maxX, y: bounds.maxY, z: bounds.maxZ },
+    { x: bounds.minX, y: bounds.maxY, z: bounds.maxZ },
+  ];
+}
+
+function projectComponentTopOntoSideShadowPolygon(comp, facePts, planeNormal, light, samplePoint = null) {
+  if (!comp || !comp.bounds || !facePts || facePts.length < 4) return null;
+  var planePoint = facePts[0];
+  var basis = planeBasisFromNormal(planeNormal);
+  var topCorners = topBoundsCorners3(comp.bounds);
+  var topPts2 = [];
+  for (var i = 0; i < topCorners.length; i++) {
+    var proj = projectPointToPlaneAlongShadow(light, topCorners[i], planePoint, planeNormal, samplePoint);
+    if (!proj) continue;
+    topPts2.push(projectPointToPlane2D(proj, planePoint, basis));
+  }
+  if (topPts2.length < 2) return null;
+  var hull2 = convexHullPlanePoints(topPts2);
+  if (!hull2 || hull2.length < 2) return null;
+  var minU = Infinity, maxU = -Infinity;
+  for (var j = 0; j < hull2.length; j++) {
+    minU = Math.min(minU, hull2[j].x);
+    maxU = Math.max(maxU, hull2[j].x);
+  }
+  if (!isFinite(minU) || !isFinite(maxU)) return null;
+  var fill2 = hull2.slice();
+  fill2.push({ x: maxU, y: -64 });
+  fill2.push({ x: minU, y: -64 });
+  var face2 = facePts.map(function (p) { return projectPointToPlane2D(p, planePoint, basis); });
+  var clipped2 = clipConvexPolygon2D(convexHullPlanePoints(fill2), face2);
+  if (!clipped2 || clipped2.length < 3) return null;
+  return clipped2.map(function (pt) { return unprojectPointFromPlane2D(pt, planePoint, basis); });
+}
+
+function intersectShadowVolumeWithPlane(comp, planePoint, planeNormal, light, samplePoint = null) {
+  return projectComponentOntoPlanePolygon(comp, planePoint, planeNormal, light, samplePoint);
+}
+
+function centroid3(points) {
+  var n = Math.max(1, (points && points.length) || 0);
+  var x = 0, y = 0, z = 0;
+  for (const p of (points || [])) { x += p.x; y += p.y; z += p.z; }
+  return { x: x / n, y: y / n, z: z / n };
+}
+
+function polyBounds3(points) {
+  var minX = Infinity, minY = Infinity, minZ = Infinity;
+  var maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+  for (const p of (points || [])) {
+    minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); minZ = Math.min(minZ, p.z);
+    maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); maxZ = Math.max(maxZ, p.z);
+  }
+  return { minX, minY, minZ, maxX, maxY, maxZ };
+}
+
+function boundsOverlap3(a, b, pad = 0.0) {
+  if (!a || !b) return true;
+  return !(a.maxX < b.minX - pad || a.minX > b.maxX + pad || a.maxY < b.minY - pad || a.minY > b.maxY + pad || a.maxZ < b.minZ - pad || a.minZ > b.maxZ + pad);
+}
+
+function planeBasisFromNormal(planeNormal) {
+  var n = normalize3(planeNormal);
+  var ref = Math.abs(n.z || 0) < 0.9 ? { x: 0, y: 0, z: 1 } : { x: 1, y: 0, z: 0 };
+  var u = normalize3(cross3Shadow(ref, n));
+  if ((u.x*u.x + u.y*u.y + u.z*u.z) < 1e-8) u = normalize3(cross3Shadow({ x: 0, y: 1, z: 0 }, n));
+  var v = normalize3(cross3Shadow(n, u));
+  return { u: u, v: v, n: n };
+}
+
+function projectPointToPlane2D(point, origin, basis) {
+  var d = { x: point.x - origin.x, y: point.y - origin.y, z: point.z - origin.z };
+  return { x: dot3(d, basis.u), y: dot3(d, basis.v) };
+}
+
+function unprojectPointFromPlane2D(pt, origin, basis) {
+  return {
+    x: origin.x + basis.u.x * pt.x + basis.v.x * pt.y,
+    y: origin.y + basis.u.y * pt.x + basis.v.y * pt.y,
+    z: origin.z + basis.u.z * pt.x + basis.v.z * pt.y,
+  };
+}
+
+function signedArea2(points) {
+  var area = 0;
+  for (var i = 0; i < points.length; i++) {
+    var a = points[i];
+    var b = points[(i + 1) % points.length];
+    area += a.x * b.y - a.y * b.x;
+  }
+  return area * 0.5;
+}
+
+function clipLineIntersection2(s, e, a, b) {
+  var se = { x: e.x - s.x, y: e.y - s.y };
+  var ab = { x: b.x - a.x, y: b.y - a.y };
+  var denom = se.x * ab.y - se.y * ab.x;
+  if (Math.abs(denom) < 1e-8) return { x: (s.x + e.x) * 0.5, y: (s.y + e.y) * 0.5 };
+  var asv = { x: a.x - s.x, y: a.y - s.y };
+  var t = (asv.x * ab.y - asv.y * ab.x) / denom;
+  return { x: s.x + se.x * t, y: s.y + se.y * t };
+}
+
+function clipConvexPolygon2D(subject, clipper) {
+  if (!subject || subject.length < 3 || !clipper || clipper.length < 3) return [];
+  var clip = clipper.slice();
+  if (signedArea2(clip) < 0) clip.reverse();
+  var output = subject.slice();
+  for (var i = 0; i < clip.length; i++) {
+    var a = clip[i];
+    var b = clip[(i + 1) % clip.length];
+    var input = output.slice();
+    output = [];
+    if (!input.length) break;
+    var prev = input[input.length - 1];
+    var prevInside = ((b.x - a.x) * (prev.y - a.y) - (b.y - a.y) * (prev.x - a.x)) >= -1e-7;
+    for (var j = 0; j < input.length; j++) {
+      var cur = input[j];
+      var curInside = ((b.x - a.x) * (cur.y - a.y) - (b.y - a.y) * (cur.x - a.x)) >= -1e-7;
+      if (curInside) {
+        if (!prevInside) output.push(clipLineIntersection2(prev, cur, a, b));
+        output.push(cur);
+      } else if (prevInside) {
+        output.push(clipLineIntersection2(prev, cur, a, b));
+      }
+      prev = cur;
+      prevInside = curInside;
+    }
+  }
+  return output;
+}
+
+function clipWorldPolyToFacePlane(poly3, facePts, planeNormal) {
+  if (!poly3 || poly3.length < 3 || !facePts || facePts.length < 3) return null;
+  var origin = facePts[0];
+  var basis = planeBasisFromNormal(planeNormal);
+  var subj2 = poly3.map(function (p) { return projectPointToPlane2D(p, origin, basis); });
+  var clip2 = facePts.map(function (p) { return projectPointToPlane2D(p, origin, basis); });
+  var clipped2 = clipConvexPolygon2D(subj2, clip2);
+  if (!clipped2 || clipped2.length < 3) return null;
+  return clipped2.map(function (p) { return unprojectPointFromPlane2D(p, origin, basis); });
+}
+
+
+function shadowDebugSign(v, eps = 1e-5) {
+  if (v > eps) return '+';
+  if (v < -eps) return '-';
+  return '0';
+}
+
+function pointWithinReceiverFace(hitPoint, face, eps = 1e-4) {
+  if (!hitPoint || !face || !face.pts || !face.pts.length) return false;
+  var b = polyBounds3(face.pts);
+  if (face.kind === 'top') {
+    return hitPoint.x >= b.minX - eps && hitPoint.x <= b.maxX + eps
+      && hitPoint.y >= b.minY - eps && hitPoint.y <= b.maxY + eps
+      && Math.abs(hitPoint.z - face.pts[0].z) <= eps * 4;
+  }
+  if (face.kind === 'east') {
+    return hitPoint.y >= b.minY - eps && hitPoint.y <= b.maxY + eps
+      && hitPoint.z >= b.minZ - eps && hitPoint.z <= b.maxZ + eps
+      && Math.abs(hitPoint.x - face.pts[0].x) <= eps * 4;
+  }
+  if (face.kind === 'south') {
+    return hitPoint.x >= b.minX - eps && hitPoint.x <= b.maxX + eps
+      && hitPoint.z >= b.minZ - eps && hitPoint.z <= b.maxZ + eps
+      && Math.abs(hitPoint.y - face.pts[0].y) <= eps * 4;
+  }
+  return false;
+}
+
+function buildInstanceVoxelOccupancy(instanceId) {
+  var targetBoxes = boxes.filter(function (b) { return String(b.instanceId || '') === String(instanceId || ''); });
+  if (!targetBoxes.length) return { boxes: [], occupancy: new Map() };
+  var occupancy = new Map();
+  for (const box of targetBoxes) {
+    var x0 = Math.round(box.x), x1 = Math.round(box.x + box.w);
+    var y0 = Math.round(box.y), y1 = Math.round(box.y + box.d);
+    var z0 = Math.round(box.z), z1 = Math.round(box.z + box.h);
+    for (let x = x0; x < x1; x++) {
+      for (let y = y0; y < y1; y++) {
+        for (let z = z0; z < z1; z++) {
+          occupancy.set(shadowVoxelKey(x, y, z), { x:x, y:y, z:z, boxId: box.id });
+        }
+      }
+    }
+  }
+  return { boxes: targetBoxes, occupancy: occupancy };
+}
+
+function collectInstanceTopProjectionVertices(instanceId) {
+  var built = buildInstanceVoxelOccupancy(instanceId);
+  var occupancy = built.occupancy;
+  var vertexMap = new Map();
+  function addVertex(pt, reason) {
+    var key = [pt.x, pt.y, pt.z].join('|');
+    if (!vertexMap.has(key)) vertexMap.set(key, { point: pt, reasons: new Set() });
+    vertexMap.get(key).reasons.add(reason);
+  }
+  for (const cell of occupancy.values()) {
+    if (occupancy.has(shadowVoxelKey(cell.x, cell.y, cell.z + 1))) continue;
+    addVertex({ x: cell.x, y: cell.y, z: cell.z + 1 }, 'top');
+    addVertex({ x: cell.x + 1, y: cell.y, z: cell.z + 1 }, 'top');
+    addVertex({ x: cell.x + 1, y: cell.y + 1, z: cell.z + 1 }, 'top');
+    addVertex({ x: cell.x, y: cell.y + 1, z: cell.z + 1 }, 'top');
+  }
+  var vertices = Array.from(vertexMap.values()).map(function (entry, idx) {
+    return { index: idx, point: entry.point, reasons: Array.from(entry.reasons.values()).sort() };
+  });
+  vertices.sort(function (a, b) {
+    if (a.point.z !== b.point.z) return b.point.z - a.point.z;
+    if (a.point.y !== b.point.y) return a.point.y - b.point.y;
+    return a.point.x - b.point.x;
+  });
+  vertices.forEach(function (v, i) { v.index = i; });
+  return { boxes: built.boxes, occupancy: occupancy, vertices: vertices };
+}
+
+function collectMergedReceiverFacesForDebug(skipOwnerInstanceId = null) {
+  var facesByOwner = buildMergedReceiverFaces();
+  var out = [];
+  for (const [ownerKey, entry] of facesByOwner.entries()) {
+    if (skipOwnerInstanceId != null && String(ownerKey) === String(skipOwnerInstanceId)) continue;
+    if (!entry || !entry.byKey) continue;
+    for (const [planeKey, face] of entry.byKey.entries()) {
+      out.push({
+        ownerKey: ownerKey,
+        planeKey: planeKey,
+        kind: face.kind,
+        pts: face.pts,
+        normal: face.normal,
+        patchId: face.patchId || 0,
+        bounds: face.bounds || null,
+      });
+    }
+  }
+  return out;
+}
+
+function shadowRayHitOnReceiverFace(light, point, receiverFace, samplePoint = null, eps = 1e-6) {
+  if (!light || !point || !receiverFace || !receiverFace.pts || !receiverFace.pts.length) return null;
+  var d = shadowProjectionDirection(light, point, samplePoint);
+  var planePoint = receiverFace.pts[0];
+  var planeNormal = receiverFace.normal;
+  var denom = dot3(planeNormal, d);
+  if (Math.abs(denom) <= eps) return null;
+  var t = dot3(planeNormal, {
+    x: planePoint.x - point.x,
+    y: planePoint.y - point.y,
+    z: planePoint.z - point.z,
+  }) / denom;
+  if (!isFinite(t) || t <= eps) return null;
+  var hitPoint = {
+    x: point.x + d.x * t,
+    y: point.y + d.y * t,
+    z: point.z + d.z * t,
+  };
+  if (!pointWithinReceiverFace(hitPoint, receiverFace, 1e-4)) return null;
+  return {
+    point: hitPoint,
+    t: t,
+    dir: d,
+    denom: denom,
+    receiverKind: receiverFace.kind,
+    receiverOwnerKey: receiverFace.ownerKey,
+    planeKey: receiverFace.planeKey,
+    patchId: receiverFace.patchId || 0,
+    dirSign: { x: shadowDebugSign(d.x), y: shadowDebugSign(d.y), z: shadowDebugSign(d.z) },
+  };
+}
+
+function collectInstanceShadowProjectionDebug(instanceId, light) {
+  if (!instanceId || !light) return null;
+  var built = collectInstanceTopProjectionVertices(instanceId);
+  if (!built.vertices.length) return null;
+  var receiverFaces = collectMergedReceiverFacesForDebug(instanceId);
+  var rays = [];
+  var faceUse = new Map();
+  for (const vertex of built.vertices) {
+    var best = null;
+    for (const face of receiverFaces) {
+      var hit = shadowRayHitOnReceiverFace(light, vertex.point, face, null);
+      if (!hit) continue;
+      if (!best || hit.t < best.t) best = Object.assign({}, hit);
+    }
+    var dir = shadowProjectionDirection(light, vertex.point, null);
+    var missFar = {
+      x: vertex.point.x + dir.x * 3.0,
+      y: vertex.point.y + dir.y * 3.0,
+      z: vertex.point.z + dir.z * 3.0,
+    };
+    var row = {
+      index: vertex.index,
+      src: vertex.point,
+      reasons: vertex.reasons,
+      dir: dir,
+      bestHit: best,
+      missFar: missFar,
+    };
+    rays.push(row);
+    if (best) {
+      var fk = String(best.receiverOwnerKey) + '|' + String(best.planeKey);
+      if (!faceUse.has(fk)) {
+        var foundFace = receiverFaces.find(function (f) { return String(f.ownerKey) === String(best.receiverOwnerKey) && String(f.planeKey) === String(best.planeKey); });
+        if (foundFace) {
+          faceUse.set(fk, {
+            ownerKey: best.receiverOwnerKey,
+            planeKey: best.planeKey,
+            kind: best.receiverKind,
+            pts: foundFace.pts,
+          });
+        }
+      }
+    }
+  }
+  var bounds = null;
+  if (built.boxes && built.boxes.length) {
+    bounds = {
+      minX: Math.min.apply(null, built.boxes.map(function (b) { return b.x; })),
+      minY: Math.min.apply(null, built.boxes.map(function (b) { return b.y; })),
+      minZ: Math.min.apply(null, built.boxes.map(function (b) { return b.z; })),
+      maxX: Math.max.apply(null, built.boxes.map(function (b) { return b.x + b.w; })),
+      maxY: Math.max.apply(null, built.boxes.map(function (b) { return b.y + b.d; })),
+      maxZ: Math.max.apply(null, built.boxes.map(function (b) { return b.z + b.h; })),
+    };
+  }
+  var lightDir = shadowProjectionDirection(light, bounds ? { x:(bounds.minX+bounds.maxX)*0.5, y:(bounds.minY+bounds.maxY)*0.5, z:bounds.maxZ } : built.vertices[0].point, null);
+  return {
+    instanceId: instanceId,
+    rays: rays,
+    hitFaces: Array.from(faceUse.values()),
+    bounds: bounds,
+    lightDir: lightDir,
+    lightDirSign: { x: shadowDebugSign(lightDir.x), y: shadowDebugSign(lightDir.y), z: shadowDebugSign(lightDir.z) },
+  };
+}
+
+function inferReceiverKind(normal) {
+  if (!normal) return 'unknown';
+  if (Math.abs(normal.z || 0) > 0.8) return 'top';
+  if ((normal.x || 0) > 0.8) return 'east';
+  if ((normal.y || 0) > 0.8) return 'south';
+  if ((normal.x || 0) < -0.8) return 'west';
+  if ((normal.y || 0) < -0.8) return 'north';
+  return 'slanted';
+}
+
+function fmt3Shadow(p) {
+  return '(' + Number(p.x || 0).toFixed(2) + ',' + Number(p.y || 0).toFixed(2) + ',' + Number(p.z || 0).toFixed(2) + ')';
+}
+
+function fmt2Shadow(p) {
+  return '(' + Number(p.x || 0).toFixed(3) + ',' + Number(p.y || 0).toFixed(3) + ')';
+}
+
+function boundsText2Shadow(points2) {
+  if (!points2 || !points2.length) return '[empty]';
+  var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (var i = 0; i < points2.length; i++) {
+    var p = points2[i];
+    minX = Math.min(minX, p.x);
+    minY = Math.min(minY, p.y);
+    maxX = Math.max(maxX, p.x);
+    maxY = Math.max(maxY, p.y);
+  }
+  return '[' + minX.toFixed(3) + '..' + maxX.toFixed(3) + ']×[' + minY.toFixed(3) + '..' + maxY.toFixed(3) + ']';
+}
+
+function samplePointsText2Shadow(points2, limit) {
+  if (!points2 || !points2.length) return '[]';
+  limit = Math.max(1, limit || 6);
+  return '[' + points2.slice(0, limit).map(fmt2Shadow).join(' ') + (points2.length > limit ? ' …' : '') + ']';
+}
+
+function samplePointsText3Shadow(points3, limit) {
+  if (!points3 || !points3.length) return '[]';
+  limit = Math.max(1, limit || 6);
+  return '[' + points3.slice(0, limit).map(fmt3Shadow).join(' ') + (points3.length > limit ? ' …' : '') + ']';
+}
+
+function boundsText3Shadow(b) {
+  return '[' + Number(b.minX).toFixed(2) + '..' + Number(b.maxX).toFixed(2) + ']×[' + Number(b.minY).toFixed(2) + '..' + Number(b.maxY).toFixed(2) + ']×[' + Number(b.minZ).toFixed(2) + '..' + Number(b.maxZ).toFixed(2) + ']';
+}
+
+function faceLocalCoverage(poly3, facePts) {
+  if (!poly3 || poly3.length < 3 || !facePts || facePts.length < 4) return null;
+  var o = facePts[0];
+  var u = { x: facePts[1].x - o.x, y: facePts[1].y - o.y, z: facePts[1].z - o.z };
+  var v = { x: facePts[3].x - o.x, y: facePts[3].y - o.y, z: facePts[3].z - o.z };
+  var uLen2 = Math.max(1e-8, dot3(u, u));
+  var vLen2 = Math.max(1e-8, dot3(v, v));
+  var minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
+  for (var i = 0; i < poly3.length; i++) {
+    var d = { x: poly3[i].x - o.x, y: poly3[i].y - o.y, z: poly3[i].z - o.z };
+    var uu = dot3(d, u) / uLen2;
+    var vv = dot3(d, v) / vLen2;
+    minU = Math.min(minU, uu); maxU = Math.max(maxU, uu);
+    minV = Math.min(minV, vv); maxV = Math.max(maxV, vv);
+  }
+  return {
+    minU: minU, maxU: maxU, minV: minV, maxV: maxV,
+    touchLeft: minU <= 0.03,
+    touchRight: maxU >= 0.97,
+    touchBottom: minV <= 0.03,
+    touchTop: maxV >= 0.97,
+  };
+}
+
+function logShadowReceiverDecision(info) {
+  if (typeof shadowDebugLog !== 'function') return;
+  var msg = [
+    'recv=' + info.receiverKind,
+    'owner=' + String(info.owner || 'none'),
+    'light=' + String(info.lightName || 'light'),
+    'comp=' + String(info.compTag || 'comp'),
+    'alpha=' + Number(info.alpha || 0).toFixed(3),
+    'planePt=' + fmt3Shadow(info.planePoint || {x:0,y:0,z:0}),
+    'compBounds=' + boundsText3Shadow(info.compBounds || {minX:0,maxX:0,minY:0,maxY:0,minZ:0,maxZ:0}),
+    'polyBounds=' + boundsText3Shadow(info.polyBounds || {minX:0,maxX:0,minY:0,maxY:0,minZ:0,maxZ:0}),
+  ];
+  if (info.cover) {
+    msg.push('u=' + info.cover.minU.toFixed(2) + '..' + info.cover.maxU.toFixed(2));
+    msg.push('v=' + info.cover.minV.toFixed(2) + '..' + info.cover.maxV.toFixed(2));
+    msg.push('touch=' + [info.cover.touchLeft?'L':'', info.cover.touchRight?'R':'', info.cover.touchBottom?'B':'', info.cover.touchTop?'T':''].join(''));
+  }
+  shadowDebugLog(msg.join(' '));
+}
+
+
+function lerp3Shadow(a, b, t) {
+  return {
+    x: a.x + (b.x - a.x) * t,
+    y: a.y + (b.y - a.y) * t,
+    z: a.z + (b.z - a.z) * t,
+  };
+}
+
+function receiverBoundsForShadow(ownerInstanceId, facePts) {
+  if (ownerInstanceId != null) {
+    var instBoxes = boxes.filter(function (b) { return b.instanceId === ownerInstanceId; });
+    if (instBoxes.length) {
+      var minX = Infinity, minY = Infinity, minZ = Infinity;
+      var maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+      for (var i = 0; i < instBoxes.length; i++) {
+        var b = instBoxes[i];
+        minX = Math.min(minX, b.x);
+        minY = Math.min(minY, b.y);
+        minZ = Math.min(minZ, b.z);
+        maxX = Math.max(maxX, b.x + b.w);
+        maxY = Math.max(maxY, b.y + b.d);
+        maxZ = Math.max(maxZ, b.z + b.h);
+      }
+      return { minX:minX, minY:minY, minZ:minZ, maxX:maxX, maxY:maxY, maxZ:maxZ };
+    }
+  }
+  return polyBounds3(facePts);
+}
+
+function shadowGroundDirectionForLight(light, refPoint) {
+  var d = shadowProjectionDirection(light, refPoint);
+  var lenXY = Math.hypot(d.x || 0, d.y || 0);
+  if (lenXY < 1e-6 || Math.abs(d.z || 0) < 1e-6) return null;
+  return {
+    d: d,
+    g: { x: d.x / lenXY, y: d.y / lenXY },
+    slope: Math.abs(d.z) / lenXY,
+  };
+}
+
+function footprintCorners2FromBounds(bounds) {
+  return [
+    { x: bounds.minX, y: bounds.minY },
+    { x: bounds.maxX, y: bounds.minY },
+    { x: bounds.maxX, y: bounds.maxY },
+    { x: bounds.minX, y: bounds.maxY },
+  ];
+}
+
+function scalarRange2(points, axis) {
+  var min = Infinity, max = -Infinity;
+  for (var i = 0; i < points.length; i++) {
+    var s = points[i].x * axis.x + points[i].y * axis.y;
+    if (s < min) min = s;
+    if (s > max) max = s;
+  }
+  return { min:min, max:max };
+}
+
+function clipPolyByHalfPlane2D(points, axis, threshold) {
+  if (!points || points.length < 3) return [];
+  function inside(p) { return p.x * axis.x + p.y * axis.y <= threshold + 1e-7; }
+  function intersect(a, b) {
+    var av = a.x * axis.x + a.y * axis.y;
+    var bv = b.x * axis.x + b.y * axis.y;
+    var denom = (bv - av);
+    var t = Math.abs(denom) < 1e-8 ? 0.5 : (threshold - av) / denom;
+    t = clamp(t, 0, 1);
+    return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+  }
+  var output = [];
+  var prev = points[points.length - 1];
+  var prevInside = inside(prev);
+  for (var i = 0; i < points.length; i++) {
+    var cur = points[i];
+    var curInside = inside(cur);
+    if (curInside) {
+      if (!prevInside) output.push(intersect(prev, cur));
+      output.push(cur);
+    } else if (prevInside) {
+      output.push(intersect(prev, cur));
+    }
+    prev = cur;
+    prevInside = curInside;
+  }
+  return output;
+}
+
+function buildSideCoveragePoly(facePts, frac) {
+  var t = clamp(frac, 0, 1);
+  if (t <= 1e-4) return null;
+  if (t >= 0.9999) return facePts.slice();
+  var p0 = facePts[0], p1 = facePts[1], p2 = facePts[2], p3 = facePts[3];
+  return [ p0, p1, lerp3Shadow(p1, p2, t), lerp3Shadow(p0, p3, t) ];
+}
+
+function buildTopCoveragePoly(facePts, axis, threshold) {
+  var pts2 = facePts.map(function (p) { return { x: p.x, y: p.y }; });
+  var clipped2 = clipPolyByHalfPlane2D(pts2, axis, threshold);
+  if (!clipped2 || clipped2.length < 3) return null;
+  var z = facePts[0].z;
+  return clipped2.map(function (p) { return { x: p.x, y: p.y, z: z }; });
+}
+
+function collectGroundShadowAdvance(comp, light, receiverBounds, advanceAxis, lateralAxis) {
+  var groundPoly = projectComponentOntoPlanePolygon(comp, { x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }, light, null);
+  if (!groundPoly || groundPoly.length < 3) return null;
+  var ground2 = groundPoly.map(function (p) { return { x: p.x, y: p.y }; });
+  var footprint2 = footprintCorners2FromBounds(receiverBounds);
+  var groundTravelRange = scalarRange2(ground2, advanceAxis);
+  var footprintTravelRange = scalarRange2(footprint2, advanceAxis);
+  var groundLateralRange = scalarRange2(ground2, lateralAxis);
+  var footprintLateralRange = scalarRange2(footprint2, lateralAxis);
+  if (groundLateralRange.max < footprintLateralRange.min - 1e-4 || groundLateralRange.min > footprintLateralRange.max + 1e-4) {
+    return null;
+  }
+  var advance = groundTravelRange.max - footprintTravelRange.min;
+  return {
+    groundPoly: groundPoly,
+    advance: advance,
+    front: footprintTravelRange.min,
+    back: footprintTravelRange.max,
+    groundMin: groundTravelRange.min,
+    groundMax: groundTravelRange.max,
+    footDepth: footprintTravelRange.max - footprintTravelRange.min,
+  };
+}
+
+
+
+
+function clipGroundPolyToFootprint2D(groundPoly3, bounds) {
+  if (!groundPoly3 || groundPoly3.length < 3 || !bounds) return null;
+  var subj2 = groundPoly3.map(function (p) { return { x: p.x, y: p.y }; });
+  var clip2 = footprintCorners2FromBounds(bounds);
+  var clipped2 = clipConvexPolygon2D(subj2, clip2);
+  return clipped2 && clipped2.length >= 3 ? clipped2 : null;
+}
+
+function boundsFromPoints2(points) {
+  if (!points || !points.length) return null;
+  var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (var i = 0; i < points.length; i++) {
+    var p = points[i];
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  }
+  return { minX:minX, minY:minY, maxX:maxX, maxY:maxY };
+}
+
+function getReceiverStackProfile(bounds) {
+  if (!bounds) {
+    return { baseZ: 0, totalHeight: 0, sliceStart: 0, sliceHeight: 0 };
+  }
+  var zMin = Math.round(bounds.minZ || 0);
+  var zMax = Math.round(bounds.maxZ || 0);
+  var sliceHeight = Math.max(0, zMax - zMin);
+  if (zMin <= 0 || sliceHeight <= 0) {
+    return { baseZ: zMin <= 0 ? 0 : zMin, totalHeight: sliceHeight, sliceStart: 0, sliceHeight: sliceHeight };
+  }
+  if (!shadowGeomCache || !shadowGeomCache.occupancy || !shadowGeomCache.occupancy.size) buildShadowComponents();
+  var occ = shadowGeomCache && shadowGeomCache.occupancy ? shadowGeomCache.occupancy : null;
+  if (!occ || !occ.size) {
+    return { baseZ: zMin, totalHeight: sliceHeight, sliceStart: 0, sliceHeight: sliceHeight };
+  }
+  var x0 = Math.round(bounds.minX), x1 = Math.round(bounds.maxX);
+  var y0 = Math.round(bounds.minY), y1 = Math.round(bounds.maxY);
+  var commonBaseZ = 0;
+  var hasColumn = false;
+  for (var x = x0; x < x1; x++) {
+    for (var y = y0; y < y1; y++) {
+      hasColumn = true;
+      var z = zMin - 1;
+      while (z >= 0 && occ.has(shadowVoxelKey(x, y, z))) z--;
+      var colBaseZ = z + 1;
+      if (colBaseZ > commonBaseZ) commonBaseZ = colBaseZ;
+    }
+  }
+  if (!hasColumn) commonBaseZ = zMin;
+  commonBaseZ = clamp(commonBaseZ, 0, zMin);
+  return {
+    baseZ: commonBaseZ,
+    totalHeight: Math.max(0, zMax - commonBaseZ),
+    sliceStart: Math.max(0, zMin - commonBaseZ),
+    sliceHeight: sliceHeight,
+  };
+}
+
+
+function faceBoundsMatchEdge(a, b, edge, eps) {
+  eps = eps == null ? 1e-4 : eps;
+  if (edge === 'minX') return Math.abs((a.minX || 0) - (b.minX || 0)) <= eps;
+  if (edge === 'maxX') return Math.abs((a.maxX || 0) - (b.maxX || 0)) <= eps;
+  if (edge === 'minY') return Math.abs((a.minY || 0) - (b.minY || 0)) <= eps;
+  if (edge === 'maxY') return Math.abs((a.maxY || 0) - (b.maxY || 0)) <= eps;
+  if (edge === 'minZ') return Math.abs((a.minZ || 0) - (b.minZ || 0)) <= eps;
+  if (edge === 'maxZ') return Math.abs((a.maxZ || 0) - (b.maxZ || 0)) <= eps;
+  return false;
+}
+
+function isMergedReceiverAnchorCell(receiverKind, cellFacePts, mergedFacePts) {
+  if (!cellFacePts || !mergedFacePts || cellFacePts.length < 3 || mergedFacePts.length < 3) return true;
+  var cb = polyBounds3(cellFacePts);
+  var mb = polyBounds3(mergedFacePts);
+  if (receiverKind === 'top') {
+    return faceBoundsMatchEdge(cb, mb, 'maxY') && faceBoundsMatchEdge(cb, mb, 'maxX');
+  }
+  if (receiverKind === 'east') {
+    return faceBoundsMatchEdge(cb, mb, 'maxZ') && faceBoundsMatchEdge(cb, mb, 'maxY');
+  }
+  if (receiverKind === 'south') {
+    return faceBoundsMatchEdge(cb, mb, 'maxZ') && faceBoundsMatchEdge(cb, mb, 'maxX');
+  }
+  return true;
+}
+
+function maybeShadowDebugChain(kind, ownerInstanceId, light, comp, stage, extra) {
+  if (!shadowDebugDetailed) return;
+  var prefix = 'chain kind=' + String(kind || 'unknown')
+    + ' owner=' + String(ownerInstanceId || 'none')
+    + ' light=' + String((light && (light.name || light.id)) || 'light')
+    + ' comp=' + String((comp && comp.debugTag) || 'none')
+    + ' stage=' + String(stage || 'step');
+  shadowDebugLog(prefix + (extra ? ' ' + extra : ''));
+}
+function buildSouthSidePolyFromGroundOverlap(overlap2, bounds, ownerInstanceId, light, comp) {
+  if (!overlap2 || overlap2.length < 3 || !bounds) { maybeShadowDebugChain('south', ownerInstanceId, light, comp, 'south-null-input', 'overlap=' + String((overlap2 && overlap2.length) || 0) + ' bounds=' + boundsText3Shadow(bounds)); return null; }
+  var b = boundsFromPoints2(overlap2);
+  var D = Math.max(1e-6, bounds.maxY - bounds.minY);
+  var H = Math.max(1e-6, bounds.maxZ - bounds.minZ);
+  var stack = getReceiverStackProfile(bounds);
+  var stackedH = Math.max(H, stack.totalHeight || H);
+  var sliceStart = Math.max(0, stack.sliceStart || 0);
+  var smax = clamp(bounds.maxY - b.minY, 0, D);
+  var total = stackedH + D;
+  var L = (smax / D) * total;
+  var sideReach = clamp(Math.min(stackedH, L), 0, stackedH);
+  var sideH = clamp(sideReach - sliceStart, 0, H);
+  maybeShadowDebugChain('south', ownerInstanceId, light, comp, 'south-build', 'overlap=' + boundsText2Shadow(overlap2) + ' cover=' + JSON.stringify({x0:b.minX,x1:b.maxX,depth:smax,D:D,H:H,stackBaseZ:stack.baseZ,stackedH:stackedH,sliceStart:sliceStart,L:L,sideH:sideH}));
+  if (sideH <= 1e-4) return null;
+  return {
+    poly: [
+      { x: b.minX, y: bounds.maxY, z: bounds.minZ },
+      { x: b.maxX, y: bounds.maxY, z: bounds.minZ },
+      { x: b.maxX, y: bounds.maxY, z: bounds.minZ + sideH },
+      { x: b.minX, y: bounds.maxY, z: bounds.minZ + sideH },
+    ],
+    sideH: sideH,
+    topAdvance: clamp(L - stackedH, 0, D),
+    cover: { x0:b.minX, x1:b.maxX, depth:smax, D:D, H:H, L:L, stackBaseZ:stack.baseZ, stackedH:stackedH }
+  };
+}
+
+function buildEastSidePolyFromGroundOverlap(overlap2, bounds, ownerInstanceId, light, comp) {
+  if (!overlap2 || overlap2.length < 3 || !bounds) { maybeShadowDebugChain('east', ownerInstanceId, light, comp, 'east-null-input', 'overlap=' + String((overlap2 && overlap2.length) || 0) + ' bounds=' + boundsText3Shadow(bounds)); return null; }
+  var b = boundsFromPoints2(overlap2);
+  var D = Math.max(1e-6, bounds.maxX - bounds.minX);
+  var H = Math.max(1e-6, bounds.maxZ - bounds.minZ);
+  var stack = getReceiverStackProfile(bounds);
+  var stackedH = Math.max(H, stack.totalHeight || H);
+  var sliceStart = Math.max(0, stack.sliceStart || 0);
+  var smax = clamp(bounds.maxX - b.minX, 0, D);
+  var total = stackedH + D;
+  var L = (smax / D) * total;
+  var sideReach = clamp(Math.min(stackedH, L), 0, stackedH);
+  var sideH = clamp(sideReach - sliceStart, 0, H);
+  maybeShadowDebugChain('east', ownerInstanceId, light, comp, 'east-build', 'overlap=' + boundsText2Shadow(overlap2) + ' cover=' + JSON.stringify({y0:b.minY,y1:b.maxY,depth:smax,D:D,H:H,stackBaseZ:stack.baseZ,stackedH:stackedH,sliceStart:sliceStart,L:L,sideH:sideH}));
+  if (sideH <= 1e-4) return null;
+  return {
+    poly: [
+      { x: bounds.maxX, y: b.minY, z: bounds.minZ },
+      { x: bounds.maxX, y: b.maxY, z: bounds.minZ },
+      { x: bounds.maxX, y: b.maxY, z: bounds.minZ + sideH },
+      { x: bounds.maxX, y: b.minY, z: bounds.minZ + sideH },
+    ],
+    sideH: sideH,
+    topAdvance: clamp(L - stackedH, 0, D),
+    cover: { y0:b.minY, y1:b.maxY, depth:smax, D:D, H:H, L:L, stackBaseZ:stack.baseZ, stackedH:stackedH }
+  };
+}
+
+function buildTopPolyFromSouthChain(overlap2, bounds, ownerInstanceId, light, comp) {
+  if (!overlap2 || overlap2.length < 3 || !bounds) { maybeShadowDebugChain('top', ownerInstanceId, light, comp, 'top-south-null-input', 'overlap=' + String((overlap2 && overlap2.length) || 0) + ' bounds=' + boundsText3Shadow(bounds)); return null; }
+  var b = boundsFromPoints2(overlap2);
+  var D = Math.max(1e-6, bounds.maxY - bounds.minY);
+  var H = Math.max(1e-6, bounds.maxZ - bounds.minZ);
+  var stack = getReceiverStackProfile(bounds);
+  var stackedH = Math.max(H, stack.totalHeight || H);
+  var smax = clamp(bounds.maxY - b.minY, 0, D);
+  var total = stackedH + D;
+  var L = (smax / D) * total;
+  var topAdvance = clamp(L - stackedH, 0, D);
+  var thresholdY = bounds.maxY - topAdvance;
+  maybeShadowDebugChain('top', ownerInstanceId, light, comp, 'top-south-build', 'overlap=' + boundsText2Shadow(overlap2) + ' cover=' + JSON.stringify({x0:b.minX,x1:b.maxX,depth:smax,D:D,H:H,stackBaseZ:stack.baseZ,stackedH:stackedH,L:L,topAdvance:topAdvance,thresholdY:thresholdY}));
+  if (topAdvance <= 1e-4) return null;
+  var clipped2 = clipPolyByHalfPlane2D(overlap2, { x: 0, y: -1 }, -thresholdY);
+  if (!clipped2 || clipped2.length < 3) return null;
+  return {
+    poly: clipped2.map(function (pt) { return { x: pt.x, y: pt.y, z: bounds.maxZ }; }),
+    topAdvance: topAdvance
+  };
+}
+
+function buildTopPolyFromEastChain(overlap2, bounds, ownerInstanceId, light, comp) {
+  if (!overlap2 || overlap2.length < 3 || !bounds) { maybeShadowDebugChain('top', ownerInstanceId, light, comp, 'top-east-null-input', 'overlap=' + String((overlap2 && overlap2.length) || 0) + ' bounds=' + boundsText3Shadow(bounds)); return null; }
+  var b = boundsFromPoints2(overlap2);
+  var D = Math.max(1e-6, bounds.maxX - bounds.minX);
+  var H = Math.max(1e-6, bounds.maxZ - bounds.minZ);
+  var stack = getReceiverStackProfile(bounds);
+  var stackedH = Math.max(H, stack.totalHeight || H);
+  var smax = clamp(bounds.maxX - b.minX, 0, D);
+  var total = stackedH + D;
+  var L = (smax / D) * total;
+  var topAdvance = clamp(L - stackedH, 0, D);
+  var thresholdX = bounds.maxX - topAdvance;
+  maybeShadowDebugChain('top', ownerInstanceId, light, comp, 'top-east-build', 'overlap=' + boundsText2Shadow(overlap2) + ' cover=' + JSON.stringify({y0:b.minY,y1:b.maxY,depth:smax,D:D,H:H,stackBaseZ:stack.baseZ,stackedH:stackedH,L:L,topAdvance:topAdvance,thresholdX:thresholdX}));
+  if (topAdvance <= 1e-4) return null;
+  var clipped2 = clipPolyByHalfPlane2D(overlap2, { x: -1, y: 0 }, -thresholdX);
+  if (!clipped2 || clipped2.length < 3) return null;
+  return {
+    poly: clipped2.map(function (pt) { return { x: pt.x, y: pt.y, z: bounds.maxZ }; }),
+    topAdvance: topAdvance
+  };
+}
+
+function choosePrimaryChainKind(bounds, light, overlap2, ownerInstanceId, receiverKind, comp) {
+  var ref = bounds ? {
+    x: (bounds.minX + bounds.maxX) * 0.5,
+    y: (bounds.minY + bounds.maxY) * 0.5,
+    z: bounds.minZ,
+  } : { x: 0, y: 0, z: 0 };
+  var gd = shadowGroundDirectionForLight(light, ref);
+  if (!gd) return 'south';
+  var W = Math.max(1e-6, bounds.maxX - bounds.minX);
+  var D = Math.max(1e-6, bounds.maxY - bounds.minY);
+  var gx = Math.abs(gd.g.x || 0);
+  var gy = Math.abs(gd.g.y || 0);
+  var tx = gx < 1e-6 ? Infinity : (W / gx);
+  var ty = gy < 1e-6 ? Infinity : (D / gy);
+  var rawChosen = (tx === Infinity && ty === Infinity) ? 'south' : (ty <= tx ? 'south' : 'east');
+  var key = String(ownerInstanceId || 'none') + '|' + String((light && (light.id || light.name)) || 'light');
+  var prev = shadowChainPrimaryCache.get(key);
+  var chosen = rawChosen;
+  var scoreSouth = ty;
+  var scoreEast = tx;
+  if (prev) {
+    var prevScore = prev.choice === 'south' ? scoreSouth : scoreEast;
+    var otherScore = prev.choice === 'south' ? scoreEast : scoreSouth;
+    var switchRatio = 0.88; // other must be clearly better (smaller) to switch
+    if (prev.frame != null && typeof debugState !== 'undefined' && debugState.frame - prev.frame < 12) {
+      chosen = prev.choice;
+    } else if (isFinite(prevScore) && isFinite(otherScore) && otherScore > prevScore * switchRatio) {
+      chosen = prev.choice;
+    }
+  }
+  shadowChainPrimaryCache.set(key, { choice: chosen, frame: (typeof debugState !== 'undefined' ? debugState.frame : 0), tx: tx, ty: ty });
+  maybeShadowDebugChain(receiverKind, ownerInstanceId, light, comp, 'choose-primary', 'gd=' + fmt3Shadow({x:gd.g.x||0,y:gd.g.y||0,z:gd.slope||0}) + ' tx=' + String(Number(tx).toFixed ? Number(tx).toFixed(3) : tx) + ' ty=' + String(Number(ty).toFixed ? Number(ty).toFixed(3) : ty) + ' raw=' + rawChosen + ' chosen=' + chosen + ' overlap=' + boundsText2Shadow(overlap2));
+  return chosen;
+}
+
+function classifyExactShadowCase(receiverKind, receiverPts, receiverNormal, light) {
+  var ref = receiverPts && receiverPts.length ? faceReceiverCenter(receiverPts) : { x: 0, y: 0, z: 0 };
+  var dir = shadowProjectionDirection(light, ref);
+  return {
+    receiverKind: receiverKind,
+    dir: dir,
+    signX: dir.x > 1e-6 ? 1 : (dir.x < -1e-6 ? -1 : 0),
+    signY: dir.y > 1e-6 ? 1 : (dir.y < -1e-6 ? -1 : 0),
+    signZ: dir.z > 1e-6 ? 1 : (dir.z < -1e-6 ? -1 : 0),
+    denom: dot3(receiverNormal || { x: 0, y: 0, z: 1 }, dir),
+  };
+}
+
+function sourceFaceKindsForExactShadow(info) {
+  var kinds = new Set(['top']);
+  if (info && info.signX > 0) kinds.add('xn');
+  else if (info && info.signX < 0) kinds.add('xp');
+  if (info && info.signY > 0) kinds.add('yn');
+  else if (info && info.signY < 0) kinds.add('yp');
+  return kinds;
+}
+
+function uniqueComponentFaceVertices(comp, faceKindSet = null) {
+  var out = [];
+  var seen = new Map();
+  if (!comp || !comp.faces) return out;
+  for (var i = 0; i < comp.faces.length; i++) {
+    var face = comp.faces[i];
+    if (faceKindSet && !faceKindSet.has(face.kind)) continue;
+    for (var j = 0; j < face.pts.length; j++) {
+      var p = face.pts[j];
+      var key = Number(p.x).toFixed(4) + '|' + Number(p.y).toFixed(4) + '|' + Number(p.z).toFixed(4);
+      if (seen.has(key)) continue;
+      seen.set(key, true);
+      out.push({ x: p.x, y: p.y, z: p.z });
+    }
+  }
+  return out;
+}
+
+function polygonKeyOnReceiver(poly3, receiverPts, receiverNormal) {
+  if (!poly3 || poly3.length < 3) return '';
+  var basis = planeBasisFromNormal(receiverNormal);
+  var origin = receiverPts[0];
+  var pts2 = poly3.map(function (p) { return projectPointToPlane2D(p, origin, basis); });
+  var ordered = convexHullPlanePoints(pts2);
+  return ordered.map(function (p) { return Number(p.x).toFixed(3) + ',' + Number(p.y).toFixed(3); }).join('|');
+}
+
+
+function areaOnReceiverPlane(poly3, receiverPts, receiverNormal) {
+  if (!poly3 || poly3.length < 3) return 0;
+  var basis = planeBasisFromNormal(receiverNormal);
+  var origin = receiverPts[0];
+  var pts2 = poly3.map(function (p) { return projectPointToPlane2D(p, origin, basis); });
+  var area = 0;
+  for (var i = 0; i < pts2.length; i++) {
+    var a = pts2[i], b = pts2[(i + 1) % pts2.length];
+    area += (a.x * b.y - b.x * a.y);
+  }
+  return Math.abs(area) * 0.5;
+}
+
+function worldPolyHashList(polys) {
+  if (!polys || !polys.length) return [];
+  var out = [];
+  for (var i = 0; i < polys.length; i++) {
+    var poly = polys[i] || [];
+    var text = poly.map(function (p) { return [Number(p.x).toFixed(3), Number(p.y).toFixed(3), Number(p.z).toFixed(3)].join(','); }).join('|');
+    out.push(typeof dbgSimpleHash === 'function' ? dbgSimpleHash(text) : text);
+  }
+  return out;
+}
+
+function projectFacePolygonOntoReceiver(face, receiverPts, receiverNormal, light) {
+  if (!face || !face.pts || face.pts.length < 3) return null;
+  var planePoint = receiverPts[0];
+  var projected = [];
+  for (var i = 0; i < face.pts.length; i++) {
+    var hit = projectPointToPlaneAlongShadow(light, face.pts[i], planePoint, receiverNormal, null);
+    if (!hit) return null;
+    projected.push(hit);
+  }
+  var ordered = orderPlanePolygon(projected, receiverNormal);
+  if (!ordered || ordered.length < 3) return null;
+  return clipWorldPolyToFacePlane(ordered, receiverPts, receiverNormal);
+}
+
+function projectComponentVertexHullOntoReceiver(comp, receiverPts, receiverNormal, light, faceKindSet) {
+  var verts = uniqueComponentFaceVertices(comp, faceKindSet);
+  if (!verts || verts.length < 3) return null;
+  var planePoint = receiverPts[0];
+  var basis = planeBasisFromNormal(receiverNormal);
+  var pts2 = [];
+  for (var i = 0; i < verts.length; i++) {
+    var hit = projectPointToPlaneAlongShadow(light, verts[i], planePoint, receiverNormal, null);
+    if (!hit) continue;
+    pts2.push(projectPointToPlane2D(hit, planePoint, basis));
+  }
+  if (pts2.length < 3) return null;
+  var hull2 = convexHullPlanePoints(pts2);
+  if (!hull2 || hull2.length < 3) return null;
+  var face2 = receiverPts.map(function (p) { return projectPointToPlane2D(p, planePoint, basis); });
+  var clipped2 = clipConvexPolygon2D(hull2, face2);
+  if (!clipped2 || clipped2.length < 3) return null;
+  return clipped2.map(function (p) { return unprojectPointFromPlane2D(p, planePoint, basis); });
+}
+
+function dedupeWorldPoints3(points, eps = 1e-4) {
+  var out = [];
+  if (!points || !points.length) return out;
+  for (var i = 0; i < points.length; i++) {
+    var p = points[i];
+    var dup = false;
+    for (var j = 0; j < out.length; j++) {
+      if (almostSamePoint3(p, out[j], eps)) {
+        dup = true;
+        break;
+      }
+    }
+    if (!dup) out.push({ x: p.x, y: p.y, z: p.z });
+  }
+  return out;
+}
+
+function projectComponentShadowVolumeOntoReceiverExact(comp, receiverPts, receiverNormal, light, samplePoint = null) {
+  if (!comp || !comp.bounds || !receiverPts || receiverPts.length < 3) return null;
+  var planePoint = receiverPts[0];
+  var basis = planeBasisFromNormal(receiverNormal);
+  var volume = buildComponentShadowVolume(comp, light, samplePoint);
+  if (!volume || volume.length < 16) return null;
+  var edgePairs = shadowVolumeEdgePairs();
+  if (!edgePairs || !edgePairs.length) return null;
+
+  var hits = [];
+  for (var i = 0; i < edgePairs.length; i++) {
+    var pair = edgePairs[i];
+    var a = volume[pair[0]];
+    var b = volume[pair[1]];
+    if (!a || !b) continue;
+    var segHits = segmentPlaneIntersection(a, b, planePoint, receiverNormal, 1e-6);
+    if (!segHits || !segHits.length) continue;
+    for (var j = 0; j < segHits.length; j++) hits.push(segHits[j]);
+  }
+  hits = dedupeWorldPoints3(hits, 1e-4);
+  if (hits.length < 3) return null;
+
+  var pts2 = [];
+  for (var k = 0; k < hits.length; k++) {
+    pts2.push(projectPointToPlane2D(hits[k], planePoint, basis));
+  }
+  var hull2 = convexHullPlanePoints(pts2);
+  if (!hull2 || hull2.length < 3) return null;
+
+  var face2 = receiverPts.map(function (p) { return projectPointToPlane2D(p, planePoint, basis); });
+  var clipped2 = clipConvexPolygon2D(hull2, face2);
+  if (!clipped2 || clipped2.length < 3) return null;
+
+  var poly3 = clipped2.map(function (p) { return unprojectPointFromPlane2D(p, planePoint, basis); });
+  poly3 = orderPlanePolygon(poly3, receiverNormal);
+  if (!poly3 || poly3.length < 3) return null;
+  return poly3;
+}
+
+function projectComponentTopSliceOntoReceiver(comp, receiverPts, receiverNormal, light) {
+  if (!comp || !comp.bounds || !receiverPts || receiverPts.length < 3) return null;
+  var planePoint = receiverPts[0];
+  var basis = planeBasisFromNormal(receiverNormal);
+  var corners = boundsCorners3(comp.bounds);
+  var points3 = [];
+
+  for (var i = 0; i < corners.length; i++) {
+    var proj = projectPointToPlaneAlongShadow(light, corners[i], planePoint, receiverNormal, null);
+    if (proj) points3.push(proj);
+  }
+
+  var edgePairs = boundsEdgePairs3();
+  for (var e = 0; e < edgePairs.length; e++) {
+    var pair = edgePairs[e];
+    var segHits = segmentPlaneIntersection(corners[pair[0]], corners[pair[1]], planePoint, receiverNormal, 1e-6);
+    if (!segHits || !segHits.length) continue;
+    for (var j = 0; j < segHits.length; j++) points3.push(segHits[j]);
+  }
+
+  points3 = dedupeWorldPoints3(points3, 1e-4);
+  if (points3.length < 3) return null;
+
+  var pts2 = [];
+  for (var k = 0; k < points3.length; k++) pts2.push(projectPointToPlane2D(points3[k], planePoint, basis));
+  var hull2 = convexHullPlanePoints(pts2);
+  if (!hull2 || hull2.length < 3) return null;
+
+  var face2 = receiverPts.map(function (p) { return projectPointToPlane2D(p, planePoint, basis); });
+  var clipped2 = clipConvexPolygon2D(hull2, face2);
+  if (!clipped2 || clipped2.length < 3) return null;
+
+  var poly3 = clipped2.map(function (p) { return unprojectPointFromPlane2D(p, planePoint, basis); });
+  poly3 = orderPlanePolygon(poly3, receiverNormal);
+  if (!poly3 || poly3.length < 3) return null;
+  return poly3;
+}
+
+function collectStylizedChainShadowPolys(receiverKind, mergedReceiver, comp, light, ownerInstanceId) {
+  if (!mergedReceiver || !mergedReceiver.pts || mergedReceiver.pts.length < 3) {
+    maybeShadowDebugChain(receiverKind, ownerInstanceId, light, comp, 'empty-merged', '');
+    return [];
+  }
+  var receiverPts = mergedReceiver.pts;
+  var receiverNormal = mergedReceiver.normal || { x: 0, y: 0, z: 1 };
+  var exactCase = classifyExactShadowCase(receiverKind, receiverPts, receiverNormal, light);
+  if (Math.abs(exactCase.denom) <= 1e-6) {
+    maybeShadowDebugChain(receiverKind, ownerInstanceId, light, comp, 'plane-parallel', 'dir=' + fmt3Shadow(exactCase.dir));
+    return [];
+  }
+  var allowTopBackfacePoint = (receiverKind === 'top' && light && light.type !== 'directional' && exactCase.dir.z >= -1e-6);
+  if (receiverKind === 'top' && exactCase.dir.z >= -1e-6 && !allowTopBackfacePoint) {
+    var topBackSlice = projectComponentTopSliceOntoReceiver(comp, receiverPts, receiverNormal, light);
+    if (topBackSlice && topBackSlice.length >= 3) {
+      maybeShadowDebugChain(receiverKind, ownerInstanceId, light, comp, 'exact-result', 'polyCount=1 mode=top-slice-backface receiver=' + boundsText3Shadow(polyBounds3(receiverPts)) + ' dir=' + fmt3Shadow(exactCase.dir));
+      return [topBackSlice];
+    }
+    maybeShadowDebugChain(receiverKind, ownerInstanceId, light, comp, 'top-facing-away', 'dir=' + fmt3Shadow(exactCase.dir) + ' sign=(' + exactCase.signX + ',' + exactCase.signY + ',' + exactCase.signZ + ')');
+    return [];
+  }
+  var preferredKinds = sourceFaceKindsForExactShadow(exactCase);
+  maybeShadowDebugChain(receiverKind, ownerInstanceId, light, comp, allowTopBackfacePoint ? 'exact-begin-top-backface' : 'exact-begin', 'dir=' + fmt3Shadow(exactCase.dir) + ' sign=(' + exactCase.signX + ',' + exactCase.signY + ',' + exactCase.signZ + ') faces=' + Array.from(preferredKinds).join(','));
+
+  var hullPoly = projectComponentVertexHullOntoReceiver(comp, receiverPts, receiverNormal, light, preferredKinds);
+  if (hullPoly && hullPoly.length >= 3) {
+    maybeShadowDebugChain(receiverKind, ownerInstanceId, light, comp, 'exact-result', 'polyCount=1 mode=vertex-hull receiver=' + boundsText3Shadow(polyBounds3(receiverPts)) + ' dir=' + fmt3Shadow(exactCase.dir));
+    return [hullPoly];
+  }
+
+  var fallbackHull = projectComponentVertexHullOntoReceiver(comp, receiverPts, receiverNormal, light, null);
+  if (fallbackHull && fallbackHull.length >= 3) {
+    maybeShadowDebugChain(receiverKind, ownerInstanceId, light, comp, 'exact-result', 'polyCount=1 mode=fallback-hull receiver=' + boundsText3Shadow(polyBounds3(receiverPts)) + ' dir=' + fmt3Shadow(exactCase.dir));
+    return [fallbackHull];
+  }
+
+  var polys = [];
+  var seen = new Set();
+  for (var i = 0; i < comp.faces.length; i++) {
+    var face = comp.faces[i];
+    if (!preferredKinds.has(face.kind)) continue;
+    var clipped = projectFacePolygonOntoReceiver(face, receiverPts, receiverNormal, light);
+    if (!clipped || clipped.length < 3) continue;
+    var key = polygonKeyOnReceiver(clipped, receiverPts, receiverNormal);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    polys.push(clipped);
+  }
+  if (polys.length) {
+    maybeShadowDebugChain(receiverKind, ownerInstanceId, light, comp, 'exact-result', 'polyCount=' + String(polys.length) + ' mode=face-fallback receiver=' + boundsText3Shadow(polyBounds3(receiverPts)) + ' dir=' + fmt3Shadow(exactCase.dir));
+    return polys;
+  }
+
+  // IMPORTANT: for point lights the exact shadow-volume fallback must use the real light origin.
+  // Passing receiverCenter here incorrectly changes the projection source and collapses the volume.
+  var volumeExact = projectComponentShadowVolumeOntoReceiverExact(comp, receiverPts, receiverNormal, light, null);
+  if (volumeExact && volumeExact.length >= 3) {
+    maybeShadowDebugChain(receiverKind, ownerInstanceId, light, comp, 'exact-result', 'polyCount=1 mode=volume-exact receiver=' + boundsText3Shadow(polyBounds3(receiverPts)) + ' dir=' + fmt3Shadow(exactCase.dir));
+    return [volumeExact];
+  }
+
+  if (receiverKind === 'top') {
+    var topSlice = projectComponentTopSliceOntoReceiver(comp, receiverPts, receiverNormal, light);
+    if (topSlice && topSlice.length >= 3) {
+      maybeShadowDebugChain(receiverKind, ownerInstanceId, light, comp, 'exact-result', 'polyCount=1 mode=top-slice-fallback receiver=' + boundsText3Shadow(polyBounds3(receiverPts)) + ' dir=' + fmt3Shadow(exactCase.dir));
+      return [topSlice];
+    }
+  }
+
+  maybeShadowDebugChain(receiverKind, ownerInstanceId, light, comp, 'exact-result', 'polyCount=0 mode=volume-exact-empty fallback=face-fallback receiver=' + boundsText3Shadow(polyBounds3(receiverPts)) + ' dir=' + fmt3Shadow(exactCase.dir));
+  return polys;
+}
+
+function collectProjectedShadowPolysForReceiver(facePts, normal, ownerInstanceId = null) {
+  if (!lightState.showShadows || !isLightingSystemEnabled()) return [];
+  var renderLights = getShadowDebugRenderLights();
+  if (!renderLights || !renderLights.length) return [];
+  var components = buildShadowComponents();
+  if (!components || !components.length) return [];
+
+  var receiverKind = inferReceiverKind(normal);
+  var mergedReceiver = getMergedReceiverFace(ownerInstanceId, receiverKind, facePts, normal);
+  var receiverPts = mergedReceiver.pts;
+  var receiverNormal = mergedReceiver.normal || normal;
+  var receiverCenter = faceReceiverCenter(receiverPts);
+  if (mergedReceiver.merged && !isMergedReceiverAnchorCell(receiverKind, facePts, receiverPts)) {
+    if (shadowDebugDetailed && (receiverKind === 'east' || receiverKind === 'south' || receiverKind === 'top')) {
+      shadowDebugLog('recv-skip-nonanchor kind=' + receiverKind
+        + ' owner=' + String(ownerInstanceId || 'none')
+        + ' planeKey=' + String(mergedReceiver.planeKey || '')
+        + ' patchId=' + String(mergedReceiver.patchId || 0)
+        + ' worldFacePts=' + samplePointsText3Shadow(receiverPts, 4)
+        + ' worldCellPts=' + samplePointsText3Shadow(facePts, 4));
+    }
+    return [];
+  }
+  var receiverBasis = planeBasisFromNormal(receiverNormal);
+  var receiverFace2 = receiverPts.map(function (p) { return projectPointToPlane2D(p, receiverPts[0], receiverBasis); });
+  var localBasis = planeBasisFromNormal(normal);
+  var localFace2 = facePts.map(function (p) { return projectPointToPlane2D(p, facePts[0], localBasis); });
+  var overlays = [];
+
+  if (shadowDebugDetailed && (receiverKind === 'east' || receiverKind === 'south' || receiverKind === 'top')) {
+    shadowDebugLog('recv-begin kind=' + receiverKind
+      + ' owner=' + String(ownerInstanceId || 'none')
+      + ' merged=' + (mergedReceiver.merged ? '1' : '0')
+      + (mergedReceiver.planeKey ? (' planeKey=' + mergedReceiver.planeKey) : '')
+      + (mergedReceiver.patchId != null ? (' patchId=' + mergedReceiver.patchId) : '')
+      + ' planePt=' + fmt3Shadow(receiverPts[0])
+      + ' normal=' + fmt3Shadow(receiverNormal)
+      + ' center=' + fmt3Shadow(receiverCenter)
+      + ' basisU=' + fmt3Shadow(receiverBasis.u)
+      + ' basisV=' + fmt3Shadow(receiverBasis.v)
+      + ' face2=' + boundsText2Shadow(receiverFace2)
+      + ' cell2=' + boundsText2Shadow(localFace2)
+      + ' worldFacePts=' + samplePointsText3Shadow(receiverPts, 4)
+      + ' worldCellPts=' + samplePointsText3Shadow(facePts, 4)
+      + (mergedReceiver.bounds ? (' mergedBounds=' + boundsText3Shadow(mergedReceiver.bounds)) : ''));
+  }
+
+  for (const light of renderLights) {
+    var alpha = clamp(shadowAlphaForLight(light, receiverCenter), 0, 0.92);
+    if (alpha <= 0.01) continue;
+    var polys = [];
+    var candidateRows = [];
+    if (shadowDebugDetailed && (receiverKind === 'east' || receiverKind === 'south' || receiverKind === 'top')) {
+      shadowDebugLog('recv-light kind=' + receiverKind + ' owner=' + String(ownerInstanceId || 'none') + ' light=' + String(light.name || light.id || 'light') + ' type=' + light.type + ' alpha=' + alpha.toFixed(3) + ' lightPos=' + fmt3Shadow({ x: light.x || 0, y: light.y || 0, z: light.z || 0 }));
+    }
+    for (const comp of components) {
+      if (componentTouchesOwnerInstance(comp, ownerInstanceId)) continue;
+      var rawPolys = collectStylizedChainShadowPolys(receiverKind, mergedReceiver, comp, light, ownerInstanceId);
+      var candidate = {
+        receiverKind: receiverKind,
+        owner: ownerInstanceId || null,
+        planeKey: mergedReceiver.planeKey || '',
+        patchId: mergedReceiver.patchId != null ? mergedReceiver.patchId : null,
+        lightId: light.id || light.name || 'light',
+        lightType: light.type || 'light',
+        comp: comp.debugTag || null,
+        alpha: alpha,
+        rawCount: rawPolys && rawPolys.length ? rawPolys.length : 0,
+        clippedCount: 0,
+        area: 0,
+        rawHashes: worldPolyHashList(rawPolys),
+        clippedHashes: [],
+        rawBounds: [],
+        clippedBounds: [],
+        note: '',
+        probeMatch: (typeof shadowProbeMatchReceiver === 'function') ? shadowProbeMatchReceiver(receiverKind, ownerInstanceId || null, receiverPts, mergedReceiver.planeKey || '', mergedReceiver.patchId != null ? mergedReceiver.patchId : null) : null
+      };
+      if (!rawPolys || !rawPolys.length) {
+        candidate.note = 'empty-raw';
+        candidateRows.push(candidate);
+        if (typeof logReceiverCandidateDebug === 'function') logReceiverCandidateDebug(candidate);
+        if (shadowDebugDetailed && (receiverKind === 'east' || receiverKind === 'south' || receiverKind === 'top')) {
+          shadowDebugLog('recv-emptyraw kind=' + receiverKind + ' owner=' + String(ownerInstanceId || 'none') + ' light=' + String(light.name || light.id || 'light') + ' comp=' + comp.debugTag);
+        }
+        continue;
+      }
+      for (var rp = 0; rp < rawPolys.length; rp++) {
+        candidate.rawBounds.push(polyBounds3(rawPolys[rp]));
+        var clippedMerged = clipWorldPolyToFacePlane(rawPolys[rp], receiverPts, receiverNormal);
+        if (!clippedMerged || clippedMerged.length < 3) {
+          if (shadowDebugDetailed && (receiverKind === 'east' || receiverKind === 'south' || receiverKind === 'top')) {
+            var projected2 = rawPolys[rp].map(function (p) { return projectPointToPlane2D(p, receiverPts[0], receiverBasis); });
+            shadowDebugLog('recv-clip-null kind=' + receiverKind + ' owner=' + String(ownerInstanceId || 'none') + ' light=' + String(light.name || light.id || 'light') + ' comp=' + comp.debugTag + ' proj2=' + boundsText2Shadow(projected2) + ' face2=' + boundsText2Shadow(receiverFace2));
+          }
+          continue;
+        }
+        polys.push(clippedMerged);
+        candidate.clippedCount += 1;
+        candidate.area += areaOnReceiverPlane(clippedMerged, receiverPts, receiverNormal);
+        candidate.clippedHashes.push(worldPolyHashList([clippedMerged])[0]);
+        candidate.clippedBounds.push(polyBounds3(clippedMerged));
+        if (shadowDebugDetailed && (receiverKind === 'east' || receiverKind === 'south' || receiverKind === 'top')) {
+          var merged2 = clippedMerged.map(function (p) { return projectPointToPlane2D(p, receiverPts[0], receiverBasis); });
+          shadowDebugLog('recv-geom kind=' + receiverKind + ' owner=' + String(ownerInstanceId || 'none') + ' light=' + String(light.name || light.id || 'light') + ' comp=' + comp.debugTag + ' merged2=' + boundsText2Shadow(merged2) + ' mergedPts=' + samplePointsText2Shadow(merged2, 8) + ' mergedWorld=' + samplePointsText3Shadow(clippedMerged, 8));
+        }
+      }
+      if (!candidate.clippedCount && !candidate.note) candidate.note = 'raw-but-no-clipped';
+      candidate.area = Number(candidate.area.toFixed(6));
+      candidateRows.push(candidate);
+      if (typeof logReceiverCandidateDebug === 'function') logReceiverCandidateDebug(candidate);
+      if (candidate.clippedCount > 0 && comp) {
+        overlays.push({
+          lightId: light.id || light.name || 'light',
+          alpha: alpha,
+          baseAlpha: alpha,
+          worldPolys: polys.slice(Math.max(0, polys.length - candidate.clippedCount)),
+          clipWorldPts: receiverPts,
+          receiverKind: receiverKind,
+          owner: ownerInstanceId || null,
+          patchId: mergedReceiver.patchId != null ? mergedReceiver.patchId : null,
+          mergedPlaneKey: mergedReceiver.planeKey || '',
+          receiverCenter: receiverCenter,
+          sourceComp: comp.debugTag || null,
+          casterCenter: comp.center || null,
+          lightType: light.type || 'unknown'
+        });
+      }
+    }
+    var contributor = null;
+    for (var ci = 0; ci < candidateRows.length; ci++) {
+      var row = candidateRows[ci];
+      if (!contributor || row.area > contributor.area) contributor = row;
+    }
+    if (typeof logReceiverSummaryDebug === 'function') logReceiverSummaryDebug({
+      receiverKind: receiverKind,
+      owner: ownerInstanceId || null,
+      planeKey: mergedReceiver.planeKey || '',
+      patchId: mergedReceiver.patchId != null ? mergedReceiver.patchId : null,
+      lightId: light.id || light.name || 'light',
+      alpha: alpha,
+      receiverBounds: polyBounds3(receiverPts),
+      receiverFacePts: receiverPts,
+      sourceCount: candidateRows.length,
+      nonEmptySourceCount: candidateRows.filter(function (r) { return r.clippedCount > 0; }).length,
+      totalPolyCount: polys.length,
+      totalArea: Number(candidateRows.reduce(function (acc, r) { return acc + (r.area || 0); }, 0).toFixed(6)),
+      topContributor: contributor,
+      cameraSig: (typeof cameraSignatureForDebug === 'function' ? cameraSignatureForDebug() : ''),
+      lightSig: (typeof lightsSignatureForDebug === 'function' ? lightsSignatureForDebug() : ''),
+      boxesSig: (typeof boxesSignatureForDebug === 'function' ? boxesSignatureForDebug() : ''),
+      probeMatch: (typeof shadowProbeMatchReceiver === 'function') ? shadowProbeMatchReceiver(receiverKind, ownerInstanceId || null, receiverPts, mergedReceiver.planeKey || '', mergedReceiver.patchId != null ? mergedReceiver.patchId : null) : null
+    });
+    if (!polys.length) continue;
+  }
+  return overlays;
+}
+

@@ -4,7 +4,7 @@
 Extract the main program's placement subsystem into an independent module and centralize prefab instance placement, instance creation/removal, placement preview commit flow, and the basic ordering trigger entry for scene objects, without changing the current behavior.
 
 ## Allowed Changes
-- Add `src/placement/placement.js`.
+- Add `src/application/placement/placement.js`.
 - Move placement-related entry logic into that file.
 - Keep compatibility wrappers where necessary.
 - Add the minimum required script reference in `index.html`.
@@ -32,4 +32,4 @@ Extract the main program's placement subsystem into an independent module and ce
 - Existing move/delete flows still work if they existed before.
 - Scene save/load remains unaffected.
 - Habbo placement remains unaffected.
-- Later developers can find placement entry logic in `src/placement/placement.js`.
+- Later developers can find placement entry logic in `src/application/placement/placement.js`.

@@ -4,7 +4,7 @@
 将主程序中的素材管理与导入逻辑抽离为独立模块，使 prefab 加载、素材索引刷新、Habbo 资源接入与资源库相关逻辑更容易维护，同时保持现有运行行为不变。
 
 ## 本轮允许的改动
-- 新增 `src/asset-management/asset-management.js`
+- 新增 `src/infrastructure/assets/asset-management.js`
 - 将以下逻辑集中到该文件：
   - prefab 索引读取
   - prefab 扫描 / 刷新逻辑
@@ -47,4 +47,4 @@
 - Habbo 资源库相关操作不受影响
 - 自定义 prefab 的 localStorage 读取不受影响
 - 不引入明显新的 UI 或运行错误
-- 后续开发者能明确知道应在 `src/asset-management/asset-management.js` 查找素材导入 / 索引相关逻辑
+- 后续开发者能明确知道应在 `src/infrastructure/assets/asset-management.js` 查找素材导入 / 索引相关逻辑

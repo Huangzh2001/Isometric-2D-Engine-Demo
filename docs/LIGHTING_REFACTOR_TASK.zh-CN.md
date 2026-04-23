@@ -1,10 +1,10 @@
 # Lighting 重构任务
 
 ## 目标
-将光影系统抽离到 `src/lighting/lighting.js`，集中管理光影状态、光源管理、UI 接线和渲染入口包装，在不改变行为的前提下提升结构清晰度。
+将光影系统抽离到 `src/presentation/lighting/lighting.js`，集中管理光影状态、光源管理、UI 接线和渲染入口包装，在不改变行为的前提下提升结构清晰度。
 
 ## 允许的改动
-- 新增 `src/lighting/lighting.js`
+- 新增 `src/presentation/lighting/lighting.js`
 - 从 `state.js` 抽出光影状态与辅助函数
 - 从 `ui.js` 抽出光影 UI 相关函数
 - 为 `render.js` 提供光影渲染入口包装

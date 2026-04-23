@@ -26,3 +26,9 @@ This project keeps only user-facing launchers and page entries at the root level
 
 ## Path handling
 All launcher, HTML, and server paths were updated together so the app keeps working after the cleanup.
+
+
+## P1 source-of-truth update
+- Root-level `app.js / state.js / app-shell.js / lighting-editor.js` are deprecated stubs.
+- Their canonical sources are `src/presentation/shell/app.js`, `src/infrastructure/legacy/state.js`, `src/presentation/shell/app-shell.js`, and `src/presentation/lighting/lighting-editor.js`.
+- `src/presentation/render/logic.js.bak` was removed in P1.

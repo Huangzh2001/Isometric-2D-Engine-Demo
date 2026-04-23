@@ -8,7 +8,7 @@
 - Debug detail logs: verbose trace output used during diagnosis
 
 ## Preferred Entry Points
-Use helpers from `src/logging/logging.js` when practical:
+Use helpers from `src/infrastructure/logging/logging.js` when practical:
 - `pushLog(...)`
 - `detailLog(...)`
 - `logWarn(...)`

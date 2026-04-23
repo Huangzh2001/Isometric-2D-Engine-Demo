@@ -1,7 +1,7 @@
 # Placement fail-fast 清理 / ownership 校验
 
 ## 目标
-确保所有关键 placement 导出都只能通过 `src/placement/placement.js` 进入。
+确保所有关键 placement 导出都只能通过 `src/application/placement/placement.js` 进入。
 
 ## 允许的改动
 - 给关键 placement 导出添加 owner 标记。

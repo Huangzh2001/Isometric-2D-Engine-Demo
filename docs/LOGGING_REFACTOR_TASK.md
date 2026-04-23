@@ -1,11 +1,11 @@
 # Logging Refactor Task
 
 ## Goal
-Extract the main program logging system into `src/logging/logging.js` and centralize runtime logging, route logging, warnings, errors, and fail-fast diagnostics without changing functional behavior.
+Extract the main program logging system into `src/infrastructure/logging/logging.js` and centralize runtime logging, route logging, warnings, errors, and fail-fast diagnostics without changing functional behavior.
 
 ## Allowed Changes
-- Add `src/logging/logging.js`
-- Move shared logging state and helper functions out of `src/state.js`
+- Add `src/infrastructure/logging/logging.js`
+- Move shared logging state and helper functions out of `src/infrastructure/legacy/state.js`
 - Add a minimal script include in `index.html`
 - Reconnect existing call sites to the new logging entry points
 - Add documentation under `docs/`
@@ -29,4 +29,4 @@ Extract the main program logging system into `src/logging/logging.js` and centra
 - Habbo library still works
 - Scene save/load still works
 - Existing route logs and fail-fast logs still appear
-- Future developers can locate logging responsibilities in `src/logging/logging.js`
+- Future developers can locate logging responsibilities in `src/infrastructure/logging/logging.js`

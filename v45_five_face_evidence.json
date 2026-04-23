@@ -1,0 +1,444 @@
+{
+  "schema": "item-preview-five-face-evidence/v1",
+  "generatedAt": "2026-04-12T04:59:45.262Z",
+  "rendererContract": {
+    "fiveFacePreviewRenderer": "drawDebugFiveFacePlacementPreview",
+    "filledSemanticFaces": true,
+    "suppressesMonochromeBaseForDebugPrefabs": true,
+    "requiredFaces": [
+      "top",
+      "north",
+      "east",
+      "south",
+      "west"
+    ]
+  },
+  "prefabs": [
+    {
+      "id": "debug_cube_5faces",
+      "name": "Debug Cube · 5 Faces",
+      "semanticFaceColors": {
+        "top": "#2F80ED",
+        "north": "#E74C3C",
+        "east": "#27AE60",
+        "south": "#F2C94C",
+        "west": "#9B51E0"
+      },
+      "facings": [
+        {
+          "facing": 0,
+          "facingLabel": "N",
+          "footprint": {
+            "w": 1,
+            "d": 1,
+            "h": 1
+          },
+          "anchor": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "sortBase": {
+            "sortKey": 0.0005,
+            "tie": 300000,
+            "rotatedAnchor": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            }
+          },
+          "debugFaceRender": {
+            "kind": "debug-face-render",
+            "mode": "placement-preview",
+            "prefabId": "debug_cube_5faces",
+            "previewFacing": 0,
+            "renderedAsFiveFaceSolid": true,
+            "baseMonochromeSuppressed": true,
+            "visibleSemanticFaces": [
+              "top",
+              "north",
+              "east",
+              "south",
+              "west"
+            ],
+            "screenFaces": [
+              "top",
+              "north",
+              "east",
+              "south",
+              "west"
+            ],
+            "topColor": "#2F80ED",
+            "northColor": "#E74C3C",
+            "eastColor": "#27AE60",
+            "southColor": "#F2C94C",
+            "westColor": "#9B51E0"
+          }
+        },
+        {
+          "facing": 1,
+          "facingLabel": "E",
+          "footprint": {
+            "w": 1,
+            "d": 1,
+            "h": 1
+          },
+          "anchor": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "sortBase": {
+            "sortKey": 0.0005,
+            "tie": 300000,
+            "rotatedAnchor": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            }
+          },
+          "debugFaceRender": {
+            "kind": "debug-face-render",
+            "mode": "placement-preview",
+            "prefabId": "debug_cube_5faces",
+            "previewFacing": 1,
+            "renderedAsFiveFaceSolid": true,
+            "baseMonochromeSuppressed": true,
+            "visibleSemanticFaces": [
+              "top",
+              "north",
+              "east",
+              "south",
+              "west"
+            ],
+            "screenFaces": [
+              "top",
+              "east",
+              "south",
+              "west",
+              "north"
+            ],
+            "topColor": "#2F80ED",
+            "northColor": "#E74C3C",
+            "eastColor": "#27AE60",
+            "southColor": "#F2C94C",
+            "westColor": "#9B51E0"
+          }
+        },
+        {
+          "facing": 2,
+          "facingLabel": "S",
+          "footprint": {
+            "w": 1,
+            "d": 1,
+            "h": 1
+          },
+          "anchor": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "sortBase": {
+            "sortKey": 0.0005,
+            "tie": 300000,
+            "rotatedAnchor": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            }
+          },
+          "debugFaceRender": {
+            "kind": "debug-face-render",
+            "mode": "placement-preview",
+            "prefabId": "debug_cube_5faces",
+            "previewFacing": 2,
+            "renderedAsFiveFaceSolid": true,
+            "baseMonochromeSuppressed": true,
+            "visibleSemanticFaces": [
+              "top",
+              "north",
+              "east",
+              "south",
+              "west"
+            ],
+            "screenFaces": [
+              "top",
+              "south",
+              "west",
+              "north",
+              "east"
+            ],
+            "topColor": "#2F80ED",
+            "northColor": "#E74C3C",
+            "eastColor": "#27AE60",
+            "southColor": "#F2C94C",
+            "westColor": "#9B51E0"
+          }
+        },
+        {
+          "facing": 3,
+          "facingLabel": "W",
+          "footprint": {
+            "w": 1,
+            "d": 1,
+            "h": 1
+          },
+          "anchor": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "sortBase": {
+            "sortKey": 0.0005,
+            "tie": 300000,
+            "rotatedAnchor": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            }
+          },
+          "debugFaceRender": {
+            "kind": "debug-face-render",
+            "mode": "placement-preview",
+            "prefabId": "debug_cube_5faces",
+            "previewFacing": 3,
+            "renderedAsFiveFaceSolid": true,
+            "baseMonochromeSuppressed": true,
+            "visibleSemanticFaces": [
+              "top",
+              "north",
+              "east",
+              "south",
+              "west"
+            ],
+            "screenFaces": [
+              "top",
+              "west",
+              "north",
+              "east",
+              "south"
+            ],
+            "topColor": "#2F80ED",
+            "northColor": "#E74C3C",
+            "eastColor": "#27AE60",
+            "southColor": "#F2C94C",
+            "westColor": "#9B51E0"
+          }
+        }
+      ]
+    },
+    {
+      "id": "debug_rect_2x1_5faces",
+      "name": "Debug Rect 2×1 · 5 Faces",
+      "semanticFaceColors": {
+        "top": "#2F80ED",
+        "north": "#E74C3C",
+        "east": "#27AE60",
+        "south": "#F2C94C",
+        "west": "#9B51E0"
+      },
+      "facings": [
+        {
+          "facing": 0,
+          "facingLabel": "N",
+          "footprint": {
+            "w": 2,
+            "d": 1,
+            "h": 1
+          },
+          "anchor": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "sortBase": {
+            "sortKey": 0.0005,
+            "tie": 300000,
+            "rotatedAnchor": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            }
+          },
+          "debugFaceRender": {
+            "kind": "debug-face-render",
+            "mode": "placement-preview",
+            "prefabId": "debug_rect_2x1_5faces",
+            "previewFacing": 0,
+            "renderedAsFiveFaceSolid": true,
+            "baseMonochromeSuppressed": true,
+            "visibleSemanticFaces": [
+              "top",
+              "north",
+              "east",
+              "south",
+              "west"
+            ],
+            "screenFaces": [
+              "top",
+              "north",
+              "east",
+              "south",
+              "west"
+            ],
+            "topColor": "#2F80ED",
+            "northColor": "#E74C3C",
+            "eastColor": "#27AE60",
+            "southColor": "#F2C94C",
+            "westColor": "#9B51E0"
+          }
+        },
+        {
+          "facing": 1,
+          "facingLabel": "E",
+          "footprint": {
+            "w": 1,
+            "d": 2,
+            "h": 1
+          },
+          "anchor": {
+            "x": 0,
+            "y": 1,
+            "z": 0
+          },
+          "sortBase": {
+            "sortKey": 1.0005,
+            "tie": 300000,
+            "rotatedAnchor": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            }
+          },
+          "debugFaceRender": {
+            "kind": "debug-face-render",
+            "mode": "placement-preview",
+            "prefabId": "debug_rect_2x1_5faces",
+            "previewFacing": 1,
+            "renderedAsFiveFaceSolid": true,
+            "baseMonochromeSuppressed": true,
+            "visibleSemanticFaces": [
+              "top",
+              "north",
+              "east",
+              "south",
+              "west"
+            ],
+            "screenFaces": [
+              "top",
+              "east",
+              "south",
+              "west",
+              "north"
+            ],
+            "topColor": "#2F80ED",
+            "northColor": "#E74C3C",
+            "eastColor": "#27AE60",
+            "southColor": "#F2C94C",
+            "westColor": "#9B51E0"
+          }
+        },
+        {
+          "facing": 2,
+          "facingLabel": "S",
+          "footprint": {
+            "w": 2,
+            "d": 1,
+            "h": 1
+          },
+          "anchor": {
+            "x": 1,
+            "y": 0,
+            "z": 0
+          },
+          "sortBase": {
+            "sortKey": 1.0005,
+            "tie": 300000,
+            "rotatedAnchor": {
+              "x": 1,
+              "y": 0,
+              "z": 0
+            }
+          },
+          "debugFaceRender": {
+            "kind": "debug-face-render",
+            "mode": "placement-preview",
+            "prefabId": "debug_rect_2x1_5faces",
+            "previewFacing": 2,
+            "renderedAsFiveFaceSolid": true,
+            "baseMonochromeSuppressed": true,
+            "visibleSemanticFaces": [
+              "top",
+              "north",
+              "east",
+              "south",
+              "west"
+            ],
+            "screenFaces": [
+              "top",
+              "south",
+              "west",
+              "north",
+              "east"
+            ],
+            "topColor": "#2F80ED",
+            "northColor": "#E74C3C",
+            "eastColor": "#27AE60",
+            "southColor": "#F2C94C",
+            "westColor": "#9B51E0"
+          }
+        },
+        {
+          "facing": 3,
+          "facingLabel": "W",
+          "footprint": {
+            "w": 1,
+            "d": 2,
+            "h": 1
+          },
+          "anchor": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "sortBase": {
+            "sortKey": 0.0005,
+            "tie": 300000,
+            "rotatedAnchor": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            }
+          },
+          "debugFaceRender": {
+            "kind": "debug-face-render",
+            "mode": "placement-preview",
+            "prefabId": "debug_rect_2x1_5faces",
+            "previewFacing": 3,
+            "renderedAsFiveFaceSolid": true,
+            "baseMonochromeSuppressed": true,
+            "visibleSemanticFaces": [
+              "top",
+              "north",
+              "east",
+              "south",
+              "west"
+            ],
+            "screenFaces": [
+              "top",
+              "west",
+              "north",
+              "east",
+              "south"
+            ],
+            "topColor": "#2F80ED",
+            "northColor": "#E74C3C",
+            "eastColor": "#27AE60",
+            "southColor": "#F2C94C",
+            "westColor": "#9B51E0"
+          }
+        }
+      ]
+    }
+  ]
+}

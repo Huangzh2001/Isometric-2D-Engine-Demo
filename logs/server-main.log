@@ -1,1 +1,25 @@
-[habbo-cache] rebuilt root=/tmp/habbo_testroot total=3 mode=classified-index
+127.0.0.1 - - [23/Apr/2026 18:27:01] "GET /api/health HTTP/1.1" 200 -
+127.0.0.1 - - [23/Apr/2026 18:27:03] "GET /index.html?v=20260323P-ui-button-iconfix HTTP/1.1" 200 -
+127.0.0.1 - - [23/Apr/2026 18:27:03] "GET /styles/main.css HTTP/1.1" 200 -
+127.0.0.1 - - [23/Apr/2026 18:27:03] "GET /src/logging/logging.js HTTP/1.1" 200 -
+127.0.0.1 - - [23/Apr/2026 18:27:03] "GET /src/placement/placement.js HTTP/1.1" 200 -
+127.0.0.1 - - [23/Apr/2026 18:27:03] "GET /src/lighting/lighting.js HTTP/1.1" 200 -
+127.0.0.1 - - [23/Apr/2026 18:27:03] "GET /src/state.js HTTP/1.1" 200 -
+127.0.0.1 - - [23/Apr/2026 18:27:03] "GET /src/asset-management/asset-management.js HTTP/1.1" 200 -
+127.0.0.1 - - [23/Apr/2026 18:27:03] "GET /src/scene-storage/scene-storage.js HTTP/1.1" 200 -
+127.0.0.1 - - [23/Apr/2026 18:27:03] "GET /src/player/player.js HTTP/1.1" 200 -
+127.0.0.1 - - [23/Apr/2026 18:27:03] "GET /src/ui.js HTTP/1.1" 200 -
+127.0.0.1 - - [23/Apr/2026 18:27:03] "GET /src/logic.js HTTP/1.1" 200 -
+127.0.0.1 - - [23/Apr/2026 18:27:03] "GET /src/app.js HTTP/1.1" 200 -
+127.0.0.1 - - [23/Apr/2026 18:27:03] "GET /src/render.js HTTP/1.1" 200 -
+127.0.0.1 - - [23/Apr/2026 18:27:04] "GET /assets/chibi_walk.png HTTP/1.1" 200 -
+127.0.0.1 - - [23/Apr/2026 18:27:04] "GET /api/habbo/config?t=1776940024046 HTTP/1.1" 200 -
+127.0.0.1 - - [23/Apr/2026 18:27:06] "GET /api/scenes/default HTTP/1.1" 200 -
+127.0.0.1 - - [23/Apr/2026 18:27:06] code 404, message File not found
+127.0.0.1 - - [23/Apr/2026 18:27:06] "GET /favicon.ico HTTP/1.1" 404 -
+127.0.0.1 - - [23/Apr/2026 18:27:06] "GET /api/prefabs/index?t=1776940026240 HTTP/1.1" 200 -
+127.0.0.1 - - [23/Apr/2026 18:27:06] "GET /assets/prefabs/Custom%20Prefab%20YOR3YS.json?t=1774504930000 HTTP/1.1" 200 -
+127.0.0.1 - - [23/Apr/2026 18:27:06] "GET /assets/prefabs/Custom%20Prefab%20YOWU6L.json?t=1774504930000 HTTP/1.1" 200 -
+127.0.0.1 - - [23/Apr/2026 18:27:06] "GET /assets/prefabs/stair_3step.json?t=1774504930000 HTTP/1.1" 200 -
+127.0.0.1 - - [23/Apr/2026 18:27:06] "GET /assets/prefabs/t_shape.json?t=1774504930000 HTTP/1.1" 200 -
+127.0.0.1 - - [23/Apr/2026 18:27:42] "GET /api/prefabs/index?t=1776940062726 HTTP/1.1" 200 -

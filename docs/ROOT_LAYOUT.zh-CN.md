@@ -26,3 +26,9 @@
 
 ## 路径处理
 本次整理同步修正了启动脚本、HTML 和本地服务中的相关路径，目标是在保持行为不变的前提下让根目录更整洁。
+
+
+## P1 唯一真实源码位置
+- 根目录 `app.js / state.js / app-shell.js / lighting-editor.js` 已变为废弃 stub。
+- 对应真源码分别位于 `src/presentation/shell/app.js`、`src/infrastructure/legacy/state.js`、`src/presentation/shell/app-shell.js`、`src/presentation/lighting/lighting-editor.js`。
+- `src/presentation/render/logic.js.bak` 已在 P1 中移除。

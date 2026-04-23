@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RUN_ME_FLOOR｜地板编辑器 v3.8 / 四向固定朝向 + 轻量旋转动画</title>
+  <link rel="stylesheet" href="styles/floor-editor.css?v=20260411-floor-editor-v42" />
+  <script>window.__APP_ENTRY_INFO={kind:"floor-editor",label:"地板编辑器",entryFile:"START_FLOOR_EDITOR.html",launcherHint:"start_floor_editor.bat",build:"20260411-floor-editor-v42"};</script>
+</head>
+<body>
+  <script src="src/infrastructure/logging/p0-phase-logger.js?v=20260411-floor-editor-v42"></script>
+  <script src="src/infrastructure/bootstrap/app-namespace.js?v=20260411-floor-editor-v42"></script>
+  <script src="src/infrastructure/audit/architecture-layer-audit.js?v=20260411-floor-editor-v42"></script>
+  <script src="src/infrastructure/logging/floor-editor-diagnostic-log.js?v=20260411-floor-editor-v42"></script>
+  <script src="src/core/domain/floor-plan-domain-core.js?v=20260411-floor-editor-v42"></script>
+  <script src="src/core/domain/view-rotation-core.js?v=20260412-main-view-rotation-v1"></script>
+  <script src="src/core/domain/floor-plan-hit-test.js?v=20260411-floor-editor-v42"></script>
+  <script src="src/core/state/floor-editor-state.js?v=20260411-floor-editor-v42"></script>
+  <script src="src/infrastructure/storage/floor-editor-storage.js?v=20260411-floor-editor-v42"></script>
+  <script src="src/application/floor-editor/floor-editor-controller.js?v=20260411-floor-editor-v42"></script>
+
+  <div class="floorEditorApp">
+    <aside class="sidebar sidebar--macro">
+      <div class="section">
+        <span class="smallTag">BUILD 20260411-floor-editor-v42</span>
+        <h2>地板编辑器</h2>
+        <p>本界面只编辑房间地板：楼层 footprint、每层尺寸、墙边、平面偏移、层高差与重叠关系。物品放置不在这里做。</p>
+      </div>
+
+      <div class="section">
+        <h2>全局房间</h2>
+        <div class="grid2">
+          <label>房间名称<input id="floorNameInput" type="text" value="Untitled Floor Plan"></label>
+          <label>形状
+            <select id="shapeModeSelect">
+              <option value="rectangle">矩形</option>
+              <option value="custom">异形 / 自定义</option>
+            </select>
+          </label>
+          <label>初始列数<input id="floorColsInput" type="number" min="1" max="10000000" step="1" value="10"></label>
+          <label>初始行数<input id="floorRowsInput" type="number" min="1" max="10000000" step="1" value="8"></label>
+          <label>默认墙高<input id="wallHeightInput" type="number" min="1" step="1" value="2"></label>
+          <div class="metaRow"><span>全局说明</span><strong>初始长宽只用于起始矩形，后续可自动向外扩张</strong></div>
+        </div>
+        <div class="grid2 topGap">
+          <button id="applyFloorMeta">应用全局元数据</button>
+          <button id="createRectanglePlan">新建矩形底层</button>
+          <button id="createCustomPlan">新建异形底层</button>
+          <div class="footerHint compact">全局面板不再直接修改当前层 cols / rows。</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>楼层管理</h2>
+        <div class="grid3 compactButtons">
+          <button id="addLevelBtn">新增空层</button>
+          <button id="addRectLevelBtn">矩形满铺层</button>
+          <button id="copyLevelBtn">复制当前层</button>
+          <button id="removeLevelBtn">删除层</button>
+        </div>
+        <div id="levelList" class="levelList topGap"></div>
+        <div id="levelListStatus" class="footerHint">楼层列表加载中…</div>
+      </div>
+
+      <div class="section">
+        <h2>重叠关系</h2>
+        <div class="grid2 compactButtons">
+          <button id="clearOverlapSelectionBtn">清空 Ctrl 选择</button>
+          <label class="checkboxLabel"><input id="showAdjacentToggle" type="checkbox" checked> 画布显示所有可见层</label>
+        </div>
+        <canvas id="levelOverlapCanvas" class="miniCanvas" width="260" height="200"></canvas>
+        <div id="overlapSummaryText" class="legendBox">默认显示所有可见层的重叠。Ctrl + 点击楼层列表可只看指定楼层集合。</div>
+      </div>
+
+      <div class="section">
+        <h2>全局视图</h2>
+        <div class="grid2">
+          <label>缩放<input id="zoomRange" type="range" min="0.45" max="2.4" step="0.05" value="1"></label>
+          <div class="metaRow"><span>当前缩放</span><strong id="zoomValueText">100%</strong></div>
+        </div>
+        <div class="grid2 topGap">
+          <label class="checkboxLabel"><input id="showGridToggle" type="checkbox"> 当前层空白辅助格线</label>
+          <label class="checkboxLabel"><input id="showWallsToggle" type="checkbox" checked> 显示墙体</label>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>保存 / 读取</h2>
+        <div class="grid2 compactButtons">
+          <button id="undoBtn">撤销</button>
+          <button id="redoBtn">重做</button>
+          <button id="saveAutosaveBtn">保存自动存档</button>
+          <button id="loadAutosaveBtn">读取自动存档</button>
+          <button id="exportFloorBtn">导出 JSON</button>
+          <button id="importFloorBtn">导入 JSON</button>
+          <button id="exportDiagnosticLogBtn">导出详细诊断日志</button>
+          <button id="clearAutosaveBtn">清除自动存档</button>
+        </div>
+        <input id="importFloorFile" type="file" accept="application/json,.json" hidden>
+      </div>
+    </aside>
+
+    <main class="mainStage">
+      <div class="headerBar">
+        <div class="headerTitle">
+          <h1>等距地板编辑器</h1>
+          <p>滚轮切换当前层；Ctrl/Cmd + 滚轮缩放；Ctrl + 点击楼层列表进入 overlap 选择；Q / E 或按钮切换 4 个固定朝向。</p>
+        </div>
+        <div class="headerControls">
+          <button id="rotateLeftBtn" type="button">Rotate Left</button>
+          <div id="currentViewDirectionLabel" class="viewDirectionBadge">NE · 0°</div>
+          <button id="rotateRightBtn" type="button">Rotate Right</button>
+          <label class="rotationSpeedControl">动画
+            <select id="rotationAnimationMsSelect">
+              <option value="0">0 ms</option>
+              <option value="80">80 ms</option>
+              <option value="160" selected>160 ms</option>
+              <option value="240">240 ms</option>
+              <option value="320">320 ms</option>
+            </select>
+          </label>
+          <div id="floorEditorStatus" class="statusText">状态：boot</div>
+        </div>
+      </div>
+      <div class="canvasWrap">
+        <canvas id="floorEditorCanvas"></canvas>
+      </div>
+    </main>
+
+    <aside class="sidebar sidebar--current">
+      <div class="section">
+        <h2>当前层</h2>
+        <div class="levelIdentityCard">
+          <div class="levelIdentityMain">
+            <span id="currentLevelColorChip" class="levelColorChip levelColorChip--large"></span>
+            <div>
+              <div id="currentLevelTitle" class="levelTitleStrong">L0</div>
+              <div id="currentLevelBadge" class="footerHint compact">当前编辑层</div>
+            </div>
+          </div>
+          <div class="metaRow"><span>当前层号</span><strong id="activeLevelText">L0 / 1</strong></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>当前层属性</h2>
+        <div class="grid2">
+          <label>层名称<input id="currentLevelNameInput" type="text" value="L0"></label>
+          <label>层颜色（连续色谱）<input id="currentLevelColorInput" type="color" value="#58A6FF" disabled></label>
+          <label>当前层列数<input id="currentLevelColsInput" type="number" min="1" max="10000000" step="1" value="10"></label>
+          <label>当前层行数<input id="currentLevelRowsInput" type="number" min="1" max="10000000" step="1" value="8"></label>
+          <label>offsetX<input id="currentOffsetXInput" type="number" step="1" value="0"></label>
+          <label>offsetY<input id="currentOffsetYInput" type="number" step="1" value="0"></label>
+          <label>elevationGap<input id="currentElevationGapInput" type="number" min="0" step="1" value="0"></label>
+          <div class="metaRow"><span>说明</span><strong>仅作用于当前层</strong></div>
+        </div>
+        <div class="grid2 topGap compactButtons">
+          <button id="applyCurrentLevelMetaBtn">应用当前层属性</button>
+          <button id="resetLevelTransformBtn">重置偏移/层高</button>
+          <button id="toggleOffsetHandlesBtn">四方向偏移手柄</button>
+          <button id="toggleElevationHandlesBtn">层高手柄</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>当前层 footprint</h2>
+        <div class="grid2 compactButtons">
+          <button id="prevLevelBtn">上一层</button>
+          <button id="nextLevelBtn">下一层</button>
+          <button id="applyPerimeterWallsBtn">当前层外围墙</button>
+          <button id="clearWallsBtn">清空当前层墙</button>
+        </div>
+        <div class="footerHint">新增层默认创建空层（仅初始化 bounds / meta），offset=(0,0)，elevationGap=1；复制当前层需显式点击“复制当前层”。</div>
+      </div>
+
+      <div class="section">
+        <h2>当前层工具</h2>
+        <div class="grid2">
+          <label>墙笔刷高度<input id="wallBrushHeightInput" type="number" min="1" step="1" value="2"></label>
+          <div class="metaRow"><span>当前工具</span><strong id="toolInfo">地板笔刷</strong></div>
+        </div>
+        <div class="toolGrid topGap">
+          <button data-floor-tool="brush-floor">B 地板笔刷</button>
+          <button data-floor-tool="brush-blocked">O 阻塞笔刷</button>
+          <button data-floor-tool="erase">E 橡皮擦</button>
+          <button data-floor-tool="wall">W 墙边笔刷</button>
+          <button data-floor-tool="wall-erase">V 墙边橡皮</button>
+          <button data-floor-tool="rect-floor">R 矩形地板</button>
+          <button data-floor-tool="rect-blocked">T 矩形阻塞</button>
+          <button data-floor-tool="rect-erase">X 矩形擦除</button>
+          <button data-floor-tool="fill-floor">F 区域填充</button>
+          <button data-floor-tool="fill-blocked">G 区域阻塞填充</button>
+          <button data-floor-tool="fill-erase">C 区域清空</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>当前层状态</h2>
+        <div class="metaList">
+          <div class="metaRow"><span>悬停单元</span><strong id="hoverInfo">无</strong></div>
+          <div class="metaRow"><span>当前选区</span><strong id="selectionInfo">无</strong></div>
+          <div class="metaRow"><span>当前层地板格</span><strong id="enabledCountText">0</strong></div>
+          <div class="metaRow"><span>当前层阻塞格</span><strong id="blockedCountText">0</strong></div>
+          <div class="metaRow"><span>当前层墙段</span><strong id="wallCountText">0</strong></div>
+          <div class="metaRow"><span>总层数</span><strong id="totalLevelsText">0</strong></div>
+          <div class="metaRow"><span>总地板格</span><strong id="totalEnabledText">0</strong></div>
+        </div>
+        <div id="legendInfo" class="legendBox topGap">楼层身份色采用连续色谱。即使 showGrid=false，空白格和 bounds 外一格也可命中并自动扩张当前层。</div>
+      </div>
+    </aside>
+  </div>
+
+  <script src="src/presentation/floor-editor/floor-editor-shell.js?v=20260411-floor-editor-v42"></script>
+</body>
+</html>

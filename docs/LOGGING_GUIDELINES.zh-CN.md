@@ -8,7 +8,7 @@
 - 详细调试日志：用于排查问题时的 verbose 输出
 
 ## 推荐入口
-后续新增日志时，优先使用 `src/logging/logging.js` 中的统一入口：
+后续新增日志时，优先使用 `src/infrastructure/logging/logging.js` 中的统一入口：
 - `pushLog(...)`
 - `detailLog(...)`
 - `logWarn(...)`

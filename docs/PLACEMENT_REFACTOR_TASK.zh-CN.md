@@ -4,7 +4,7 @@
 将主程序中的 placement（物品放置与排序）系统抽离为独立模块，集中管理 prefab 实例放置、实例创建/删除、预览落地提交以及场景物品基础排序触发入口，在不改变现有行为的前提下提升结构清晰度。
 
 ## 允许的改动
-- 新增 `src/placement/placement.js`。
+- 新增 `src/application/placement/placement.js`。
 - 将 placement 相关入口逻辑集中到该文件。
 - 必要时保留兼容包装函数。
 - 在 `index.html` 中新增最小必要的脚本接线。
@@ -32,4 +32,4 @@
 - 若项目原本支持，移动/删除流程仍正常。
 - scene 保存/读取不受影响。
 - Habbo 资源放置不受影响。
-- 后续开发者能够明确在 `src/placement/placement.js` 中查找 placement 入口逻辑。
+- 后续开发者能够明确在 `src/application/placement/placement.js` 中查找 placement 入口逻辑。

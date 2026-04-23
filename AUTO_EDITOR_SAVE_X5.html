@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>自动保存 X5 Prefab</title>
+  <style>
+    body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0f1726;color:#dce7ff;display:flex;align-items:center;justify-content:center;min-height:100vh}
+    .card{width:min(720px,92vw);padding:28px 32px;border:1px solid rgba(120,160,220,.35);border-radius:20px;background:rgba(20,31,52,.92);box-shadow:0 18px 48px rgba(0,0,0,.28)}
+    h1{margin:0 0 12px;font-size:24px} p{opacity:.9;line-height:1.6} .status{margin-top:16px;padding:12px 14px;border-radius:12px;background:rgba(7,14,26,.55);font-family:ui-monospace,Consolas,monospace;white-space:pre-wrap}
+  </style>
+  <script src="src/infrastructure/bootstrap/app-namespace.js"></script>
+  <script src="src/infrastructure/services/prefab-api.js"></script>
+  <script src="src/infrastructure/services/editor-handoff-api.js"></script>
+</head>
+<body>
+  <div class="card">
+    <h1>自动保存 X5 Prefab</h1>
+    <p>这是验收回放专用页面，不会替代正常编辑器界面。当前正在自动生成并保存一个新的 X 形 5 voxel 物体，然后返回主程序继续后续流程。</p>
+    <div id="status" class="status">准备中…</div>
+  </div>
+  <script>
+    (function(){
+      function qs(name){ try { return new URLSearchParams(location.search).get(name) || ''; } catch (_) { return ''; } }
+      function nowIso(){ return new Date().toISOString(); }
+      var sessionId = qs('replaySession') || String(Date.now());
+      var autoScenario = qs('autoScenario') || 'save-x5';
+      var statusEl = document.getElementById('status');
+      function setStatus(msg){ if(statusEl) statusEl.textContent = String(msg || ''); }
+      function summarizeEditorPlatformBoundary(label){
+        try {
+          var services = getServices();
+          return {
+            label: String(label || ''),
+            prefabApi: services.prefabApi && typeof services.prefabApi.summarize === 'function' ? services.prefabApi.summarize(String(label || '')) : null,
+            editorHandoff: services.editorHandoff && typeof services.editorHandoff.summarize === 'function' ? services.editorHandoff.summarize(String(label || '')) : null
+          };
+        } catch (_) { return { label: String(label || ''), error: 'summary-failed' }; }
+      }
+      async function report(tag, payload){
+        try {
+          await fetch('/api/self-check/report', {
+            method:'POST', headers:{'Content-Type':'application/json;charset=utf-8'},
+            body: JSON.stringify({
+              filenameHint: 'editor-auto-' + sessionId + '-' + String(tag||'unknown') + '.json',
+              report: {
+                phase:'P8X', owner:'AUTO_EDITOR_SAVE_X5.html', kind:'editor-auto', tag:String(tag||'unknown'),
+                sessionId:sessionId, autoScenario:autoScenario, href:String(location.href||''), at: nowIso(), payload: payload || {},
+                platformBoundary: summarizeEditorPlatformBoundary(tag || 'unknown')
+              }
+            })
+          });
+        } catch (_) {}
+      }
+      function getServices(){ try { return (window.App && window.App.services) ? window.App.services : {}; } catch (_) { return {}; } }
+      function writeMainHandoff(payload){
+        try {
+          var service = getServices().editorHandoff;
+          if (!service || typeof service.writeHandoff !== 'function') return;
+          service.writeHandoff(Object.assign({
+            phase:'P1b', source:'editor-auto', launchedFromMain: qs('fromMain') === '1', savedAtMs: Date.now(),
+            editorEntry:{ kind:'editor-auto', label:'编辑器自动保存页', entryFile:'AUTO_EDITOR_SAVE_X5.html', launcherHint:'replay-only', build:'auto-x5-v1' }
+          }, payload || {}), { source: 'editor-auto:write-main-handoff' });
+        } catch (_) {}
+      }
+      function buildReturnHref(prefabId, reason){
+        var p = new URLSearchParams();
+        p.set('fromEditor','1'); p.set('t', String(Date.now()));
+        if (reason) p.set('reason', reason);
+        if (prefabId) p.set('prefabId', prefabId);
+        return 'index.html?' + p.toString();
+      }
+      async function saveX5(){
+        var suffix = String(sessionId).replace(/[^0-9A-Za-z_-]/g, '').slice(-12) || String(Date.now());
+        var prefabId = 'auto_x5_' + suffix;
+        var prefabName = 'Auto X5 ' + suffix;
+        var prefab = { id: prefabId, name: prefabName, kind: 'custom', asset: '', base: '#c7b0df', renderMode: 'voxel', anchor: { x:0, y:0, z:0 }, voxels: [
+          { x:0, y:0, z:0, solid:true, collidable:true },
+          { x:0, y:2, z:0, solid:true, collidable:true },
+          { x:1, y:1, z:0, solid:true, collidable:true },
+          { x:2, y:0, z:0, solid:true, collidable:true },
+          { x:2, y:2, z:0, solid:true, collidable:true }
+        ]};
+        setStatus('正在写入 prefab…\n' + prefabId);
+        await report('save-start', { prefabId: prefabId, prefabName: prefabName });
+        try {
+          var prefabApi = getServices().prefabApi;
+          if (!prefabApi || typeof prefabApi.savePrefabToServer !== 'function') throw new Error('missing-prefab-service');
+          var result = await prefabApi.savePrefabToServer(prefabName + '.json', prefab, { source: 'editor-auto:save-prefab' });
+          var res = result && result.response ? result.response : null;
+          var data = result && result.data ? result.data : null;
+          if (!res || !res.ok || !data || !data.ok) throw new Error((data && data.error) || ('HTTP ' + (res ? res.status : '0')));
+          writeMainHandoff({ reason:'scenario-editor-save', kind:'prefab-save', prefabId: prefabId, prefabName: prefabName, voxels: prefab.voxels.length, replaySessionId: sessionId, replayScenario: autoScenario, file: data.file || '', path: data.path || '' });
+          await report('save-success', { prefabId: prefabId, file: data.file || '', path: data.path || '' });
+          setStatus('保存成功，正在返回主程序…\n' + prefabId);
+          setTimeout(function(){ location.href = buildReturnHref(prefabId, 'scenario-editor-save'); }, 500);
+        } catch (err) {
+          var message = err && err.message ? err.message : String(err);
+          await report('save-error', { prefabId: prefabId, error: message });
+          setStatus('保存失败：' + message + '\n正在返回主程序。');
+          setTimeout(function(){ location.href = buildReturnHref(prefabId, 'scenario-editor-error'); }, 700);
+        }
+      }
+      report('boot', { readyState: document.readyState });
+      window.addEventListener('error', function(ev){ report('window-error', { message: ev && ev.message ? ev.message : 'unknown' }); });
+      window.addEventListener('unhandledrejection', function(ev){ report('window-unhandledrejection', { reason: String(ev && ev.reason ? ev.reason : 'unknown') }); });
+      saveX5();
+    })();
+  </script>
+</body>
+</html>

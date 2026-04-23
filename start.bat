@@ -2,12 +2,17 @@
 cd /d "%~dp0"
 if not exist "%~dp0logs" mkdir "%~dp0logs"
 set LOGFILE=%~dp0logs\server-main.log
+set QUERY_SUFFIX=%~1
 call :pick_port
 if errorlevel 1 goto :port_failed
 start "Isometric Room Main Server" /min cmd /c ""%~dp0server\run_server.bat" %PORT% main"
 call :wait_ready
 if errorlevel 1 goto :server_failed
-start "" "http://127.0.0.1:%PORT%/index.html?v=20260323P-ui-button-iconfix"
+if not "%QUERY_SUFFIX%"=="" (
+  start "" "http://127.0.0.1:%PORT%/index.html%QUERY_SUFFIX%"
+) else (
+  start "" "http://127.0.0.1:%PORT%/index.html?v=20260323P-ui-button-iconfix"
+)
 exit /b
 
 :pick_port

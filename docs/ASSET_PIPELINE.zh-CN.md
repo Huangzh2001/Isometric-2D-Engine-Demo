@@ -11,7 +11,7 @@
 3. 由独立素材编辑器导出并保存到 prefab 库中的素材
 
 ## 当前内部统一入口
-当前素材接入的主要入口已经集中到 `src/asset-management/asset-management.js`。
+当前素材接入的主要入口已经集中到 `src/infrastructure/assets/asset-management.js`。
 
 该模块负责：
 - 读取 prefab 索引

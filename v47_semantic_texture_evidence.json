@@ -1,0 +1,693 @@
+{
+  "schema": "main-editor-semantic-texture-evidence/v47",
+  "generatedAt": "2026-04-12T06:04:08.211Z",
+  "claim": "debug_5faces uses semantic texture map; visible faces select top/north/east/south/west textures and produce renderable faces",
+  "cubeFacing0": {
+    "prefabId": "debug_cube_5faces",
+    "previewFacing": 0,
+    "semanticTextureMap": {
+      "top": {
+        "textureId": "debug.semantic.top.solid",
+        "kind": "solid-color",
+        "color": "#2F80ED",
+        "semanticFace": "top"
+      },
+      "north": {
+        "textureId": "debug.semantic.north.solid",
+        "kind": "solid-color",
+        "color": "#E74C3C",
+        "semanticFace": "north"
+      },
+      "east": {
+        "textureId": "debug.semantic.east.solid",
+        "kind": "solid-color",
+        "color": "#27AE60",
+        "semanticFace": "east"
+      },
+      "south": {
+        "textureId": "debug.semantic.south.solid",
+        "kind": "solid-color",
+        "color": "#F2C94C",
+        "semanticFace": "south"
+      },
+      "west": {
+        "textureId": "debug.semantic.west.solid",
+        "kind": "solid-color",
+        "color": "#9B51E0",
+        "semanticFace": "west"
+      }
+    },
+    "visibleSemanticFaces": [
+      "top",
+      "east",
+      "south"
+    ],
+    "renderedFaces": [
+      {
+        "faceId": "evidence:debug_cube_5faces:0,0,0:east:east",
+        "semanticFace": "east",
+        "screenFace": "east",
+        "textureId": "debug.semantic.east.solid",
+        "color": "#27AE60",
+        "polygon": [
+          {
+            "x": 1,
+            "y": 0,
+            "z": 0
+          },
+          {
+            "x": 1,
+            "y": 1,
+            "z": 0
+          },
+          {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          {
+            "x": 1,
+            "y": 0,
+            "z": 1
+          }
+        ],
+        "depthKey": 1
+      },
+      {
+        "faceId": "evidence:debug_cube_5faces:0,0,0:south:south",
+        "semanticFace": "south",
+        "screenFace": "south",
+        "textureId": "debug.semantic.south.solid",
+        "color": "#F2C94C",
+        "polygon": [
+          {
+            "x": 0,
+            "y": 1,
+            "z": 0
+          },
+          {
+            "x": 1,
+            "y": 1,
+            "z": 0
+          },
+          {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          {
+            "x": 0,
+            "y": 1,
+            "z": 1
+          }
+        ],
+        "depthKey": 2
+      },
+      {
+        "faceId": "evidence:debug_cube_5faces:0,0,0:top:top",
+        "semanticFace": "top",
+        "screenFace": "top",
+        "textureId": "debug.semantic.top.solid",
+        "color": "#2F80ED",
+        "polygon": [
+          {
+            "x": 0,
+            "y": 0,
+            "z": 1
+          },
+          {
+            "x": 1,
+            "y": 0,
+            "z": 1
+          },
+          {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          {
+            "x": 0,
+            "y": 1,
+            "z": 1
+          }
+        ],
+        "depthKey": 3
+      }
+    ],
+    "faceDrawOrder": [
+      "evidence:debug_cube_5faces:0,0,0:east:east",
+      "evidence:debug_cube_5faces:0,0,0:south:south",
+      "evidence:debug_cube_5faces:0,0,0:top:top"
+    ],
+    "renderedAsOverlay": false,
+    "helperLayerUsed": false,
+    "boxBaseUsedForDebugFaces": false
+  },
+  "cubeFacing1": {
+    "prefabId": "debug_cube_5faces",
+    "previewFacing": 1,
+    "semanticTextureMap": {
+      "top": {
+        "textureId": "debug.semantic.top.solid",
+        "kind": "solid-color",
+        "color": "#2F80ED",
+        "semanticFace": "top"
+      },
+      "north": {
+        "textureId": "debug.semantic.north.solid",
+        "kind": "solid-color",
+        "color": "#E74C3C",
+        "semanticFace": "north"
+      },
+      "east": {
+        "textureId": "debug.semantic.east.solid",
+        "kind": "solid-color",
+        "color": "#27AE60",
+        "semanticFace": "east"
+      },
+      "south": {
+        "textureId": "debug.semantic.south.solid",
+        "kind": "solid-color",
+        "color": "#F2C94C",
+        "semanticFace": "south"
+      },
+      "west": {
+        "textureId": "debug.semantic.west.solid",
+        "kind": "solid-color",
+        "color": "#9B51E0",
+        "semanticFace": "west"
+      }
+    },
+    "visibleSemanticFaces": [
+      "top",
+      "north",
+      "east"
+    ],
+    "renderedFaces": [
+      {
+        "faceId": "evidence:debug_cube_5faces:0,0,0:east:north",
+        "semanticFace": "north",
+        "screenFace": "east",
+        "textureId": "debug.semantic.north.solid",
+        "color": "#E74C3C",
+        "polygon": [
+          {
+            "x": 1,
+            "y": 0,
+            "z": 0
+          },
+          {
+            "x": 1,
+            "y": 1,
+            "z": 0
+          },
+          {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          {
+            "x": 1,
+            "y": 0,
+            "z": 1
+          }
+        ],
+        "depthKey": 1
+      },
+      {
+        "faceId": "evidence:debug_cube_5faces:0,0,0:south:east",
+        "semanticFace": "east",
+        "screenFace": "south",
+        "textureId": "debug.semantic.east.solid",
+        "color": "#27AE60",
+        "polygon": [
+          {
+            "x": 0,
+            "y": 1,
+            "z": 0
+          },
+          {
+            "x": 1,
+            "y": 1,
+            "z": 0
+          },
+          {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          {
+            "x": 0,
+            "y": 1,
+            "z": 1
+          }
+        ],
+        "depthKey": 2
+      },
+      {
+        "faceId": "evidence:debug_cube_5faces:0,0,0:top:top",
+        "semanticFace": "top",
+        "screenFace": "top",
+        "textureId": "debug.semantic.top.solid",
+        "color": "#2F80ED",
+        "polygon": [
+          {
+            "x": 0,
+            "y": 0,
+            "z": 1
+          },
+          {
+            "x": 1,
+            "y": 0,
+            "z": 1
+          },
+          {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          {
+            "x": 0,
+            "y": 1,
+            "z": 1
+          }
+        ],
+        "depthKey": 3
+      }
+    ],
+    "faceDrawOrder": [
+      "evidence:debug_cube_5faces:0,0,0:east:north",
+      "evidence:debug_cube_5faces:0,0,0:south:east",
+      "evidence:debug_cube_5faces:0,0,0:top:top"
+    ],
+    "renderedAsOverlay": false,
+    "helperLayerUsed": false,
+    "boxBaseUsedForDebugFaces": false
+  },
+  "rectFacing0": {
+    "prefabId": "debug_rect_2x1_5faces",
+    "previewFacing": 0,
+    "semanticTextureMap": {
+      "top": {
+        "textureId": "debug.semantic.top.solid",
+        "kind": "solid-color",
+        "color": "#2F80ED",
+        "semanticFace": "top"
+      },
+      "north": {
+        "textureId": "debug.semantic.north.solid",
+        "kind": "solid-color",
+        "color": "#E74C3C",
+        "semanticFace": "north"
+      },
+      "east": {
+        "textureId": "debug.semantic.east.solid",
+        "kind": "solid-color",
+        "color": "#27AE60",
+        "semanticFace": "east"
+      },
+      "south": {
+        "textureId": "debug.semantic.south.solid",
+        "kind": "solid-color",
+        "color": "#F2C94C",
+        "semanticFace": "south"
+      },
+      "west": {
+        "textureId": "debug.semantic.west.solid",
+        "kind": "solid-color",
+        "color": "#9B51E0",
+        "semanticFace": "west"
+      }
+    },
+    "visibleSemanticFaces": [
+      "top",
+      "east",
+      "south"
+    ],
+    "renderedFaces": [
+      {
+        "faceId": "evidence:debug_rect_2x1_5faces:0,0,0:south:south",
+        "semanticFace": "south",
+        "screenFace": "south",
+        "textureId": "debug.semantic.south.solid",
+        "color": "#F2C94C",
+        "polygon": [
+          {
+            "x": 0,
+            "y": 1,
+            "z": 0
+          },
+          {
+            "x": 1,
+            "y": 1,
+            "z": 0
+          },
+          {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          {
+            "x": 0,
+            "y": 1,
+            "z": 1
+          }
+        ],
+        "depthKey": 2
+      },
+      {
+        "faceId": "evidence:debug_rect_2x1_5faces:0,0,0:top:top",
+        "semanticFace": "top",
+        "screenFace": "top",
+        "textureId": "debug.semantic.top.solid",
+        "color": "#2F80ED",
+        "polygon": [
+          {
+            "x": 0,
+            "y": 0,
+            "z": 1
+          },
+          {
+            "x": 1,
+            "y": 0,
+            "z": 1
+          },
+          {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          {
+            "x": 0,
+            "y": 1,
+            "z": 1
+          }
+        ],
+        "depthKey": 3
+      },
+      {
+        "faceId": "evidence:debug_rect_2x1_5faces:1,0,0:east:east",
+        "semanticFace": "east",
+        "screenFace": "east",
+        "textureId": "debug.semantic.east.solid",
+        "color": "#27AE60",
+        "polygon": [
+          {
+            "x": 2,
+            "y": 0,
+            "z": 0
+          },
+          {
+            "x": 2,
+            "y": 1,
+            "z": 0
+          },
+          {
+            "x": 2,
+            "y": 1,
+            "z": 1
+          },
+          {
+            "x": 2,
+            "y": 0,
+            "z": 1
+          }
+        ],
+        "depthKey": 1001.001
+      },
+      {
+        "faceId": "evidence:debug_rect_2x1_5faces:1,0,0:south:south",
+        "semanticFace": "south",
+        "screenFace": "south",
+        "textureId": "debug.semantic.south.solid",
+        "color": "#F2C94C",
+        "polygon": [
+          {
+            "x": 1,
+            "y": 1,
+            "z": 0
+          },
+          {
+            "x": 2,
+            "y": 1,
+            "z": 0
+          },
+          {
+            "x": 2,
+            "y": 1,
+            "z": 1
+          },
+          {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          }
+        ],
+        "depthKey": 1002.001
+      },
+      {
+        "faceId": "evidence:debug_rect_2x1_5faces:1,0,0:top:top",
+        "semanticFace": "top",
+        "screenFace": "top",
+        "textureId": "debug.semantic.top.solid",
+        "color": "#2F80ED",
+        "polygon": [
+          {
+            "x": 1,
+            "y": 0,
+            "z": 1
+          },
+          {
+            "x": 2,
+            "y": 0,
+            "z": 1
+          },
+          {
+            "x": 2,
+            "y": 1,
+            "z": 1
+          },
+          {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          }
+        ],
+        "depthKey": 1003.001
+      }
+    ],
+    "faceDrawOrder": [
+      "evidence:debug_rect_2x1_5faces:0,0,0:south:south",
+      "evidence:debug_rect_2x1_5faces:0,0,0:top:top",
+      "evidence:debug_rect_2x1_5faces:1,0,0:east:east",
+      "evidence:debug_rect_2x1_5faces:1,0,0:south:south",
+      "evidence:debug_rect_2x1_5faces:1,0,0:top:top"
+    ],
+    "renderedAsOverlay": false,
+    "helperLayerUsed": false,
+    "boxBaseUsedForDebugFaces": false
+  },
+  "rectFacing1": {
+    "prefabId": "debug_rect_2x1_5faces",
+    "previewFacing": 1,
+    "semanticTextureMap": {
+      "top": {
+        "textureId": "debug.semantic.top.solid",
+        "kind": "solid-color",
+        "color": "#2F80ED",
+        "semanticFace": "top"
+      },
+      "north": {
+        "textureId": "debug.semantic.north.solid",
+        "kind": "solid-color",
+        "color": "#E74C3C",
+        "semanticFace": "north"
+      },
+      "east": {
+        "textureId": "debug.semantic.east.solid",
+        "kind": "solid-color",
+        "color": "#27AE60",
+        "semanticFace": "east"
+      },
+      "south": {
+        "textureId": "debug.semantic.south.solid",
+        "kind": "solid-color",
+        "color": "#F2C94C",
+        "semanticFace": "south"
+      },
+      "west": {
+        "textureId": "debug.semantic.west.solid",
+        "kind": "solid-color",
+        "color": "#9B51E0",
+        "semanticFace": "west"
+      }
+    },
+    "visibleSemanticFaces": [
+      "top",
+      "north",
+      "east"
+    ],
+    "renderedFaces": [
+      {
+        "faceId": "evidence:debug_rect_2x1_5faces:0,0,0:south:east",
+        "semanticFace": "east",
+        "screenFace": "south",
+        "textureId": "debug.semantic.east.solid",
+        "color": "#27AE60",
+        "polygon": [
+          {
+            "x": 0,
+            "y": 1,
+            "z": 0
+          },
+          {
+            "x": 1,
+            "y": 1,
+            "z": 0
+          },
+          {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          {
+            "x": 0,
+            "y": 1,
+            "z": 1
+          }
+        ],
+        "depthKey": 2
+      },
+      {
+        "faceId": "evidence:debug_rect_2x1_5faces:0,0,0:top:top",
+        "semanticFace": "top",
+        "screenFace": "top",
+        "textureId": "debug.semantic.top.solid",
+        "color": "#2F80ED",
+        "polygon": [
+          {
+            "x": 0,
+            "y": 0,
+            "z": 1
+          },
+          {
+            "x": 1,
+            "y": 0,
+            "z": 1
+          },
+          {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          {
+            "x": 0,
+            "y": 1,
+            "z": 1
+          }
+        ],
+        "depthKey": 3
+      },
+      {
+        "faceId": "evidence:debug_rect_2x1_5faces:1,0,0:east:north",
+        "semanticFace": "north",
+        "screenFace": "east",
+        "textureId": "debug.semantic.north.solid",
+        "color": "#E74C3C",
+        "polygon": [
+          {
+            "x": 2,
+            "y": 0,
+            "z": 0
+          },
+          {
+            "x": 2,
+            "y": 1,
+            "z": 0
+          },
+          {
+            "x": 2,
+            "y": 1,
+            "z": 1
+          },
+          {
+            "x": 2,
+            "y": 0,
+            "z": 1
+          }
+        ],
+        "depthKey": 1001.001
+      },
+      {
+        "faceId": "evidence:debug_rect_2x1_5faces:1,0,0:south:east",
+        "semanticFace": "east",
+        "screenFace": "south",
+        "textureId": "debug.semantic.east.solid",
+        "color": "#27AE60",
+        "polygon": [
+          {
+            "x": 1,
+            "y": 1,
+            "z": 0
+          },
+          {
+            "x": 2,
+            "y": 1,
+            "z": 0
+          },
+          {
+            "x": 2,
+            "y": 1,
+            "z": 1
+          },
+          {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          }
+        ],
+        "depthKey": 1002.001
+      },
+      {
+        "faceId": "evidence:debug_rect_2x1_5faces:1,0,0:top:top",
+        "semanticFace": "top",
+        "screenFace": "top",
+        "textureId": "debug.semantic.top.solid",
+        "color": "#2F80ED",
+        "polygon": [
+          {
+            "x": 1,
+            "y": 0,
+            "z": 1
+          },
+          {
+            "x": 2,
+            "y": 0,
+            "z": 1
+          },
+          {
+            "x": 2,
+            "y": 1,
+            "z": 1
+          },
+          {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          }
+        ],
+        "depthKey": 1003.001
+      }
+    ],
+    "faceDrawOrder": [
+      "evidence:debug_rect_2x1_5faces:0,0,0:south:east",
+      "evidence:debug_rect_2x1_5faces:0,0,0:top:top",
+      "evidence:debug_rect_2x1_5faces:1,0,0:east:north",
+      "evidence:debug_rect_2x1_5faces:1,0,0:south:east",
+      "evidence:debug_rect_2x1_5faces:1,0,0:top:top"
+    ],
+    "renderedAsOverlay": false,
+    "helperLayerUsed": false,
+    "boxBaseUsedForDebugFaces": false
+  }
+}

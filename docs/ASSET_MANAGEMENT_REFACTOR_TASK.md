@@ -4,7 +4,7 @@
 Extract the main program's asset management and import logic into a dedicated module so that prefab loading, asset index refresh, Habbo resource access, and asset-library-facing integration are easier to maintain without changing runtime behavior.
 
 ## Allowed changes
-- Add `src/asset-management/asset-management.js`
+- Add `src/infrastructure/assets/asset-management.js`
 - Move asset-related logic into that file, including:
   - prefab index loading
   - prefab scan / refresh logic
@@ -47,4 +47,4 @@ Extract the main program's asset management and import logic into a dedicated mo
 - Habbo library related actions still work
 - Custom prefab loading from local storage still works
 - No obvious new UI or runtime errors are introduced
-- Future developers can find asset import / indexing logic in `src/asset-management/asset-management.js`
+- Future developers can find asset import / indexing logic in `src/infrastructure/assets/asset-management.js`

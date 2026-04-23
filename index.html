@@ -17,6 +17,8 @@
         <button id="tabWorld" class="panelTab active">世界</button>
         <button id="tabItems" class="panelTab">物品</button>
         <button id="tabLights" class="panelTab">灯光</button>
+        <button id="tabCamera" class="panelTab">摄像头</button>
+        <button id="tabTerrain" class="panelTab">地形</button>
         <button id="tabPlayer" class="panelTab">角色</button>
       </div>
 
@@ -56,6 +58,16 @@
             <button id="clearLog">清空日志</button>
             <button id="downloadLog">下载日志</button>
           </div>
+          <div class="rowButtons rowButtons2">
+            <button id="runSelfCheck">运行自检并保存报告</button>
+            <button id="downloadSelfCheckReport">下载最近自检报告</button>
+          </div>
+          <div id="selfCheckStatus" class="hintBox">自检：未运行。报告会自动保存到 logs/self-check。</div>
+          <div class="rowButtons rowButtons2">
+            <button id="runAcceptanceReplay">运行可见验收回放</button>
+            <button id="stopAcceptanceReplay">停止验收回放</button>
+          </div>
+          <div id="acceptanceReplayStatus" class="hintBox">验收回放：未运行。将自动保存报告到 logs/self-check，并在页面上显示虚拟点击与步骤状态。</div>
           <div class="rowButtons rowButtons2">
             <button id="downloadHabboDebug">下载 Habbo 调试 JSON</button>
             <label style="display:flex;align-items:center;gap:6px;font-size:12px;"><input id="showHabboDebugOverlay" type="checkbox" checked> 显示 Habbo 调试覆盖层</label>
@@ -131,6 +143,26 @@
           <pre id="assetScanDetails" class="inspectorPre"></pre>
         </div>
         <div class="group inspectorGroup">
+          <h2>物品旋转 Prototype（阶段 1）</h2>
+          <div class="hintBox">本阶段只做 item rotation prototype：item facing、五个语义面调试色、footprint/anchor/sortBase 映射，以及 spriteStrategy（1张 / 2张镜像 / 4张）。logicalType 分类规则放到下一阶段，不在这里混入。放置预览激活时，鼠标滚轮只旋转 previewFacing，不旋转已放置实例。</div>
+          <div class="rowButtons rowButtons2 itemFacingControls">
+            <button id="previewRotateLeft">预览左转</button>
+            <button id="previewRotateRight">预览右转</button>
+          </div>
+          <div class="rowButtons rowButtons4 itemFacingButtons">
+            <button id="previewFacing0">朝向 N</button>
+            <button id="previewFacing1">朝向 E</button>
+            <button id="previewFacing2">朝向 S</button>
+            <button id="previewFacing3">朝向 W</button>
+          </div>
+          <div class="itemFacingStatus">
+            <strong>当前预览朝向：</strong>
+            <span id="previewFacingLabel">N</span>
+          </div>
+          <div class="hintBox">已放置实例原地旋转已从本阶段 UI 降级；本阶段只验证放置前 previewFacing。</div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;"><input id="showItemFacingDebug" type="checkbox" checked> 显示 item facing 语义面调试色</label>
+        </div>
+        <div class="group inspectorGroup">
           <h2>物品检查器</h2>
           <div id="itemInspectorEmpty" class="hintBox">在查看模式下点击场景中的物件，即可在这里查看该 instance 与 prefab 的信息。</div>
           <div id="itemInspectorSummary" class="inspectorSummary hidden"></div>
@@ -139,7 +171,130 @@
             <pre id="itemInspectorInstance" class="inspectorPre"></pre>
             <label>模板信息</label>
             <pre id="itemInspectorPrefab" class="inspectorPre"></pre>
+            <label>旋转 prototype 信息</label>
+            <pre id="itemInspectorFacingPrototype" class="inspectorPre"></pre>
           </div>
+        </div>
+      </div>
+      </section>
+
+      <section id="tabCameraPage" class="tabPage">
+      <div class="controls">
+        <div class="group inspectorGroup">
+          <h2>摄像头 / Camera</h2>
+          <div class="hintBox">这里是 main editor 视角切换与旋转动画的正式入口。它只改变相机/投影视角，不会修改逻辑占地、scene graph 坐标、previewFacing、instanceFacing 或 light world position。</div>
+          <div class="rowButtons rowButtons3 itemFacingControls">
+            <button id="mainViewRotateLeft">Rotate Left</button>
+            <button id="mainViewRotateRight">Rotate Right</button>
+            <button id="mainCameraResetView">Reset View</button>
+          </div>
+          <div class="itemFacingStatus">
+            <strong>当前视角：</strong>
+            <span id="mainViewRotationLabel">NE / rot=0</span>
+          </div>
+        </div>
+        <div class="group inspectorGroup">
+          <h2>旋转动画</h2>
+          <label style="display:flex;align-items:center;gap:8px;"><input id="mainCameraAnimationEnabled" type="checkbox" checked> Rotation Animation Enabled</label>
+          <label>Rotation Duration (ms) <input id="mainCameraAnimationMs" type="number" min="0" max="5000" step="10" value="160"></label>
+          <label style="display:flex;align-items:center;gap:8px;"><input id="mainCameraInterpolationEnabled" type="checkbox" checked> Rotation Interpolation Enabled</label>
+          <label>Interpolation Mode
+            <select id="mainCameraInterpolationMode">
+              <option value="linear">linear</option>
+              <option value="easeInOut" selected>easeInOut</option>
+            </select>
+          </label>
+          <div class="rowButtons rowButtons2">
+            <button id="downloadMainViewRotationDiagnostic">导出视角旋转诊断日志</button>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;"><input id="showFaceDebugOverlay" type="checkbox"> 显示 face 调试标签</label>
+          </div>
+        </div>
+        <div class="group inspectorGroup">
+          <h2>缩放 / Zoom</h2>
+          <label>Zoom <input id="mainCameraZoom" type="number" min="0.05" max="4" step="0.05" value="1"></label>
+          <label>Min Zoom <input id="mainCameraMinZoom" type="number" min="0.05" max="4" step="0.05" value="0.5"></label>
+          <label>Max Zoom <input id="mainCameraMaxZoom" type="number" min="0.05" max="6" step="0.05" value="2"></label>
+        </div>
+        <div class="group inspectorGroup">
+          <h2>裁剪 / Culling</h2>
+          <label style="display:flex;align-items:center;gap:8px;"><input id="mainCameraCullingEnabled" type="checkbox" checked> Camera Culling Enabled</label>
+          <label>Culling Margin <input id="mainCameraCullingMargin" type="number" min="0" max="64" step="0.5" value="2"></label>
+          <label style="display:flex;align-items:center;gap:8px;"><input id="mainCameraShowBounds" type="checkbox"> Show Camera Bounds</label>
+          <label style="display:flex;align-items:center;gap:8px;"><input id="mainCameraShowCullingBounds" type="checkbox"> Show Culling Bounds</label>
+          <label style="display:flex;align-items:center;gap:8px;"><input id="mainCameraSurfaceOnlyRenderingEnabled" type="checkbox" checked> Surface-Only Rendering Enabled</label>
+          <label style="display:flex;align-items:center;gap:8px;"><input id="mainCameraDebugVisibleSurfaces" type="checkbox"> Debug Visible Surfaces</label>
+          <div id="mainCameraSettingsSummary" class="hintBox">动画：开启，160ms，插值：开启 / easeInOut，缩放：1.00x，裁剪：开启，margin=2</div>
+        </div>
+      </div>
+      </section>
+
+
+      <section id="tabTerrainPage" class="tabPage">
+      <div class="controls">
+        <div class="group inspectorGroup">
+          <h2>地形 / Terrain</h2>
+          <div class="hintBox">第一版只做：根据平滑噪声 + octave/fBm + height profile 生成整数高度，然后在每个格子上沿 z 方向堆叠对应数量的方块。不会生成斜坡、mesh、植被或河流。</div>
+          <label>Seed <input id="terrainSeed" type="text" value="1337"></label>
+          <label>Width <input id="terrainWidth" type="number" min="1" max="128" step="1" value="11"></label>
+          <label>Height <input id="terrainHeight" type="number" min="1" max="128" step="1" value="9"></label>
+        </div>
+
+        <div class="group inspectorGroup">
+          <h2>细节噪声 / detailNoise</h2>
+          <label>Detail Scale <input id="terrainDetailScale" type="number" min="0.1" max="512" step="0.1" value="8"></label>
+          <label>Detail Octaves <input id="terrainDetailOctaves" type="number" min="1" max="8" step="1" value="4"></label>
+          <label>Detail Persistence <input id="terrainDetailPersistence" type="number" min="0" max="1.5" step="0.01" value="0.5"></label>
+          <label>Detail Lacunarity <input id="terrainDetailLacunarity" type="number" min="1" max="6" step="0.01" value="2"></label>
+          <label>Detail Strength <input id="terrainDetailStrength" type="number" min="0" max="64" step="0.1" value="4"></label>
+        </div>
+
+        <div class="group inspectorGroup">
+          <h2>宏观噪声 / macroNoise</h2>
+          <label>Macro Scale <input id="terrainMacroScale" type="number" min="0.1" max="1024" step="0.1" value="28"></label>
+          <label>Macro Octaves <input id="terrainMacroOctaves" type="number" min="1" max="8" step="1" value="3"></label>
+          <label>Macro Persistence <input id="terrainMacroPersistence" type="number" min="0" max="1.5" step="0.01" value="0.55"></label>
+          <label>Macro Lacunarity <input id="terrainMacroLacunarity" type="number" min="1" max="6" step="0.01" value="2"></label>
+        </div>
+
+        <div class="group inspectorGroup">
+          <h2>高度范围</h2>
+          <label>Min Height <input id="terrainMinHeight" type="number" min="0" max="128" step="1" value="0"></label>
+          <label>Max Height <input id="terrainMaxHeight" type="number" min="0" max="128" step="1" value="18"></label>
+          <label>Water Level <input id="terrainWaterLevel" type="number" min="-64" max="128" step="1" value="0"></label>
+          <label>Base Height Offset <input id="terrainBaseHeightOffset" type="number" min="-64" max="128" step="1" value="0"></label>
+        </div>
+
+        <div class="group inspectorGroup">
+          <h2>高度剖面 / Height Profile</h2>
+          <div class="hintBox">每一段表示：当 macroNoise 落在该区间时，本区域的基础海拔档位。</div>
+          <label>Profile 1 Start <input id="terrainProfile0Start" type="number" min="0" max="1" step="0.01" value="0.00"></label>
+          <label>Profile 1 End <input id="terrainProfile0End" type="number" min="0" max="1.01" step="0.01" value="0.28"></label>
+          <label>Profile 1 Base Height <input id="terrainProfile0Base" type="number" min="-64" max="128" step="1" value="0"></label>
+          <label>Profile 2 Start <input id="terrainProfile1Start" type="number" min="0" max="1" step="0.01" value="0.28"></label>
+          <label>Profile 2 End <input id="terrainProfile1End" type="number" min="0" max="1.01" step="0.01" value="0.56"></label>
+          <label>Profile 2 Base Height <input id="terrainProfile1Base" type="number" min="-64" max="128" step="1" value="3"></label>
+          <label>Profile 3 Start <input id="terrainProfile2Start" type="number" min="0" max="1" step="0.01" value="0.56"></label>
+          <label>Profile 3 End <input id="terrainProfile2End" type="number" min="0" max="1.01" step="0.01" value="0.80"></label>
+          <label>Profile 3 Base Height <input id="terrainProfile2Base" type="number" min="-64" max="128" step="1" value="7"></label>
+          <label>Profile 4 Start <input id="terrainProfile3Start" type="number" min="0" max="1" step="0.01" value="0.80"></label>
+          <label>Profile 4 End <input id="terrainProfile3End" type="number" min="0" max="1.01" step="0.01" value="1.01"></label>
+          <label>Profile 4 Base Height <input id="terrainProfile3Base" type="number" min="-64" max="128" step="1" value="12"></label>
+        </div>
+
+        <div class="group inspectorGroup">
+          <h2>调试显示 / Debug</h2>
+          <label><input id="terrainDebugFaceColorsEnabled" type="checkbox"> Terrain Semantic Edge Colors</label>
+          <div class="hintBox">开启后，terrain 使用原方块语义面的调试颜色；关闭后恢复自然地形颜色。</div>
+        </div>
+
+        <div class="group inspectorGroup">
+          <div class="rowButtons rowButtons3">
+            <button id="terrainGenerate">Generate</button>
+            <button id="terrainClear">Clear Terrain</button>
+            <button id="terrainResetParams">Reset Params</button>
+          </div>
+          <div id="terrainSummary" class="hintBox">Terrain：尚未生成。</div>
+          <pre id="terrainDetails" class="inspectorPre"></pre>
         </div>
       </div>
       </section>
@@ -240,7 +395,8 @@
       <div class="keys">
         <div><kbd>WASD</kbd> / 方向键：按屏幕方向移动人物</div>
         <div><kbd>1</kbd>~<kbd>7</kbd>：选择要摆的 Prefab</div>
-        <div><kbd>Q</kbd>：旋转 footprint（交换宽深）</div>
+        <div><kbd>Q</kbd> / <kbd>E</kbd>：旋转当前预览朝向（四向）</div>
+        <div><kbd>[</kbd> / <kbd>]</kbd>：旋转主编辑器视角 viewRotation</div>
         <div><kbd>左键</kbd>：根据模式执行（拖动画面 / 放置 / 删除）</div>
         <div><kbd>Shift</kbd> + <kbd>左键</kbd>：在“建立物件”模式下拖动物体</div>
         <div><kbd>右键</kbd>：取消拖动</div>
@@ -330,16 +486,57 @@
       build: '20260326-shadow-controls-v8'
     };
   </script>
-  <script src="src/logging/logging.js"></script>
-  <script src="src/placement/placement.js"></script>
-  <script src="src/lighting/lighting.js"></script>
-  <script src="src/state.js"></script>
-  <script src="src/asset-management/asset-management.js"></script>
-  <script src="src/scene-storage/scene-storage.js"></script>
-  <script src="src/player/player.js"></script>
-  <script src="src/ui.js"></script>
-  <script src="src/logic.js"></script>
-  <script src="src/render.js"></script>
-  <script src="src/app.js"></script>
+  <script src="src/infrastructure/logging/logging.js"></script>
+  <script src="src/infrastructure/logging/p0-phase-logger.js"></script>
+  <script src="src/infrastructure/bootstrap/app-namespace.js"></script>
+  <script src="src/infrastructure/audit/architecture-layer-audit.js"></script>
+  <script src="src/core/state/state-owner-map.js"></script>
+  <script src="src/core/state/state-selectors.js"></script>
+  <script src="src/infrastructure/audit/placement-route-audit.js"></script>
+  <script src="src/infrastructure/audit/runtime-route-audit.js"></script>
+  <script src="src/application/placement/placement.js"></script>
+  <script src="src/core/scene/scene-keys.js"></script>
+  <script src="src/core/lighting/lighting-state.js"></script>
+  <script src="src/presentation/lighting/lighting-editor.js"></script>
+  <script src="src/presentation/lighting/lighting-render.js"></script>
+  <script src="src/presentation/lighting/lighting.js"></script>
+  <script src="src/presentation/shell/dom-registry.js"></script>
+  <script src="src/core/state/runtime-state.js"></script>
+  <script src="src/core/state/prefab-registry.js"></script>
+  <script src="src/core/state/scene-session-state.js"></script>
+  <script src="src/application/state/state-actions.js"></script>
+  <script src="src/infrastructure/adapters/placement-effects.js"></script>
+  <script src="src/core/domain/scene-domain-core.js"></script>
+  <script src="src/core/domain/view-rotation-core.js"></script>
+  <script src="src/core/domain/item-facing-core.js"></script>
+  <script src="src/core/domain/render-face-oracle-core.js"></script>
+  <script src="src/core/domain/terrain-generator-core.js"></script>
+  <script src="src/core/domain/render-visibility-core.js"></script>
+  <script src="src/infrastructure/logging/item-rotation-diagnostic-log.js"></script>
+  <script src="src/core/domain/portable-core.js"></script>
+  <script src="src/infrastructure/bootstrap/core-domain-bindings.js"></script>
+  <script src="src/infrastructure/legacy/state.js"></script>
+  <script src="src/infrastructure/services/scene-api.js"></script>
+  <script src="src/infrastructure/services/prefab-api.js"></script>
+  <script src="src/infrastructure/services/habbo-api.js"></script>
+  <script src="src/infrastructure/services/asset-api.js"></script>
+  <script src="src/infrastructure/services/editor-handoff-api.js"></script>
+  <script src="src/application/assets/asset-import.js"></script>
+  <script src="src/infrastructure/assets/asset-management.js"></script>
+  <script src="src/infrastructure/storage/scene-storage.js"></script>
+  <script src="src/application/controllers/app-controllers.js"></script>
+  <script src="src/infrastructure/legacy/placement-legacy-bridge.js"></script>
+  <script src="src/infrastructure/self-check/self-check.js"></script>
+  <script src="src/application/player/player.js"></script>
+  <script src="src/presentation/ui/ui-tabs.js"></script>
+  <script src="src/presentation/ui/ui-inspectors.js"></script>
+  <script src="src/presentation/ui/ui-habbo-library.js"></script>
+  <script src="src/presentation/ui/ui.js"></script>
+  <script src="src/presentation/render/logic.js"></script>
+  <script src="src/presentation/render/render.js"></script>
+  <script src="src/presentation/render/renderer/canvas2d-renderer.js"></script>
+  <script src="src/presentation/shell/app-shell.js"></script>
+  <script src="src/presentation/shell/app.js"></script>
+  <script src="src/infrastructure/self-check/scenario-runner.js"></script>
 </body>
 </html>

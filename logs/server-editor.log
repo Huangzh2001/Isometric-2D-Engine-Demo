@@ -1,0 +1,6 @@
+127.0.0.1 - - [23/Apr/2026 18:27:47] "GET /api/health HTTP/1.1" 200 -
+127.0.0.1 - - [23/Apr/2026 18:27:49] "GET /START_V18_ONLY.html?v=20260321-v18-entry-log HTTP/1.1" 200 -
+127.0.0.1 - - [23/Apr/2026 18:27:49] "GET /styles/editor-v18.css?v=20260321-v18-entry-log HTTP/1.1" 200 -
+127.0.0.1 - - [23/Apr/2026 18:27:49] "GET /src/editor-unified-v18.js?v=20260320-v18-box-occlusion HTTP/1.1" 200 -
+127.0.0.1 - - [23/Apr/2026 18:27:51] code 404, message File not found
+127.0.0.1 - - [23/Apr/2026 18:27:51] "GET /favicon.ico HTTP/1.1" 404 -

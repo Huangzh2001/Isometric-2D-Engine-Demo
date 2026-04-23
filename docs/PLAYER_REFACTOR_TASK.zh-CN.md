@@ -1,7 +1,7 @@
 # Player 重构任务说明
 
 ## 目标
-将人物运动与碰撞系统抽离到 `src/player/player.js`，在保持行为不变的前提下明确职责边界。
+将人物运动与碰撞系统抽离到 `src/application/player/player.js`，在保持行为不变的前提下明确职责边界。
 
 ## 本轮范围
 集中以下内容：

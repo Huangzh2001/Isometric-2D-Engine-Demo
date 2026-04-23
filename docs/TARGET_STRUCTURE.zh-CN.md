@@ -88,7 +88,7 @@ src/
 当前轮次只做：
 
 ```text
-src/scene-storage/scene-storage.js
+src/infrastructure/storage/scene-storage.js
 ```
 
 其他系统保持不动，留待后续轮次逐步处理。

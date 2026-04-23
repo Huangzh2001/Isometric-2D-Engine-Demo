@@ -1,11 +1,11 @@
 # 日志系统重构任务说明
 
 ## 目标
-将主程序中的日志系统抽离到 `src/logging/logging.js`，集中管理运行日志、路由日志、告警、错误与 fail-fast 诊断输出，在不改变现有功能行为的前提下提升代码结构清晰度与调试能力。
+将主程序中的日志系统抽离到 `src/infrastructure/logging/logging.js`，集中管理运行日志、路由日志、告警、错误与 fail-fast 诊断输出，在不改变现有功能行为的前提下提升代码结构清晰度与调试能力。
 
 ## 允许的改动
-- 新增 `src/logging/logging.js`
-- 将共享日志状态与通用日志函数从 `src/state.js` 中抽离
+- 新增 `src/infrastructure/logging/logging.js`
+- 将共享日志状态与通用日志函数从 `src/infrastructure/legacy/state.js` 中抽离
 - 在 `index.html` 中新增最小必要的脚本引用
 - 将原有调用点接到新的 logging 入口
 - 在 `docs/` 下补充文档
@@ -29,4 +29,4 @@
 - Habbo library 正常
 - scene save/load 不受影响
 - route 日志与 fail-fast 日志不丢失
-- 后续开发者能够明确知道日志职责优先在 `src/logging/logging.js` 中查找
+- 后续开发者能够明确知道日志职责优先在 `src/infrastructure/logging/logging.js` 中查找

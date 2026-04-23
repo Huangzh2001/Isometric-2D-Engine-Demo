@@ -216,13 +216,13 @@ The current codebase is not fully modularized, but it can be mapped approximatel
 |---|---|
 | `index.html` | main program entry |
 | `START_V18_ONLY.html` | asset editor entry |
-| `src/state.js` | global state, prefab / scene-related base objects, shared runtime state |
-| `src/scene-storage/scene-storage.js` | scene storage and restore logic (extracted module) |
-| `src/ui.js` | main-program UI synchronization and controls |
-| `src/logic.js` | coordinate math, collision, occlusion, shared spatial logic |
-| `src/render.js` | scene rendering |
-| `src/app.js` | bootstrapping, event wiring, initialization, loop orchestration |
-| `src/editor-unified-v18.js` | asset editor core logic |
+| `src/infrastructure/legacy/state.js` | global state, prefab / scene-related base objects, shared runtime state |
+| `src/infrastructure/storage/scene-storage.js` | scene storage and restore logic (extracted module) |
+| `src/presentation/ui/ui.js` | main-program UI synchronization and controls |
+| `src/presentation/render/logic.js` | coordinate math, collision, occlusion, shared spatial logic |
+| `src/presentation/render/render.js` | scene rendering |
+| `src/presentation/shell/app.js` | bootstrapping, event wiring, initialization, loop orchestration |
+| `src/presentation/editor/editor-unified-v18.js` | asset editor core logic |
 | `local_server.py` | local file service and scene / prefab / Habbo APIs |
 
 ---

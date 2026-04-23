@@ -1,7 +1,7 @@
 # Player Refactor Task
 
 ## Goal
-Extract the player movement and collision system into `src/player/player.js` while preserving behavior.
+Extract the player movement and collision system into `src/application/player/player.js` while preserving behavior.
 
 ## Scope
 This refactor centralizes:

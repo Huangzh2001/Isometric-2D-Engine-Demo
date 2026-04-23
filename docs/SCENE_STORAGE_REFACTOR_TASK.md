@@ -15,7 +15,7 @@ This round focuses on the **scene storage / restore system only**.
 Create:
 
 ```text
-src/scene-storage/scene-storage.js
+src/infrastructure/storage/scene-storage.js
 ```
 
 ### 2.2 Logic to be centralized in the new module
@@ -94,7 +94,7 @@ The following must remain true after this refactor:
 
 This round should produce:
 
-- `src/scene-storage/scene-storage.js`
+- `src/infrastructure/storage/scene-storage.js`
 - minimal script wiring in `index.html`
 - no broad structural migration outside the scene storage scope
 

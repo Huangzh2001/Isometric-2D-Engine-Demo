@@ -17,7 +17,7 @@
 新增：
 
 ```text
-src/scene-storage/scene-storage.js
+src/infrastructure/storage/scene-storage.js
 ```
 
 ### 2.2 需要集中到新模块中的逻辑
@@ -96,7 +96,7 @@ src/scene-storage/scene-storage.js
 
 本轮应至少产出：
 
-- `src/scene-storage/scene-storage.js`
+- `src/infrastructure/storage/scene-storage.js`
 - `index.html` 中最小必要的脚本接线改动
 - 不超出 scene-storage 范围的结构调整
 

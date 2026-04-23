@@ -1,10 +1,10 @@
 # Lighting Refactor Task
 
 ## Goal
-Extract the lighting system into `src/lighting/lighting.js` and centralize lighting state, light management, UI wiring, and render entry wrappers without changing behavior.
+Extract the lighting system into `src/presentation/lighting/lighting.js` and centralize lighting state, light management, UI wiring, and render entry wrappers without changing behavior.
 
 ## Allowed Changes
-- Add `src/lighting/lighting.js`
+- Add `src/presentation/lighting/lighting.js`
 - Move lighting state/helpers from `state.js`
 - Move lighting UI helpers from `ui.js`
 - Add render entry wrappers used by `render.js`

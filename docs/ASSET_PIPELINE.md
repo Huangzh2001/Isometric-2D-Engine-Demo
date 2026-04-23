@@ -11,7 +11,7 @@ A third source already exists in the broader workflow:
 3. Prefabs exported by the dedicated editor and then saved into the prefab library
 
 ## Current internal entry points
-The current asset entry points are concentrated in `src/asset-management/asset-management.js`.
+The current asset entry points are concentrated in `src/infrastructure/assets/asset-management.js`.
 
 This module is responsible for:
 - reading prefab indexes

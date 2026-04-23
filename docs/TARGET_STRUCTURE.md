@@ -83,7 +83,7 @@ The existence of this document does **not** mean the project should be reorganiz
 The current round only extracts:
 
 ```text
-src/scene-storage/scene-storage.js
+src/infrastructure/storage/scene-storage.js
 ```
 
 Everything else should remain stable until later rounds.
