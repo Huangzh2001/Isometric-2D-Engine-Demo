@@ -148,23 +148,23 @@
   async function dragCanvas(canvas, startX, startY, endX, endY, label, options) {
     options = options || {};
     log('canvas-drag:' + String(label || 'drag'));
-    var start = await moveMouseOnCanvas(canvas, startX, startY, { duration: Number(options.duration || DEFAULT_DELAY) });
+    var start = await moveMouseOnCanvas(canvas, startX, startY, { duration: Number(options.startDuration || options.duration || DEFAULT_DELAY) });
     dispatchMouse(canvas, 'mousedown', start.clientX, start.clientY, { buttons: 1, button: 0 });
-    await sleep(120);
-    var steps = Math.max(6, Number(options.steps || 16));
+    await sleep(Number(options.downHold || 80));
+    var steps = Math.max(4, Number(options.steps || 10));
     for (var i = 1; i <= steps; i++) {
       if (currentRun && currentRun.stopRequested) throw new Error('replay-stopped');
       var t = i / steps;
       var x = startX + (endX - startX) * t;
       var y = startY + (endY - startY) * t;
       var pt = canvasInternalToClient(canvas, x, y);
-      await movePointerToClient(pt.clientX, pt.clientY, { duration: Number(options.stepDuration || 80), steps: 1 });
+      await movePointerToClient(pt.clientX, pt.clientY, { duration: Number(options.stepDuration || 48), steps: 1 });
       dispatchMouse(canvas, 'mousemove', pt.clientX, pt.clientY, { buttons: 1, button: 0 });
-      await sleep(Number(options.pauseEach || 50));
+      await sleep(Number(options.pauseEach || 0));
     }
     var end = canvasInternalToClient(canvas, endX, endY);
     dispatchMouse(canvas, 'mouseup', end.clientX, end.clientY, { buttons: 0, button: 0 });
-    await sleep(Number(options.after || 380));
+    await sleep(Number(options.after || 180));
   }
   function readQueryFlag(name) {
     try { var params = new URLSearchParams(window.location.search || ''); var raw = params.get(name); return raw != null && (raw === '' || raw === '1' || raw === 'true' || raw === 'yes'); } catch (_) { return false; }
@@ -210,9 +210,205 @@
   function pushStep(flow, name, detail) {
     flow.steps.push({ name: name, at: nowIso(), detail: safeJson(detail || {}) });
   }
+  function getVisibleErrorBannerNode() {
+    try { return document.querySelector('.startupBanner') || null; } catch (_) { return null; }
+  }
+  function getVisibleErrorHistory() {
+    try {
+      if (!Array.isArray(window.__RUNTIME_ERROR_BANNER_HISTORY__)) return [];
+      return window.__RUNTIME_ERROR_BANNER_HISTORY__.map(function (entry) { return safeJson(entry); });
+    } catch (_) { return []; }
+  }
+  function snapshotVisibleErrors(label, options) {
+    options = options || {};
+    var banner = getVisibleErrorBannerNode();
+    var bannerText = '';
+    try { bannerText = banner && typeof banner.textContent === 'string' ? String(banner.textContent).trim() : ''; } catch (_) { bannerText = ''; }
+    var history = getVisibleErrorHistory();
+    var sinceIndex = Math.max(0, Number(options.sinceIndex || 0));
+    var newEntries = history.slice(sinceIndex);
+    return {
+      label: String(label || ''),
+      bannerVisible: !!(banner && bannerText),
+      bannerText: bannerText,
+      bannerUpdatedAt: banner && banner.dataset ? String(banner.dataset.errorAt || '') : '',
+      historyCount: history.length,
+      newEntryCount: Math.max(0, history.length - sinceIndex),
+      latestHistory: history.slice(-5),
+      newEntries: newEntries.slice(-10),
+      lastEntry: history.length ? history[history.length - 1] : null
+    };
+  }
+
+  function getActiveInspectorTab() {
+    try { return window.inspectorState && window.inspectorState.activeTab ? String(window.inspectorState.activeTab) : ''; } catch (_) { return ''; }
+  }
+  function snapshotEditorInteractionState(label) {
+    var summaryText = '';
+    try { summaryText = ui() && ui().terrainSummary && typeof ui().terrainSummary.textContent === 'string' ? String(ui().terrainSummary.textContent).trim() : ''; } catch (_) { summaryText = ''; }
+    return {
+      label: String(label || ''),
+      activeTab: getActiveInspectorTab(),
+      editorMode: window.editor && window.editor.mode ? String(window.editor.mode) : '',
+      selectedPrefabId: appPath('state.selectors') && typeof appPath('state.selectors').getSelectedPrefabId === 'function' ? appPath('state.selectors').getSelectedPrefabId() : null,
+      terrainSummaryText: summaryText,
+      visibleRuntimeErrors: snapshotVisibleErrors(String(label || '') + ':visible-runtime-errors')
+    };
+  }
+  function getTerrainSummaryText() {
+    try {
+      var u = ui();
+      return u && u.terrainSummary && typeof u.terrainSummary.textContent === 'string' ? String(u.terrainSummary.textContent).trim() : '';
+    } catch (_) { return ''; }
+  }
+  function parseTerrainSummaryText(text) {
+    var value = String(text || '');
+    var batchMatch = value.match(/batch=([^·]+)/);
+    var cellsMatch = value.match(/cells=(\d+)/);
+    var voxelsMatch = value.match(/voxels=(\d+)/);
+    var appliedMatch = value.match(/applied=(\d+)/);
+    return {
+      raw: value,
+      batchId: batchMatch ? String(batchMatch[1] || '').trim() : '',
+      cells: cellsMatch ? Number(cellsMatch[1] || 0) : 0,
+      voxels: voxelsMatch ? Number(voxelsMatch[1] || 0) : 0,
+      applied: appliedMatch ? Number(appliedMatch[1] || 0) : 0
+    };
+  }
+  function percentileFromSorted(values, ratio) {
+    if (!Array.isArray(values) || !values.length) return 0;
+    var p = Math.max(0, Math.min(1, Number(ratio || 0)));
+    var idx = Math.max(0, Math.min(values.length - 1, Math.ceil(values.length * p) - 1));
+    return Number(values[idx] || 0);
+  }
+  function summarizeFrameIntervals(label, intervals, extra) {
+    var list = Array.isArray(intervals) ? intervals.filter(function (v) { return Number.isFinite(Number(v)) && Number(v) >= 0; }).map(function (v) { return Number(v); }) : [];
+    var sorted = list.slice().sort(function (a, b) { return a - b; });
+    var total = list.reduce(function (sum, v) { return sum + v; }, 0);
+    var avg = list.length ? (total / list.length) : 0;
+    var max = list.length ? sorted[sorted.length - 1] : 0;
+    var p95 = percentileFromSorted(sorted, 0.95);
+    var over34 = list.filter(function (v) { return v > 34; }).length;
+    var over50 = list.filter(function (v) { return v > 50; }).length;
+    var fpsApprox = avg > 0 ? (1000 / avg) : 0;
+    return Object.assign({
+      label: String(label || ''),
+      sampleCount: list.length,
+      avgFrameMs: Number(avg.toFixed(3)),
+      p95FrameMs: Number(p95.toFixed(3)),
+      maxFrameMs: Number(max.toFixed(3)),
+      approxFps: Number(fpsApprox.toFixed(2)),
+      longFrameOver34Count: over34,
+      longFrameOver50Count: over50
+    }, safeJson(extra || {}));
+  }
+  async function measureFrameIntervalsDuring(label, action, options) {
+    options = options || {};
+    var intervals = [];
+    var stop = false;
+    var lastTs = 0;
+    function onFrame(ts) {
+      if (stop) return;
+      if (lastTs) intervals.push(Number(ts - lastTs) || 0);
+      lastTs = ts;
+      requestAnimationFrame(onFrame);
+    }
+    requestAnimationFrame(onFrame);
+    var actionStartedAt = (typeof performance !== 'undefined' && performance && typeof performance.now === 'function') ? performance.now() : Date.now();
+    var result = await action();
+    await sleep(Number(options.settleMs || 0));
+    stop = true;
+    await new Promise(function (resolve) { requestAnimationFrame(function () { resolve(); }); });
+    var actionEndedAt = (typeof performance !== 'undefined' && performance && typeof performance.now === 'function') ? performance.now() : Date.now();
+    return summarizeFrameIntervals(label, intervals, {
+      actionWallMs: Number(Math.max(0, actionEndedAt - actionStartedAt).toFixed(3)),
+      result: safeJson(result || null)
+    });
+  }
+  async function waitForTerrainNavigationReady(targetWidth, targetHeight, beforeBatchId, timeoutMs) {
+    var startedAt = Date.now();
+    var targetCells = Math.max(1, Number(targetWidth || 0) * Number(targetHeight || 0));
+    var lastSignature = '';
+    var stableSince = 0;
+    var lastObserved = null;
+    while ((Date.now() - startedAt) < Number(timeoutMs || 30000)) {
+      if (currentRun && currentRun.stopRequested) throw new Error('replay-stopped');
+      var model = getTerrainRuntimeModel();
+      var summary = model && model.lastSummary ? model.lastSummary : null;
+      var batchId = model && model.activeTerrainBatchId ? String(model.activeTerrainBatchId) : null;
+      var generatedCellCount = Number(summary && summary.generatedCellCount || 0);
+      var generatedVoxelCount = Number(summary && summary.generatedVoxelCount || 0);
+      var appliedVoxelCount = Number(summary && summary.appliedVoxelCount || 0);
+      var terrainExpandedVoxelInstanceCount = Number(model && model.terrainExpandedVoxelInstanceCount || 0);
+      var applyInProgress = !!(summary && summary.applyInProgress === true);
+      var terrainSummaryParsed = parseTerrainSummaryText(getTerrainSummaryText());
+      var textBatchId = terrainSummaryParsed.batchId ? String(terrainSummaryParsed.batchId) : null;
+      var textCells = Number(terrainSummaryParsed.cells || 0);
+      var textVoxels = Number(terrainSummaryParsed.voxels || 0);
+      var textApplied = Number(terrainSummaryParsed.applied || 0);
+      var observed = {
+        activeTerrainBatchId: batchId,
+        width: Number(model && model.width || 0),
+        height: Number(model && model.height || 0),
+        generatedCellCount: generatedCellCount,
+        generatedVoxelCount: generatedVoxelCount,
+        appliedVoxelCount: appliedVoxelCount,
+        terrainExpandedVoxelInstanceCount: terrainExpandedVoxelInstanceCount,
+        applyInProgress: applyInProgress,
+        elapsedMs: Date.now() - startedAt,
+        terrainSummary: terrainSummaryParsed,
+        summary: summary ? safeJson(summary) : null
+      };
+      lastObserved = observed;
+      var batchChanged = !!((batchId && String(batchId) !== String(beforeBatchId || '')) || (textBatchId && String(textBatchId) !== String(beforeBatchId || '')));
+      var dimensionReady = (observed.width === Number(targetWidth || 0) && observed.height === Number(targetHeight || 0));
+      var cellsReady = (generatedCellCount >= targetCells) || (textCells >= targetCells);
+      var voxelsReady = (generatedVoxelCount > 0 && appliedVoxelCount >= generatedVoxelCount) || (generatedVoxelCount > 0 && terrainExpandedVoxelInstanceCount >= generatedVoxelCount) || (textVoxels > 0 && textApplied >= textVoxels);
+      var explicitComplete = batchChanged && cellsReady && (applyInProgress === false || voxelsReady);
+      if (explicitComplete) return Object.assign({ ready: true, mode: 'explicit-complete' }, observed);
+      var signature = JSON.stringify({ batchId: batchId, textBatchId: textBatchId, width: observed.width, height: observed.height, generatedCellCount: generatedCellCount, textCells: textCells, generatedVoxelCount: generatedVoxelCount, textVoxels: textVoxels, appliedVoxelCount: appliedVoxelCount, textApplied: textApplied, terrainExpandedVoxelInstanceCount: terrainExpandedVoxelInstanceCount, applyInProgress: applyInProgress });
+      if (signature !== lastSignature) {
+        lastSignature = signature;
+        stableSince = Date.now();
+      }
+      var stableMs = stableSince ? (Date.now() - stableSince) : 0;
+      if ((batchChanged || dimensionReady) && cellsReady && stableMs >= 1800) return Object.assign({ ready: true, mode: 'stable-fallback', stableMs: stableMs }, observed);
+      await sleep(140);
+    }
+    if (lastObserved) {
+      var timeoutBatchChanged = !!((lastObserved.activeTerrainBatchId && String(lastObserved.activeTerrainBatchId) !== String(beforeBatchId || '')) || (lastObserved.terrainSummary && lastObserved.terrainSummary.batchId && String(lastObserved.terrainSummary.batchId) !== String(beforeBatchId || '')));
+      var timeoutCellsReady = Number(lastObserved.generatedCellCount || 0) >= targetCells || Number(lastObserved.terrainSummary && lastObserved.terrainSummary.cells || 0) >= targetCells;
+      var timeoutDimensionReady = lastObserved.width === Number(targetWidth || 0) && lastObserved.height === Number(targetHeight || 0);
+      if ((timeoutBatchChanged || timeoutDimensionReady) && timeoutCellsReady) {
+        return Object.assign({ ready: true, mode: 'timeout-fallback' }, lastObserved);
+      }
+    }
+    throw new Error('timeout:terrain-ready-' + String(targetWidth || 0) + 'x' + String(targetHeight || 0));
+  }
+
+  async function ensureItemsViewDragMode(flow, label) {
+    var u = ui();
+    var before = snapshotEditorInteractionState(String(label || 'items-view-drag') + ':before');
+    if (flow) pushStep(flow, String(label || 'items-view-drag') + '-before', before);
+    try {
+      var placementController = appPath('controllers.placement');
+      if (placementController && typeof placementController.handleModeButton === 'function') placementController.handleModeButton('view', 'replay:' + String(label || 'items-view-drag') + ':request-view');
+      else if (placementController && typeof placementController.requestModeChange === 'function') placementController.requestModeChange('view', { source: 'replay:' + String(label || 'items-view-drag') + ':request-view' });
+      else if (typeof requestEditorModeChange === 'function') requestEditorModeChange('view', { source: 'replay:' + String(label || 'items-view-drag') + ':request-view' });
+    } catch (_) {}
+    if (u && u.tabItems) await clickElement(u.tabItems, String(label || 'items-view-drag') + ':tabItems', { duration: 260, after: 180 });
+    if (u && u.modeView) await clickElement(u.modeView, String(label || 'items-view-drag') + ':modeView', { duration: 260, after: 220 });
+    await waitFor(function () {
+      return window.editor && String(window.editor.mode || '') === 'view' && getActiveInspectorTab() === 'items';
+    }, 5000, String(label || 'items-view-drag') + ':items-view-mode');
+    var after = snapshotEditorInteractionState(String(label || 'items-view-drag') + ':after');
+    after.ready = after.editorMode === 'view' && after.activeTab === 'items';
+    if (flow) pushStep(flow, String(label || 'items-view-drag') + '-after', after);
+    return after;
+  }
   async function saveFlowReport(session, flow) {
     flow.finishedAt = nowIso();
-    var payload = { phase: PHASE, owner: OWNER, sessionId: session.id, entry: window.__APP_ENTRY_INFO || null, query: String(location.search || ''), flow: flow, session: { scenarioNames: session.scenarioNames || [], currentIndex: session.currentIndex || 0 } };
+    var payload = { phase: PHASE, owner: OWNER, sessionId: session.id, entry: window.__APP_ENTRY_INFO || null, query: String(location.search || ''), flow: flow, session: { scenarioNames: session.scenarioNames || [], currentIndex: session.currentIndex || 0 }, visibleRuntimeErrors: snapshotVisibleErrors(flow && flow.name ? flow.name : 'flow-save') };
     flow.saved = await saveReportWithRetry(payload, 'acceptance-' + session.id + '-' + flow.name + '.json', 2);
     var reports = getStoredReports().filter(function (item) {
       try {
@@ -259,7 +455,57 @@
     try { el.blur(); } catch (_) {}
     await sleep(320);
   }
-
+  function dispatchWheel(target, clientX, clientY, deltaY, extra) {
+    if (!target) return;
+    var event = new WheelEvent('wheel', Object.assign({ bubbles: true, cancelable: true, view: window, clientX: clientX, clientY: clientY, deltaX: 0, deltaY: Number(deltaY) || 0, deltaMode: 0 }, extra || {}));
+    target.dispatchEvent(event);
+  }
+  async function wheelCanvas(canvas, x, y, deltaY, label, options) {
+    options = options || {};
+    log('canvas-wheel:' + String(label || 'wheel'));
+    var pt = await moveMouseOnCanvas(canvas, x, y, { duration: Number(options.duration || 260) });
+    await sleep(Number(options.pauseBefore || 90));
+    dispatchWheel(canvas, pt.clientX, pt.clientY, deltaY);
+    await sleep(Number(options.after || 260));
+    return pt;
+  }
+  async function wheelCanvasBurst(canvas, x, y, deltaY, count, label, options) {
+    options = options || {};
+    var burstCount = Math.max(1, Number(count || 1));
+    log('canvas-wheel-burst:' + String(label || 'wheel-burst'), { count: burstCount, deltaY: Number(deltaY) || 0 });
+    var pt = await moveMouseOnCanvas(canvas, x, y, { duration: Number(options.duration || 110) });
+    await sleep(Number(options.pauseBefore || 30));
+    for (var i = 0; i < burstCount; i++) {
+      if (currentRun && currentRun.stopRequested) throw new Error('replay-stopped');
+      dispatchWheel(canvas, pt.clientX, pt.clientY, deltaY);
+      await sleep(Number(options.between || 45));
+    }
+    await sleep(Number(options.after || 90));
+    return Object.assign({ count: burstCount, deltaY: Number(deltaY) || 0 }, pt);
+  }
+  function getTerrainRuntimeModel() {
+    try {
+      var runtimeApi = appPath('state.runtimeState') || null;
+      if (runtimeApi && typeof runtimeApi.getTerrainRuntimeModelValue === 'function') return runtimeApi.getTerrainRuntimeModelValue() || null;
+    } catch (_) {}
+    return null;
+  }
+  function getLatestRenderFrameSummaryFromDebugLog() {
+    try {
+      var u = ui();
+      var text = u && u.debugLog && typeof u.debugLog.value === 'string' ? String(u.debugLog.value || '') : '';
+      if (!text) return null;
+      var lines = text.split(/\r?\n/);
+      for (var i = lines.length - 1; i >= 0; i--) {
+        var line = String(lines[i] || '');
+        var markerIndex = line.indexOf('[RENDER-FRAME-SUMMARY] ');
+        if (markerIndex < 0) continue;
+        var jsonText = line.slice(markerIndex + '[RENDER-FRAME-SUMMARY] '.length);
+        try { return JSON.parse(jsonText); } catch (_) {}
+      }
+    } catch (_) {}
+    return null;
+  }
   function dispatchKey(type, key) {
     var event = new KeyboardEvent(type, { bubbles: true, cancelable: true, key: key, code: key, composed: true });
     window.dispatchEvent(event);
@@ -365,7 +611,8 @@
       applicationBoundary: summarizeApplicationBoundary('acceptance-summary'),
       assetImportBoundary: summarizeAssetImportBoundary('acceptance-summary'),
       placementBoundary: summarizePlacementBoundary('acceptance-summary'),
-      platformBoundary: summarizePlatformBoundary('acceptance-summary')
+      platformBoundary: summarizePlatformBoundary('acceptance-summary'),
+      visibleRuntimeErrors: snapshotVisibleErrors('acceptance-summary')
     };
   }
 
@@ -876,6 +1123,8 @@
     var u = ui();
     var item = document.querySelector('[data-asset-id]');
     if (!item) throw new Error('missing-first-habbo-item');
+    var visibleErrorsBefore = snapshotVisibleErrors('before-habbo-place');
+    pushStep(flow, 'visible-runtime-errors-before-habbo-place', visibleErrorsBefore);
     var beforeInstances = currentInstancesCount();
     await clickElement(item, 'habbo-first-item', { duration: 520, after: 500 });
     await clickElement(u.habboLibraryPlace, 'habboLibraryPlace', { duration: 520, after: 800 });
@@ -887,7 +1136,10 @@
     var pt = (typeof iso === 'function') ? iso(target.cell.x + 0.5, target.cell.y + 0.5, 0) : { x: window.canvas.width / 2, y: window.canvas.height / 2 };
     await clickCanvas(window.canvas, pt.x, pt.y, 'place-habbo-item', { duration: 360, after: 600 });
     await waitFor(function () { return currentInstancesCount() > beforeInstances; }, 6000, 'habbo-item-placed');
+    await sleep(900);
+    var visibleErrorsAfter = snapshotVisibleErrors('after-habbo-place', { sinceIndex: visibleErrorsBefore.historyCount });
     pushStep(flow, 'placed', { beforeInstances: beforeInstances, afterInstances: currentInstancesCount(), selectedPrefabId: selectedPrefabId });
+    pushStep(flow, 'visible-runtime-errors-after-habbo-place', visibleErrorsAfter);
     pushStep(flow, 'state-actions-after-habbo-place', summarizeStateActions('after-habbo-place'));
     var stateActionsBoundaryAfterHabboPlace = summarizeStateActionsBoundary('after-habbo-place');
     pushStep(flow, 'state-actions-boundary-after-habbo-place', stateActionsBoundaryAfterHabboPlace);
@@ -1086,16 +1338,172 @@
   }
   async function flowPlayerWalk(session) {
     var flow = makeFlowResult('07-player-walk');
-    var before = { x: Number(window.player && window.player.x || 0), y: Number(window.player && window.player.y || 0) };
-    pushStep(flow, 'before', before);
-    await holdKey('ArrowRight', 1100);
-    await holdKey('ArrowDown', 900);
-    var after = { x: Number(window.player && window.player.x || 0), y: Number(window.player && window.player.y || 0) };
-    pushStep(flow, 'after', after);
-    if (after.x === before.x && after.y === before.y) throw new Error('player-not-moved');
-    flow.ok = true;
-    await saveFlowReport(session, flow);
-    return flow;
+    try {
+      var u = ui();
+      var before = { x: Number(window.player && window.player.x || 0), y: Number(window.player && window.player.y || 0) };
+      pushStep(flow, 'before', before);
+      await holdKey('ArrowRight', 1100);
+      await holdKey('ArrowDown', 900);
+      var after = { x: Number(window.player && window.player.x || 0), y: Number(window.player && window.player.y || 0) };
+      pushStep(flow, 'after', after);
+      if (after.x === before.x && after.y === before.y) throw new Error('player-not-moved');
+
+      try {
+        var mainController = appPath('controllers.main');
+        if (mainController && typeof mainController.requestModeChange === 'function') mainController.requestModeChange('view', { source: 'replay:post-walk-terrain-prep' });
+        else if (typeof requestEditorModeChange === 'function') requestEditorModeChange('view', { source: 'replay:post-walk-terrain-prep' });
+        if (u && u.modeView) await clickElement(u.modeView, 'modeViewAfterWalk', { duration: 280, after: 180 });
+        await waitFor(function () { return window.editor && String(window.editor.mode || '') === 'view'; }, 3000, 'post-walk-view-mode');
+      } catch (prepErr) {
+        pushStep(flow, 'post-walk-view-mode-warning', { error: String(prepErr && prepErr.message ? prepErr.message : prepErr), mode: window.editor && window.editor.mode ? String(window.editor.mode) : null });
+      }
+
+      if (u && u.tabLights) await clickElement(u.tabLights, 'tabLightsAfterWalk');
+      if (u && u.lightingEnabled) await setCheckbox(u.lightingEnabled, false, 'lightingEnabledOffAfterWalk');
+      pushStep(flow, 'lighting-disabled', { lightingEnabled: !!(u && u.lightingEnabled && u.lightingEnabled.checked) });
+
+      if (u && u.tabWorld) await clickElement(u.tabWorld, 'tabWorldFor80x80');
+      if (u && u.gridW) await setInputValue(u.gridW, '80', 'worldGridW80');
+      if (u && u.gridH) await setInputValue(u.gridH, '80', 'worldGridH80');
+      if (u && u.worldResolution) await setSelectValue(u.worldResolution, '1', 'worldResolution1x');
+      if (u && u.applyWorld) await clickElement(u.applyWorld, 'applyWorld80x80', { duration: 360, after: 520 });
+      await waitFor(function () {
+        return !!(window.settings && Number(window.settings.worldCols || 0) === 80 && Number(window.settings.worldRows || 0) === 80 && Number(window.settings.gridW || 0) === 80 && Number(window.settings.gridH || 0) === 80);
+      }, 5000, 'world-80x80-applied');
+      pushStep(flow, 'world-resized', {
+        worldCols: Number(window.settings && window.settings.worldCols || 0),
+        worldRows: Number(window.settings && window.settings.worldRows || 0),
+        gridW: Number(window.settings && window.settings.gridW || 0),
+        gridH: Number(window.settings && window.settings.gridH || 0)
+      });
+
+      var canvas = window.canvas;
+      if (!canvas) throw new Error('missing-main-canvas');
+      var centerX = canvas.width * 0.50;
+      var centerY = canvas.height * 0.52;
+      var zoomBeforeWheelUp = Number(window.settings && window.settings.worldDisplayScale || 0);
+      pushStep(flow, 'zoom-before-wheel-up-shrink', { zoom: zoomBeforeWheelUp });
+      var perfWheelUp1 = await measureFrameIntervalsDuring('wheel-up-shrink-1', function () { return wheelCanvas(canvas, centerX, centerY, 120, 'wheel-up-shrink-1', { after: 240 }); });
+      pushStep(flow, 'perf-wheel-up-shrink-1', perfWheelUp1);
+      var perfWheelUp2 = await measureFrameIntervalsDuring('wheel-up-shrink-2', function () { return wheelCanvas(canvas, centerX, centerY, 120, 'wheel-up-shrink-2', { after: 240 }); });
+      pushStep(flow, 'perf-wheel-up-shrink-2', perfWheelUp2);
+      var perfWheelUp3 = await measureFrameIntervalsDuring('wheel-up-shrink-3', function () { return wheelCanvas(canvas, centerX, centerY, 120, 'wheel-up-shrink-3', { after: 320 }); });
+      pushStep(flow, 'perf-wheel-up-shrink-3', perfWheelUp3);
+      var zoomAfterWheelUp = Number(window.settings && window.settings.worldDisplayScale || 0);
+      pushStep(flow, 'zoom-after-wheel-up-shrink', { zoomBefore: zoomBeforeWheelUp, zoomAfter: zoomAfterWheelUp, shrinkOk: zoomAfterWheelUp < zoomBeforeWheelUp });
+
+      if (u && u.tabTerrain) await clickElement(u.tabTerrain, 'tabTerrain80x80');
+      if (u && u.terrainWidth) await setInputValue(u.terrainWidth, '80', 'terrainWidth80');
+      if (u && u.terrainHeight) await setInputValue(u.terrainHeight, '80', 'terrainHeight80');
+      var terrainBefore = getTerrainRuntimeModel();
+      var terrainBeforeBatchId = terrainBefore && terrainBefore.activeTerrainBatchId ? String(terrainBefore.activeTerrainBatchId) : null;
+      if (u && u.terrainGenerate) await clickElement(u.terrainGenerate, 'terrainGenerate80x80', { duration: 360, after: 420 });
+      pushStep(flow, 'terrain-generate-issued', {
+        strategy: 'fixed-wait-before-drag',
+        waitMs: 5500,
+        terrainBeforeBatchId: terrainBeforeBatchId,
+        terrainBefore: terrainBefore
+      });
+      await sleep(5500);
+      pushStep(flow, 'terrain-wait-finished', {
+        strategy: 'fixed-wait-before-drag',
+        waitMs: 5500,
+        terrainAfterWait: getTerrainRuntimeModel(),
+        terrainSummaryText: (function () {
+          try {
+            var uiNow = ui();
+            return uiNow && uiNow.terrainSummary ? String(uiNow.terrainSummary.textContent || '').trim() : '';
+          } catch (_) { return ''; }
+        })(),
+        visibleRuntimeErrors: snapshotVisibleErrors('terrain-wait-finished')
+      });
+
+      var dragModeReady = await ensureItemsViewDragMode(flow, 'terrain-navigation');
+      if (!dragModeReady || dragModeReady.ready !== true) throw new Error('terrain-navigation:not-in-items-view-mode');
+
+      var perfPostTerrainDrag1 = await measureFrameIntervalsDuring('post-terrain-drag-1', function () { return dragCanvas(canvas, centerX - 18, centerY + 10, centerX + 210, centerY + 118, 'post-terrain-drag-1', { startDuration: 90, downHold: 70, steps: 6, stepDuration: 16, pauseEach: 0, after: 120 }); });
+      pushStep(flow, 'perf-post-terrain-drag-1', perfPostTerrainDrag1);
+      var perfPostTerrainDrag2 = await measureFrameIntervalsDuring('post-terrain-drag-2', function () { return dragCanvas(canvas, centerX + 92, centerY + 42, centerX - 172, centerY - 124, 'post-terrain-drag-2', { startDuration: 90, downHold: 70, steps: 6, stepDuration: 16, pauseEach: 0, after: 140 }); });
+      pushStep(flow, 'perf-post-terrain-drag-2', perfPostTerrainDrag2);
+      var zoomBeforeWheelDown = Number(window.settings && window.settings.worldDisplayScale || 0);
+      var perfWheelDownSmall = await measureFrameIntervalsDuring('wheel-down-grow-small', function () { return wheelCanvas(canvas, centerX, centerY, -120, 'wheel-down-grow-small', { after: 260 }); });
+      pushStep(flow, 'perf-wheel-down-grow-small', perfWheelDownSmall);
+      var zoomAfterWheelDown = Number(window.settings && window.settings.worldDisplayScale || 0);
+      pushStep(flow, 'zoom-after-wheel-down-grow-small', { zoomBefore: zoomBeforeWheelDown, zoomAfter: zoomAfterWheelDown, growOk: zoomAfterWheelDown > zoomBeforeWheelDown });
+
+      var dragModeReadyAfterWheel = await ensureItemsViewDragMode(flow, 'terrain-navigation-post-wheel');
+      if (!dragModeReadyAfterWheel || dragModeReadyAfterWheel.ready !== true) throw new Error('terrain-navigation-post-wheel:not-in-items-view-mode');
+
+      var perfPostZoomoutDrag1 = await measureFrameIntervalsDuring('post-wheel-down-drag-1', function () { return dragCanvas(canvas, centerX - 86, centerY + 28, centerX + 156, centerY - 132, 'post-wheel-down-drag-1', { startDuration: 90, downHold: 70, steps: 6, stepDuration: 16, pauseEach: 0, after: 150 }); });
+      pushStep(flow, 'perf-post-wheel-down-drag-1', perfPostZoomoutDrag1);
+      pushStep(flow, 'camera-after-terrain-navigation', {
+        zoom: Number(window.settings && window.settings.worldDisplayScale || 0),
+        cameraX: Number(window.camera && window.camera.x || 0),
+        cameraY: Number(window.camera && window.camera.y || 0),
+        visibleRuntimeErrors: snapshotVisibleErrors('player-walk-after-navigation')
+      });
+
+      if (u && u.tabRender) await clickElement(u.tabRender, 'tabRenderFaceMergeThresholdCheck', { duration: 220, after: 120 });
+      await waitFor(function () { return getActiveInspectorTab() === 'render'; }, 5000, 'tabRenderFaceMergeThresholdCheck:active');
+      if (u && u.renderFaceMergeEnabled) await setCheckbox(u.renderFaceMergeEnabled, true, 'renderFaceMergeEnabledOnBeforeThresholdCheck');
+      if (u && u.renderDisableFaceMergeAtZoomEnabled) await setCheckbox(u.renderDisableFaceMergeAtZoomEnabled, true, 'renderDisableFaceMergeAtZoomEnabledOn');
+      var zoomDisableThreshold = Number((u && u.renderDisableFaceMergeAtZoomThreshold && u.renderDisableFaceMergeAtZoomThreshold.value) || (window.settings && window.settings.disableFaceMergeAtOrAboveZoomThreshold) || 1.6);
+      var faceMergeCheckBefore = {
+        activeTab: getActiveInspectorTab(),
+        zoom: Number(window.settings && window.settings.worldDisplayScale || 0),
+        zoomDisableThreshold: zoomDisableThreshold,
+        renderFaceMergeEnabled: !!(u && u.renderFaceMergeEnabled && u.renderFaceMergeEnabled.checked),
+        renderDisableFaceMergeAtZoomEnabled: !!(u && u.renderDisableFaceMergeAtZoomEnabled && u.renderDisableFaceMergeAtZoomEnabled.checked),
+        terrainSummaryText: getTerrainSummaryText(),
+        terrainRuntimeModel: getTerrainRuntimeModel(),
+        latestRenderFrameSummary: getLatestRenderFrameSummaryFromDebugLog(),
+        visibleRuntimeErrors: snapshotVisibleErrors('face-merge-threshold-check-before')
+      };
+      pushStep(flow, 'face-merge-threshold-check-before', faceMergeCheckBefore);
+      var wheelDownCountForDisable = 0;
+      while (Number(window.settings && window.settings.worldDisplayScale || 0) < zoomDisableThreshold && wheelDownCountForDisable < 8) {
+        var remaining = zoomDisableThreshold - Number(window.settings && window.settings.worldDisplayScale || 0);
+        var burstCount = remaining > 0.32 ? 3 : (remaining > 0.16 ? 2 : 1);
+        burstCount = Math.min(burstCount, 8 - wheelDownCountForDisable);
+        var burstResult = await wheelCanvasBurst(canvas, centerX, centerY, -120, burstCount, 'face-merge-threshold-wheel-down-burst-' + String(wheelDownCountForDisable + 1), { duration: 90, pauseBefore: 18, between: 34, after: 55 });
+        wheelDownCountForDisable += Number(burstResult && burstResult.count || burstCount || 0);
+      }
+      await sleep(420);
+      var latestRenderFrameSummaryAfterDisable = getLatestRenderFrameSummaryFromDebugLog();
+      var terrainModelAfterDisable = getTerrainRuntimeModel();
+      var terrainSummaryParsedAfterDisable = parseTerrainSummaryText(getTerrainSummaryText());
+      pushStep(flow, 'face-merge-threshold-check-after', {
+        activeTab: getActiveInspectorTab(),
+        zoom: Number(window.settings && window.settings.worldDisplayScale || 0),
+        zoomDisableThreshold: zoomDisableThreshold,
+        thresholdReached: Number(window.settings && window.settings.worldDisplayScale || 0) >= zoomDisableThreshold,
+        wheelDownCount: wheelDownCountForDisable,
+        renderFaceMergeEnabled: !!(u && u.renderFaceMergeEnabled && u.renderFaceMergeEnabled.checked),
+        renderDisableFaceMergeAtZoomEnabled: !!(u && u.renderDisableFaceMergeAtZoomEnabled && u.renderDisableFaceMergeAtZoomEnabled.checked),
+        terrainSummaryText: getTerrainSummaryText(),
+        terrainSummary: terrainSummaryParsedAfterDisable,
+        terrainRuntimeModel: terrainModelAfterDisable,
+        latestRenderFrameSummary: latestRenderFrameSummaryAfterDisable,
+        faceMergeDisabledObserved: !!(latestRenderFrameSummaryAfterDisable && String(latestRenderFrameSummaryAfterDisable.effectiveFaceMergeMode || '') === 'no-merge'),
+        allCellsShownCheck: !!(terrainSummaryParsedAfterDisable && Number(terrainSummaryParsedAfterDisable.cells || 0) >= 6400),
+        visibleRuntimeErrors: snapshotVisibleErrors('face-merge-threshold-check-after')
+      });
+
+      flow.ok = true;
+      await saveFlowReport(session, flow);
+      return flow;
+    } catch (err) {
+      flow.ok = false;
+      flow.error = String(err && err.message ? err.message : err);
+      pushStep(flow, 'failure', {
+        error: flow.error,
+        state: snapshotEditorInteractionState('player-walk-failure'),
+        terrainRuntimeModel: getTerrainRuntimeModel(),
+        visibleRuntimeErrors: snapshotVisibleErrors('player-walk-failure')
+      });
+      await saveFlowReport(session, flow);
+      throw err;
+    }
   }
   var FLOWS = [flowBaseline, flowHabboOpen, flowHabboPlace, flowEditorRoundtrip, flowSceneSaveLoad, flowMainCameraRotation, flowLighting, flowPlayerWalk, flowEditorNormalHealth];
   async function saveSummary(session, results, statusText) {

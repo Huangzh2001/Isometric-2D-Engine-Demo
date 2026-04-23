@@ -448,7 +448,26 @@ function errorBanner(msg) {
     banner.className = 'startupBanner';
     document.body.appendChild(banner);
   }
-  banner.textContent = msg;
+  var text = String(msg == null ? '' : msg);
+  banner.textContent = text;
+  try {
+    var entry = {
+      at: new Date().toISOString(),
+      message: text,
+      phase: debugState && debugState.phase ? String(debugState.phase) : 'unknown',
+      frame: debugState && Number.isFinite(Number(debugState.frame)) ? Number(debugState.frame) : 0,
+      updateStep: debugState && debugState.updateStep ? String(debugState.updateStep) : '',
+      renderStep: debugState && debugState.renderStep ? String(debugState.renderStep) : '',
+      lastRenderable: debugState && debugState.lastRenderable ? String(debugState.lastRenderable) : '',
+      lastEvent: debugState && debugState.lastEvent ? String(debugState.lastEvent) : ''
+    };
+    window.__RUNTIME_ERROR_BANNER_HISTORY__ = Array.isArray(window.__RUNTIME_ERROR_BANNER_HISTORY__) ? window.__RUNTIME_ERROR_BANNER_HISTORY__ : [];
+    window.__RUNTIME_ERROR_BANNER_HISTORY__.push(entry);
+    if (window.__RUNTIME_ERROR_BANNER_HISTORY__.length > 80) window.__RUNTIME_ERROR_BANNER_HISTORY__ = window.__RUNTIME_ERROR_BANNER_HISTORY__.slice(-80);
+    window.__LAST_RUNTIME_ERROR_BANNER__ = entry;
+    banner.dataset.errorAt = entry.at;
+    banner.dataset.errorCount = String(window.__RUNTIME_ERROR_BANNER_HISTORY__.length);
+  } catch (_) {}
 }
 function formatErrorDetails(message, source, lineno, colno, error) {
   const preview = editor && editor.preview ? {
