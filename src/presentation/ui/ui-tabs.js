@@ -18,12 +18,14 @@ function setActivePanelTab(tab) {
   if (ui.tabItems) ui.tabItems.classList.toggle('active', tab === 'items');
   if (ui.tabLights) ui.tabLights.classList.toggle('active', tab === 'lights');
   if (ui.tabCamera) ui.tabCamera.classList.toggle('active', tab === 'camera');
+  if (ui.tabRender) ui.tabRender.classList.toggle('active', tab === 'render');
   if (ui.tabTerrain) ui.tabTerrain.classList.toggle('active', tab === 'terrain');
   if (ui.tabPlayer) ui.tabPlayer.classList.toggle('active', tab === 'player');
   if (ui.tabWorldPage) ui.tabWorldPage.classList.toggle('active', tab === 'world');
   if (ui.tabItemsPage) ui.tabItemsPage.classList.toggle('active', tab === 'items');
   if (ui.tabLightsPage) ui.tabLightsPage.classList.toggle('active', tab === 'lights');
   if (ui.tabCameraPage) ui.tabCameraPage.classList.toggle('active', tab === 'camera');
+  if (ui.tabRenderPage) ui.tabRenderPage.classList.toggle('active', tab === 'render');
   if (ui.tabTerrainPage) ui.tabTerrainPage.classList.toggle('active', tab === 'terrain');
   if (ui.tabPlayerPage) ui.tabPlayerPage.classList.toggle('active', tab === 'player');
 }
@@ -38,6 +40,7 @@ function bindPanelTabs() {
   safeListen(ui.tabItems, 'click', () => setActivePanelTab('items'));
   safeListen(ui.tabLights, 'click', () => setActivePanelTab('lights'));
   safeListen(ui.tabCamera, 'click', () => setActivePanelTab('camera'));
+  safeListen(ui.tabRender, 'click', () => setActivePanelTab('render'));
   safeListen(ui.tabTerrain, 'click', () => setActivePanelTab('terrain'));
   safeListen(ui.tabPlayer, 'click', () => setActivePanelTab('player'));
   __panelTabsBound = true;

@@ -984,7 +984,10 @@
       showCameraBounds: !!cameraSettings.showCameraBounds,
       showCullingBounds: !!cameraSettings.showCullingBounds,
       surfaceOnlyRenderingEnabled: cameraSettings.surfaceOnlyRenderingEnabled !== false,
-      debugVisibleSurfaces: !!cameraSettings.debugVisibleSurfaces
+      debugVisibleSurfaces: !!cameraSettings.debugVisibleSurfaces,
+      staticWorldFaceMergeEnabled: cameraSettings.staticWorldFaceMergeEnabled !== false,
+      disableFaceMergeAtOrAboveZoomEnabled: !!cameraSettings.disableFaceMergeAtOrAboveZoomEnabled,
+      disableFaceMergeAtOrAboveZoomThreshold: Math.max(0.05, Number(cameraSettings.disableFaceMergeAtOrAboveZoomThreshold) || 1.6)
     };
     recordAppBoundaryEvent('runtime-state', 'state.runtimeState.editor.cameraSettings.read', {
       source: requestSource,
@@ -1114,6 +1117,36 @@
     if (runtimeApi && typeof runtimeApi.patchEditorCameraSettings === 'function') {
       runtimeApi.patchEditorCameraSettings({ debugVisibleSurfaces: !!enabled }, { source: requestSource });
     }
+    return getMainEditorCameraSettings(requestSource);
+  }
+
+  function setMainEditorStaticWorldFaceMergeEnabled(enabled, source) {
+    var requestSource = String(source || 'render-panel:set-face-merge-enabled');
+    var runtimeApi = getRuntimeStateApi();
+    if (runtimeApi && typeof runtimeApi.patchEditorCameraSettings === 'function') {
+      runtimeApi.patchEditorCameraSettings({ staticWorldFaceMergeEnabled: enabled !== false }, { source: requestSource });
+    }
+    markMainCameraRenderLayersDirty('render-face-merge-enabled');
+    return getMainEditorCameraSettings(requestSource);
+  }
+
+  function setMainEditorDisableFaceMergeAtOrAboveZoomEnabled(enabled, source) {
+    var requestSource = String(source || 'render-panel:set-zoom-disable-enabled');
+    var runtimeApi = getRuntimeStateApi();
+    if (runtimeApi && typeof runtimeApi.patchEditorCameraSettings === 'function') {
+      runtimeApi.patchEditorCameraSettings({ disableFaceMergeAtOrAboveZoomEnabled: !!enabled }, { source: requestSource });
+    }
+    markMainCameraRenderLayersDirty('render-face-merge-zoom-enabled');
+    return getMainEditorCameraSettings(requestSource);
+  }
+
+  function setMainEditorDisableFaceMergeAtOrAboveZoomThreshold(threshold, source) {
+    var requestSource = String(source || 'render-panel:set-zoom-disable-threshold');
+    var runtimeApi = getRuntimeStateApi();
+    if (runtimeApi && typeof runtimeApi.patchEditorCameraSettings === 'function') {
+      runtimeApi.patchEditorCameraSettings({ disableFaceMergeAtOrAboveZoomThreshold: threshold }, { source: requestSource });
+    }
+    markMainCameraRenderLayersDirty('render-face-merge-zoom-threshold');
     return getMainEditorCameraSettings(requestSource);
   }
 
@@ -2716,7 +2749,7 @@
     owner: 'src/application/controllers/app-controllers.js',
     roots: ['controllers.main', 'controllers.scene', 'controllers.assetLibrary', 'controllers.placement', 'controllers.editorHandoff', 'controllers.dispatch'],
     functions: {
-      main: ['summarizeBoundary','resetBoundaryAudit','openEditorFromMain', 'handleOpenEditorButton', 'requestModeChange', 'runAssetScan', 'handleRescanAssetsButton', 'saveSceneTarget', 'loadSceneTarget', 'getMainEditorViewRotation', 'getMainEditorCameraSettings', 'getMainEditorVisualRotation', 'isMainEditorViewRotating', 'tickMainEditorViewRotationAnimation', 'completeMainEditorViewRotationAnimation', 'setMainEditorRotationAnimationEnabled', 'setMainEditorRotationAnimationMs', 'setMainEditorRotationInterpolationEnabled', 'setMainEditorRotationInterpolationMode', 'setMainEditorZoom', 'setMainEditorZoomBounds', 'setMainEditorCameraCullingEnabled', 'setMainEditorCullingMargin', 'setMainEditorShowCameraBounds', 'setMainEditorShowCullingBounds', 'getMainEditorTerrainSettings', 'setMainEditorTerrainSettings', 'resetMainEditorTerrainSettings', 'generateMainEditorTerrain', 'clearMainEditorTerrain', 'tickMainEditorTerrainApply', 'resetMainEditorViewRotation', 'setMainEditorViewRotation', 'rotateMainEditorView', 'exportMainViewRotationDiagnostic', 'dispatch'],
+      main: ['summarizeBoundary','resetBoundaryAudit','openEditorFromMain', 'handleOpenEditorButton', 'requestModeChange', 'runAssetScan', 'handleRescanAssetsButton', 'saveSceneTarget', 'loadSceneTarget', 'getMainEditorViewRotation', 'getMainEditorCameraSettings', 'getMainEditorVisualRotation', 'isMainEditorViewRotating', 'tickMainEditorViewRotationAnimation', 'completeMainEditorViewRotationAnimation', 'setMainEditorRotationAnimationEnabled', 'setMainEditorRotationAnimationMs', 'setMainEditorRotationInterpolationEnabled', 'setMainEditorRotationInterpolationMode', 'setMainEditorZoom', 'setMainEditorZoomBounds', 'setMainEditorCameraCullingEnabled', 'setMainEditorCullingMargin', 'setMainEditorShowCameraBounds', 'setMainEditorShowCullingBounds', 'setMainEditorStaticWorldFaceMergeEnabled', 'setMainEditorDisableFaceMergeAtOrAboveZoomEnabled', 'setMainEditorDisableFaceMergeAtOrAboveZoomThreshold', 'getMainEditorTerrainSettings', 'setMainEditorTerrainSettings', 'resetMainEditorTerrainSettings', 'generateMainEditorTerrain', 'clearMainEditorTerrain', 'tickMainEditorTerrainApply', 'resetMainEditorViewRotation', 'setMainEditorViewRotation', 'rotateMainEditorView', 'exportMainViewRotationDiagnostic', 'dispatch'],
       scene: ['saveSceneTarget', 'loadSceneTarget', 'saveLocalScene', 'loadLocalScene', 'saveSceneFile', 'openDefaultScene', 'importSceneFile', 'dispatch'],
       assetLibrary: ['openHabboLibrary', 'handleOpenBrowserClick', 'handleRefreshBrowserClick', 'handleTypeSwitch', 'handleCategorySelect', 'handleSearchInput', 'handlePageAction', 'handlePlaceSelectedItem', 'runAssetScan', 'dispatch'],
       placement: ['requestModeChange', 'handleModeButton', 'selectPrefabByIndex', 'selectPrefabById', 'handlePrefabSelectChange', 'applyPlacementIntent', 'getPreviewFacing', 'setPreviewFacing', 'rotatePreviewFacing', 'rotatePreviewFacingByWheel', 'startDragging', 'commitPreview', 'cancelDrag', 'completeDragInteraction', 'syncPlacementUi', 'summarizeRoutes', 'resetRouteAudit', 'dispatch'],

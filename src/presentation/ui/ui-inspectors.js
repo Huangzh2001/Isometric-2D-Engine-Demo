@@ -171,6 +171,7 @@ function refreshInspectorPanels() {
   refreshItemInspector();
   refreshPlayerInspector();
   refreshAssetScanStatus();
+  if (typeof uiRefreshRenderPanel === 'function') uiRefreshRenderPanel('presentation.ui.ui-inspectors');
 }
 
 

@@ -76,6 +76,17 @@ function uiDispatchControllerCommand(controllerName, action, payload) {
   return uiDispatchController(controller, action, payload);
 }
 
+function uiDirectPatchRenderSettings(patch, source) {
+  try {
+    var runtimeApi = window.App && window.App.state ? window.App.state.runtimeStateApi || null : null;
+    if (!runtimeApi && window.__RUNTIME_STATE_API__) runtimeApi = window.__RUNTIME_STATE_API__;
+    if (runtimeApi && typeof runtimeApi.patchEditorCameraSettings === 'function') {
+      return runtimeApi.patchEditorCameraSettings(patch || {}, { source: String(source || 'ui-direct-render-patch') });
+    }
+  } catch (_) {}
+  return null;
+}
+
 
 async function uiRunAssetScan(force, source) {
   var controller = getUiMainController();
@@ -318,6 +329,127 @@ function uiRefreshMainCameraPanel(source) {
       (settings.isViewRotating ? ' · 视角过渡中' : '');
   }
   return settings;
+}
+
+var __uiRenderControlInteractionLockUntil = 0;
+
+function uiLockRenderControlsInteraction(ms) {
+  try { __uiRenderControlInteractionLockUntil = Date.now() + Math.max(0, Number(ms) || 0); } catch (_) { __uiRenderControlInteractionLockUntil = 0; }
+}
+
+function uiIsRenderControlsInteractionLocked() {
+  try { return Date.now() < __uiRenderControlInteractionLockUntil; } catch (_) { return false; }
+}
+
+function uiGetRenderControlOverrides() {
+  try {
+    if (typeof window === 'undefined') return null;
+    var overrides = window.__RENDER_CONTROL_OVERRIDES__;
+    return overrides && typeof overrides === 'object' ? overrides : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function uiSetRenderControlOverrides(patch) {
+  try {
+    if (typeof window === 'undefined') return null;
+    if (!window.__RENDER_CONTROL_OVERRIDES__ || typeof window.__RENDER_CONTROL_OVERRIDES__ !== 'object') window.__RENDER_CONTROL_OVERRIDES__ = {};
+    var target = window.__RENDER_CONTROL_OVERRIDES__;
+    if (patch && typeof patch === 'object') {
+      if (Object.prototype.hasOwnProperty.call(patch, 'staticWorldFaceMergeEnabled')) target.staticWorldFaceMergeEnabled = patch.staticWorldFaceMergeEnabled !== false;
+      if (Object.prototype.hasOwnProperty.call(patch, 'disableFaceMergeAtOrAboveZoomEnabled')) target.disableFaceMergeAtOrAboveZoomEnabled = !!patch.disableFaceMergeAtOrAboveZoomEnabled;
+      if (Object.prototype.hasOwnProperty.call(patch, 'disableFaceMergeAtOrAboveZoomThreshold')) target.disableFaceMergeAtOrAboveZoomThreshold = Math.max(0.05, Number(patch.disableFaceMergeAtOrAboveZoomThreshold) || 1.6);
+      target.updatedAt = Date.now();
+    }
+    return target;
+  } catch (_) {
+    return null;
+  }
+}
+
+function uiBuildEffectiveRenderSettings(settings) {
+  var base = settings && typeof settings === 'object' ? settings : {};
+  var effective = Object.assign({}, base);
+  var overrides = uiGetRenderControlOverrides();
+  if (overrides) {
+    if (Object.prototype.hasOwnProperty.call(overrides, 'staticWorldFaceMergeEnabled')) effective.staticWorldFaceMergeEnabled = overrides.staticWorldFaceMergeEnabled !== false;
+    if (Object.prototype.hasOwnProperty.call(overrides, 'disableFaceMergeAtOrAboveZoomEnabled')) effective.disableFaceMergeAtOrAboveZoomEnabled = !!overrides.disableFaceMergeAtOrAboveZoomEnabled;
+    if (Object.prototype.hasOwnProperty.call(overrides, 'disableFaceMergeAtOrAboveZoomThreshold')) effective.disableFaceMergeAtOrAboveZoomThreshold = Math.max(0.05, Number(overrides.disableFaceMergeAtOrAboveZoomThreshold) || 1.6);
+  }
+  return effective;
+}
+
+function uiRefreshRenderPanel(source) {
+  var settings = uiGetMainCameraSettings(source || 'render-panel:refresh') || null;
+  if (!settings) return null;
+  var effectiveSettings = uiBuildEffectiveRenderSettings(settings);
+  var skipControlWrite = uiIsRenderControlsInteractionLocked() || !!(inspectorState && inspectorState.activeTab === 'render');
+  if (!skipControlWrite && ui.renderFaceMergeEnabled) ui.renderFaceMergeEnabled.checked = effectiveSettings.staticWorldFaceMergeEnabled !== false;
+  if (!skipControlWrite && ui.renderDisableFaceMergeAtZoomEnabled) ui.renderDisableFaceMergeAtZoomEnabled.checked = !!effectiveSettings.disableFaceMergeAtOrAboveZoomEnabled;
+  if (!skipControlWrite && ui.renderDisableFaceMergeAtZoomThreshold) ui.renderDisableFaceMergeAtZoomThreshold.value = String(Number(effectiveSettings.disableFaceMergeAtOrAboveZoomThreshold || 1.6).toFixed(2));
+  if (ui.renderSettingsSummary) {
+    var mergeSummary = effectiveSettings.staticWorldFaceMergeEnabled === false ? '关闭' : '开启';
+    var zoomRuleSummary = effectiveSettings.disableFaceMergeAtOrAboveZoomEnabled === true
+      ? ('开启（zoom ≥ ' + Number(effectiveSettings.disableFaceMergeAtOrAboveZoomThreshold || 1.6).toFixed(2) + ' 时禁用）')
+      : '关闭';
+    ui.renderSettingsSummary.textContent = 'Face Merge：' + mergeSummary + '；Zoom 条件禁用：' + zoomRuleSummary + '；当前 Zoom：' + Number(effectiveSettings.zoom || 1).toFixed(2) + 'x';
+  }
+  return effectiveSettings;
+}
+
+function uiHandleRenderSetFaceMergeEnabled(enabled, source) {
+  uiLockRenderControlsInteraction(1200);
+  enabled = enabled !== false;
+  if (ui.renderFaceMergeEnabled) ui.renderFaceMergeEnabled.checked = enabled;
+  uiSetRenderControlOverrides({ staticWorldFaceMergeEnabled: enabled });
+  uiDirectPatchRenderSettings({ staticWorldFaceMergeEnabled: enabled }, source || 'render-panel:face-merge-enabled:direct');
+  var controller = getUiMainController();
+  var dispatched = uiDispatchControllerCommand('main', 'setMainEditorStaticWorldFaceMergeEnabled', [enabled, source || 'render-panel:face-merge-enabled']);
+  if (dispatched) { uiRefreshRenderPanel(source); return dispatched; }
+  if (controller && typeof controller.setMainEditorStaticWorldFaceMergeEnabled === 'function') {
+    var result = controller.setMainEditorStaticWorldFaceMergeEnabled(enabled, source || 'render-panel:face-merge-enabled');
+    uiRefreshRenderPanel(source);
+    return result;
+  }
+  uiRefreshRenderPanel(source);
+  return { ok: false, reason: 'missing-render-face-merge-controller' };
+}
+
+function uiHandleRenderSetZoomDisableEnabled(enabled, source) {
+  uiLockRenderControlsInteraction(1200);
+  enabled = !!enabled;
+  if (ui.renderDisableFaceMergeAtZoomEnabled) ui.renderDisableFaceMergeAtZoomEnabled.checked = enabled;
+  uiSetRenderControlOverrides({ disableFaceMergeAtOrAboveZoomEnabled: enabled });
+  uiDirectPatchRenderSettings({ disableFaceMergeAtOrAboveZoomEnabled: enabled }, source || 'render-panel:zoom-disable-enabled:direct');
+  var controller = getUiMainController();
+  var dispatched = uiDispatchControllerCommand('main', 'setMainEditorDisableFaceMergeAtOrAboveZoomEnabled', [enabled, source || 'render-panel:zoom-disable-enabled']);
+  if (dispatched) { uiRefreshRenderPanel(source); return dispatched; }
+  if (controller && typeof controller.setMainEditorDisableFaceMergeAtOrAboveZoomEnabled === 'function') {
+    var result = controller.setMainEditorDisableFaceMergeAtOrAboveZoomEnabled(enabled, source || 'render-panel:zoom-disable-enabled');
+    uiRefreshRenderPanel(source);
+    return result;
+  }
+  uiRefreshRenderPanel(source);
+  return { ok: false, reason: 'missing-render-zoom-disable-enabled-controller' };
+}
+
+function uiHandleRenderSetZoomDisableThreshold(threshold, source) {
+  uiLockRenderControlsInteraction(1200);
+  threshold = Math.max(0.05, Number(threshold) || 1.6);
+  if (ui.renderDisableFaceMergeAtZoomThreshold) ui.renderDisableFaceMergeAtZoomThreshold.value = String(Number(threshold).toFixed(2));
+  uiSetRenderControlOverrides({ disableFaceMergeAtOrAboveZoomThreshold: threshold });
+  uiDirectPatchRenderSettings({ disableFaceMergeAtOrAboveZoomThreshold: threshold }, source || 'render-panel:zoom-disable-threshold:direct');
+  var controller = getUiMainController();
+  var dispatched = uiDispatchControllerCommand('main', 'setMainEditorDisableFaceMergeAtOrAboveZoomThreshold', [threshold, source || 'render-panel:zoom-disable-threshold']);
+  if (dispatched) { uiRefreshRenderPanel(source); return dispatched; }
+  if (controller && typeof controller.setMainEditorDisableFaceMergeAtOrAboveZoomThreshold === 'function') {
+    var result = controller.setMainEditorDisableFaceMergeAtOrAboveZoomThreshold(threshold, source || 'render-panel:zoom-disable-threshold');
+    uiRefreshRenderPanel(source);
+    return result;
+  }
+  uiRefreshRenderPanel(source);
+  return { ok: false, reason: 'missing-render-zoom-disable-threshold-controller' };
 }
 
 function uiLogMainCameraAction(action, source) {
@@ -681,6 +813,12 @@ safeListen(ui.mainCameraShowCullingBounds, 'change', () => uiHandleMainCameraSet
 safeListen(ui.mainCameraSurfaceOnlyRenderingEnabled, 'change', () => uiHandleMainCameraSetSurfaceOnlyRenderingEnabled(!!(ui.mainCameraSurfaceOnlyRenderingEnabled && ui.mainCameraSurfaceOnlyRenderingEnabled.checked), 'camera-panel:surface-only-rendering'));
 safeListen(ui.mainCameraDebugVisibleSurfaces, 'change', () => uiHandleMainCameraSetDebugVisibleSurfaces(!!(ui.mainCameraDebugVisibleSurfaces && ui.mainCameraDebugVisibleSurfaces.checked), 'camera-panel:debug-visible-surfaces'));
 safeListen(ui.downloadMainViewRotationDiagnostic, 'click', () => uiHandleMainViewRotationDiagnosticExport('camera-panel:download-diagnostic'));
+safeListen(ui.renderFaceMergeEnabled, 'click', () => uiHandleRenderSetFaceMergeEnabled(!!(ui.renderFaceMergeEnabled && ui.renderFaceMergeEnabled.checked), 'render-panel:face-merge-enabled:click'));
+safeListen(ui.renderFaceMergeEnabled, 'change', () => uiHandleRenderSetFaceMergeEnabled(!!(ui.renderFaceMergeEnabled && ui.renderFaceMergeEnabled.checked), 'render-panel:face-merge-enabled'));
+safeListen(ui.renderDisableFaceMergeAtZoomEnabled, 'click', () => uiHandleRenderSetZoomDisableEnabled(!!(ui.renderDisableFaceMergeAtZoomEnabled && ui.renderDisableFaceMergeAtZoomEnabled.checked), 'render-panel:zoom-disable-enabled:click'));
+safeListen(ui.renderDisableFaceMergeAtZoomEnabled, 'change', () => uiHandleRenderSetZoomDisableEnabled(!!(ui.renderDisableFaceMergeAtZoomEnabled && ui.renderDisableFaceMergeAtZoomEnabled.checked), 'render-panel:zoom-disable-enabled'));
+safeListen(ui.renderDisableFaceMergeAtZoomThreshold, 'input', () => uiHandleRenderSetZoomDisableThreshold(Number(ui.renderDisableFaceMergeAtZoomThreshold && ui.renderDisableFaceMergeAtZoomThreshold.value || 1.6), 'render-panel:zoom-disable-threshold:input'));
+safeListen(ui.renderDisableFaceMergeAtZoomThreshold, 'change', () => uiHandleRenderSetZoomDisableThreshold(Number(ui.renderDisableFaceMergeAtZoomThreshold && ui.renderDisableFaceMergeAtZoomThreshold.value || 1.6), 'render-panel:zoom-disable-threshold'));
 
 safeListen(ui.terrainGenerate, 'click', () => uiHandleTerrainGenerate('terrain-panel:generate'));
 safeListen(ui.terrainClear, 'click', () => uiHandleTerrainClear('terrain-panel:clear'));
@@ -951,4 +1089,13 @@ safeListen(ui.ambientStrength, 'input', () => {
 
 if (typeof refreshItemFacingStatusOnly === 'function') refreshItemFacingStatusOnly();
 uiRefreshMainCameraPanel('ui:init');
+window.__UI_RENDER_CONTROLS_API__ = {
+  refresh: uiRefreshRenderPanel,
+  getOverrides: uiGetRenderControlOverrides,
+  setFaceMergeEnabled: uiHandleRenderSetFaceMergeEnabled,
+  setZoomDisableEnabled: uiHandleRenderSetZoomDisableEnabled,
+  setZoomDisableThreshold: uiHandleRenderSetZoomDisableThreshold
+};
+
+uiRefreshRenderPanel('ui:init');
 uiRefreshMainTerrainPanel('ui:init');

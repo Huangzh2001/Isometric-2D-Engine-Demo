@@ -470,10 +470,11 @@
     var scope = opts.scope || null;
     var comparePackets = typeof opts.comparePackets === 'function' ? opts.comparePackets : null;
     var profileContext = opts.profileContext && typeof opts.profileContext === 'object' ? opts.profileContext : {};
+    var deferVisibleRebuild = opts.deferVisibleRebuild === true;
     var startAt = perfNow();
     var requestedVisibleChunkKeys = sortVisibleChunkKeys(computeVisibleChunkKeys(scope), scope);
     var renderSignatureChanged = state.lastRenderSignature !== renderSignature;
-    if (renderSignatureChanged) {
+    if (renderSignatureChanged && !deferVisibleRebuild) {
       state.chunks.forEach(function (chunk, key) {
         if (!chunk) return;
         chunk.dirtyGeometry = true;
@@ -484,14 +485,17 @@
     var visibleChunkKeys = [];
     var visibleDirtyChunkCount = 0;
     var queuedChunkKeys = [];
-    for (var q = 0; q < requestedVisibleChunkKeys.length; q++) {
-      var visibleKey = requestedVisibleChunkKeys[q];
+    var sourceVisibleChunkKeys = deferVisibleRebuild && Array.isArray(state.lastVisibleChunkKeys) && state.lastVisibleChunkKeys.length
+      ? state.lastVisibleChunkKeys.slice()
+      : requestedVisibleChunkKeys.slice();
+    for (var q = 0; q < sourceVisibleChunkKeys.length; q++) {
+      var visibleKey = sourceVisibleChunkKeys[q];
       if (!state.chunks.has(visibleKey)) continue;
       var visibleChunk = state.chunks.get(visibleKey);
       visibleChunkKeys.push(visibleKey);
-      var needsRebuild = visibleChunk && visibleChunk.dirtyGeometry === true;
+      var needsRebuild = !deferVisibleRebuild && visibleChunk && (visibleChunk.dirtyGeometry === true || visibleChunk.renderSignature !== renderSignature);
       if (needsRebuild) queuedChunkKeys.push(visibleKey);
-      if (state.dirtyChunkKeys.has(visibleKey)) visibleDirtyChunkCount += 1;
+      if (!deferVisibleRebuild && state.dirtyChunkKeys.has(visibleKey)) visibleDirtyChunkCount += 1;
     }
     var rebuildBudgetMode = String(opts.rebuildBudgetMode || state.rebuildBudgetMode || 'count');
     var rebuildBudgetValue = Math.max(1, Math.round(Number(opts.rebuildBudgetValue || state.rebuildBudgetValue || 1) || 1));
@@ -593,7 +597,9 @@
     state.chunks.forEach(function (chunk) {
       state.totalStaticRenderables += Array.isArray(chunk.cachedPackets) ? chunk.cachedPackets.length : 0;
     });
-    state.lastVisibleChunkKeys = visibleChunkKeys.slice();
+    if (!(deferVisibleRebuild && Array.isArray(state.lastVisibleChunkKeys) && state.lastVisibleChunkKeys.length)) {
+      state.lastVisibleChunkKeys = visibleChunkKeys.slice();
+    }
     var totalDirtyChunkCount = state.dirtyChunkKeys.size;
     var deferredChunkCountAfter = Math.max(0, queuedChunkCountBefore - rebuiltChunkCountThisFrame);
     state.lastSchedulerSummary = {
@@ -608,7 +614,8 @@
       rebuildBudgetMode: rebuildBudgetMode,
       rebuildBudgetValue: rebuildBudgetValue,
       rebuildMsThisFrame: Number(rebuildMsThisFrame.toFixed ? rebuildMsThisFrame.toFixed(3) : rebuildMsThisFrame),
-      renderSignatureChanged: renderSignatureChanged === true
+      renderSignatureChanged: renderSignatureChanged === true,
+      deferVisibleRebuild: deferVisibleRebuild === true
     };
     if (totalDirtyChunkCount > 0 || queuedChunkCountBefore > 0 || rebuiltChunkCountThisFrame > 0) {
       emitStaticChunkRebuildScheduler(cloneJsonSafe(state.lastSchedulerSummary));

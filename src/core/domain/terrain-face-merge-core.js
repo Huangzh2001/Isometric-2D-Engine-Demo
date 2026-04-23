@@ -137,6 +137,13 @@
     return strips;
   }
 
+  function shouldBreakSideStripAtStepEdge(previousFace, nextFace) {
+    var prev = previousFace && typeof previousFace === 'object' ? previousFace : null;
+    var next = nextFace && typeof nextFace === 'object' ? nextFace : null;
+    if (!prev || !next) return false;
+    return String(prev.sideStepBreakSignature || '') !== String(next.sideStepBreakSignature || '');
+  }
+
   function extractSideStrips(faces) {
     var list = Array.isArray(faces) ? faces : [];
     var byU = new Map();
@@ -147,14 +154,7 @@
       byU.get(uKey).push(face);
     }
     var strips = [];
-    var stepBreakCount = 0;
-
-    function shouldBreakSideStripAtStepEdge(previousFace, nextFace) {
-      var prevSig = previousFace && previousFace.sideStepBreakSignature != null ? String(previousFace.sideStepBreakSignature) : '';
-      var nextSig = nextFace && nextFace.sideStepBreakSignature != null ? String(nextFace.sideStepBreakSignature) : '';
-      return !!prevSig && !!nextSig && prevSig !== nextSig;
-    }
-
+    var breakCount = 0;
     byU.forEach(function (group, uKey) {
       var sorted = group.slice().sort(function (a, b) {
         return safeInt(a.mergeV, 0) - safeInt(b.mergeV, 0);
@@ -165,24 +165,24 @@
         var u = safeInt(face.mergeU, 0);
         var v = safeInt(face.mergeV, 0);
         if (!current) {
-          current = { minU: u, minV: v, width: 1, height: 1, members: [face], lastV: v, lastFace: face };
+          current = { minU: u, minV: v, width: 1, height: 1, members: [face], lastV: v };
           continue;
         }
-        var shouldBreakAtStepEdge = shouldBreakSideStripAtStepEdge(current.lastFace, face);
-        if (!shouldBreakAtStepEdge && v === current.lastV + 1) {
-          current.members.push(face);
-          current.height += 1;
-          current.lastV = v;
-          current.lastFace = face;
-          continue;
+        if (v === current.lastV + 1) {
+          if (!shouldBreakSideStripAtStepEdge(current.members[current.members.length - 1], face)) {
+            current.members.push(face);
+            current.height += 1;
+            current.lastV = v;
+            continue;
+          }
+          breakCount += 1;
         }
-        if (shouldBreakAtStepEdge) stepBreakCount += 1;
         strips.push({ minU: current.minU, minV: current.minV, width: 1, height: current.height, members: current.members.slice() });
-        current = { minU: u, minV: v, width: 1, height: 1, members: [face], lastV: v, lastFace: face };
+        current = { minU: u, minV: v, width: 1, height: 1, members: [face], lastV: v };
       }
       if (current) strips.push({ minU: current.minU, minV: current.minV, width: 1, height: current.height, members: current.members.slice() });
     });
-    return { strips: strips, stepBreakCount: stepBreakCount };
+    return { strips: strips, breakCount: breakCount };
   }
 
   function mergeTerrainFaceDescriptors(descriptors, options) {
@@ -252,11 +252,13 @@
     groups.forEach(function (faces) {
       if (!faces.length) return;
       var semanticFace = String(faces[0].semanticFace || 'top');
-      var stripsResult = semanticFace === 'top'
-        ? { strips: extractTopStrips(faces), stepBreakCount: 0 }
-        : extractSideStrips(faces);
-      var strips = Array.isArray(stripsResult && stripsResult.strips) ? stripsResult.strips : [];
-      sideStepBreakCount += Number(stripsResult && stripsResult.stepBreakCount || 0);
+      var strips = null;
+      if (semanticFace === 'top') strips = extractTopStrips(faces);
+      else {
+        var sideResult = extractSideStrips(faces);
+        strips = sideResult && Array.isArray(sideResult.strips) ? sideResult.strips : [];
+        sideStepBreakCount += Number(sideResult && sideResult.breakCount || 0);
+      }
       for (var si = 0; si < strips.length; si++) {
         var descriptor = buildMergedDescriptorFromStrip(strips[si]);
         if (!descriptor) continue;
@@ -273,8 +275,8 @@
       reductionRatio: list.length > 0 ? Math.max(0, (list.length - merged.length) / list.length) : 0,
       usedMerge: true,
       mergedComponentCount: mergedComponentCount,
-      sideStepBreakCount: sideStepBreakCount,
       boundarySegmentCount: 0,
+      sideStepBreakCount: sideStepBreakCount,
       mergeStrategy: 'top-and-side-strip'
     };
   }

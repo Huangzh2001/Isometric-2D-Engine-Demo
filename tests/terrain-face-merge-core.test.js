@@ -51,3 +51,10 @@ const sideWest = api.mergeTerrainFaceDescriptors([
 ], { enabled: true });
 assert.strictEqual(sideWest.outputCount, 2, 'west side faces should remain passthrough in first side-strip merge version');
 console.log('terrain-face-merge-core.test.js: OK');
+
+const sideStepBreak = api.mergeTerrainFaceDescriptors([
+  Object.assign({}, sideBase, { mergeU: 0, mergeV: 0, sideStepBreakSignature: 'east|selfTop:1|neg:void|pos:open' }),
+  Object.assign({}, sideBase, { mergeU: 0, mergeV: 1, sideStepBreakSignature: 'east|selfTop:1|neg:void|pos:closed', cell: { x: 0, y: 0, z: 1 } })
+]);
+assert.strictEqual(sideStepBreak.outputCount, 2, 'different side step break signatures should proactively split side strips');
+assert(sideStepBreak.sideStepBreakCount >= 1, 'side step break count should be tracked when side strips are proactively split');

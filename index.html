@@ -18,6 +18,7 @@
         <button id="tabItems" class="panelTab">物品</button>
         <button id="tabLights" class="panelTab">灯光</button>
         <button id="tabCamera" class="panelTab">摄像头</button>
+        <button id="tabRender" class="panelTab">渲染</button>
         <button id="tabTerrain" class="panelTab">地形</button>
         <button id="tabPlayer" class="panelTab">角色</button>
       </div>
@@ -225,6 +226,20 @@
           <label style="display:flex;align-items:center;gap:8px;"><input id="mainCameraSurfaceOnlyRenderingEnabled" type="checkbox" checked> Surface-Only Rendering Enabled</label>
           <label style="display:flex;align-items:center;gap:8px;"><input id="mainCameraDebugVisibleSurfaces" type="checkbox"> Debug Visible Surfaces</label>
           <div id="mainCameraSettingsSummary" class="hintBox">动画：开启，160ms，插值：开启 / easeInOut，缩放：1.00x，裁剪：开启，margin=2</div>
+        </div>
+      </div>
+      </section>
+
+
+      <section id="tabRenderPage" class="tabPage">
+      <div class="controls">
+        <div class="group inspectorGroup">
+          <h2>渲染 / Rendering</h2>
+          <div class="hintBox">这里集中控制 static-world face merge 相关开关。你可以直接关闭 face merge，或设置为当 zoom 放大到某个程度时自动退回逐方块/逐小面渲染。</div>
+          <label style="display:flex;align-items:center;gap:8px;"><input id="renderFaceMergeEnabled" type="checkbox" checked onclick="window.__UI_RENDER_CONTROLS_API__&&window.__UI_RENDER_CONTROLS_API__.setFaceMergeEnabled(this.checked, 'render-panel:inline-click')" onchange="window.__UI_RENDER_CONTROLS_API__&&window.__UI_RENDER_CONTROLS_API__.setFaceMergeEnabled(this.checked, 'render-panel:inline-change')"> 启用 Face Merge</label>
+          <label style="display:flex;align-items:center;gap:8px;"><input id="renderDisableFaceMergeAtZoomEnabled" type="checkbox" onclick="window.__UI_RENDER_CONTROLS_API__&&window.__UI_RENDER_CONTROLS_API__.setZoomDisableEnabled(this.checked, 'render-panel:inline-click')" onchange="window.__UI_RENDER_CONTROLS_API__&&window.__UI_RENDER_CONTROLS_API__.setZoomDisableEnabled(this.checked, 'render-panel:inline-change')"> Zoom 放大到阈值时禁用 Face Merge</label>
+          <label>禁用阈值 Zoom <input id="renderDisableFaceMergeAtZoomThreshold" type="number" min="0.1" max="8" step="0.05" value="1.6" oninput="window.__UI_RENDER_CONTROLS_API__&&window.__UI_RENDER_CONTROLS_API__.setZoomDisableThreshold(this.value, 'render-panel:inline-input')" onchange="window.__UI_RENDER_CONTROLS_API__&&window.__UI_RENDER_CONTROLS_API__.setZoomDisableThreshold(this.value, 'render-panel:inline-change')"></label>
+          <div id="renderSettingsSummary" class="hintBox">Face Merge：开启。Zoom 条件禁用：关闭。</div>
         </div>
       </div>
       </section>

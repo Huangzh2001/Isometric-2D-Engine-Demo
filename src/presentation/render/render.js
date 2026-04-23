@@ -278,49 +278,231 @@ function getTerrainSideEdgeVisibilitySignature(visibleFaces, semanticFace) {
   return [String(semanticFace || ''), list.join(',')].join('|');
 }
 
-function occupancyReaderHasSolid(occupancy, x, y, z) {
-  var occ = occupancy && typeof occupancy === 'object' ? occupancy : null;
-  if (!occ) return false;
+function occupancyReaderHasSolid(reader, x, y, z) {
+  if (!reader || typeof reader !== 'object') return false;
   try {
-    if (typeof occ.isOccupied === 'function') return !!occ.isOccupied(x, y, z);
-    if (typeof occ.has === 'function') return !!occ.has(x, y, z);
-    if (typeof occ.get === 'function') return !!occ.get(x, y, z);
+    if (typeof reader.isOccupied === 'function') return reader.isOccupied(x, y, z) === true;
+    if (typeof reader.has === 'function') return reader.has(x, y, z) === true;
   } catch (_) {}
   return false;
 }
 
-function getTerrainSideStepBreakSignature(cell, semanticFace, visibleFaces, occupancy) {
+function getTerrainSideTangentNeighbor(cell, semanticFace, direction) {
   var safeCell = cell && typeof cell === 'object' ? cell : null;
-  if (!safeCell || safeCell.generatedBy !== 'terrain-generator') return null;
+  if (!safeCell) return null;
+  var dir = direction === 'neg' ? -1 : 1;
+  var x = Number(safeCell.x || 0);
+  var y = Number(safeCell.y || 0);
+  var z = Number(safeCell.z || 0);
+  if (semanticFace === 'east') return { x: x, y: y + dir, z: z };
+  if (semanticFace === 'south') return { x: x + dir, y: y, z: z };
+  return null;
+}
+
+function getTerrainSideStepBreakSignature(cell, semanticFace, occupancyReader) {
+  var safeCell = cell && typeof cell === 'object' ? cell : null;
+  if (!safeCell) return null;
   var face = String(semanticFace || '');
   if (face !== 'east' && face !== 'south') return null;
   var x = Number(safeCell.x || 0);
   var y = Number(safeCell.y || 0);
   var z = Number(safeCell.z || 0);
-  var topOpen = Array.isArray(visibleFaces) ? visibleFaces.indexOf('top') >= 0 : !occupancyReaderHasSolid(occupancy, x, y, z + 1);
-  var tangentNegX = face === 'east' ? x : x - 1;
-  var tangentNegY = face === 'east' ? y - 1 : y;
-  var tangentPosX = face === 'east' ? x : x + 1;
-  var tangentPosY = face === 'east' ? y + 1 : y;
-  var negSolid = occupancyReaderHasSolid(occupancy, tangentNegX, tangentNegY, z);
-  var posSolid = occupancyReaderHasSolid(occupancy, tangentPosX, tangentPosY, z);
-  var negTopOpen = negSolid && !occupancyReaderHasSolid(occupancy, tangentNegX, tangentNegY, z + 1);
-  var posTopOpen = posSolid && !occupancyReaderHasSolid(occupancy, tangentPosX, tangentPosY, z + 1);
-  var stepCapLeft = topOpen !== negTopOpen ? 1 : 0;
-  var stepCapRight = topOpen !== posTopOpen ? 1 : 0;
+  var selfTopOpen = !occupancyReaderHasSolid(occupancyReader, x, y, z + 1);
+  function classify(direction) {
+    var neighbor = getTerrainSideTangentNeighbor(safeCell, face, direction);
+    if (!neighbor) return 'none';
+    var solid = occupancyReaderHasSolid(occupancyReader, neighbor.x, neighbor.y, neighbor.z);
+    if (!solid) return 'void';
+    var topOpen = !occupancyReaderHasSolid(occupancyReader, neighbor.x, neighbor.y, neighbor.z + 1);
+    return topOpen ? 'open' : 'closed';
+  }
   return [
     String(face),
-    'top:' + (topOpen ? 1 : 0),
-    'neg:' + (negTopOpen ? 1 : 0),
-    'pos:' + (posTopOpen ? 1 : 0),
-    'capL:' + stepCapLeft,
-    'capR:' + stepCapRight
+    'selfTop:' + String(selfTopOpen ? 1 : 0),
+    'neg:' + classify('neg'),
+    'pos:' + classify('pos')
   ].join('|');
+}
+
+function readStaticWorldFaceMergeDomOverrides() {
+  try {
+    if (typeof window === 'undefined') return null;
+    var overrides = window.__RENDER_CONTROL_OVERRIDES__;
+    var result = {};
+    if (overrides && typeof overrides === 'object') {
+      if (Object.prototype.hasOwnProperty.call(overrides, 'staticWorldFaceMergeEnabled')) result.staticWorldFaceMergeEnabled = overrides.staticWorldFaceMergeEnabled !== false;
+      if (Object.prototype.hasOwnProperty.call(overrides, 'disableFaceMergeAtOrAboveZoomEnabled')) result.disableFaceMergeAtOrAboveZoomEnabled = !!overrides.disableFaceMergeAtOrAboveZoomEnabled;
+      if (Object.prototype.hasOwnProperty.call(overrides, 'disableFaceMergeAtOrAboveZoomThreshold')) result.disableFaceMergeAtOrAboveZoomThreshold = Math.max(0.05, Number(overrides.disableFaceMergeAtOrAboveZoomThreshold) || 1.6);
+    }
+    var enabledEl = document.getElementById('renderFaceMergeEnabled');
+    var zoomDisableEl = document.getElementById('renderDisableFaceMergeAtZoomEnabled');
+    var thresholdEl = document.getElementById('renderDisableFaceMergeAtZoomThreshold');
+    if (enabledEl) result.staticWorldFaceMergeEnabled = enabledEl.checked !== false;
+    if (zoomDisableEl) result.disableFaceMergeAtOrAboveZoomEnabled = !!zoomDisableEl.checked;
+    if (thresholdEl) result.disableFaceMergeAtOrAboveZoomThreshold = Math.max(0.05, Number(thresholdEl.value) || 1.6);
+    return result;
+  } catch (_) {
+    return null;
+  }
+}
+
+var __staticWorldFaceMergeControlState = {
+  hysteresisGap: 0.12,
+  settleDelayMs: 140,
+  lastObservedZoom: null,
+  lastZoomInteractionAt: 0,
+  zoomInteractionActive: false,
+  zoomSettlePending: false,
+  effectiveFaceMergeMode: null,
+  pendingFaceMergeMode: null,
+  faceMergeModeSwitchCount: 0,
+  hysteresisHitCount: 0,
+  lastRequestedSettingsSignature: ''
+};
+
+function getEffectiveStaticWorldFaceMergeSettingsForRender() {
+  var settings = typeof getMainEditorCameraSettingsForRender === 'function' ? (getMainEditorCameraSettingsForRender() || {}) : {};
+  var effective = Object.assign({}, settings);
+  try {
+    var domOverrides = readStaticWorldFaceMergeDomOverrides();
+    if (domOverrides) {
+      if (Object.prototype.hasOwnProperty.call(domOverrides, 'staticWorldFaceMergeEnabled')) effective.staticWorldFaceMergeEnabled = domOverrides.staticWorldFaceMergeEnabled !== false;
+      if (Object.prototype.hasOwnProperty.call(domOverrides, 'disableFaceMergeAtOrAboveZoomEnabled')) effective.disableFaceMergeAtOrAboveZoomEnabled = !!domOverrides.disableFaceMergeAtOrAboveZoomEnabled;
+      if (Object.prototype.hasOwnProperty.call(domOverrides, 'disableFaceMergeAtOrAboveZoomThreshold')) effective.disableFaceMergeAtOrAboveZoomThreshold = Math.max(0.05, Number(domOverrides.disableFaceMergeAtOrAboveZoomThreshold) || 1.6);
+    }
+  } catch (_) {}
+  effective.staticWorldFaceMergeEnabled = effective.staticWorldFaceMergeEnabled !== false;
+  effective.disableFaceMergeAtOrAboveZoomEnabled = !!effective.disableFaceMergeAtOrAboveZoomEnabled;
+  effective.disableFaceMergeAtOrAboveZoomThreshold = Math.max(0.05, Number(effective.disableFaceMergeAtOrAboveZoomThreshold) || 1.6);
+  effective.zoom = Math.max(0.05, Number(effective.zoom) || 1);
+  return effective;
+}
+
+function resolveRequestedFaceMergeModeForRender(settings, basisMode, state) {
+  var safe = settings && typeof settings === 'object' ? settings : {};
+  var s = state && typeof state === 'object' ? state : __staticWorldFaceMergeControlState;
+  var mergeAllowed = safe.staticWorldFaceMergeEnabled !== false;
+  if (!mergeAllowed) {
+    return {
+      mode: 'no-merge',
+      highThreshold: Math.max(0.05, Number(safe.disableFaceMergeAtOrAboveZoomThreshold) || 1.6),
+      lowThreshold: Math.max(0.05, Number((Number(safe.disableFaceMergeAtOrAboveZoomThreshold) || 1.6) - Number(s.hysteresisGap || 0.12)) || 0.05)
+    };
+  }
+  if (safe.disableFaceMergeAtOrAboveZoomEnabled !== true) {
+    return {
+      mode: 'merge',
+      highThreshold: Math.max(0.05, Number(safe.disableFaceMergeAtOrAboveZoomThreshold) || 1.6),
+      lowThreshold: Math.max(0.05, Number((Number(safe.disableFaceMergeAtOrAboveZoomThreshold) || 1.6) - Number(s.hysteresisGap || 0.12)) || 0.05)
+    };
+  }
+  var high = Math.max(0.05, Number(safe.disableFaceMergeAtOrAboveZoomThreshold) || 1.6);
+  var low = Math.max(0.05, high - Math.max(0.01, Number(s.hysteresisGap || 0.12)));
+  var zoom = Math.max(0.05, Number(safe.zoom) || 1);
+  var base = String(basisMode || 'merge');
+  var mode = base;
+  if (base === 'merge') mode = zoom >= high ? 'no-merge' : 'merge';
+  else mode = zoom <= low ? 'merge' : 'no-merge';
+  return { mode: mode, highThreshold: high, lowThreshold: low };
+}
+
+function updateStaticWorldFaceMergeControlStateForRender() {
+  var state = __staticWorldFaceMergeControlState;
+  var settings = getEffectiveStaticWorldFaceMergeSettingsForRender();
+  var now = perfNow();
+  var requestedSignature = [
+    settings.staticWorldFaceMergeEnabled !== false ? 1 : 0,
+    settings.disableFaceMergeAtOrAboveZoomEnabled === true ? 1 : 0,
+    Number(settings.disableFaceMergeAtOrAboveZoomThreshold || 1.6).toFixed(3)
+  ].join('|');
+  var controlsChanged = state.lastRequestedSettingsSignature !== requestedSignature;
+  var zoom = Math.max(0.05, Number(settings.zoom) || 1);
+  var zoomChanged = state.lastObservedZoom == null ? false : Math.abs(zoom - Number(state.lastObservedZoom || 0)) > 1e-6;
+  var basisMode = String(state.pendingFaceMergeMode || state.effectiveFaceMergeMode || 'merge');
+  var requested = resolveRequestedFaceMergeModeForRender(settings, basisMode, state);
+  if (state.effectiveFaceMergeMode == null) state.effectiveFaceMergeMode = requested.mode;
+  if (state.pendingFaceMergeMode == null) state.pendingFaceMergeMode = state.effectiveFaceMergeMode;
+  if (controlsChanged) {
+    state.lastRequestedSettingsSignature = requestedSignature;
+    state.pendingFaceMergeMode = requested.mode;
+    if (!state.zoomInteractionActive) {
+      if (state.effectiveFaceMergeMode !== state.pendingFaceMergeMode) state.faceMergeModeSwitchCount += 1;
+      state.effectiveFaceMergeMode = state.pendingFaceMergeMode;
+    }
+  }
+  if (zoomChanged) {
+    state.lastObservedZoom = zoom;
+    state.lastZoomInteractionAt = now;
+    state.zoomInteractionActive = true;
+    state.zoomSettlePending = true;
+    state.pendingFaceMergeMode = requested.mode;
+  } else {
+    state.lastObservedZoom = zoom;
+    state.pendingFaceMergeMode = requested.mode;
+    if (state.zoomInteractionActive) {
+      if ((now - Number(state.lastZoomInteractionAt || 0)) >= Number(state.settleDelayMs || 140)) {
+        state.zoomInteractionActive = false;
+        state.zoomSettlePending = false;
+        if (state.effectiveFaceMergeMode !== state.pendingFaceMergeMode) state.faceMergeModeSwitchCount += 1;
+        state.effectiveFaceMergeMode = state.pendingFaceMergeMode;
+      } else {
+        state.zoomSettlePending = true;
+      }
+    } else {
+      state.zoomSettlePending = false;
+      if (controlsChanged && state.effectiveFaceMergeMode !== state.pendingFaceMergeMode) {
+        state.faceMergeModeSwitchCount += 1;
+        state.effectiveFaceMergeMode = state.pendingFaceMergeMode;
+      }
+    }
+  }
+  if (settings.disableFaceMergeAtOrAboveZoomEnabled === true && requested.highThreshold > requested.lowThreshold && zoom > requested.lowThreshold && zoom < requested.highThreshold) {
+    state.hysteresisHitCount += 1;
+  }
+  return {
+    zoomInteractionActive: state.zoomInteractionActive === true,
+    zoomSettlePending: state.zoomSettlePending === true,
+    effectiveFaceMergeMode: String(state.effectiveFaceMergeMode || 'merge'),
+    pendingFaceMergeMode: String(state.pendingFaceMergeMode || state.effectiveFaceMergeMode || 'merge'),
+    faceMergeModeSwitchCount: Math.max(0, Math.round(Number(state.faceMergeModeSwitchCount || 0) || 0)),
+    hysteresisHitCount: Math.max(0, Math.round(Number(state.hysteresisHitCount || 0) || 0)),
+    disableThresholdHigh: Number(requested.highThreshold || settings.disableFaceMergeAtOrAboveZoomThreshold || 1.6),
+    disableThresholdLow: Number(requested.lowThreshold || settings.disableFaceMergeAtOrAboveZoomThreshold || 1.48),
+    staticWorldFaceMergeEnabled: settings.staticWorldFaceMergeEnabled !== false,
+    disableFaceMergeAtOrAboveZoomEnabled: settings.disableFaceMergeAtOrAboveZoomEnabled === true,
+    disableFaceMergeAtOrAboveZoomThreshold: Number(settings.disableFaceMergeAtOrAboveZoomThreshold || 1.6),
+    zoom: zoom
+  };
+}
+
+function getStaticWorldFaceMergeControlStateSnapshotForRender() {
+  try {
+    return updateStaticWorldFaceMergeControlStateForRender();
+  } catch (_) {
+    return {
+      zoomInteractionActive: false,
+      zoomSettlePending: false,
+      effectiveFaceMergeMode: 'merge',
+      pendingFaceMergeMode: 'merge',
+      faceMergeModeSwitchCount: 0,
+      hysteresisHitCount: 0,
+      disableThresholdHigh: 1.6,
+      disableThresholdLow: 1.48,
+      staticWorldFaceMergeEnabled: true,
+      disableFaceMergeAtOrAboveZoomEnabled: false,
+      disableFaceMergeAtOrAboveZoomThreshold: 1.6,
+      zoom: 1
+    };
+  }
 }
 
 function isStaticWorldFaceMergeEnabledForRender() {
   try {
     if (typeof window !== 'undefined' && window.__STATIC_WORLD_FACE_MERGE_ENABLED__ === false) return false;
+  } catch (_) {}
+  try {
+    var controlState = getStaticWorldFaceMergeControlStateSnapshotForRender();
+    return String(controlState.effectiveFaceMergeMode || 'merge') !== 'no-merge';
   } catch (_) {}
   return true;
 }
@@ -439,6 +621,7 @@ function isStaticWorldBoxForRender(box, instanceRenderUpdateModes) {
 }
 
 function buildStaticWorldRenderSignature(currentViewRotation) {
+  var faceMergeControlState = getStaticWorldFaceMergeControlStateSnapshotForRender();
   return JSON.stringify({
     lightingSignature: staticBoxLightingSignature(),
     xrayFaces: !!xrayFaces,
@@ -447,7 +630,8 @@ function buildStaticWorldRenderSignature(currentViewRotation) {
     packetViewRotation: Number(currentViewRotation || 0),
     cacheContentType: 'world-face-packets',
     cameraIndependent: true,
-    usesScreenSpaceCache: false
+    usesScreenSpaceCache: false,
+    faceMergeEffectiveMode: String(faceMergeControlState.effectiveFaceMergeMode || 'merge')
   });
 }
 
@@ -1277,7 +1461,7 @@ function buildStaticWorldChunkRenderables(chunk, options) {
         ? getTerrainSideEdgeVisibilitySignature(visibleFaces, semanticFace)
         : null;
       var sideStepBreakSignature = (cell && cell.generatedBy === 'terrain-generator' && (semanticFace === 'east' || semanticFace === 'south'))
-        ? getTerrainSideStepBreakSignature(cell, semanticFace, visibleFaces, chunkOcc)
+        ? getTerrainSideStepBreakSignature(cell, semanticFace, chunkOcc)
         : null;
       step5ComputeSortKeyMs += Math.max(0, perfNow() - sortKeyStartAt);
       inputFaceDescriptorCount += 1;
@@ -3453,6 +3637,7 @@ function drawCachedVoxelRenderable(item) {
 
 function rebuildStaticBoxRenderCacheIfNeeded(force = false) {
   const profileStartAt = perfNow();
+  const faceMergeControlState = getStaticWorldFaceMergeControlStateSnapshotForRender();
   const viewRotationInfo = getSafeMainEditorViewRotation(null);
   const currentViewRotation = normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation);
   const signatureStartAt = perfNow();
@@ -3473,10 +3658,15 @@ function rebuildStaticBoxRenderCacheIfNeeded(force = false) {
     ? (sceneStaticWorldApi.consumeUpdates() || [])
     : [];
   const staticWorldCacheApi = getSharedStaticWorldChunkCacheApiForRender();
+  const deferVisibleRebuild = faceMergeControlState.zoomInteractionActive === true || faceMergeControlState.zoomSettlePending === true;
   if (!staticWorldCacheApi || typeof staticWorldCacheApi.syncWithScene !== 'function' || typeof staticWorldCacheApi.collectVisibleRenderables !== 'function') {
     const fallbackPayload = {
       reason: 'rebuildStaticBoxRenderCacheIfNeeded',
       cacheHit: true,
+      zoomInteractionActive: faceMergeControlState.zoomInteractionActive === true,
+      zoomSettlePending: faceMergeControlState.zoomSettlePending === true,
+      effectiveFaceMergeMode: String(faceMergeControlState.effectiveFaceMergeMode || 'merge'),
+      pendingFaceMergeMode: String(faceMergeControlState.pendingFaceMergeMode || faceMergeControlState.effectiveFaceMergeMode || 'merge'),
       invalidationReason: 'missing-static-world-chunk-cache',
       totalBoxes: Number(boxes.length || 0),
       structuredBoxCount: 0,
@@ -6995,6 +7185,7 @@ function drawPlacementPreview() {
 }
 
 function buildRenderables() {
+  const faceMergeControlState = getStaticWorldFaceMergeControlStateSnapshotForRender();
   beginRenderFrameDiagnosticState();
   const buildStartAt = perfNow();
   const viewRotationInfoStartAt = perfNow();
@@ -7181,7 +7372,13 @@ function buildRenderables() {
     staticCacheBuildMs: staticCacheBuildMs,
     visibleChunkCount: Number(surfaceStats.visibleChunkCount || 0),
     rebuiltChunkCountThisFrame: Number(surfaceStats.rebuiltChunkCountThisFrame || 0),
-    reusedChunkCountThisFrame: Number(surfaceStats.reusedChunkCountThisFrame || 0)
+    reusedChunkCountThisFrame: Number(surfaceStats.reusedChunkCountThisFrame || 0),
+    zoomInteractionActive: faceMergeControlState.zoomInteractionActive === true,
+    zoomSettlePending: faceMergeControlState.zoomSettlePending === true,
+    effectiveFaceMergeMode: String(faceMergeControlState.effectiveFaceMergeMode || 'merge'),
+    pendingFaceMergeMode: String(faceMergeControlState.pendingFaceMergeMode || faceMergeControlState.effectiveFaceMergeMode || 'merge'),
+    faceMergeModeSwitchCount: Number(faceMergeControlState.faceMergeModeSwitchCount || 0),
+    hysteresisHitCount: Number(faceMergeControlState.hysteresisHitCount || 0)
   };
   __lastRenderFrameOccupancyVersion = occupancyCacheVersion;
   var frameBuildMs = Number(Math.max(0, perfNow() - buildStartAt).toFixed(3));
@@ -7245,6 +7442,12 @@ function buildRenderables() {
     visibleChunkCount: Number(surfaceStats.visibleChunkCount || 0),
     rebuiltChunkCountThisFrame: Number(surfaceStats.rebuiltChunkCountThisFrame || 0),
     reusedChunkCountThisFrame: Number(surfaceStats.reusedChunkCountThisFrame || 0),
+    zoomInteractionActive: faceMergeControlState.zoomInteractionActive === true,
+    zoomSettlePending: faceMergeControlState.zoomSettlePending === true,
+    effectiveFaceMergeMode: String(faceMergeControlState.effectiveFaceMergeMode || 'merge'),
+    pendingFaceMergeMode: String(faceMergeControlState.pendingFaceMergeMode || faceMergeControlState.effectiveFaceMergeMode || 'merge'),
+    faceMergeModeSwitchCount: Number(faceMergeControlState.faceMergeModeSwitchCount || 0),
+    hysteresisHitCount: Number(faceMergeControlState.hysteresisHitCount || 0),
     frameBuildMs: frameBuildMs
   });
   maybeLogCameraStaticWorldVerify({
@@ -7256,6 +7459,10 @@ function buildRenderables() {
     reusedChunkCountThisFrame: Number(surfaceStats.reusedChunkCountThisFrame || 0),
     staticCacheRebuiltThisFrame: staticCacheRebuiltThisFrame,
     staticCacheBuildMs: Number(staticCacheBuildMs.toFixed(3)),
+    zoomInteractionActive: faceMergeControlState.zoomInteractionActive === true,
+    zoomSettlePending: faceMergeControlState.zoomSettlePending === true,
+    effectiveFaceMergeMode: String(faceMergeControlState.effectiveFaceMergeMode || 'merge'),
+    pendingFaceMergeMode: String(faceMergeControlState.pendingFaceMergeMode || faceMergeControlState.effectiveFaceMergeMode || 'merge'),
     cacheContentType: String(surfaceStats.cacheContentType || 'world-face-packets'),
     cameraIndependent: surfaceStats.cameraIndependent !== false,
     usesScreenSpaceCache: surfaceStats.usesScreenSpaceCache === true,

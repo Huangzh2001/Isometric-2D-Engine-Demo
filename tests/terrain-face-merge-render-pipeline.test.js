@@ -12,3 +12,5 @@ assert(renderSource.includes('mergeHeight'), 'render should support merged strip
 assert(renderSource.includes('terrainSideInputFaceDescriptorCount'), 'render should track terrain side input face counts');
 assert(renderSource.includes('terrainSideMergedFaceDescriptorCount'), 'render should track terrain side merged face counts');
 console.log('terrain-face-merge-render-pipeline.test.js: OK');
+
+assert(renderSource.includes('sideStepBreakSignature'), 'render should annotate side step break signature');

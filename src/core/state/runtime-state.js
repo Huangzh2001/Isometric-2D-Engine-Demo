@@ -81,6 +81,9 @@ var editor = {
   showCullingBounds: false,
   surfaceOnlyRenderingEnabled: true,
   debugVisibleSurfaces: false,
+  staticWorldFaceMergeEnabled: true,
+  disableFaceMergeAtOrAboveZoomEnabled: false,
+  disableFaceMergeAtOrAboveZoomThreshold: 1.6,
   // previewFacing is the placement-preview item facing. It is intentionally
   // separate from view rotation and placed-instance rotation.
   previewFacing: 0,
@@ -529,7 +532,10 @@ function getEditorCameraSettingsValue() {
     showCameraBounds: !!(editor && editor.showCameraBounds),
     showCullingBounds: !!(editor && editor.showCullingBounds),
     surfaceOnlyRenderingEnabled: editor && editor.surfaceOnlyRenderingEnabled !== false,
-    debugVisibleSurfaces: !!(editor && editor.debugVisibleSurfaces)
+    debugVisibleSurfaces: !!(editor && editor.debugVisibleSurfaces),
+    staticWorldFaceMergeEnabled: editor && editor.staticWorldFaceMergeEnabled !== false,
+    disableFaceMergeAtOrAboveZoomEnabled: !!(editor && editor.disableFaceMergeAtOrAboveZoomEnabled),
+    disableFaceMergeAtOrAboveZoomThreshold: Math.max(0.05, Number(editor && editor.disableFaceMergeAtOrAboveZoomThreshold) || 1.6)
   };
 }
 
@@ -561,6 +567,12 @@ function patchEditorCameraSettings(patch, meta) {
   if (Object.prototype.hasOwnProperty.call(patch, 'showCullingBounds')) editor.showCullingBounds = !!patch.showCullingBounds;
   if (Object.prototype.hasOwnProperty.call(patch, 'surfaceOnlyRenderingEnabled')) editor.surfaceOnlyRenderingEnabled = patch.surfaceOnlyRenderingEnabled !== false;
   if (Object.prototype.hasOwnProperty.call(patch, 'debugVisibleSurfaces')) editor.debugVisibleSurfaces = !!patch.debugVisibleSurfaces;
+  if (Object.prototype.hasOwnProperty.call(patch, 'staticWorldFaceMergeEnabled')) editor.staticWorldFaceMergeEnabled = patch.staticWorldFaceMergeEnabled !== false;
+  if (Object.prototype.hasOwnProperty.call(patch, 'disableFaceMergeAtOrAboveZoomEnabled')) editor.disableFaceMergeAtOrAboveZoomEnabled = !!patch.disableFaceMergeAtOrAboveZoomEnabled;
+  if (Object.prototype.hasOwnProperty.call(patch, 'disableFaceMergeAtOrAboveZoomThreshold')) {
+    var faceMergeZoomThreshold = Number(patch.disableFaceMergeAtOrAboveZoomThreshold);
+    if (Number.isFinite(faceMergeZoomThreshold)) editor.disableFaceMergeAtOrAboveZoomThreshold = Math.max(0.05, faceMergeZoomThreshold);
+  }
   var after = getEditorCameraSettingsValue();
   runtimeWrite('patchEditorCameraSettings', {
     source: meta && meta.source ? String(meta.source) : 'unknown',
