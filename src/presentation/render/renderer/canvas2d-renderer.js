@@ -392,6 +392,8 @@
       hash = mixHashString(hash, String(packet && packet.stroke || ''));
       hash = mixHashString(hash, Number(packet && packet.width || 1));
       hash = mixHashString(hash, Array.isArray(packet && packet.worldPts) ? packet.worldPts.length : 0);
+      hash = mixHashString(hash, Array.isArray(packet && packet.worldLoops) ? packet.worldLoops.length : 0);
+      hash = mixHashString(hash, Array.isArray(packet && packet.worldOutlineSegments) ? packet.worldOutlineSegments.length : 0);
       hash = mixHashString(hash, Array.isArray(packet && packet.shadowOverlaysWorld) ? packet.shadowOverlaysWorld.length : 0);
     }
     return [

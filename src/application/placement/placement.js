@@ -516,6 +516,9 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
         terrainBatchId: instance.terrainBatchId || null,
         terrainCellX: instance.terrainCellX != null ? instance.terrainCellX : null,
         terrainCellY: instance.terrainCellY != null ? instance.terrainCellY : null,
+        terrainMaterialId: instance.terrainMaterialId != null ? instance.terrainMaterialId : null,
+        materialType: instance.materialType != null ? instance.materialType : null,
+        terrainMaterialLabel: instance.terrainMaterialLabel != null ? instance.terrainMaterialLabel : null,
         semanticTextureMap: instance.semanticTextureMap || null,
         semanticTextures: instance.semanticTextures || null,
         semanticFaceColors: instance.semanticFaceColors || null,
@@ -652,18 +655,63 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
     return removeInstanceById(instanceId);
   }
 
+
+  function getTerrainMaterialCoreForPlacement() {
+    try {
+      if (typeof window !== 'undefined' && window.__TERRAIN_MATERIAL_CORE__) return window.__TERRAIN_MATERIAL_CORE__;
+    } catch (_) {}
+    return null;
+  }
+
+  function buildDefaultTerrainMaterialDemoInstances(nextDefaultId) {
+    var materialCore = getTerrainMaterialCoreForPlacement();
+    var patches = [
+      { id: 'sand', x0: 0, y0: 0, w: 2, h: 2 },
+      { id: 'grass', x0: 4, y0: 0, w: 2, h: 2 },
+      { id: 'rock', x0: 8, y0: 0, w: 2, h: 2 }
+    ];
+    var out = [];
+    for (var p = 0; p < patches.length; p++) {
+      var patch = patches[p];
+      var def = materialCore && typeof materialCore.getTerrainMaterialDefinition === 'function'
+        ? materialCore.getTerrainMaterialDefinition(patch.id)
+        : null;
+      var baseColor = def && def.colors && def.colors.top ? def.colors.top : '#79b35a';
+      for (var y = 0; y < patch.h; y++) {
+        for (var x = 0; x < patch.w; x++) {
+          out.push(makeInstance('cube_1x1', patch.x0 + x, patch.y0 + y, 0, 0, {
+            instanceId: nextDefaultId(),
+            source: 'placement:defaultTerrainMaterialDemo',
+            name: String(def && def.label ? def.label : patch.id) + ' Sample',
+            generatedBy: 'terrain-generator',
+            terrainBatchId: 'demo-terrain-materials',
+            terrainCellX: patch.x0 + x,
+            terrainCellY: patch.y0 + y,
+            terrainMaterialId: patch.id,
+            materialType: patch.id,
+            terrainMaterialLabel: def && def.label ? def.label : patch.id,
+            base: baseColor,
+            renderUpdateMode: 'static'
+          }));
+        }
+      }
+    }
+    return out;
+  }
+
   function defaultInstances() {
     var localSerial = 1;
     function nextDefaultId() {
       return 'obj_' + String(localSerial++).padStart(4, '0');
     }
-    return [
+    var baseInstances = [
       makeInstance('bench_2x1', 1, 5, 0, 0, { instanceId: nextDefaultId(), source: 'placement:defaultInstances' }),
       makeInstance('table_2x1', 2, 2, 0, 0, { instanceId: nextDefaultId(), name: 'Table', source: 'placement:defaultInstances' }),
       makeInstance('sofa_2x1', 4, 5, 0, 0, { instanceId: nextDefaultId(), source: 'placement:defaultInstances' }),
       makeInstance('cabinet_1x1x2', 7, 2, 0, 0, { instanceId: nextDefaultId(), source: 'placement:defaultInstances' }),
-      makeInstance('cube_1x1', 8, 6, 0, 0, { instanceId: nextDefaultId(), source: 'placement:defaultInstances' }),
+      makeInstance('cube_1x1', 8, 6, 0, 0, { instanceId: nextDefaultId(), source: 'placement:defaultInstances' })
     ];
+    return baseInstances;
   }
 
   function defaultBoxes() {

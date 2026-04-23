@@ -185,6 +185,10 @@
     return appPath('domain.terrainGeneratorCore') || (typeof window !== 'undefined' ? window.__TERRAIN_GENERATOR_CORE__ || null : null);
   }
 
+  function getTerrainMaterialCoreApi() {
+    return appPath('domain.terrainMaterial') || (typeof window !== 'undefined' ? window.__TERRAIN_MATERIAL_CORE__ || null : null);
+  }
+
   function getSceneSessionApi() {
     var state = getState();
     return state && state.sceneSession ? state.sceneSession : (appPath('state.sceneSession') || (typeof window !== 'undefined' ? window.__SCENE_SESSION_STATE__ || null : null));
@@ -2056,6 +2060,45 @@
     return '#79b35a';
   }
 
+  function isTerrainMaterialDataEnabledForApply() {
+    try {
+      if (typeof window !== 'undefined' && window.__TERRAIN_MATERIAL_DATA_ENABLED__ === true) return true;
+    } catch (_) {}
+    return false;
+  }
+
+  function buildTerrainMaterialMapForApply(heightMap, terrainSettings) {
+    if (!isTerrainMaterialDataEnabledForApply()) return null;
+    var materialCore = getTerrainMaterialCoreApi();
+    if (materialCore && typeof materialCore.buildTerrainMaterialMap === 'function') {
+      try {
+        return materialCore.buildTerrainMaterialMap(heightMap, terrainSettings || {});
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  function getTerrainMaterialDefinitionForApply(materialId) {
+    if (!isTerrainMaterialDataEnabledForApply()) return null;
+    var materialCore = getTerrainMaterialCoreApi();
+    if (materialCore && typeof materialCore.getTerrainMaterialDefinition === 'function') {
+      try { return materialCore.getTerrainMaterialDefinition(materialId); } catch (_) {}
+    }
+    return null;
+  }
+
+  function getTerrainMaterialIdForStep(materialMap, step, fallbackId) {
+    var defaultKey = String(fallbackId || '__terrain_default__');
+    if (!isTerrainMaterialDataEnabledForApply()) return defaultKey;
+    var materialCore = getTerrainMaterialCoreApi();
+    var x = Number(step && step.terrainCellX != null ? step.terrainCellX : step && step.x) || 0;
+    var y = Number(step && step.terrainCellY != null ? step.terrainCellY : step && step.y) || 0;
+    if (materialCore && typeof materialCore.getTerrainMaterialIdAt === 'function') {
+      try { return materialCore.getTerrainMaterialIdAt(materialMap, x, y, defaultKey); } catch (_) {}
+    }
+    return defaultKey;
+  }
+
   function buildTerrainInstanceSemanticMetadata(terrainSettings) {
     var settings = terrainSettings && typeof terrainSettings === 'object' ? terrainSettings : {};
     if (settings.terrainDebugFaceColorsEnabled !== true) return { semanticTextureMap: null, semanticFaceColors: null };
@@ -2086,12 +2129,14 @@
     return plan;
   }
 
-  function buildTerrainInstancesFromPlacementPlan(plan, batchId, terrainSettings, heightMap) {
+  function buildTerrainInstancesFromPlacementPlan(plan, batchId, terrainSettings, heightMap, materialMap) {
     var semanticMeta = buildTerrainInstanceSemanticMetadata(terrainSettings);
     var map = Array.isArray(heightMap) ? heightMap : [];
     var list = Array.isArray(plan) ? plan : [];
     return list.map(function (step) {
       var targetHeight = Array.isArray(map[step.x]) ? Number(map[step.x][step.y] || 0) : 0;
+      var terrainMaterialId = getTerrainMaterialIdForStep(materialMap, step, '__terrain_default__');
+      var materialDef = getTerrainMaterialDefinitionForApply(terrainMaterialId);
       return {
         instanceId: String(batchId || 'terrain') + ':' + String(step.x) + ':' + String(step.y) + ':' + String(step.z),
         prefabId: 'cube_1x1',
@@ -2106,13 +2151,16 @@
         terrainCellY: Number(step.terrainCellY) || 0,
         semanticTextureMap: semanticMeta.semanticTextureMap,
         semanticFaceColors: semanticMeta.semanticFaceColors,
-        base: getTerrainBlockBaseColor(targetHeight, terrainSettings)
+        terrainMaterialId: terrainMaterialId,
+        materialType: terrainMaterialId,
+        terrainMaterialLabel: materialDef && materialDef.label ? materialDef.label : terrainMaterialId,
+        base: materialDef && materialDef.colors && materialDef.colors.top ? materialDef.colors.top : getTerrainBlockBaseColor(targetHeight, terrainSettings)
       };
     });
   }
 
 
-  function buildTerrainInstancesAndBoxesFromPlacementPlanRange(plan, startIndex, count, batchId, terrainSettings, heightMap, semanticMeta, startingBoxId) {
+  function buildTerrainInstancesAndBoxesFromPlacementPlanRange(plan, startIndex, count, batchId, terrainSettings, heightMap, materialMap, semanticMeta, startingBoxId) {
     var map = Array.isArray(heightMap) ? heightMap : [];
     var list = Array.isArray(plan) ? plan : [];
     var safeStart = Math.max(0, Math.round(Number(startIndex) || 0));
@@ -2127,8 +2175,10 @@
       var y = Number(step.y) || 0;
       var z = Number(step.z) || 0;
       var targetHeight = Array.isArray(map[x]) ? Number(map[x][y] || 0) : 0;
+      var terrainMaterialId = getTerrainMaterialIdForStep(materialMap, step, '__terrain_default__');
+      var materialDef = getTerrainMaterialDefinitionForApply(terrainMaterialId);
       var instanceId = String(batchId || 'terrain') + ':' + String(x) + ':' + String(y) + ':' + String(z);
-      var baseColor = getTerrainBlockBaseColor(targetHeight, terrainSettings);
+      var baseColor = materialDef && materialDef.colors && materialDef.colors.top ? materialDef.colors.top : getTerrainBlockBaseColor(targetHeight, terrainSettings);
       var instance = {
         instanceId: instanceId,
         prefabId: 'cube_1x1',
@@ -2143,6 +2193,9 @@
         terrainCellY: Number(step.terrainCellY) || 0,
         semanticTextureMap: semantic.semanticTextureMap || null,
         semanticFaceColors: semantic.semanticFaceColors || null,
+        terrainMaterialId: terrainMaterialId,
+        materialType: terrainMaterialId,
+        terrainMaterialLabel: materialDef && materialDef.label ? materialDef.label : terrainMaterialId,
         base: baseColor,
         renderUpdateMode: 'static'
       };
@@ -2166,6 +2219,9 @@
         semanticTextureMap: semantic.semanticTextureMap || null,
         semanticTextures: null,
         semanticFaceColors: semantic.semanticFaceColors || null,
+        terrainMaterialId: terrainMaterialId,
+        materialType: terrainMaterialId,
+        terrainMaterialLabel: materialDef && materialDef.label ? materialDef.label : terrainMaterialId,
         renderUpdateMode: 'static',
         rotation: 0,
         localIndex: 0
@@ -2189,7 +2245,7 @@
         height: job.normalizedParams.height,
         heightMap: job.generated.heightMap,
         existingHeightMap: job.occupancySummary.existingHeightMap,
-        materialMap: null,
+        materialMap: terrainMaterialMap,
         editDiff: {},
         params: job.normalizedParams,
         lastSummary: summary,
@@ -2237,7 +2293,7 @@
       : { start: job.nextBoxId, count: batchCount };
     var startingBoxId = range && Number.isFinite(Number(range.start)) ? Number(range.start) : job.nextBoxId;
     var materializeStartAt = controllerPerfNowMs();
-    var built = buildTerrainInstancesAndBoxesFromPlacementPlanRange(job.terrainPlacementPlan, job.nextPlanIndex, batchCount, job.batchId, job.normalizedParams, job.generated.heightMap, job.semanticMeta, startingBoxId);
+    var built = buildTerrainInstancesAndBoxesFromPlacementPlanRange(job.terrainPlacementPlan, job.nextPlanIndex, batchCount, job.batchId, job.normalizedParams, job.generated.heightMap, job.generated && job.generated.materialMap ? job.generated.materialMap : null, job.semanticMeta, startingBoxId);
     var materializeMs = Math.max(0, controllerPerfNowMs() - materializeStartAt);
     var nextInstances = job.survivors.concat(job.appliedInstances, built.instances);
     var nextBoxes = job.survivorsBoxes.concat(job.appliedBoxes, built.boxes);
@@ -2259,7 +2315,7 @@
       height: job.normalizedParams.height,
       heightMap: job.generated.heightMap,
       existingHeightMap: job.occupancySummary.existingHeightMap,
-      materialMap: null,
+      materialMap: job.generated && job.generated.materialMap ? job.generated.materialMap : null,
       editDiff: {},
       params: job.normalizedParams,
       lastSummary: summary,
@@ -2383,6 +2439,8 @@
       : ((typeof boxes !== 'undefined' && Array.isArray(boxes)) ? boxes.length : 0));
     var buildHeightMapStartAt = controllerPerfNowMs();
     var generated = terrainCore.generateHeightMap(normalizedParams);
+    var terrainMaterialMap = buildTerrainMaterialMapForApply(generated && generated.heightMap, normalizedParams);
+    if (generated && typeof generated === 'object') generated.materialMap = terrainMaterialMap;
     var stacks = terrainCore.heightMapToVoxelStacks(generated);
     terrainProfile.timings.buildHeightMapMs = Number(Math.max(0, controllerPerfNowMs() - buildHeightMapStartAt).toFixed(3));
     terrainProfile.heightMapCellCount = Number((Array.isArray(generated && generated.heightMap) ? generated.heightMap.length : 0) && Array.isArray(generated && generated.heightMap && generated.heightMap[0])
@@ -2426,7 +2484,7 @@
       height: normalizedParams.height,
       heightMap: generated.heightMap,
       existingHeightMap: occupancySummary.existingHeightMap,
-      materialMap: null,
+      materialMap: terrainMaterialMap,
       editDiff: {},
       params: normalizedParams,
       lastSummary: summary,

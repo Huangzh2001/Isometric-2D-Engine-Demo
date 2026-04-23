@@ -1,0 +1,14 @@
+const assert = require('assert');
+const fs = require('fs');
+const renderSource = fs.readFileSync('src/presentation/render/render.js', 'utf8');
+assert(renderSource.includes('getTerrainFaceMergeCoreApi'), 'render should resolve terrain face merge core api');
+assert(renderSource.includes('terrainMaterialMergeKey'), 'render should annotate terrain material merge key');
+assert(renderSource.includes('terrainMergeSignature'), 'render should build terrain merge signature');
+assert(renderSource.includes('terrainSortBandKey'), 'render should annotate terrain sort band key');
+assert(renderSource.includes('edgeVisibilitySignature'), 'render should annotate side edge visibility signature');
+assert(renderSource.includes('mergeTerrainFaceDescriptors'), 'render should invoke terrain face merge helper');
+assert(renderSource.includes('mergeWidth'), 'render should support merged strip widths');
+assert(renderSource.includes('mergeHeight'), 'render should support merged strip heights');
+assert(renderSource.includes('terrainSideInputFaceDescriptorCount'), 'render should track terrain side input face counts');
+assert(renderSource.includes('terrainSideMergedFaceDescriptorCount'), 'render should track terrain side merged face counts');
+console.log('terrain-face-merge-render-pipeline.test.js: OK');

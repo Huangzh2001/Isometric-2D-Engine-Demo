@@ -195,6 +195,173 @@ function getSceneOccupancySnapshotForRender(reason) {
   };
 }
 
+function getOccupancyReaderCoreApi() {
+  try {
+    if (typeof window !== 'undefined' && window.__OCCUPANCY_READER_CORE__) return window.__OCCUPANCY_READER_CORE__;
+  } catch (_) {}
+  return null;
+}
+
+function getStaticWorldFaceMergeCoreApi() {
+  try {
+    if (typeof window !== 'undefined' && window.__STATIC_WORLD_FACE_MERGE_CORE__) return window.__STATIC_WORLD_FACE_MERGE_CORE__;
+  } catch (_) {}
+  return null;
+}
+
+function getTerrainMaterialCoreApi() {
+  try {
+    if (typeof window !== 'undefined' && window.__TERRAIN_MATERIAL_CORE__) return window.__TERRAIN_MATERIAL_CORE__;
+  } catch (_) {}
+  return null;
+}
+
+function getTerrainFaceMergeCoreApi() {
+  try {
+    if (typeof window !== 'undefined' && window.__TERRAIN_FACE_MERGE_CORE__) return window.__TERRAIN_FACE_MERGE_CORE__;
+  } catch (_) {}
+  return null;
+}
+
+function isTerrainMaterialVisualsEnabledForRender() {
+  try {
+    if (typeof window !== 'undefined' && window.__TERRAIN_MATERIAL_VISUALS_ENABLED__ === true) return true;
+  } catch (_) {}
+  return false;
+}
+
+function getTerrainMaterialMergeKeyForRenderCell(cell) {
+  var safeCell = cell && typeof cell === 'object' ? cell : null;
+  if (!safeCell || safeCell.generatedBy !== 'terrain-generator') return null;
+  if (safeCell.terrainMaterialMergeKey != null && String(safeCell.terrainMaterialMergeKey)) {
+    return String(safeCell.terrainMaterialMergeKey);
+  }
+  return '__terrain_default__';
+}
+
+function getTerrainFaceMergeSignature(cell, semanticFace, screenFace, currentViewRotation) {
+  var safeCell = cell && typeof cell === 'object' ? cell : {};
+  var semanticTextureSignature = [
+    safeCell.semanticTextureMap ? JSON.stringify(safeCell.semanticTextureMap) : '',
+    safeCell.semanticTextures ? JSON.stringify(safeCell.semanticTextures) : '',
+    safeCell.semanticFaceColors ? JSON.stringify(safeCell.semanticFaceColors) : ''
+  ].join('|');
+  return [
+    'terrain-face',
+    String(semanticFace || 'top'),
+    String(screenFace || ''),
+    Number(currentViewRotation || 0),
+    String(getTerrainMaterialMergeKeyForRenderCell(safeCell) || '__terrain_default__'),
+    semanticTextureSignature
+  ].join('|');
+}
+
+function getTerrainSortBandKeyForRenderFace(cell, semanticFace, mergeCoords, orderMeta) {
+  var safeCell = cell && typeof cell === 'object' ? cell : null;
+  if (!safeCell || safeCell.generatedBy !== 'terrain-generator') return null;
+  var face = String(semanticFace || 'top');
+  var coords = mergeCoords && typeof mergeCoords === 'object' ? mergeCoords : null;
+  if (!coords) return null;
+  var rotatedPoint = orderMeta && orderMeta.rotatedPoint ? orderMeta.rotatedPoint : null;
+  if (face === 'top') {
+    return 'ry:' + String(Number(rotatedPoint && rotatedPoint.y != null ? rotatedPoint.y : 0));
+  }
+  if (face === 'east' || face === 'south') {
+    return face + '|u:' + String(Number(coords.u || 0));
+  }
+  return null;
+}
+
+function getTerrainSideEdgeVisibilitySignature(visibleFaces, semanticFace) {
+  var list = Array.isArray(visibleFaces) ? visibleFaces.filter(Boolean).map(String) : [];
+  list.sort();
+  return [String(semanticFace || ''), list.join(',')].join('|');
+}
+
+function occupancyReaderHasSolid(occupancy, x, y, z) {
+  var occ = occupancy && typeof occupancy === 'object' ? occupancy : null;
+  if (!occ) return false;
+  try {
+    if (typeof occ.isOccupied === 'function') return !!occ.isOccupied(x, y, z);
+    if (typeof occ.has === 'function') return !!occ.has(x, y, z);
+    if (typeof occ.get === 'function') return !!occ.get(x, y, z);
+  } catch (_) {}
+  return false;
+}
+
+function getTerrainSideStepBreakSignature(cell, semanticFace, visibleFaces, occupancy) {
+  var safeCell = cell && typeof cell === 'object' ? cell : null;
+  if (!safeCell || safeCell.generatedBy !== 'terrain-generator') return null;
+  var face = String(semanticFace || '');
+  if (face !== 'east' && face !== 'south') return null;
+  var x = Number(safeCell.x || 0);
+  var y = Number(safeCell.y || 0);
+  var z = Number(safeCell.z || 0);
+  var topOpen = Array.isArray(visibleFaces) ? visibleFaces.indexOf('top') >= 0 : !occupancyReaderHasSolid(occupancy, x, y, z + 1);
+  var tangentNegX = face === 'east' ? x : x - 1;
+  var tangentNegY = face === 'east' ? y - 1 : y;
+  var tangentPosX = face === 'east' ? x : x + 1;
+  var tangentPosY = face === 'east' ? y + 1 : y;
+  var negSolid = occupancyReaderHasSolid(occupancy, tangentNegX, tangentNegY, z);
+  var posSolid = occupancyReaderHasSolid(occupancy, tangentPosX, tangentPosY, z);
+  var negTopOpen = negSolid && !occupancyReaderHasSolid(occupancy, tangentNegX, tangentNegY, z + 1);
+  var posTopOpen = posSolid && !occupancyReaderHasSolid(occupancy, tangentPosX, tangentPosY, z + 1);
+  var stepCapLeft = topOpen !== negTopOpen ? 1 : 0;
+  var stepCapRight = topOpen !== posTopOpen ? 1 : 0;
+  return [
+    String(face),
+    'top:' + (topOpen ? 1 : 0),
+    'neg:' + (negTopOpen ? 1 : 0),
+    'pos:' + (posTopOpen ? 1 : 0),
+    'capL:' + stepCapLeft,
+    'capR:' + stepCapRight
+  ].join('|');
+}
+
+function isStaticWorldFaceMergeEnabledForRender() {
+  try {
+    if (typeof window !== 'undefined' && window.__STATIC_WORLD_FACE_MERGE_ENABLED__ === false) return false;
+  } catch (_) {}
+  return true;
+}
+
+function resolveChunkOccupancyReaderForRender(options) {
+  var opts = options && typeof options === 'object' ? options : {};
+  var occupancyReaderCore = getOccupancyReaderCoreApi();
+  var localBoxes = Array.isArray(opts.localBoxes) ? opts.localBoxes : [];
+  var occupancy = opts.occupancy || null;
+  if (occupancyReaderCore && typeof occupancyReaderCore.createOccupancyReader === 'function') {
+    var globalResult = occupancyReaderCore.createOccupancyReader({
+      occupancy: occupancy,
+      localBoxes: localBoxes,
+      sourceLabel: 'global',
+      validateLocalBoxes: true
+    });
+    if (globalResult && globalResult.valid === true && globalResult.reader) return globalResult;
+    var localOccupancy = buildChunkLocalOccupancyMap(localBoxes, Array.isArray(opts.neighborBoxes) ? opts.neighborBoxes : []);
+    var localResult = occupancyReaderCore.createOccupancyReader({
+      occupancy: localOccupancy,
+      localBoxes: localBoxes,
+      sourceLabel: 'local-fallback',
+      validateLocalBoxes: false
+    });
+    if (localResult && localResult.reader) {
+      localResult.fallbackReason = globalResult && globalResult.fallbackReason ? globalResult.fallbackReason : 'missing-global-occupancy';
+      localResult.localOccupancy = localOccupancy;
+      return localResult;
+    }
+  }
+  var fallbackOccupancy = buildChunkLocalOccupancyMap(localBoxes, Array.isArray(opts.neighborBoxes) ? opts.neighborBoxes : []);
+  return {
+    valid: true,
+    source: 'local-fallback',
+    fallbackReason: occupancy && typeof occupancy.has === 'function' ? 'missing-occupancy-reader-core' : 'missing-global-occupancy',
+    validationSampleCount: 0,
+    reader: fallbackOccupancy,
+    localOccupancy: fallbackOccupancy
+  };
+}
+
 
 function getSceneStaticWorldCacheApiForRender() {
   try {
@@ -337,6 +504,264 @@ function buildVoxelFaceWorldPolygon(x, y, z, semanticFace) {
   if (semanticFace === 'west') return [{ x: cellX, y: cellY, z: cellZ + 1 }, { x: cellX, y: cellY + 1, z: cellZ + 1 }, { x: cellX, y: cellY + 1, z: cellZ }, { x: cellX, y: cellY, z: cellZ }];
   if (semanticFace === 'north') return [{ x: cellX, y: cellY, z: cellZ + 1 }, { x: cellX + 1, y: cellY, z: cellZ + 1 }, { x: cellX + 1, y: cellY, z: cellZ }, { x: cellX, y: cellY, z: cellZ }];
   return [];
+}
+
+function getStaticWorldFaceMergeCoords(cell, semanticFace) {
+  var safeCell = cell && typeof cell === 'object' ? cell : null;
+  if (!safeCell) return null;
+  var x = Number(safeCell.x || 0);
+  var y = Number(safeCell.y || 0);
+  var z = Number(safeCell.z || 0);
+  if (semanticFace === 'top') return { plane: z + 1, u: x, v: y };
+  if (semanticFace === 'east') return { plane: x + 1, u: y, v: z };
+  if (semanticFace === 'south') return { plane: y + 1, u: x, v: z };
+  if (semanticFace === 'west') return { plane: x, u: y, v: z };
+  if (semanticFace === 'north') return { plane: y, u: x, v: z };
+  return null;
+}
+
+function getStaticWorldFaceMergeSignature(cell, semanticFace, screenFace, currentViewRotation) {
+  var safeCell = cell && typeof cell === 'object' ? cell : {};
+  var ownerKey = safeCell.instanceId != null
+    ? 'instance:' + String(safeCell.instanceId)
+    : (safeCell.terrainBatchId != null
+      ? 'terrain:' + String(safeCell.terrainBatchId)
+      : 'prefab:' + String(safeCell.prefabId || '') + '|generated:' + String(safeCell.generatedBy || '') + '|base:' + String(safeCell.base || ''));
+  var semanticTextureSignature = [
+    safeCell.semanticTextureMap ? JSON.stringify(safeCell.semanticTextureMap) : '',
+    safeCell.semanticTextures ? JSON.stringify(safeCell.semanticTextures) : '',
+    safeCell.semanticFaceColors ? JSON.stringify(safeCell.semanticFaceColors) : ''
+  ].join('|');
+  return [
+    ownerKey,
+    String(safeCell.prefabId || ''),
+    String(safeCell.generatedBy || ''),
+    String(safeCell.base || ''),
+    String(safeCell.terrainMaterialId || ''),
+    String(safeCell.materialType || safeCell.terrainBand || ''),
+    String(safeCell.rotation != null ? safeCell.rotation : ''),
+    String(semanticFace || 'top'),
+    String(screenFace || ''),
+    Number(currentViewRotation || 0),
+    semanticTextureSignature
+  ].join('|');
+}
+
+
+var __terrainMaterialPatternCache = new Map();
+
+function getTerrainMaterialIdForRenderCell(cell) {
+  var safeCell = cell && typeof cell === 'object' ? cell : null;
+  if (!safeCell) return null;
+  var materialCore = getTerrainMaterialCoreApi();
+  var candidate = safeCell.terrainMaterialId != null
+    ? safeCell.terrainMaterialId
+    : ((safeCell.generatedBy === 'terrain-generator' && safeCell.materialType != null) ? safeCell.materialType : null);
+  if (!candidate) return null;
+  if (materialCore && typeof materialCore.normalizeTerrainMaterialId === 'function') {
+    try { return materialCore.normalizeTerrainMaterialId(candidate); } catch (_) {}
+  }
+  return String(candidate);
+}
+
+function getTerrainMaterialDefinitionForRenderCell(cell) {
+  var materialId = getTerrainMaterialIdForRenderCell(cell);
+  if (!materialId) return null;
+  var materialCore = getTerrainMaterialCoreApi();
+  if (materialCore && typeof materialCore.getTerrainMaterialDefinition === 'function') {
+    try { return materialCore.getTerrainMaterialDefinition(materialId); } catch (_) {}
+  }
+  return null;
+}
+
+function getTerrainMaterialFaceVariantForRender(semanticFace) {
+  return String(semanticFace || 'top') === 'top' ? 'top' : 'side';
+}
+
+function getTerrainMaterialBaseFaceColorsForRenderCell(cell) {
+  if (!isTerrainMaterialVisualsEnabledForRender()) return null;
+  var def = getTerrainMaterialDefinitionForRenderCell(cell);
+  if (!def || !def.colors) return null;
+  var topHex = def.colors.top || '#79b35a';
+  var sideHex = def.colors.side || topHex;
+  return {
+    top: hexToRgb(topHex),
+    east: hexToRgb(sideHex),
+    south: hexToRgb(sideHex),
+    line: String(def.colors.edge || '#3c3c3c')
+  };
+}
+
+function getTerrainMaterialPatternDescriptorForRenderCell(cell, semanticFace) {
+  if (!isTerrainMaterialVisualsEnabledForRender()) return null;
+  var def = getTerrainMaterialDefinitionForRenderCell(cell);
+  if (!def) return null;
+  var materialId = getTerrainMaterialIdForRenderCell(cell);
+  var faceVariant = getTerrainMaterialFaceVariantForRender(semanticFace);
+  var pattern = def.patterns && def.patterns[faceVariant] ? def.patterns[faceVariant] : null;
+  var materialCore = getTerrainMaterialCoreApi();
+  var signature = materialCore && typeof materialCore.resolveTerrainMaterialRenderSignature === 'function'
+    ? materialCore.resolveTerrainMaterialRenderSignature(materialId, faceVariant, 'pixel-pattern')
+    : [String(materialId || ''), faceVariant, 'pixel-pattern'].join('|');
+  return {
+    materialId: materialId,
+    label: def.label || materialId,
+    faceVariant: faceVariant,
+    signature: signature,
+    opacity: Number(pattern && pattern.opacity != null ? pattern.opacity : 0),
+    pattern: pattern || null,
+    lineColor: String(def.colors && def.colors.edge || '#3c3c3c')
+  };
+}
+
+function buildTerrainMaterialPatternEntry(descriptor) {
+  var desc = descriptor && typeof descriptor === 'object' ? descriptor : null;
+  if (!desc || !desc.pattern || typeof document === 'undefined') return null;
+  var key = String(desc.signature || [desc.materialId || '', desc.faceVariant || ''].join('|'));
+  var cached = __terrainMaterialPatternCache.get(key);
+  if (cached) return cached;
+  var size = Math.max(2, Math.round(Number(desc.pattern.size || 8) || 8));
+  var canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  var g = canvas.getContext('2d');
+  if (!g) return null;
+  g.clearRect(0, 0, size, size);
+  var pixels = Array.isArray(desc.pattern.pixels) ? desc.pattern.pixels : [];
+  for (var i = 0; i < pixels.length; i++) {
+    var px = pixels[i] || {};
+    g.fillStyle = String(px.color || '#ffffff');
+    g.fillRect(Math.max(0, Math.round(Number(px.x) || 0)) % size, Math.max(0, Math.round(Number(px.y) || 0)) % size, 1, 1);
+  }
+  var pattern = null;
+  try { pattern = ctx && typeof ctx.createPattern === 'function' ? ctx.createPattern(canvas, 'repeat') : null; } catch (_) { pattern = null; }
+  if (!pattern) return null;
+  cached = { key: key, pattern: pattern, opacity: Number(desc.opacity || 0.5) };
+  __terrainMaterialPatternCache.set(key, cached);
+  return cached;
+}
+
+function getPointBounds(points) {
+  var pts = Array.isArray(points) ? points : [];
+  if (!pts.length) return null;
+  var minX = Number(pts[0].x || 0), maxX = minX, minY = Number(pts[0].y || 0), maxY = minY;
+  for (var i = 1; i < pts.length; i++) {
+    var px = Number(pts[i].x || 0), py = Number(pts[i].y || 0);
+    if (px < minX) minX = px;
+    if (px > maxX) maxX = px;
+    if (py < minY) minY = py;
+    if (py > maxY) maxY = py;
+  }
+  return { minX: minX, minY: minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
+}
+
+function applyTerrainMaterialPatternOverlay(ctxRef, points, path2d, offsetX, offsetY, renderable) {
+  if (!isTerrainMaterialVisualsEnabledForRender()) return;
+  var target = ctxRef || ctx;
+  if (!target || !renderable) return;
+  var descriptor = renderable.terrainPatternDescriptor && typeof renderable.terrainPatternDescriptor === 'object'
+    ? renderable.terrainPatternDescriptor
+    : null;
+  if (!descriptor && renderable.terrainMaterialId) {
+    descriptor = getTerrainMaterialPatternDescriptorForRenderCell(renderable, renderable.semanticFace || renderable.screenFace || 'top');
+  }
+  var entry = buildTerrainMaterialPatternEntry(descriptor);
+  if (!entry || !entry.pattern) return;
+  var bounds = getPointBounds(points);
+  if (!bounds) return;
+  var dx = Number(offsetX || 0), dy = Number(offsetY || 0);
+  target.save();
+  if (dx || dy) target.translate(dx, dy);
+  if (path2d) {
+    target.clip(path2d);
+  } else {
+    target.beginPath();
+    target.moveTo(Number(points[0].x || 0), Number(points[0].y || 0));
+    for (var i = 1; i < points.length; i++) target.lineTo(Number(points[i].x || 0), Number(points[i].y || 0));
+    target.closePath();
+    target.clip();
+  }
+  var oldAlpha = Number(target.globalAlpha || 1);
+  target.globalAlpha = Math.max(0, Math.min(1, Number(renderable.terrainPatternOpacity != null ? renderable.terrainPatternOpacity : entry.opacity)));
+  target.fillStyle = entry.pattern;
+  target.fillRect(Math.floor(bounds.minX) - 8, Math.floor(bounds.minY) - 8, Math.ceil(bounds.width) + 16, Math.ceil(bounds.height) + 16);
+  target.globalAlpha = oldAlpha;
+  target.restore();
+}
+
+
+function worldPointFromMergeUV(semanticFace, plane, u, v) {
+  var face = String(semanticFace || 'top');
+  var p = Number(plane || 0);
+  var uu = Number(u || 0);
+  var vv = Number(v || 0);
+  if (face === 'top') return { x: uu, y: vv, z: p };
+  if (face === 'east') return { x: p, y: uu, z: vv };
+  if (face === 'south') return { x: uu, y: p, z: vv };
+  if (face === 'west') return { x: p, y: uu, z: vv };
+  if (face === 'north') return { x: uu, y: p, z: vv };
+  return { x: uu, y: vv, z: p };
+}
+
+function buildTerrainPolygonLoopSignature(descriptor) {
+  var loops = Array.isArray(descriptor && descriptor.polygonLoopsUV) ? descriptor.polygonLoopsUV : [];
+  if (!loops.length) return '';
+  return loops.map(function (loop) {
+    return (Array.isArray(loop) ? loop : []).map(function (pt) {
+      return String(Number(pt && pt.u || 0)) + ',' + String(Number(pt && pt.v || 0));
+    }).join(';');
+  }).join('||');
+}
+
+
+function buildMergedVoxelFaceWorldGeometry(descriptor) {
+  var face = descriptor && typeof descriptor === 'object' ? descriptor : null;
+  if (!face) return { worldPts: [], worldLoops: null, worldOutlineSegments: null };
+  var semanticFace = String(face.semanticFace || 'top');
+  var plane = Number(face.mergePlane != null ? face.mergePlane : 0);
+  if (semanticFace === 'top' && Array.isArray(face.polygonLoopsUV) && face.polygonLoopsUV.length) {
+    var worldLoops = [];
+    for (var li = 0; li < face.polygonLoopsUV.length; li++) {
+      var loop = Array.isArray(face.polygonLoopsUV[li]) ? face.polygonLoopsUV[li] : [];
+      if (loop.length < 3) continue;
+      worldLoops.push(loop.map(function (pt) { return worldPointFromMergeUV('top', plane, pt.u, pt.v); }));
+    }
+    var primaryLoop = worldLoops.length ? worldLoops[0] : [];
+    var worldOutlineSegments = [];
+    if (worldLoops.length) {
+      for (var lsi = 0; lsi < worldLoops.length; lsi++) {
+        var wLoop = worldLoops[lsi];
+        for (var wi = 0; wi < wLoop.length; wi++) {
+          worldOutlineSegments.push([wLoop[wi], wLoop[(wi + 1) % wLoop.length]]);
+        }
+      }
+    }
+    return {
+      worldPts: primaryLoop,
+      worldLoops: worldLoops,
+      worldOutlineSegments: worldOutlineSegments
+    };
+  }
+  var u = Number(face.mergeU || 0);
+  var v = Number(face.mergeV || 0);
+  var width = Math.max(1, Number(face.mergeWidth || 1));
+  var height = Math.max(1, Number(face.mergeHeight || 1));
+  if (!(width > 1 || height > 1)) {
+    var cell = face.cell || face.box || null;
+    var cellPts = buildVoxelFaceWorldPolygon(cell && cell.x, cell && cell.y, cell && cell.z, semanticFace);
+    return { worldPts: cellPts, worldLoops: null, worldOutlineSegments: null };
+  }
+  var rect = [];
+  if (semanticFace === 'top') rect = [{ x: u, y: v, z: plane }, { x: u + width, y: v, z: plane }, { x: u + width, y: v + height, z: plane }, { x: u, y: v + height, z: plane }];
+  else if (semanticFace === 'east') rect = [{ x: plane, y: u, z: v }, { x: plane, y: u + width, z: v }, { x: plane, y: u + width, z: v + height }, { x: plane, y: u, z: v + height }];
+  else if (semanticFace === 'south') rect = [{ x: u, y: plane, z: v }, { x: u + width, y: plane, z: v }, { x: u + width, y: plane, z: v + height }, { x: u, y: plane, z: v + height }];
+  else if (semanticFace === 'west') rect = [{ x: plane, y: u, z: v + height }, { x: plane, y: u + width, z: v + height }, { x: plane, y: u + width, z: v }, { x: plane, y: u, z: v }];
+  else if (semanticFace === 'north') rect = [{ x: u, y: plane, z: v + height }, { x: u + width, y: plane, z: v + height }, { x: u + width, y: plane, z: v }, { x: u, y: plane, z: v }];
+  return { worldPts: rect, worldLoops: null, worldOutlineSegments: null };
+}
+
+function buildMergedVoxelFaceWorldPolygon(descriptor) {
+  return buildMergedVoxelFaceWorldGeometry(descriptor).worldPts || [];
 }
 
 function emitChunkRebuildBreakdown(payload) {
@@ -609,7 +1034,8 @@ function getStaticRenderableColorCacheMeta(cell, semanticFace, currentViewRotati
   var faceCenterZ = semanticFace === 'top' ? z + 1 : z + 0.5;
   var heightBucketIndex = Math.round(faceCenterZ * 2);
   var heightBucket = heightBucketIndex / 2;
-  var materialType = String((cell && (cell.materialType || cell.terrainBand || cell.base)) || '#7aa2f7');
+  var terrainMaterialIdForMeta = getTerrainMaterialIdForRenderCell(cell);
+  var materialType = String(terrainMaterialIdForMeta || (cell && (cell.materialType || cell.terrainBand || cell.base)) || '#7aa2f7');
   var key = [buildColorMode, semanticFace, materialType, heightBucketIndex, xBucket, yBucket, lightingSignature, Number(currentViewRotation || 0)].join('|');
   return {
     key: key,
@@ -660,7 +1086,8 @@ function getCachedStaticRenderableFill(cell, semanticFace, worldPts, normal, cur
   if (buildColorMode === 'flat_debug') baseRgb = getStaticRenderableFlatDebugFillRgb(semanticFace);
   else if (buildColorMode === 'debug-semantic') baseRgb = getStaticRenderableFlatDebugFillRgb(semanticFace);
   else {
-    var fc = getCachedBaseFaceColorsForRenderable((cell && cell.base) || '#7aa2f7');
+    var terrainFc = getTerrainMaterialBaseFaceColorsForRenderCell(cell);
+    var fc = terrainFc || getCachedBaseFaceColorsForRenderable((cell && cell.base) || '#7aa2f7');
     baseRgb = getBaseFaceFillRgbForSemanticFace(fc, semanticFace);
   }
   var paletteLookupMs = Math.max(0, perfNow() - paletteLookupStartAt);
@@ -720,9 +1147,22 @@ function buildStaticWorldChunkRenderables(chunk, options) {
   }
   var step2CollectNeighborBoxesMs = Math.max(0, perfNow() - neighborBoxesCollectStartAt);
   var occupancyStartAt = perfNow();
-  var chunkOcc = buildChunkLocalOccupancyMap(chunkBoxes, neighborBoxes);
+  // Prefer the scene-level occupancy cache so chunk rebuilds can reuse the shared world occupancy index.
+  // Keep the local fallback to preserve behavior and allow fast rollback if validation fails.
+  var occupancyResolution = resolveChunkOccupancyReaderForRender({
+    occupancy: opts.occupancy,
+    localBoxes: chunkBoxes,
+    neighborBoxes: neighborBoxes
+  });
+  var chunkOcc = occupancyResolution && occupancyResolution.reader ? occupancyResolution.reader : buildChunkLocalOccupancyMap(chunkBoxes, neighborBoxes);
   var occupancyBuildMs = Math.max(0, perfNow() - occupancyStartAt);
-  var step3BuildLocalOccupancyMs = occupancyBuildMs;
+  var usedGlobalOccupancy = occupancyResolution && occupancyResolution.source === 'global';
+  var usedLocalOccupancyFallback = !usedGlobalOccupancy;
+  var occupancyAccessMode = occupancyResolution && occupancyResolution.source ? String(occupancyResolution.source) : 'local-fallback';
+  var occupancyFallbackReason = occupancyResolution && occupancyResolution.fallbackReason ? String(occupancyResolution.fallbackReason) : null;
+  var occupancyValidationSampleCount = Number(occupancyResolution && occupancyResolution.validationSampleCount || 0);
+  var step3ResolveOccupancyMs = occupancyBuildMs;
+  var step3BuildLocalOccupancyMs = usedLocalOccupancyFallback ? occupancyBuildMs : 0;
   var visibleSurfaceStartAt = perfNow();
   var surfaceCache = visibilityCore && typeof visibilityCore.buildVisibleSurfaceCache === 'function'
     ? visibilityCore.buildVisibleSurfaceCache(chunkBoxes, {
@@ -764,6 +1204,15 @@ function buildStaticWorldChunkRenderables(chunk, options) {
   var step6ObjectAllocationMs = 0;
   var step7ArrayPushMs = 0;
   var step8FinalizeRenderableListMs = 0;
+  var mergeFaceDescriptorsMs = 0;
+  var inputFaceDescriptorCount = 0;
+  var mergedFaceDescriptorCount = 0;
+  var mergedStaticFaceCount = 0;
+  var mergeReductionRatio = 0;
+  var terrainPacketCount = 0;
+  var faceMergeMode = 'disabled';
+  var faceMergeFallbackReason = null;
+  var faceMergeEnabled = isStaticWorldFaceMergeEnabledForRender();
   var colorBuildStats = {
     colorCacheEnabled: true,
     colorCacheHitCount: 0,
@@ -799,6 +1248,7 @@ function buildStaticWorldChunkRenderables(chunk, options) {
   var touchedGlobalRenderableTemplates = false;
   var touchedGlobalStyleCache = false;
   var touchedGlobalMaterialCache = false;
+  var faceDescriptors = [];
   for (var i = 0; i < surfaceCells.length; i++) {
     var entry = surfaceCells[i];
     var cell = entry && entry.box ? entry.box : entry;
@@ -808,13 +1258,13 @@ function buildStaticWorldChunkRenderables(chunk, options) {
       scannedFaceCount += 1;
       var prepareFaceInputsStartAt = perfNow();
       var semanticFace = String(visibleFaces[vf] || 'top');
-      var worldPts = buildVoxelFaceWorldPolygon(cell.x, cell.y, cell.z, semanticFace);
-      if (!worldPts.length) {
+      var screenFace = getScreenFaceForSemanticFace(semanticFace, currentViewRotation);
+      var normal = getSemanticFaceNormal(semanticFace || screenFace);
+      var mergeCoords = getStaticWorldFaceMergeCoords(cell, semanticFace);
+      if (!mergeCoords) {
         step1PrepareFaceInputsMs += Math.max(0, perfNow() - prepareFaceInputsStartAt);
         continue;
       }
-      var screenFace = getScreenFaceForSemanticFace(semanticFace, currentViewRotation);
-      var normal = getSemanticFaceNormal(semanticFace || screenFace);
       step1PrepareFaceInputsMs += Math.max(0, perfNow() - prepareFaceInputsStartAt);
       var sortKeyStartAt = perfNow();
       var orderMeta = domainCore && typeof domainCore.computeVoxelRenderableSort === 'function'
@@ -822,69 +1272,246 @@ function buildStaticWorldChunkRenderables(chunk, options) {
         : computeViewAwareSortMeta({ x: Number(cell.x || 0), y: Number(cell.y || 0), z: Number(cell.z || 0) }, 1, currentViewRotation);
       var sortKey = Number(orderMeta.sortKey || 0);
       var tie = Number(orderMeta.tie || 0) + ((faceTiePrio[screenFace] || 0) * 0.01);
+      var terrainSortBandKey = getTerrainSortBandKeyForRenderFace(cell, semanticFace, mergeCoords, orderMeta);
+      var edgeVisibilitySignature = (cell && cell.generatedBy === 'terrain-generator' && (semanticFace === 'east' || semanticFace === 'south'))
+        ? getTerrainSideEdgeVisibilitySignature(visibleFaces, semanticFace)
+        : null;
+      var sideStepBreakSignature = (cell && cell.generatedBy === 'terrain-generator' && (semanticFace === 'east' || semanticFace === 'south'))
+        ? getTerrainSideStepBreakSignature(cell, semanticFace, visibleFaces, chunkOcc)
+        : null;
       step5ComputeSortKeyMs += Math.max(0, perfNow() - sortKeyStartAt);
-      var buildRenderableBaseStartAt = perfNow();
-      var packetId = 'voxel-' + String(cell.id || 'x') + '-' + String(cell.x || 0) + '-' + String(cell.y || 0) + '-' + String(cell.z || 0) + '::' + semanticFace;
-      var faceKey = [cell.instanceId || 'unknown', [Number(cell.x || 0), Number(cell.y || 0), Number(cell.z || 0)].join(','), semanticFace, screenFace].join('|');
-      step2BuildRenderableBaseMs += Math.max(0, perfNow() - buildRenderableBaseStartAt);
-      var styleOrMaterialStartAt = perfNow();
-      var fc = getCachedBaseFaceColorsForRenderable((cell && cell.base) || '#7aa2f7');
-      var stroke = fc.line;
-      var texture = null;
-      var textureColor = null;
-      var semanticTextureSlot = null;
-      var semanticTextureSlotColor = null;
-      step3BuildStyleOrMaterialMs += Math.max(0, perfNow() - styleOrMaterialStartAt);
-      var buildColorStartAt = perfNow();
-      var terrainSettingsForStep4 = getTerrainRenderSettingsForRender();
-      var lightingActiveForStep4 = isStaticRenderableLightingActiveForBuild(terrainSettingsForStep4);
-      colorBuildStats.usedLightingSignature = lightingActiveForStep4;
-      colorBuildStats.lightingEnabledUi = isStaticRenderableLightingUiEnabledForBuild();
-      var cachedFillResult = getCachedStaticRenderableFill(cell, semanticFace, worldPts, normal, currentViewRotation, colorBuildStats);
-      var assignStartAt = perfNow();
-      var fill = cachedFillResult.fill;
-      var shadowOverlaysWorld = [];
-      if (lightingActiveForStep4) shadowOverlaysWorld = buildVoxelFaceShadowWorldOverlays(worldPts, normal, cell.instanceId || null, colorBuildStats);
-      else colorBuildStats.shadowOverlaySkippedByLightingOff = true;
-      colorBuildStats.step4h_fillAndOverlayAssignMs += Math.max(0, perfNow() - assignStartAt);
-      step4BuildColorMs += Math.max(0, perfNow() - buildColorStartAt);
-      var objectAllocationStartAt = perfNow();
-      var packet = {
-        id: packetId,
-        kind: 'static-world-face-packet',
-        sortKey: sortKey,
-        tie: tie,
+      inputFaceDescriptorCount += 1;
+      var isTerrainFaceMergeCandidate = !!(cell && cell.generatedBy === 'terrain-generator');
+      var terrainMaterialMergeKey = getTerrainMaterialMergeKeyForRenderCell(cell);
+      var terrainMergeSignature = isTerrainFaceMergeCandidate
+        ? getTerrainFaceMergeSignature(cell, semanticFace, screenFace, currentViewRotation)
+        : null;
+      faceDescriptors.push({
+        cell: cell,
+        box: cell || null,
         instanceId: cell.instanceId || null,
         prefabId: cell.prefabId || null,
-        renderPath: 'static-world-chunk-packet',
-        cacheViewRotation: currentViewRotation,
-        cacheContentType: 'world-face-packets',
-        cameraIndependent: true,
-        usesScreenSpaceCache: false,
         semanticFace: semanticFace,
         screenFace: screenFace,
         depthKey: vf,
-        fill: fill,
-        stroke: stroke,
-        texture: texture,
-        textureColor: textureColor,
-        semanticTextureSlot: semanticTextureSlot,
-        semanticTextureSlotColor: semanticTextureSlotColor,
-        width: 1,
-        worldPts: worldPts,
-        shadowOverlaysWorld: shadowOverlaysWorld,
-        box: cell || null,
-        cellX: Number(cell.x || 0),
-        cellY: Number(cell.y || 0),
-        cellZ: Number(cell.z || 0),
-        faceKey: faceKey,
-        packetNormal: normal
-      };
-      step6ObjectAllocationMs += Math.max(0, perfNow() - objectAllocationStartAt);
-      var arrayPushStartAt = perfNow();
-      packets.push(packet);
-      step7ArrayPushMs += Math.max(0, perfNow() - arrayPushStartAt);
+        sortKey: sortKey,
+        tie: tie,
+        normal: normal,
+        mergePlane: Number(mergeCoords.plane || 0),
+        mergeU: Number(mergeCoords.u || 0),
+        mergeV: Number(mergeCoords.v || 0),
+        mergeWidth: 1,
+        mergeHeight: 1,
+        mergeSignature: isTerrainFaceMergeCandidate
+          ? terrainMergeSignature
+          : getStaticWorldFaceMergeSignature(cell, semanticFace, screenFace, currentViewRotation),
+        terrainMaterialMergeKey: terrainMaterialMergeKey,
+        terrainMergeSignature: terrainMergeSignature,
+        terrainSortBandKey: terrainSortBandKey,
+        edgeVisibilitySignature: edgeVisibilitySignature,
+        sideStepBreakSignature: sideStepBreakSignature,
+        isTerrainFaceMergeCandidate: isTerrainFaceMergeCandidate,
+        memberCount: 1,
+        merged: false
+      });
     }
+  }
+  var renderFaceDescriptors = faceDescriptors;
+  var terrainInputFaceDescriptorCount = 0;
+  var terrainMergedFaceDescriptorCount = 0;
+  var terrainMergedStaticFaceCount = 0;
+  var terrainMergeReductionRatio = 0;
+  var terrainMergeFaceDescriptorsMs = 0;
+  var terrainSideInputFaceDescriptorCount = 0;
+  var terrainSideMergedFaceDescriptorCount = 0;
+  var terrainSideMergedStaticFaceCount = 0;
+  var terrainSideMergeReductionRatio = 0;
+  var terrainSideStepBreakCount = 0;
+  var terrainFaceMergeMode = 'not-applicable';
+  var terrainFaceMergeFallbackReason = null;
+  var faceMergeCore = getStaticWorldFaceMergeCoreApi();
+  var terrainFaceMergeCore = getTerrainFaceMergeCoreApi();
+  var nonTerrainDescriptors = [];
+  var terrainDescriptors = [];
+  for (var fdi = 0; fdi < faceDescriptors.length; fdi++) {
+    var faceDesc = faceDescriptors[fdi];
+    if (faceDesc && faceDesc.isTerrainFaceMergeCandidate === true) terrainDescriptors.push(faceDesc);
+    else nonTerrainDescriptors.push(faceDesc);
+  }
+  terrainInputFaceDescriptorCount = terrainDescriptors.length;
+  terrainSideInputFaceDescriptorCount = terrainDescriptors.filter(function (face) {
+    var sf = String(face && face.semanticFace || '');
+    return sf === 'east' || sf === 'south';
+  }).length;
+  var mergedNonTerrainDescriptors = nonTerrainDescriptors;
+  var mergedTerrainDescriptors = terrainDescriptors;
+  var nonTerrainMergedCount = 0;
+  var nonTerrainOutputCount = nonTerrainDescriptors.length;
+  if (faceMergeEnabled && faceMergeCore && typeof faceMergeCore.mergeFaceDescriptors === 'function' && nonTerrainDescriptors.length > 0) {
+    var nonTerrainMergeStartAt = perfNow();
+    var nonTerrainMergeResult = faceMergeCore.mergeFaceDescriptors(nonTerrainDescriptors, { enabled: true });
+    mergeFaceDescriptorsMs += Math.max(0, perfNow() - nonTerrainMergeStartAt);
+    if (nonTerrainMergeResult && Array.isArray(nonTerrainMergeResult.descriptors)) {
+      mergedNonTerrainDescriptors = nonTerrainMergeResult.descriptors;
+      nonTerrainOutputCount = Number(nonTerrainMergeResult.outputCount || mergedNonTerrainDescriptors.length || 0);
+      nonTerrainMergedCount = Number(nonTerrainMergeResult.mergedFaceCount || Math.max(0, nonTerrainDescriptors.length - nonTerrainOutputCount));
+    } else {
+      faceMergeFallbackReason = 'invalid-non-terrain-merge-result';
+      faceMergeMode = 'fallback-no-merge';
+    }
+  } else if (!faceMergeEnabled) {
+    faceMergeMode = 'disabled';
+    faceMergeFallbackReason = 'face-merge-disabled';
+  } else if (nonTerrainDescriptors.length > 0 && !(faceMergeCore && typeof faceMergeCore.mergeFaceDescriptors === 'function')) {
+    faceMergeMode = 'fallback-no-merge';
+    faceMergeFallbackReason = 'missing-face-merge-core';
+  }
+  if (terrainDescriptors.length > 0) {
+    if (faceMergeEnabled && terrainFaceMergeCore && typeof terrainFaceMergeCore.mergeTerrainFaceDescriptors === 'function') {
+      var terrainMergeStartAt = perfNow();
+      var terrainMergeResult = terrainFaceMergeCore.mergeTerrainFaceDescriptors(terrainDescriptors, { enabled: true });
+      terrainMergeFaceDescriptorsMs = Math.max(0, perfNow() - terrainMergeStartAt);
+      mergeFaceDescriptorsMs += terrainMergeFaceDescriptorsMs;
+      if (terrainMergeResult && Array.isArray(terrainMergeResult.descriptors)) {
+        mergedTerrainDescriptors = terrainMergeResult.descriptors;
+        terrainMergedFaceDescriptorCount = Number(terrainMergeResult.outputCount || mergedTerrainDescriptors.length || 0);
+        terrainMergedStaticFaceCount = Number(terrainMergeResult.mergedFaceCount || Math.max(0, terrainDescriptors.length - terrainMergedFaceDescriptorCount));
+        terrainMergeReductionRatio = Number(terrainMergeResult.reductionRatio || (terrainDescriptors.length > 0 ? Math.max(0, (terrainDescriptors.length - terrainMergedFaceDescriptorCount) / terrainDescriptors.length) : 0));
+        terrainSideStepBreakCount = Number(terrainMergeResult.sideStepBreakCount || 0);
+        terrainFaceMergeMode = 'terrain-core-merge';
+      } else {
+        terrainMergedFaceDescriptorCount = terrainDescriptors.length;
+        terrainFaceMergeMode = 'fallback-no-merge';
+        terrainFaceMergeFallbackReason = 'invalid-terrain-merge-result';
+      }
+    } else if (!faceMergeEnabled) {
+      terrainMergedFaceDescriptorCount = terrainDescriptors.length;
+      terrainFaceMergeMode = 'disabled';
+      terrainFaceMergeFallbackReason = 'face-merge-disabled';
+    } else {
+      terrainMergedFaceDescriptorCount = terrainDescriptors.length;
+      terrainFaceMergeMode = 'fallback-no-merge';
+      terrainFaceMergeFallbackReason = 'missing-terrain-face-merge-core';
+    }
+  }
+  if (terrainMergedFaceDescriptorCount <= 0 && terrainInputFaceDescriptorCount > 0) terrainMergedFaceDescriptorCount = terrainInputFaceDescriptorCount;
+  terrainSideMergedFaceDescriptorCount = mergedTerrainDescriptors.filter(function (face) {
+    var sf = String(face && face.semanticFace || '');
+    return sf === 'east' || sf === 'south';
+  }).length;
+  terrainSideMergedStaticFaceCount = Math.max(0, Number(terrainSideInputFaceDescriptorCount || 0) - Number(terrainSideMergedFaceDescriptorCount || 0));
+  terrainSideMergeReductionRatio = terrainSideInputFaceDescriptorCount > 0
+    ? Math.max(0, (terrainSideInputFaceDescriptorCount - terrainSideMergedFaceDescriptorCount) / terrainSideInputFaceDescriptorCount)
+    : 0;
+  renderFaceDescriptors = mergedNonTerrainDescriptors.concat(mergedTerrainDescriptors);
+  mergedFaceDescriptorCount = Number(nonTerrainOutputCount || mergedNonTerrainDescriptors.length || 0) + Number(terrainMergedFaceDescriptorCount || 0);
+  mergedStaticFaceCount = Math.max(0, Number(nonTerrainMergedCount || 0) + Number(terrainMergedStaticFaceCount || 0));
+  mergeReductionRatio = inputFaceDescriptorCount > 0 ? Math.max(0, (inputFaceDescriptorCount - mergedFaceDescriptorCount) / inputFaceDescriptorCount) : 0;
+  if (terrainDescriptors.length > 0 && nonTerrainDescriptors.length > 0) faceMergeMode = 'split-terrain-generic';
+  else if (terrainDescriptors.length > 0) faceMergeMode = terrainFaceMergeMode;
+  else if (nonTerrainDescriptors.length > 0 && faceMergeEnabled && faceMergeCore && typeof faceMergeCore.mergeFaceDescriptors === 'function') faceMergeMode = 'generic-core-merge';
+  if (mergedFaceDescriptorCount <= 0 && inputFaceDescriptorCount > 0) mergedFaceDescriptorCount = inputFaceDescriptorCount;
+  for (var fd = 0; fd < renderFaceDescriptors.length; fd++) {
+    var descriptor = renderFaceDescriptors[fd];
+    var cell = descriptor && (descriptor.cell || descriptor.box) ? (descriptor.cell || descriptor.box) : null;
+    if (!cell) continue;
+    var prepareFaceInputsStartAt = perfNow();
+    var semanticFace = String(descriptor.semanticFace || 'top');
+    var screenFace = descriptor.screenFace || getScreenFaceForSemanticFace(semanticFace, currentViewRotation);
+    var normal = descriptor.normal || getSemanticFaceNormal(semanticFace || screenFace);
+    var worldGeometry = buildMergedVoxelFaceWorldGeometry(descriptor);
+    var worldPts = Array.isArray(worldGeometry && worldGeometry.worldPts) ? worldGeometry.worldPts : [];
+    var worldLoops = Array.isArray(worldGeometry && worldGeometry.worldLoops) ? worldGeometry.worldLoops : null;
+    var worldOutlineSegments = Array.isArray(worldGeometry && worldGeometry.worldOutlineSegments) ? worldGeometry.worldOutlineSegments : null;
+    if (!worldPts.length) {
+      step1PrepareFaceInputsMs += Math.max(0, perfNow() - prepareFaceInputsStartAt);
+      continue;
+    }
+    step1PrepareFaceInputsMs += Math.max(0, perfNow() - prepareFaceInputsStartAt);
+    var sortKey = Number(descriptor.sortKey || 0);
+    var tie = Number(descriptor.tie || 0);
+    var buildRenderableBaseStartAt = perfNow();
+    var terrainLoopSignature = buildTerrainPolygonLoopSignature(descriptor);
+    var packetId = descriptor.merged === true
+      ? 'voxel-merge-' + String(cell.instanceId || cell.prefabId || 'x') + '-' + String(descriptor.mergePlane) + '-' + String(descriptor.mergeU) + '-' + String(descriptor.mergeV) + '-' + String(descriptor.mergeWidth || 1) + 'x' + String(descriptor.mergeHeight || 1) + '-' + String(descriptor.memberCount || 1) + '-' + String(terrainLoopSignature || '') + '::' + semanticFace
+      : 'voxel-' + String(cell.id || 'x') + '-' + String(cell.x || 0) + '-' + String(cell.y || 0) + '-' + String(cell.z || 0) + '::' + semanticFace;
+    var faceKey = descriptor.merged === true
+      ? [cell.instanceId || 'unknown', [Number(descriptor.mergePlane || 0), Number(descriptor.mergeU || 0), Number(descriptor.mergeV || 0), Number(descriptor.mergeWidth || 1), Number(descriptor.mergeHeight || 1), Number(descriptor.memberCount || 1)].join(','), terrainLoopSignature || '', semanticFace, screenFace].join('|')
+      : [cell.instanceId || 'unknown', [Number(cell.x || 0), Number(cell.y || 0), Number(cell.z || 0)].join(','), semanticFace, screenFace].join('|');
+    step2BuildRenderableBaseMs += Math.max(0, perfNow() - buildRenderableBaseStartAt);
+    var styleOrMaterialStartAt = perfNow();
+    var terrainPatternDescriptor = getTerrainMaterialPatternDescriptorForRenderCell(cell, semanticFace);
+    var terrainFc = getTerrainMaterialBaseFaceColorsForRenderCell(cell);
+    var fc = terrainFc || getCachedBaseFaceColorsForRenderable((cell && cell.base) || '#7aa2f7');
+    var stroke = terrainPatternDescriptor && terrainPatternDescriptor.lineColor ? terrainPatternDescriptor.lineColor : fc.line;
+    var texture = null;
+    var textureColor = null;
+    var semanticTextureSlot = null;
+    var semanticTextureSlotColor = null;
+    step3BuildStyleOrMaterialMs += Math.max(0, perfNow() - styleOrMaterialStartAt);
+    var buildColorStartAt = perfNow();
+    var terrainSettingsForStep4 = getTerrainRenderSettingsForRender();
+    var lightingActiveForStep4 = isStaticRenderableLightingActiveForBuild(terrainSettingsForStep4);
+    colorBuildStats.usedLightingSignature = lightingActiveForStep4;
+    colorBuildStats.lightingEnabledUi = isStaticRenderableLightingUiEnabledForBuild();
+    var cachedFillResult = getCachedStaticRenderableFill(cell, semanticFace, worldPts, normal, currentViewRotation, colorBuildStats);
+    var assignStartAt = perfNow();
+    var fill = cachedFillResult.fill;
+    var shadowOverlaysWorld = [];
+    var suppressMergedTerrainTopShadows = !!(descriptor && descriptor.isTerrainFaceMergeCandidate === true && String(semanticFace || 'top') === 'top' && Array.isArray(worldLoops) && worldLoops.length > 0);
+    if (lightingActiveForStep4 && !suppressMergedTerrainTopShadows) shadowOverlaysWorld = buildVoxelFaceShadowWorldOverlays(worldPts, normal, cell.instanceId || null, colorBuildStats);
+    else colorBuildStats.shadowOverlaySkippedByLightingOff = true;
+    colorBuildStats.step4h_fillAndOverlayAssignMs += Math.max(0, perfNow() - assignStartAt);
+    step4BuildColorMs += Math.max(0, perfNow() - buildColorStartAt);
+    var objectAllocationStartAt = perfNow();
+    if (descriptor && descriptor.isTerrainFaceMergeCandidate === true) terrainPacketCount += 1;
+    var packet = {
+      id: packetId,
+      kind: 'static-world-face-packet',
+      sortKey: sortKey,
+      tie: tie,
+      instanceId: cell.instanceId || null,
+      prefabId: cell.prefabId || null,
+      renderPath: 'static-world-chunk-packet',
+      cacheViewRotation: currentViewRotation,
+      cacheContentType: 'world-face-packets',
+      cameraIndependent: true,
+      usesScreenSpaceCache: false,
+      semanticFace: semanticFace,
+      screenFace: screenFace,
+      depthKey: descriptor.depthKey != null ? descriptor.depthKey : 0,
+      fill: fill,
+      stroke: stroke,
+      texture: texture,
+      textureColor: textureColor,
+      semanticTextureSlot: semanticTextureSlot,
+      semanticTextureSlotColor: semanticTextureSlotColor,
+      width: 1,
+      worldPts: worldPts,
+      worldLoops: worldLoops,
+      worldOutlineSegments: worldOutlineSegments,
+      shadowOverlaysWorld: shadowOverlaysWorld,
+      box: cell || null,
+      cellX: Number(cell.x || 0),
+      cellY: Number(cell.y || 0),
+      cellZ: Number(cell.z || 0),
+      faceKey: faceKey,
+      packetNormal: normal,
+      mergedFace: descriptor.merged === true,
+      mergedFaceCount: Number(descriptor.memberCount || 1),
+      mergeWidth: Number(descriptor.mergeWidth || 1),
+      mergeHeight: Number(descriptor.mergeHeight || 1),
+      terrainMaterialMergeKey: descriptor.terrainMaterialMergeKey || null,
+      terrainMaterialId: getTerrainMaterialIdForRenderCell(cell),
+      terrainMaterialLabel: terrainPatternDescriptor && terrainPatternDescriptor.label ? terrainPatternDescriptor.label : null,
+      materialType: cell && (cell.materialType || cell.terrainBand) ? String(cell.materialType || cell.terrainBand) : null,
+      terrainPatternDescriptor: terrainPatternDescriptor || null,
+      terrainPatternOpacity: terrainPatternDescriptor && Number.isFinite(Number(terrainPatternDescriptor.opacity)) ? Number(terrainPatternDescriptor.opacity) : null
+    };
+    step6ObjectAllocationMs += Math.max(0, perfNow() - objectAllocationStartAt);
+    var arrayPushStartAt = perfNow();
+    packets.push(packet);
+    step7ArrayPushMs += Math.max(0, perfNow() - arrayPushStartAt);
   }
   var step5BuildPacketsMs = Math.max(0, perfNow() - packetBuildStartAt);
   var staticRenderableBuildStartAt = perfNow();
@@ -933,10 +1560,10 @@ function buildStaticWorldChunkRenderables(chunk, options) {
     scannedBoxCount: Number(chunkBoxes.length + neighborBoxes.length || 0),
     scannedChunkCount: Number(touchedChunkKeys.length || 0),
     touchedChunkKeys: touchedChunkKeys,
-    touchedGlobalOccupancy: false,
+    touchedGlobalOccupancy: usedGlobalOccupancy === true,
     touchedGlobalRenderableList: false,
     touchedGlobalSurfacePass: false,
-    isChunkLocalOnly: true
+    isChunkLocalOnly: usedLocalOccupancyFallback === true
   };
   emitChunkRebuildScopeVerify(scopePayload);
   var detailPayload = {
@@ -951,11 +1578,37 @@ function buildStaticWorldChunkRenderables(chunk, options) {
     visibleFaceCountAfterCull: Number(visibleFaceCountAfterCull || 0),
     staticRenderableCount: Number(packets.length || 0),
     packetCount: Number(packets.length || 0),
+    inputFaceDescriptorCount: Number(inputFaceDescriptorCount || 0),
+    mergedFaceDescriptorCount: Number(mergedFaceDescriptorCount || 0),
+    mergedStaticFaceCount: Number(mergedStaticFaceCount || 0),
+    mergeReductionRatio: Number(mergeReductionRatio || 0),
+    faceMergeMode: faceMergeMode,
+    faceMergeFallbackReason: faceMergeFallbackReason,
+    terrainInputFaceDescriptorCount: Number(terrainInputFaceDescriptorCount || 0),
+    terrainMergedFaceDescriptorCount: Number(terrainMergedFaceDescriptorCount || 0),
+    terrainMergedStaticFaceCount: Number(terrainMergedStaticFaceCount || 0),
+    terrainMergeReductionRatio: Number(terrainMergeReductionRatio || 0),
+    terrainSideInputFaceDescriptorCount: Number(terrainSideInputFaceDescriptorCount || 0),
+    terrainSideMergedFaceDescriptorCount: Number(terrainSideMergedFaceDescriptorCount || 0),
+    terrainSideMergedStaticFaceCount: Number(terrainSideMergedStaticFaceCount || 0),
+    terrainSideMergeReductionRatio: Number(terrainSideMergeReductionRatio || 0),
+    terrainSideStepBreakCount: Number(terrainSideStepBreakCount || 0),
+    terrainMergeFaceDescriptorsMs: Number(terrainMergeFaceDescriptorsMs.toFixed(3)),
+    terrainFaceMergeMode: terrainFaceMergeMode,
+    terrainFaceMergeFallbackReason: terrainFaceMergeFallbackReason,
+    terrainPacketCount: Number(terrainPacketCount || 0),
+    occupancyAccessMode: occupancyAccessMode,
+    usedGlobalOccupancy: usedGlobalOccupancy === true,
+    usedLocalOccupancyFallback: usedLocalOccupancyFallback === true,
+    occupancyFallbackReason: occupancyFallbackReason,
+    occupancyValidationSampleCount: occupancyValidationSampleCount,
     step1_collectChunkBoxesMs: Number(step1CollectChunkBoxesMs.toFixed(3)),
     step2_collectNeighborBoxesMs: Number(step2CollectNeighborBoxesMs.toFixed(3)),
+    step3_resolveOccupancyMs: Number(step3ResolveOccupancyMs.toFixed(3)),
     step3_buildLocalOccupancyMs: Number(step3BuildLocalOccupancyMs.toFixed(3)),
     step4_computeVisibleFacesMs: Number(step4ComputeVisibleFacesMs.toFixed(3)),
     step5_buildPacketsMs: Number(step5BuildPacketsMs.toFixed(3)),
+    mergeFaceDescriptorsMs: Number(mergeFaceDescriptorsMs.toFixed(3)),
     step6_buildStaticRenderablesMs: Number(step6BuildStaticRenderablesMs.toFixed(3)),
     step7_sortRenderablesMs: Number(step7SortRenderablesMs.toFixed(3)),
     step8_finalizeChunkCacheMs: Number(step8FinalizeChunkCacheMs.toFixed(3)),
@@ -967,6 +1620,7 @@ function buildStaticWorldChunkRenderables(chunk, options) {
     var stepEntries = [
       ['step1_collectChunkBoxesMs', step1CollectChunkBoxesMs],
       ['step2_collectNeighborBoxesMs', step2CollectNeighborBoxesMs],
+      ['step3_resolveOccupancyMs', step3ResolveOccupancyMs],
       ['step3_buildLocalOccupancyMs', step3BuildLocalOccupancyMs],
       ['step4_computeVisibleFacesMs', step4ComputeVisibleFacesMs],
       ['step5_buildPacketsMs', step5BuildPacketsMs],
@@ -983,6 +1637,27 @@ function buildStaticWorldChunkRenderables(chunk, options) {
       visibleFaceCountAfterCull: Number(visibleFaceCountAfterCull || 0),
       staticRenderableCount: Number(packets.length || 0),
       packetCount: Number(packets.length || 0),
+      inputFaceDescriptorCount: Number(inputFaceDescriptorCount || 0),
+      mergedFaceDescriptorCount: Number(mergedFaceDescriptorCount || 0),
+      mergedStaticFaceCount: Number(mergedStaticFaceCount || 0),
+      mergeReductionRatio: Number(mergeReductionRatio || 0),
+      mergeFaceDescriptorsMs: Number(mergeFaceDescriptorsMs.toFixed(3)),
+      faceMergeMode: faceMergeMode,
+      faceMergeFallbackReason: faceMergeFallbackReason,
+      terrainInputFaceDescriptorCount: Number(terrainInputFaceDescriptorCount || 0),
+      terrainMergedFaceDescriptorCount: Number(terrainMergedFaceDescriptorCount || 0),
+      terrainMergedStaticFaceCount: Number(terrainMergedStaticFaceCount || 0),
+      terrainMergeReductionRatio: Number(terrainMergeReductionRatio || 0),
+      terrainMergeFaceDescriptorsMs: Number(terrainMergeFaceDescriptorsMs.toFixed(3)),
+      terrainFaceMergeMode: terrainFaceMergeMode,
+      terrainFaceMergeFallbackReason: terrainFaceMergeFallbackReason,
+      terrainPacketCount: Number(terrainPacketCount || 0),
+    inputFaceDescriptorCount: Number(inputFaceDescriptorCount || 0),
+    mergedFaceDescriptorCount: Number(mergedFaceDescriptorCount || 0),
+    mergedStaticFaceCount: Number(mergedStaticFaceCount || 0),
+    mergeReductionRatio: Number(mergeReductionRatio || 0),
+    faceMergeMode: faceMergeMode,
+    faceMergeFallbackReason: faceMergeFallbackReason,
       dominantStep: String(stepEntries[0] && stepEntries[0][0] || ''),
       dominantStepMs: Number(Number(stepEntries[0] && stepEntries[0][1] || 0).toFixed(3)),
       secondStep: String(stepEntries[1] && stepEntries[1][0] || ''),
@@ -1005,6 +1680,11 @@ function buildStaticWorldChunkRenderables(chunk, options) {
     step7_arrayPushMs: Number(step7ArrayPushMs.toFixed(3)),
     step8_finalizeRenderableListMs: Number(step8FinalizeRenderableListMs.toFixed(3)),
     outputRenderableCount: Number(packets.length || 0),
+    inputFaceDescriptorCount: Number(inputFaceDescriptorCount || 0),
+    mergedFaceDescriptorCount: Number(mergedFaceDescriptorCount || 0),
+    mergedStaticFaceCount: Number(mergedStaticFaceCount || 0),
+    mergeReductionRatio: Number(mergeReductionRatio || 0),
+    mergeFaceDescriptorsMs: Number(mergeFaceDescriptorsMs.toFixed(3)),
     totalStaticRenderableBuildMs: Number(totalStaticRenderableBuildMs.toFixed(3))
   };
   emitStaticRenderableBuildDetail(staticRenderableBuildDetailPayload);
@@ -1037,6 +1717,11 @@ function buildStaticWorldChunkRenderables(chunk, options) {
       chunkKey: chunk && chunk.key ? String(chunk.key) : null,
       localBoxCount: Number(chunkBoxes.length || 0),
       outputRenderableCount: Number(packets.length || 0),
+    inputFaceDescriptorCount: Number(inputFaceDescriptorCount || 0),
+    mergedFaceDescriptorCount: Number(mergedFaceDescriptorCount || 0),
+    mergedStaticFaceCount: Number(mergedStaticFaceCount || 0),
+    mergeReductionRatio: Number(mergeReductionRatio || 0),
+    mergeFaceDescriptorsMs: Number(mergeFaceDescriptorsMs.toFixed(3)),
       totalStaticRenderableBuildMs: Number(totalStaticRenderableBuildMs.toFixed(3)),
       dominantStep: String(renderableStepEntries[0] && renderableStepEntries[0][0] || ''),
       dominantStepMs: Number(Number(renderableStepEntries[0] && renderableStepEntries[0][1] || 0).toFixed(3)),
@@ -1051,6 +1736,11 @@ function buildStaticWorldChunkRenderables(chunk, options) {
     frameIndexAfterTerrainApply: profileContext.frameIndexAfterTerrainApply != null ? Number(profileContext.frameIndexAfterTerrainApply) : null,
     chunkKey: chunk && chunk.key ? String(chunk.key) : null,
     outputRenderableCount: Number(packets.length || 0),
+    inputFaceDescriptorCount: Number(inputFaceDescriptorCount || 0),
+    mergedFaceDescriptorCount: Number(mergedFaceDescriptorCount || 0),
+    mergedStaticFaceCount: Number(mergedStaticFaceCount || 0),
+    mergeReductionRatio: Number(mergeReductionRatio || 0),
+    mergeFaceDescriptorsMs: Number(mergeFaceDescriptorsMs.toFixed(3)),
     colorCacheEnabled: colorBuildStats.colorCacheEnabled === true,
     colorCacheHitCount: Number(colorBuildStats.colorCacheHitCount || 0),
     colorCacheMissCount: Number(colorBuildStats.colorCacheMissCount || 0),
@@ -1063,6 +1753,11 @@ function buildStaticWorldChunkRenderables(chunk, options) {
     frameIndexAfterTerrainApply: profileContext.frameIndexAfterTerrainApply != null ? Number(profileContext.frameIndexAfterTerrainApply) : null,
     chunkKey: chunk && chunk.key ? String(chunk.key) : null,
     outputRenderableCount: Number(packets.length || 0),
+    inputFaceDescriptorCount: Number(inputFaceDescriptorCount || 0),
+    mergedFaceDescriptorCount: Number(mergedFaceDescriptorCount || 0),
+    mergedStaticFaceCount: Number(mergedStaticFaceCount || 0),
+    mergeReductionRatio: Number(mergeReductionRatio || 0),
+    mergeFaceDescriptorsMs: Number(mergeFaceDescriptorsMs.toFixed(3)),
     colorCacheHitCount: Number(colorBuildStats.colorCacheHitCount || 0),
     colorCacheMissCount: Number(colorBuildStats.colorCacheMissCount || 0),
     shadowOverlayCacheHitCount: Number(colorBuildStats.shadowOverlayCacheHitCount || 0),
@@ -1083,6 +1778,11 @@ function buildStaticWorldChunkRenderables(chunk, options) {
     frameIndexAfterTerrainApply: profileContext.frameIndexAfterTerrainApply != null ? Number(profileContext.frameIndexAfterTerrainApply) : null,
     chunkKey: chunk && chunk.key ? String(chunk.key) : null,
     outputRenderableCount: Number(packets.length || 0),
+    inputFaceDescriptorCount: Number(inputFaceDescriptorCount || 0),
+    mergedFaceDescriptorCount: Number(mergedFaceDescriptorCount || 0),
+    mergedStaticFaceCount: Number(mergedStaticFaceCount || 0),
+    mergeReductionRatio: Number(mergeReductionRatio || 0),
+    mergeFaceDescriptorsMs: Number(mergeFaceDescriptorsMs.toFixed(3)),
     scannedFaceCount: Number(scannedFaceCount || 0),
     colorCacheHitCount: Number(colorBuildStats.colorCacheHitCount || 0),
     colorCacheMissCount: Number(colorBuildStats.colorCacheMissCount || 0),
@@ -1178,6 +1878,11 @@ function buildStaticWorldChunkRenderables(chunk, options) {
       frameIndexAfterTerrainApply: profileContext.frameIndexAfterTerrainApply != null ? Number(profileContext.frameIndexAfterTerrainApply) : null,
       chunkKey: chunk && chunk.key ? String(chunk.key) : null,
       outputRenderableCount: Number(packets.length || 0),
+    inputFaceDescriptorCount: Number(inputFaceDescriptorCount || 0),
+    mergedFaceDescriptorCount: Number(mergedFaceDescriptorCount || 0),
+    mergedStaticFaceCount: Number(mergedStaticFaceCount || 0),
+    mergeReductionRatio: Number(mergeReductionRatio || 0),
+    mergeFaceDescriptorsMs: Number(mergeFaceDescriptorsMs.toFixed(3)),
       totalStep4BuildColorMs: Number(step4BuildColorMs.toFixed(3)),
       shadowOverlayCacheHitRate: Number((Number(colorBuildStats.shadowOverlayCacheHitCount || 0) + Number(colorBuildStats.shadowOverlayCacheMissCount || 0)) > 0 ? (Number(colorBuildStats.shadowOverlayCacheHitCount || 0) / (Number(colorBuildStats.shadowOverlayCacheHitCount || 0) + Number(colorBuildStats.shadowOverlayCacheMissCount || 0))).toFixed(6) : '0.000000'),
       dominantSubstep: String(step4Substeps[0] && step4Substeps[0][0] || ''),
@@ -1191,8 +1896,23 @@ function buildStaticWorldChunkRenderables(chunk, options) {
     localBoxCount: Number(chunkBoxes.length || 0),
     neighborBoxCount: Number(neighborBoxes.length || 0),
     occupancyBuildMs: Number(occupancyBuildMs.toFixed(3)),
+    occupancyAccessMode: occupancyAccessMode,
+    usedGlobalOccupancy: usedGlobalOccupancy === true,
+    usedLocalOccupancyFallback: usedLocalOccupancyFallback === true,
+    occupancyFallbackReason: occupancyFallbackReason,
     visibleSurfaceBuildMs: Number(visibleSurfaceBuildMs.toFixed(3)),
     staticRenderableBuildMs: Number(staticRenderableBuildMs.toFixed(3)),
+    terrainInputFaceDescriptorCount: Number(terrainInputFaceDescriptorCount || 0),
+    terrainMergedFaceDescriptorCount: Number(terrainMergedFaceDescriptorCount || 0),
+    terrainMergedStaticFaceCount: Number(terrainMergedStaticFaceCount || 0),
+    terrainMergeReductionRatio: Number(terrainMergeReductionRatio || 0),
+    terrainSideInputFaceDescriptorCount: Number(terrainSideInputFaceDescriptorCount || 0),
+    terrainSideMergedFaceDescriptorCount: Number(terrainSideMergedFaceDescriptorCount || 0),
+    terrainSideMergedStaticFaceCount: Number(terrainSideMergedStaticFaceCount || 0),
+    terrainSideMergeReductionRatio: Number(terrainSideMergeReductionRatio || 0),
+    terrainSideStepBreakCount: Number(terrainSideStepBreakCount || 0),
+    terrainMergeFaceDescriptorsMs: Number(terrainMergeFaceDescriptorsMs.toFixed(3)),
+    terrainPacketCount: Number(terrainPacketCount || 0),
     totalChunkBuildMs: Number(totalChunkBuildMs.toFixed(3))
   });
   return {
@@ -1208,6 +1928,19 @@ function buildStaticWorldChunkRenderables(chunk, options) {
       exposedFaceCountBeforeCull: Number(exposedFaceCountBeforeCull || 0),
       visibleFaceCountAfterCull: Number(visibleFaceCountAfterCull || 0),
       packetCount: Number(packets.length || 0),
+      inputFaceDescriptorCount: Number(inputFaceDescriptorCount || 0),
+      mergedFaceDescriptorCount: Number(mergedFaceDescriptorCount || 0),
+      mergedStaticFaceCount: Number(mergedStaticFaceCount || 0),
+      mergeReductionRatio: Number(mergeReductionRatio || 0),
+      mergeFaceDescriptorsMs: Number(mergeFaceDescriptorsMs.toFixed(3)),
+      faceMergeMode: faceMergeMode,
+      faceMergeFallbackReason: faceMergeFallbackReason,
+    inputFaceDescriptorCount: Number(inputFaceDescriptorCount || 0),
+    mergedFaceDescriptorCount: Number(mergedFaceDescriptorCount || 0),
+    mergedStaticFaceCount: Number(mergedStaticFaceCount || 0),
+    mergeReductionRatio: Number(mergeReductionRatio || 0),
+    faceMergeMode: faceMergeMode,
+    faceMergeFallbackReason: faceMergeFallbackReason,
       structuredBoxCount: chunkBoxes.length,
       renderSourceCountBeforeVisibility: chunkBoxes.length,
       renderSourceCountAfterVisibility: surfaceCells.length,
@@ -1219,18 +1952,26 @@ function buildStaticWorldChunkRenderables(chunk, options) {
       cacheContentType: 'world-face-packets',
       cameraIndependent: true,
       usesScreenSpaceCache: false,
+      occupancyAccessMode: occupancyAccessMode,
+      usedGlobalOccupancy: usedGlobalOccupancy === true,
+      usedLocalOccupancyFallback: usedLocalOccupancyFallback === true,
+      occupancyFallbackReason: occupancyFallbackReason,
+      occupancyValidationSampleCount: occupancyValidationSampleCount,
       occupancyBuildMs: Number(occupancyBuildMs.toFixed(3)),
       visibleSurfaceBuildMs: Number(visibleSurfaceBuildMs.toFixed(3)),
       staticRenderableBuildMs: Number(staticRenderableBuildMs.toFixed(3)),
       step1_collectChunkBoxesMs: Number(step1CollectChunkBoxesMs.toFixed(3)),
       step2_collectNeighborBoxesMs: Number(step2CollectNeighborBoxesMs.toFixed(3)),
+      step3_resolveOccupancyMs: Number(step3ResolveOccupancyMs.toFixed(3)),
       step3_buildLocalOccupancyMs: Number(step3BuildLocalOccupancyMs.toFixed(3)),
       step4_computeVisibleFacesMs: Number(step4ComputeVisibleFacesMs.toFixed(3)),
       step5_buildPacketsMs: Number(step5BuildPacketsMs.toFixed(3)),
+    mergeFaceDescriptorsMs: Number(mergeFaceDescriptorsMs.toFixed(3)),
       step6_buildStaticRenderablesMs: Number(step6BuildStaticRenderablesMs.toFixed(3)),
       step7_sortRenderablesMs: Number(step7SortRenderablesMs.toFixed(3)),
       step8_finalizeChunkCacheMs: Number(step8FinalizeChunkCacheMs.toFixed(3)),
       step1_prepareFaceInputsMs: Number(step1PrepareFaceInputsMs.toFixed(3)),
+      mergeFaceDescriptorsMs: Number(mergeFaceDescriptorsMs.toFixed(3)),
       step2_buildRenderableBaseMs: Number(step2BuildRenderableBaseMs.toFixed(3)),
       step3_buildStyleOrMaterialMs: Number(step3BuildStyleOrMaterialMs.toFixed(3)),
       step4_buildColorMs: Number(step4BuildColorMs.toFixed(3)),
@@ -1275,10 +2016,10 @@ function buildStaticWorldChunkRenderables(chunk, options) {
       scannedBoxCount: Number(chunkBoxes.length + neighborBoxes.length || 0),
       scannedChunkCount: Number(touchedChunkKeys.length || 0),
       touchedChunkKeys: touchedChunkKeys,
-      touchedGlobalOccupancy: false,
+      touchedGlobalOccupancy: usedGlobalOccupancy === true,
       touchedGlobalRenderableList: false,
       touchedGlobalSurfacePass: false,
-      isChunkLocalOnly: true,
+      isChunkLocalOnly: usedLocalOccupancyFallback === true,
       finalRenderableCount: packets.length,
       totalChunkBuildMs: Number(totalChunkBuildMs.toFixed(3))
     }
@@ -3681,7 +4422,31 @@ function buildTerrainFaceWorldPolygon(x, y, semanticFace, zStart, zEnd) {
   return [];
 }
 
+function getTerrainMaterialIdForRenderModelCell(model, x, y) {
+  var materialCore = getTerrainMaterialCoreApi();
+  var materialMap = model && model.materialMap ? model.materialMap : null;
+  if (materialCore && typeof materialCore.getTerrainMaterialIdAt === 'function') {
+    try { return materialCore.getTerrainMaterialIdAt(materialMap, x, y, 'grass'); } catch (_) {}
+  }
+  return 'grass';
+}
+
 function getTerrainBaseFaceColorsForRender(model, x, y) {
+  var materialCore = getTerrainMaterialCoreApi();
+  var materialId = getTerrainMaterialIdForRenderModelCell(model, x, y);
+  if (materialCore && typeof materialCore.getTerrainMaterialDefinition === 'function') {
+    try {
+      var def = materialCore.getTerrainMaterialDefinition(materialId);
+      if (def && def.colors) {
+        return {
+          top: hexToRgb(def.colors.top || '#79b35a'),
+          east: hexToRgb(def.colors.side || def.colors.top || '#79b35a'),
+          south: hexToRgb(def.colors.side || def.colors.top || '#79b35a'),
+          line: String(def.colors.edge || '#3c3c3c')
+        };
+      }
+    } catch (_) {}
+  }
   var params = model && model.params ? model.params : null;
   var waterLevel = params ? Math.round(Number(params.waterLevel) || 0) : 0;
   var h = getTerrainColumnHeightForRender(model, x, y);
@@ -3712,15 +4477,19 @@ function getTerrainFaceAppearanceForRender(model, x, y, faceDesc) {
       usesSemanticFaceColors: false
     };
   }
+  var materialId = getTerrainMaterialIdForRenderModelCell(model, x, y);
   var fc = getTerrainBaseFaceColorsForRender(model, x, y);
   var fillRgb = semanticFace === 'top' ? fc.top : (semanticFace === 'east' ? fc.east : (semanticFace === 'south' ? fc.south : (semanticFace === 'west' ? fc.east : fc.south)));
+  var terrainPatternDescriptor = getTerrainMaterialPatternDescriptorForRenderCell({ terrainMaterialId: materialId, generatedBy: 'terrain-generator' }, semanticFace);
   return {
     colorMode: 'natural',
-    paletteSource: 'terrain-base-face-colors',
+    paletteSource: 'terrain-material-definition',
     paletteUsed: null,
     semanticTextureSlot: null,
     fillRgb: fillRgb,
-    stroke: fc.line,
+    stroke: terrainPatternDescriptor && terrainPatternDescriptor.lineColor ? terrainPatternDescriptor.lineColor : fc.line,
+    terrainMaterialId: materialId,
+    terrainPatternDescriptor: terrainPatternDescriptor || null,
     usesSemanticTextures: false,
     usesSemanticFaceColors: false
   };
@@ -3951,6 +4720,9 @@ function buildTerrainFaceRenderableItem(x, y, faceDesc, viewRotation, model) {
     cellZ: cellZ,
     faceKey: ['terrain', x, y, faceDesc.semanticFace, cellZ].join('|'),
     terrainColorMode: appearance.colorMode,
+    terrainMaterialId: appearance.terrainMaterialId || null,
+    terrainPatternDescriptor: appearance.terrainPatternDescriptor || null,
+    terrainPatternOpacity: appearance.terrainPatternDescriptor && Number.isFinite(Number(appearance.terrainPatternDescriptor.opacity)) ? Number(appearance.terrainPatternDescriptor.opacity) : null,
     terrainDebugPalette: appearance.paletteUsed || null,
     terrainUsesOriginalVoxelFacePipeline: true,
     terrainUsesCustomColumnSurfacePipeline: false,
@@ -8227,8 +8999,34 @@ function drawCachedVoxelRenderable(item) {
 
 function drawCachedVoxelFaceRenderable(item) {
   if (!item) return;
-  drawPoly(item.points || [], item.fill, item.stroke, item.width || 1);
-  drawFaceShadowOverlays(ctx, item.points || [], item.shadowOverlays || []);
+  var points = Array.isArray(item.points) ? item.points : [];
+  var loops = Array.isArray(item.loops) ? item.loops : [];
+  if (!points.length && !loops.length) return;
+  var path2d = loops.length ? buildPath2DFromLoops(loops) : buildPath2DFromPoints(points);
+  var strokePath2d = loops.length ? buildPath2DFromSegments((loops || []).reduce(function (acc, loop) {
+    if (!Array.isArray(loop) || loop.length < 2) return acc;
+    for (var i = 0; i < loop.length; i++) acc.push([loop[i], loop[(i + 1) % loop.length]]);
+    return acc;
+  }, [])) : null;
+  if (path2d) {
+    ctx.save();
+    if (item.fill) {
+      ctx.fillStyle = item.fill;
+      if (loops.length) ctx.fill(path2d, 'evenodd');
+      else ctx.fill(path2d);
+    }
+    applyTerrainMaterialPatternOverlay(ctx, loops.length ? (loops[0] || []) : points, path2d, 0, 0, item);
+    if (item.stroke) {
+      ctx.strokeStyle = item.stroke; ctx.lineWidth = item.width || 1;
+      if (strokePath2d) ctx.stroke(strokePath2d);
+      else ctx.stroke(path2d);
+    }
+    ctx.restore();
+  } else if (points.length) {
+    drawPoly(points, item.fill, item.stroke, item.width || 1);
+    applyTerrainMaterialPatternOverlay(ctx, points, null, 0, 0, item);
+  }
+  drawFaceShadowOverlays(ctx, points.length ? points : (loops[0] || []), item.shadowOverlays || []);
 }
 
 function buildPath2DFromPoints(points) {
@@ -8242,7 +9040,40 @@ function buildPath2DFromPoints(points) {
   return path;
 }
 
+function buildPath2DFromLoops(loops) {
+  if (typeof Path2D === 'undefined') return null;
+  var list = Array.isArray(loops) ? loops : [];
+  var path = new Path2D();
+  var used = false;
+  for (var li = 0; li < list.length; li++) {
+    var pts = Array.isArray(list[li]) ? list[li] : [];
+    if (pts.length < 3) continue;
+    path.moveTo(Number(pts[0].x || 0), Number(pts[0].y || 0));
+    for (var i = 1; i < pts.length; i++) path.lineTo(Number(pts[i].x || 0), Number(pts[i].y || 0));
+    path.closePath();
+    used = true;
+  }
+  return used ? path : null;
+}
+
+function buildPath2DFromSegments(segments) {
+  if (typeof Path2D === 'undefined') return null;
+  var list = Array.isArray(segments) ? segments : [];
+  var path = new Path2D();
+  var used = false;
+  for (var si = 0; si < list.length; si++) {
+    var seg = Array.isArray(list[si]) ? list[si] : [];
+    if (seg.length < 2) continue;
+    path.moveTo(Number(seg[0].x || 0), Number(seg[0].y || 0));
+    path.lineTo(Number(seg[1].x || 0), Number(seg[1].y || 0));
+    used = true;
+  }
+  return used ? path : null;
+}
+
 function buildStaticWorldPacketProjectionCacheKey(packet, viewRotation) {
+  var worldLoops = Array.isArray(packet && packet.worldLoops) ? packet.worldLoops : [];
+  var worldOutlineSegments = Array.isArray(packet && packet.worldOutlineSegments) ? packet.worldOutlineSegments : [];
   return [
     Number(viewRotation || 0),
     Number(settings && settings.tileW || 0),
@@ -8253,6 +9084,9 @@ function buildStaticWorldPacketProjectionCacheKey(packet, viewRotation) {
     String(packet && packet.stroke || ''),
     Number(packet && packet.width || 1),
     Array.isArray(packet && packet.worldPts) ? packet.worldPts.length : 0,
+    worldLoops.length,
+    worldLoops.map(function (loop) { return Array.isArray(loop) ? loop.length : 0; }).join(','),
+    worldOutlineSegments.length,
     Array.isArray(packet && packet.shadowOverlaysWorld) ? packet.shadowOverlaysWorld.length : 0,
     packet && packet.id ? String(packet.id) : ''
   ].join('|');
@@ -8271,14 +9105,28 @@ function getStaticWorldPacketProjectedGeometry(packet, viewRotation) {
     return cached;
   }
   var pointsNoCamera = screenPointsFromWorldFaceNoCamera(packet.worldPts || [], viewRotation);
+  var loopsNoCamera = Array.isArray(packet.worldLoops) && packet.worldLoops.length
+    ? packet.worldLoops.map(function (loop) { return screenPointsFromWorldFaceNoCamera(loop || [], viewRotation); }).filter(function (loop) { return Array.isArray(loop) && loop.length >= 3; })
+    : [];
+  var outlineSegmentsNoCamera = Array.isArray(packet.worldOutlineSegments) && packet.worldOutlineSegments.length
+    ? packet.worldOutlineSegments.map(function (seg) {
+        return [
+          screenPointsFromWorldFaceNoCamera([seg[0] || {}], viewRotation)[0] || null,
+          screenPointsFromWorldFaceNoCamera([seg[1] || {}], viewRotation)[0] || null
+        ];
+      }).filter(function (seg) { return Array.isArray(seg) && seg[0] && seg[1]; })
+    : [];
   var overlaysNoCamera = Array.isArray(packet.shadowOverlaysWorld) && packet.shadowOverlaysWorld.length
     ? worldShadowOverlaysToNoCamera(packet.shadowOverlaysWorld || [], viewRotation)
     : [];
   cached = {
     key: cacheKey,
     pointsNoCamera: pointsNoCamera,
+    loopsNoCamera: loopsNoCamera,
+    outlineSegmentsNoCamera: outlineSegmentsNoCamera,
     overlaysNoCamera: overlaysNoCamera,
-    path2d: buildPath2DFromPoints(pointsNoCamera)
+    path2d: loopsNoCamera.length ? buildPath2DFromLoops(loopsNoCamera) : buildPath2DFromPoints(pointsNoCamera),
+    strokePath2d: outlineSegmentsNoCamera.length ? buildPath2DFromSegments(outlineSegmentsNoCamera) : null
   };
   packet.__projectedDrawCache = cached;
   packet.__lastStaticPacketCacheState = {
@@ -8296,18 +9144,22 @@ function drawStaticWorldFacePacket(packet) {
   var currentViewRotation = normalizeMainEditorViewRotationValue(getSafeMainEditorViewRotation(null).viewRotation);
   var projected = getStaticWorldPacketProjectedGeometry(packet, currentViewRotation);
   var pointsNoCamera = projected && Array.isArray(projected.pointsNoCamera) ? projected.pointsNoCamera : [];
-  if (!pointsNoCamera.length) return;
+  var loopsNoCamera = projected && Array.isArray(projected.loopsNoCamera) ? projected.loopsNoCamera : [];
+  if (!pointsNoCamera.length && !loopsNoCamera.length) return;
   if (projected && projected.path2d) {
     ctx.save();
     if (offsetX || offsetY) ctx.translate(offsetX, offsetY);
     if (packet.fill) {
       ctx.fillStyle = packet.fill;
-      ctx.fill(projected.path2d);
+      if (loopsNoCamera.length) ctx.fill(projected.path2d, 'evenodd');
+      else ctx.fill(projected.path2d);
     }
+    applyTerrainMaterialPatternOverlay(ctx, loopsNoCamera.length ? (loopsNoCamera[0] || []) : pointsNoCamera, projected.path2d, 0, 0, packet);
     if (packet.stroke) {
       ctx.strokeStyle = packet.stroke;
       ctx.lineWidth = packet.width || 1;
-      ctx.stroke(projected.path2d);
+      if (projected.strokePath2d) ctx.stroke(projected.strokePath2d);
+      else ctx.stroke(projected.path2d);
     }
     if (Array.isArray(projected.overlaysNoCamera) && projected.overlaysNoCamera.length) {
       drawFaceShadowOverlaysNoCamera(ctx, pointsNoCamera, projected.overlaysNoCamera, 0, 0);
@@ -8316,6 +9168,7 @@ function drawStaticWorldFacePacket(packet) {
     return;
   }
   drawPolyWithOffset(pointsNoCamera, offsetX, offsetY, packet.fill, packet.stroke, packet.width || 1);
+  applyTerrainMaterialPatternOverlay(ctx, pointsNoCamera, null, offsetX, offsetY, packet);
   drawFaceShadowOverlaysNoCamera(ctx, pointsNoCamera, projected && projected.overlaysNoCamera ? projected.overlaysNoCamera : worldShadowOverlaysToNoCamera(packet.shadowOverlaysWorld || [], currentViewRotation), offsetX, offsetY);
 }
 
@@ -8377,10 +9230,12 @@ function flattenStaticVoxelRenderable(baseRenderable, viewRotation) {
 function materializeStaticWorldFacePacket(packet) {
   if (!packet || typeof packet !== 'object') return null;
   var points = screenPointsFromWorldFace(packet.worldPts || []);
-  var centroid = averageScreenPoint(points);
+  var loops = Array.isArray(packet.worldLoops) ? packet.worldLoops.map(function (loop) { return screenPointsFromWorldFace(loop || []); }).filter(function (loop) { return Array.isArray(loop) && loop.length >= 3; }) : [];
+  var centroid = averageScreenPoint(points.length ? points : (loops[0] || []));
   return Object.assign({}, packet, {
     renderPath: 'static-world-frame-face',
     points: points,
+    loops: loops,
     shadowOverlays: worldShadowOverlaysToScreen(packet.shadowOverlaysWorld || []),
     drawScreenPosition: { x: Math.round(centroid.x || 0), y: Math.round(centroid.y || 0) },
     draw: function () { drawCachedVoxelFaceRenderable(this); }

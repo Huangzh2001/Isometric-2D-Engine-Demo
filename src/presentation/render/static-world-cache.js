@@ -506,6 +506,17 @@
     var rebuiltChunkTotalBoxCount = 0;
     var rebuiltChunkTotalRenderableCount = 0;
     var rebuiltChunkTotalVisibleFaceCount = 0;
+    var globalOccupancyChunkCountThisFrame = 0;
+    var localOccupancyFallbackChunkCountThisFrame = 0;
+    var mergedStaticFaceCountThisFrame = 0;
+    var inputFaceDescriptorCountThisFrame = 0;
+    var mergedFaceDescriptorCountThisFrame = 0;
+    var faceMergeBuildMsThisFrame = 0;
+    var terrainInputFaceDescriptorCountThisFrame = 0;
+    var terrainMergedFaceDescriptorCountThisFrame = 0;
+    var terrainMergedStaticFaceCountThisFrame = 0;
+    var terrainMergeBuildMsThisFrame = 0;
+    var terrainVisiblePacketCountThisFrame = 0;
     for (var rq = 0; rq < queuedChunkKeys.length; rq++) {
       if (rebuildBudgetMode === 'count' && rebuiltChunkCountThisFrame >= rebuildBudgetValue) break;
       var rebuildKey = queuedChunkKeys[rq];
@@ -533,6 +544,17 @@
         rebuiltChunkTotalBoxCount += Math.max(0, Math.round(Number(rebuildTarget.lastStats.localBoxCount || rebuildTarget.lastStats.structuredBoxCount) || 0));
         rebuiltChunkTotalRenderableCount += Math.max(0, Math.round(Number(rebuildTarget.lastStats.finalRenderableCount || rebuildTarget.lastStats.packetCount) || 0));
         rebuiltChunkTotalVisibleFaceCount += Math.max(0, Math.round(Number(rebuildTarget.lastStats.visibleFaceCountAfterCull || (Number(rebuildTarget.lastStats.visibleTopFaceCount || 0) + Number(rebuildTarget.lastStats.visibleSideFaceCount || 0))) || 0));
+        if (rebuildTarget.lastStats.usedGlobalOccupancy === true) globalOccupancyChunkCountThisFrame += 1;
+        if (rebuildTarget.lastStats.usedLocalOccupancyFallback === true) localOccupancyFallbackChunkCountThisFrame += 1;
+        mergedStaticFaceCountThisFrame += Math.max(0, Math.round(Number(rebuildTarget.lastStats.mergedStaticFaceCount || 0) || 0));
+        inputFaceDescriptorCountThisFrame += Math.max(0, Math.round(Number(rebuildTarget.lastStats.inputFaceDescriptorCount || 0) || 0));
+        mergedFaceDescriptorCountThisFrame += Math.max(0, Math.round(Number(rebuildTarget.lastStats.mergedFaceDescriptorCount || 0) || 0));
+        faceMergeBuildMsThisFrame += Math.max(0, Number(rebuildTarget.lastStats.mergeFaceDescriptorsMs || 0));
+        terrainInputFaceDescriptorCountThisFrame += Math.max(0, Math.round(Number(rebuildTarget.lastStats.terrainInputFaceDescriptorCount || 0) || 0));
+        terrainMergedFaceDescriptorCountThisFrame += Math.max(0, Math.round(Number(rebuildTarget.lastStats.terrainMergedFaceDescriptorCount || 0) || 0));
+        terrainMergedStaticFaceCountThisFrame += Math.max(0, Math.round(Number(rebuildTarget.lastStats.terrainMergedStaticFaceCount || 0) || 0));
+        terrainMergeBuildMsThisFrame += Math.max(0, Number(rebuildTarget.lastStats.terrainMergeFaceDescriptorsMs || 0));
+        terrainVisiblePacketCountThisFrame += Math.max(0, Math.round(Number(rebuildTarget.lastStats.terrainPacketCount || 0) || 0));
       }
       if (rebuildBudgetMode === 'ms' && rebuildMsThisFrame >= rebuildBudgetValue) break;
     }
@@ -604,12 +626,25 @@
       rebuiltChunkTotalBoxCount: rebuiltChunkTotalBoxCount,
       rebuiltChunkTotalRenderableCount: rebuiltChunkTotalRenderableCount,
       rebuiltChunkTotalVisibleFaceCount: rebuiltChunkTotalVisibleFaceCount,
+      globalOccupancyChunkCountThisFrame: globalOccupancyChunkCountThisFrame,
+      localOccupancyFallbackChunkCountThisFrame: localOccupancyFallbackChunkCountThisFrame,
       reusedChunkCountThisFrame: reusedChunkCountThisFrame,
       chunkSize: state.chunkSize,
       totalStaticBoxes: state.totalStaticBoxes,
       totalStaticRenderables: state.totalStaticRenderables,
       visibleStaticPacketCount: visibleStaticPacketCount,
       packetMergeMs: Number(packetMergeMs.toFixed ? packetMergeMs.toFixed(3) : packetMergeMs),
+      mergedStaticFaceCountThisFrame: mergedStaticFaceCountThisFrame,
+      inputFaceDescriptorCountThisFrame: inputFaceDescriptorCountThisFrame,
+      mergedFaceDescriptorCountThisFrame: mergedFaceDescriptorCountThisFrame,
+      mergeReductionRatio: inputFaceDescriptorCountThisFrame > 0 ? Number((Math.max(0, inputFaceDescriptorCountThisFrame - mergedFaceDescriptorCountThisFrame) / inputFaceDescriptorCountThisFrame).toFixed(6)) : 0,
+      faceMergeBuildMsThisFrame: Number(faceMergeBuildMsThisFrame.toFixed ? faceMergeBuildMsThisFrame.toFixed(3) : faceMergeBuildMsThisFrame),
+      terrainInputFaceDescriptorCountThisFrame: terrainInputFaceDescriptorCountThisFrame,
+      terrainMergedFaceDescriptorCountThisFrame: terrainMergedFaceDescriptorCountThisFrame,
+      terrainMergedStaticFaceCountThisFrame: terrainMergedStaticFaceCountThisFrame,
+      terrainMergeReductionRatio: terrainInputFaceDescriptorCountThisFrame > 0 ? Number((Math.max(0, terrainInputFaceDescriptorCountThisFrame - terrainMergedFaceDescriptorCountThisFrame) / terrainInputFaceDescriptorCountThisFrame).toFixed(6)) : 0,
+      terrainMergeBuildMsThisFrame: Number(terrainMergeBuildMsThisFrame.toFixed ? terrainMergeBuildMsThisFrame.toFixed(3) : terrainMergeBuildMsThisFrame),
+      terrainVisiblePacketCountThisFrame: terrainVisiblePacketCountThisFrame,
       cacheContentType: 'world-face-packets',
       cameraIndependent: true,
       usesScreenSpaceCache: false,
