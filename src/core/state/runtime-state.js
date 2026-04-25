@@ -100,24 +100,67 @@ var terrainGenerator = {
   seed: 1337,
   width: 11,
   height: 9,
+  terrainAlgorithm: 'profile_fbm',
+
+  sinScaleX: 8,
+  sinScaleZ: 8,
+  sinScaleY: 8,
+  sinPhaseX: 0,
+  sinPhaseZ: 0,
+  sinPhaseY: 0,
+  sinMixMode: 'add',
+
+  perlinScale: 16,
+  perlinOffsetX: 0,
+  perlinOffsetZ: 0,
+
+  octaveScale: 8,
+  octaves: 4,
+  persistence: 0.5,
+  lacunarity: 2,
+  octaveOffsetX: 0,
+  octaveOffsetZ: 0,
+
   detailScale: 8,
   detailOctaves: 4,
   detailPersistence: 0.5,
   detailLacunarity: 2,
   detailStrength: 4,
+  detailOffsetX: 0,
+  detailOffsetZ: 0,
+
+  multiScale1: 10,
+  multiWeight1: 1.0,
+  multiOffsetX1: 0,
+  multiOffsetZ1: 0,
+  multiSeedOffset1: 101,
+  multiScale2: 22,
+  multiWeight2: 0.65,
+  multiOffsetX2: 0,
+  multiOffsetZ2: 0,
+  multiSeedOffset2: 202,
+  multiScale3: 48,
+  multiWeight3: 0.35,
+  multiOffsetX3: 0,
+  multiOffsetZ3: 0,
+  multiSeedOffset3: 303,
+
   macroScale: 28,
   macroOctaves: 3,
   macroPersistence: 0.55,
   macroLacunarity: 2,
-  minHeight: 0,
-  maxHeight: 18,
+  macroOffsetX: 0,
+  macroOffsetZ: 0,
+
+  minHeight: -10,
+  maxHeight: 25,
   waterLevel: 0,
   baseHeightOffset: 0,
   heightProfileConfig: [
-    { start: 0.00, end: 0.28, baseHeight: 0 },
-    { start: 0.28, end: 0.56, baseHeight: 3 },
-    { start: 0.56, end: 0.80, baseHeight: 7 },
-    { start: 0.80, end: 1.01, baseHeight: 12 }
+    { start: 0.00, end: 0.25, baseHeight: -10 },
+    { start: 0.25, end: 0.58, baseHeight: 5 },
+    { start: 0.58, end: 0.60, baseHeight: 25 },
+    { start: 0.60, end: 1.01, baseHeight: 25 }
   ],
   activeTerrainBatchId: null,
   lastSummary: null,
@@ -167,15 +210,58 @@ function getTerrainGeneratorSettingsValue() {
     seed: terrainGenerator.seed,
     width: terrainGenerator.width,
     height: terrainGenerator.height,
+    terrainAlgorithm: String(terrainGenerator.terrainAlgorithm || 'profile_fbm'),
+
+    sinScaleX: terrainGenerator.sinScaleX,
+    sinScaleZ: terrainGenerator.sinScaleZ,
+    sinScaleY: terrainGenerator.sinScaleZ,
+    sinPhaseX: terrainGenerator.sinPhaseX,
+    sinPhaseZ: terrainGenerator.sinPhaseZ,
+    sinPhaseY: terrainGenerator.sinPhaseZ,
+    sinMixMode: String(terrainGenerator.sinMixMode || 'add'),
+
+    perlinScale: terrainGenerator.perlinScale,
+    perlinOffsetX: terrainGenerator.perlinOffsetX,
+    perlinOffsetZ: terrainGenerator.perlinOffsetZ,
+
+    octaveScale: terrainGenerator.octaveScale,
+    octaves: terrainGenerator.octaves,
+    persistence: terrainGenerator.persistence,
+    lacunarity: terrainGenerator.lacunarity,
+    octaveOffsetX: terrainGenerator.octaveOffsetX,
+    octaveOffsetZ: terrainGenerator.octaveOffsetZ,
+
     detailScale: terrainGenerator.detailScale,
     detailOctaves: terrainGenerator.detailOctaves,
     detailPersistence: terrainGenerator.detailPersistence,
     detailLacunarity: terrainGenerator.detailLacunarity,
     detailStrength: terrainGenerator.detailStrength,
+    detailOffsetX: terrainGenerator.detailOffsetX,
+    detailOffsetZ: terrainGenerator.detailOffsetZ,
+
+    multiScale1: terrainGenerator.multiScale1,
+    multiWeight1: terrainGenerator.multiWeight1,
+    multiOffsetX1: terrainGenerator.multiOffsetX1,
+    multiOffsetZ1: terrainGenerator.multiOffsetZ1,
+    multiSeedOffset1: terrainGenerator.multiSeedOffset1,
+    multiScale2: terrainGenerator.multiScale2,
+    multiWeight2: terrainGenerator.multiWeight2,
+    multiOffsetX2: terrainGenerator.multiOffsetX2,
+    multiOffsetZ2: terrainGenerator.multiOffsetZ2,
+    multiSeedOffset2: terrainGenerator.multiSeedOffset2,
+    multiScale3: terrainGenerator.multiScale3,
+    multiWeight3: terrainGenerator.multiWeight3,
+    multiOffsetX3: terrainGenerator.multiOffsetX3,
+    multiOffsetZ3: terrainGenerator.multiOffsetZ3,
+    multiSeedOffset3: terrainGenerator.multiSeedOffset3,
+
     macroScale: terrainGenerator.macroScale,
     macroOctaves: terrainGenerator.macroOctaves,
     macroPersistence: terrainGenerator.macroPersistence,
     macroLacunarity: terrainGenerator.macroLacunarity,
+    macroOffsetX: terrainGenerator.macroOffsetX,
+    macroOffsetZ: terrainGenerator.macroOffsetZ,
+
     minHeight: terrainGenerator.minHeight,
     maxHeight: terrainGenerator.maxHeight,
     waterLevel: terrainGenerator.waterLevel,
@@ -201,21 +287,68 @@ function patchTerrainGeneratorSettings(patch, meta) {
     terrainGenerator[key] = roundToInt ? Math.round(num) : num;
   }
   if (Object.prototype.hasOwnProperty.call(patch, 'seed')) terrainGenerator.seed = patch.seed;
+  if (Object.prototype.hasOwnProperty.call(patch, 'terrainAlgorithm')) terrainGenerator.terrainAlgorithm = String(patch.terrainAlgorithm || 'profile_fbm');
+
   setNum('width', true);
   setNum('height', true);
+
+  setNum('sinScaleX', false);
+  if (Object.prototype.hasOwnProperty.call(patch, 'sinScaleZ')) setNum('sinScaleZ', false);
+  else if (Object.prototype.hasOwnProperty.call(patch, 'sinScaleY')) terrainGenerator.sinScaleZ = Number(patch.sinScaleY);
+  terrainGenerator.sinScaleY = terrainGenerator.sinScaleZ;
+  setNum('sinPhaseX', false);
+  if (Object.prototype.hasOwnProperty.call(patch, 'sinPhaseZ')) setNum('sinPhaseZ', false);
+  else if (Object.prototype.hasOwnProperty.call(patch, 'sinPhaseY')) terrainGenerator.sinPhaseZ = Number(patch.sinPhaseY);
+  terrainGenerator.sinPhaseY = terrainGenerator.sinPhaseZ;
+  if (Object.prototype.hasOwnProperty.call(patch, 'sinMixMode')) terrainGenerator.sinMixMode = String(patch.sinMixMode || 'add');
+
+  setNum('perlinScale', false);
+  setNum('perlinOffsetX', false);
+  setNum('perlinOffsetZ', false);
+
+  setNum('octaveScale', false);
+  setNum('octaves', true);
+  setNum('persistence', false);
+  setNum('lacunarity', false);
+  setNum('octaveOffsetX', false);
+  setNum('octaveOffsetZ', false);
+
   setNum('detailScale', false);
   setNum('detailOctaves', true);
   setNum('detailPersistence', false);
   setNum('detailLacunarity', false);
   setNum('detailStrength', false);
+  setNum('detailOffsetX', false);
+  setNum('detailOffsetZ', false);
+
+  setNum('multiScale1', false);
+  setNum('multiWeight1', false);
+  setNum('multiOffsetX1', false);
+  setNum('multiOffsetZ1', false);
+  setNum('multiSeedOffset1', true);
+  setNum('multiScale2', false);
+  setNum('multiWeight2', false);
+  setNum('multiOffsetX2', false);
+  setNum('multiOffsetZ2', false);
+  setNum('multiSeedOffset2', true);
+  setNum('multiScale3', false);
+  setNum('multiWeight3', false);
+  setNum('multiOffsetX3', false);
+  setNum('multiOffsetZ3', false);
+  setNum('multiSeedOffset3', true);
+
   setNum('macroScale', false);
   setNum('macroOctaves', true);
   setNum('macroPersistence', false);
   setNum('macroLacunarity', false);
+  setNum('macroOffsetX', false);
+  setNum('macroOffsetZ', false);
+
   setNum('minHeight', true);
   setNum('maxHeight', true);
   setNum('waterLevel', true);
   setNum('baseHeightOffset', true);
+
   if (Object.prototype.hasOwnProperty.call(patch, 'heightProfileConfig')) terrainGenerator.heightProfileConfig = cloneTerrainProfileConfig(patch.heightProfileConfig);
   if (Object.prototype.hasOwnProperty.call(patch, 'activeTerrainBatchId')) terrainGenerator.activeTerrainBatchId = patch.activeTerrainBatchId == null ? null : String(patch.activeTerrainBatchId);
   if (Object.prototype.hasOwnProperty.call(patch, 'lastSummary')) {

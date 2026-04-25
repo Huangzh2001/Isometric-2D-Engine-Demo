@@ -2,7 +2,7 @@
   if (typeof window === 'undefined') return;
 
   var OWNER = 'src/core/domain/terrain-generator-core.js';
-  var PHASE = 'TERRAIN-GENERATOR-V1';
+  var PHASE = 'TERRAIN-GENERATOR-V3-COLLAPSIBLE-PERLIN-PARAMS';
 
   function toNumber(value, fallback) {
     var num = Number(value);
@@ -18,13 +18,15 @@
     return v;
   }
 
-  function clamp01(value) {
-    return clamp(value, 0, 1);
-  }
+  function clamp01(value) { return clamp(value, 0, 1); }
 
   function fract(value) {
     var v = Number(value) || 0;
     return v - Math.floor(v);
+  }
+
+  function lerp(a, b, t) {
+    return a + (b - a) * t;
   }
 
   function normalizeSeed(seed) {
@@ -41,10 +43,6 @@
   function smoothstep(t) {
     var v = clamp01(t);
     return v * v * (3 - 2 * v);
-  }
-
-  function lerp(a, b, t) {
-    return a + (b - a) * t;
   }
 
   function hash2D(seed, x, y) {
@@ -105,10 +103,10 @@
   }
 
   var DEFAULT_HEIGHT_PROFILE = [
-    { start: 0.00, end: 0.28, baseHeight: 0 },
-    { start: 0.28, end: 0.56, baseHeight: 3 },
-    { start: 0.56, end: 0.80, baseHeight: 7 },
-    { start: 0.80, end: 1.01, baseHeight: 12 }
+    { start: 0.00, end: 0.25, baseHeight: -10 },
+    { start: 0.25, end: 0.58, baseHeight: 5 },
+    { start: 0.58, end: 0.60, baseHeight: 25 },
+    { start: 0.60, end: 1.01, baseHeight: 25 }
   ];
 
   function cloneProfile(profile) {
@@ -153,30 +151,100 @@
     return Math.round(toNumber(segments[segments.length - 1].baseHeight, 0));
   }
 
+  var TERRAIN_ALGORITHMS = {
+    random_height: { id: 'random_height', label: 'Random', description: 'independent random height per cell.' },
+    sin_wave: { id: 'sin_wave', label: 'Sin', description: 'periodic sine-wave terrain.' },
+    perlin: { id: 'perlin', label: 'Perlin(x,z)', description: 'single smooth noise field with scale and offsets.' },
+    perlin_octaves: { id: 'perlin_octaves', label: 'Perlin + Octaves', description: 'fBm noise with octave controls.' },
+    multi_perlin: { id: 'multi_perlin', label: 'Multiple Perlin', description: 'weighted sum of multiple Perlin fields.' },
+    profile_fbm: { id: 'profile_fbm', label: 'Perlin + Height Profile', description: 'macro fBm chooses a height profile band; detail fBm adds local variation.' }
+  };
+
+  function normalizeTerrainAlgorithm(value) {
+    var raw = String(value == null ? '' : value).trim();
+    if (!raw) return 'profile_fbm';
+    if (raw === 'random' || raw === 'rand') return 'random_height';
+    if (raw === 'sin') return 'sin_wave';
+    if (raw === 'simple_fbm' || raw === 'simple-fbm' || raw === 'fbm' || raw === 'noise') return 'perlin_octaves';
+    if (raw === 'profile_perlin' || raw === 'profile-fbm' || raw === 'profile_fbm' || raw === 'profile' || raw === 'height_profile') return 'profile_fbm';
+    if (raw === 'single_perlin') return 'perlin';
+    if (raw === 'multiple_perlin') return 'multi_perlin';
+    return TERRAIN_ALGORITHMS[raw] ? raw : 'profile_fbm';
+  }
+
   var DEFAULT_SETTINGS = {
     seed: 1337,
     width: 11,
     height: 9,
+    terrainAlgorithm: 'profile_fbm',
+
+    sinScaleX: 8,
+    sinScaleZ: 8,
+    sinScaleY: 8,
+    sinPhaseX: 0,
+    sinPhaseZ: 0,
+    sinPhaseY: 0,
+    sinMixMode: 'add',
+
+    perlinScale: 16,
+    perlinOffsetX: 0,
+    perlinOffsetZ: 0,
+
+    octaveScale: 8,
+    octaves: 4,
+    persistence: 0.5,
+    lacunarity: 2,
+    octaveOffsetX: 0,
+    octaveOffsetZ: 0,
+
     detailScale: 8,
     detailOctaves: 4,
     detailPersistence: 0.5,
     detailLacunarity: 2,
     detailStrength: 4,
+    detailOffsetX: 0,
+    detailOffsetZ: 0,
+
+    multiScale1: 10,
+    multiWeight1: 1,
+    multiOffsetX1: 0,
+    multiOffsetZ1: 0,
+    multiSeedOffset1: 101,
+    multiScale2: 22,
+    multiWeight2: 0.65,
+    multiOffsetX2: 0,
+    multiOffsetZ2: 0,
+    multiSeedOffset2: 202,
+    multiScale3: 48,
+    multiWeight3: 0.35,
+    multiOffsetX3: 0,
+    multiOffsetZ3: 0,
+    multiSeedOffset3: 303,
+
     macroScale: 28,
     macroOctaves: 3,
     macroPersistence: 0.55,
     macroLacunarity: 2,
-    minHeight: 0,
-    maxHeight: 18,
+    macroOffsetX: 0,
+    macroOffsetZ: 0,
+
+    minHeight: -10,
+    maxHeight: 25,
     waterLevel: 0,
     baseHeightOffset: 0,
     heightProfileConfig: DEFAULT_HEIGHT_PROFILE,
+
     terrainDebugFaceColorsEnabled: false,
     terrainColorMode: 'natural',
     terrainBuildColorMode: 'natural',
     terrainBuildLightingBypass: false,
     terrainDetailedProfilingEnabled: false
   };
+
+  function readNumber(src, key, fallback) {
+    if (!src || !Object.prototype.hasOwnProperty.call(src, key)) return fallback;
+    return toNumber(src[key], fallback);
+  }
 
   function normalizeTerrainParams(params) {
     var src = params && typeof params === 'object' ? params : {};
@@ -187,24 +255,74 @@
       minHeight = maxHeight;
       maxHeight = tmp;
     }
+
+    var octaveScale = readNumber(src, 'octaveScale', readNumber(src, 'detailScale', DEFAULT_SETTINGS.octaveScale));
+    var octaves = readNumber(src, 'octaves', readNumber(src, 'detailOctaves', DEFAULT_SETTINGS.octaves));
+    var persistence = readNumber(src, 'persistence', readNumber(src, 'detailPersistence', DEFAULT_SETTINGS.persistence));
+    var lacunarity = readNumber(src, 'lacunarity', readNumber(src, 'detailLacunarity', DEFAULT_SETTINGS.lacunarity));
+
     return {
       seed: src.seed != null ? src.seed : DEFAULT_SETTINGS.seed,
       width: Math.max(1, Math.round(toNumber(src.width, DEFAULT_SETTINGS.width))),
       height: Math.max(1, Math.round(toNumber(src.height, DEFAULT_SETTINGS.height))),
-      detailScale: Math.max(0.0001, toNumber(src.detailScale, DEFAULT_SETTINGS.detailScale)),
-      detailOctaves: normalizeOctaves(src.detailOctaves, DEFAULT_SETTINGS.detailOctaves),
-      detailPersistence: clamp(toNumber(src.detailPersistence, DEFAULT_SETTINGS.detailPersistence), 0, 1.5),
-      detailLacunarity: Math.max(1, toNumber(src.detailLacunarity, DEFAULT_SETTINGS.detailLacunarity)),
-      detailStrength: toNumber(src.detailStrength, DEFAULT_SETTINGS.detailStrength),
-      macroScale: Math.max(0.0001, toNumber(src.macroScale, DEFAULT_SETTINGS.macroScale)),
-      macroOctaves: normalizeOctaves(src.macroOctaves, DEFAULT_SETTINGS.macroOctaves),
-      macroPersistence: clamp(toNumber(src.macroPersistence, DEFAULT_SETTINGS.macroPersistence), 0, 1.5),
-      macroLacunarity: Math.max(1, toNumber(src.macroLacunarity, DEFAULT_SETTINGS.macroLacunarity)),
+      terrainAlgorithm: normalizeTerrainAlgorithm(src.terrainAlgorithm || src.algorithm || DEFAULT_SETTINGS.terrainAlgorithm),
+
+      sinScaleX: Math.max(0.0001, readNumber(src, 'sinScaleX', DEFAULT_SETTINGS.sinScaleX)),
+      sinScaleZ: Math.max(0.0001, readNumber(src, 'sinScaleZ', readNumber(src, 'sinScaleY', DEFAULT_SETTINGS.sinScaleZ))),
+      sinScaleY: Math.max(0.0001, readNumber(src, 'sinScaleZ', readNumber(src, 'sinScaleY', DEFAULT_SETTINGS.sinScaleZ))),
+      sinPhaseX: readNumber(src, 'sinPhaseX', DEFAULT_SETTINGS.sinPhaseX),
+      sinPhaseZ: readNumber(src, 'sinPhaseZ', readNumber(src, 'sinPhaseY', DEFAULT_SETTINGS.sinPhaseZ)),
+      sinPhaseY: readNumber(src, 'sinPhaseZ', readNumber(src, 'sinPhaseY', DEFAULT_SETTINGS.sinPhaseZ)),
+      sinMixMode: String(src.sinMixMode || DEFAULT_SETTINGS.sinMixMode),
+
+      perlinScale: Math.max(0.0001, readNumber(src, 'perlinScale', DEFAULT_SETTINGS.perlinScale)),
+      perlinOffsetX: readNumber(src, 'perlinOffsetX', DEFAULT_SETTINGS.perlinOffsetX),
+      perlinOffsetZ: readNumber(src, 'perlinOffsetZ', DEFAULT_SETTINGS.perlinOffsetZ),
+
+      octaveScale: Math.max(0.0001, octaveScale),
+      octaves: normalizeOctaves(octaves, DEFAULT_SETTINGS.octaves),
+      persistence: clamp(persistence, 0, 1.5),
+      lacunarity: Math.max(1, lacunarity),
+      octaveOffsetX: readNumber(src, 'octaveOffsetX', DEFAULT_SETTINGS.octaveOffsetX),
+      octaveOffsetZ: readNumber(src, 'octaveOffsetZ', DEFAULT_SETTINGS.octaveOffsetZ),
+
+      detailScale: Math.max(0.0001, readNumber(src, 'detailScale', DEFAULT_SETTINGS.detailScale)),
+      detailOctaves: normalizeOctaves(readNumber(src, 'detailOctaves', DEFAULT_SETTINGS.detailOctaves), DEFAULT_SETTINGS.detailOctaves),
+      detailPersistence: clamp(readNumber(src, 'detailPersistence', DEFAULT_SETTINGS.detailPersistence), 0, 1.5),
+      detailLacunarity: Math.max(1, readNumber(src, 'detailLacunarity', DEFAULT_SETTINGS.detailLacunarity)),
+      detailStrength: readNumber(src, 'detailStrength', DEFAULT_SETTINGS.detailStrength),
+      detailOffsetX: readNumber(src, 'detailOffsetX', DEFAULT_SETTINGS.detailOffsetX),
+      detailOffsetZ: readNumber(src, 'detailOffsetZ', DEFAULT_SETTINGS.detailOffsetZ),
+
+      multiScale1: Math.max(0.0001, readNumber(src, 'multiScale1', DEFAULT_SETTINGS.multiScale1)),
+      multiWeight1: Math.max(0, readNumber(src, 'multiWeight1', DEFAULT_SETTINGS.multiWeight1)),
+      multiOffsetX1: readNumber(src, 'multiOffsetX1', DEFAULT_SETTINGS.multiOffsetX1),
+      multiOffsetZ1: readNumber(src, 'multiOffsetZ1', DEFAULT_SETTINGS.multiOffsetZ1),
+      multiSeedOffset1: Math.round(readNumber(src, 'multiSeedOffset1', DEFAULT_SETTINGS.multiSeedOffset1)),
+      multiScale2: Math.max(0.0001, readNumber(src, 'multiScale2', DEFAULT_SETTINGS.multiScale2)),
+      multiWeight2: Math.max(0, readNumber(src, 'multiWeight2', DEFAULT_SETTINGS.multiWeight2)),
+      multiOffsetX2: readNumber(src, 'multiOffsetX2', DEFAULT_SETTINGS.multiOffsetX2),
+      multiOffsetZ2: readNumber(src, 'multiOffsetZ2', DEFAULT_SETTINGS.multiOffsetZ2),
+      multiSeedOffset2: Math.round(readNumber(src, 'multiSeedOffset2', DEFAULT_SETTINGS.multiSeedOffset2)),
+      multiScale3: Math.max(0.0001, readNumber(src, 'multiScale3', DEFAULT_SETTINGS.multiScale3)),
+      multiWeight3: Math.max(0, readNumber(src, 'multiWeight3', DEFAULT_SETTINGS.multiWeight3)),
+      multiOffsetX3: readNumber(src, 'multiOffsetX3', DEFAULT_SETTINGS.multiOffsetX3),
+      multiOffsetZ3: readNumber(src, 'multiOffsetZ3', DEFAULT_SETTINGS.multiOffsetZ3),
+      multiSeedOffset3: Math.round(readNumber(src, 'multiSeedOffset3', DEFAULT_SETTINGS.multiSeedOffset3)),
+
+      macroScale: Math.max(0.0001, readNumber(src, 'macroScale', DEFAULT_SETTINGS.macroScale)),
+      macroOctaves: normalizeOctaves(readNumber(src, 'macroOctaves', DEFAULT_SETTINGS.macroOctaves), DEFAULT_SETTINGS.macroOctaves),
+      macroPersistence: clamp(readNumber(src, 'macroPersistence', DEFAULT_SETTINGS.macroPersistence), 0, 1.5),
+      macroLacunarity: Math.max(1, readNumber(src, 'macroLacunarity', DEFAULT_SETTINGS.macroLacunarity)),
+      macroOffsetX: readNumber(src, 'macroOffsetX', DEFAULT_SETTINGS.macroOffsetX),
+      macroOffsetZ: readNumber(src, 'macroOffsetZ', DEFAULT_SETTINGS.macroOffsetZ),
+
       minHeight: minHeight,
       maxHeight: maxHeight,
       waterLevel: Math.round(toNumber(src.waterLevel, DEFAULT_SETTINGS.waterLevel)),
       baseHeightOffset: Math.round(toNumber(src.baseHeightOffset, DEFAULT_SETTINGS.baseHeightOffset)),
       heightProfileConfig: normalizeHeightProfileConfig(src.heightProfileConfig),
+
       terrainDebugFaceColorsEnabled: src.terrainDebugFaceColorsEnabled === true,
       terrainColorMode: String(src.terrainColorMode || (src.terrainDebugFaceColorsEnabled ? 'debug-semantic' : 'natural')),
       terrainBuildColorMode: String(src.terrainBuildColorMode || 'natural'),
@@ -213,26 +331,65 @@
     };
   }
 
+  function remap01ToHeight(value01, params) {
+    var range = Math.max(0, params.maxHeight - params.minHeight);
+    var heightValue = Math.round(params.minHeight + (clamp01(value01) * range) + params.baseHeightOffset);
+    return Math.round(clamp(heightValue, params.minHeight, params.maxHeight));
+  }
+
+  function singlePerlin(seed, x, y, scale, offsetX, offsetZ) {
+    var safeScale = Math.max(0.0001, toNumber(scale, 16));
+    return noise2D(seed, (toNumber(x, 0) + toNumber(offsetX, 0)) / safeScale, (toNumber(y, 0) + toNumber(offsetZ, 0)) / safeScale);
+  }
+
   function generateHeightMap(params) {
     var p = normalizeTerrainParams(params);
     var seed = normalizeSeed(p.seed);
-    var detailSeed = (seed + 17) >>> 0;
-    var macroSeed = (seed + 1000003) >>> 0;
     var heightMap = [];
     var minObserved = Infinity;
     var maxObserved = -Infinity;
     var total = 0;
     var count = 0;
+
     for (var x = 0; x < p.width; x++) {
       var column = [];
       heightMap.push(column);
       for (var y = 0; y < p.height; y++) {
-        var detailNoise = fbm2D(detailSeed, x, y, p.detailOctaves, p.detailPersistence, p.detailLacunarity, p.detailScale);
-        var macroNoise = fbm2D(macroSeed, x, y, p.macroOctaves, p.macroPersistence, p.macroLacunarity, p.macroScale);
-        var detail = p.detailStrength * ((detailNoise * 2) - 1);
-        var base = evaluateHeightProfile(macroNoise, p.heightProfileConfig) + p.baseHeightOffset;
-        var heightValue = Math.round(base + detail);
-        heightValue = Math.round(clamp(heightValue, p.minHeight, p.maxHeight));
+        var heightValue = 0;
+
+        if (p.terrainAlgorithm === 'random_height') {
+          heightValue = remap01ToHeight(hash2D(seed, x, y), p);
+        } else if (p.terrainAlgorithm === 'sin_wave') {
+          var sx = (Math.sin((x / p.sinScaleX) + p.sinPhaseX) + 1) / 2;
+          var sz = (Math.sin((y / p.sinScaleZ) + p.sinPhaseZ) + 1) / 2;
+          var sinValue = p.sinMixMode === 'multiply' ? (sx * sz) : ((sx + sz) / 2);
+          heightValue = remap01ToHeight(sinValue, p);
+        } else if (p.terrainAlgorithm === 'perlin') {
+          heightValue = remap01ToHeight(singlePerlin(seed + 17, x, y, p.perlinScale, p.perlinOffsetX, p.perlinOffsetZ), p);
+        } else if (p.terrainAlgorithm === 'perlin_octaves') {
+          var octaveNoise = fbm2D(seed + 17, x + p.octaveOffsetX, y + p.octaveOffsetZ, p.octaves, p.persistence, p.lacunarity, p.octaveScale);
+          heightValue = remap01ToHeight(octaveNoise, p);
+        } else if (p.terrainAlgorithm === 'multi_perlin') {
+          var w1 = Math.max(0, p.multiWeight1);
+          var w2 = Math.max(0, p.multiWeight2);
+          var w3 = Math.max(0, p.multiWeight3);
+          var weightSum = w1 + w2 + w3;
+          if (weightSum <= 0) weightSum = 1;
+          var multiNoise = (
+            w1 * singlePerlin(seed + p.multiSeedOffset1, x, y, p.multiScale1, p.multiOffsetX1, p.multiOffsetZ1) +
+            w2 * singlePerlin(seed + p.multiSeedOffset2, x, y, p.multiScale2, p.multiOffsetX2, p.multiOffsetZ2) +
+            w3 * singlePerlin(seed + p.multiSeedOffset3, x, y, p.multiScale3, p.multiOffsetX3, p.multiOffsetZ3)
+          ) / weightSum;
+          heightValue = remap01ToHeight(multiNoise, p);
+        } else {
+          var macroNoise = fbm2D(seed + 1000003, x + p.macroOffsetX, y + p.macroOffsetZ, p.macroOctaves, p.macroPersistence, p.macroLacunarity, p.macroScale);
+          var detailNoise = fbm2D(seed + 17, x + p.detailOffsetX, y + p.detailOffsetZ, p.detailOctaves, p.detailPersistence, p.detailLacunarity, p.detailScale);
+          var base = evaluateHeightProfile(macroNoise, p.heightProfileConfig);
+          var detail = p.detailStrength * ((detailNoise * 2) - 1);
+          heightValue = Math.round(base + detail + p.baseHeightOffset);
+          heightValue = Math.round(clamp(heightValue, p.minHeight, p.maxHeight));
+        }
+
         column.push(heightValue);
         minObserved = Math.min(minObserved, heightValue);
         maxObserved = Math.max(maxObserved, heightValue);
@@ -240,6 +397,7 @@
         count += 1;
       }
     }
+
     return {
       params: p,
       heightMap: heightMap,
@@ -288,6 +446,8 @@
     phase: PHASE,
     defaultSettings: JSON.parse(JSON.stringify(DEFAULT_SETTINGS)),
     defaultHeightProfile: cloneProfile(DEFAULT_HEIGHT_PROFILE),
+    terrainAlgorithms: JSON.parse(JSON.stringify(TERRAIN_ALGORITHMS)),
+    normalizeTerrainAlgorithm: normalizeTerrainAlgorithm,
     noise2D: noise2D,
     fbm2D: fbm2D,
     evaluateHeightProfile: evaluateHeightProfile,

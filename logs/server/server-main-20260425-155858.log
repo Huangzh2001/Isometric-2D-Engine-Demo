@@ -1,0 +1,41 @@
+# server log session
+# role=main
+# startedAt=20260425-155858
+# root=D:\Document\Github\Isometric-2D-Engine-Demo
+# currentLog=logs\server\server-main-20260425-155858.log
+# latestLog=logs\server\server-main-latest.log
+[P0][BOOT] server-starting {"latestLogFile": "logs\\server\\server-main-latest.log", "logFile": "logs\\server\\server-main-20260425-155858.log", "port": 14302, "role": "main", "root": "D:\\Document\\Github\\Isometric-2D-Engine-Demo"}
+[P0][BOUNDARY] routes-registered {"counts": {"GET": 11, "POST": 5}, "routes": {"GET": ["/api/health", "/api/prefabs/index", "/api/habbo/config", "/api/habbo/index", "/api/habbo/library/index", "/api/habbo/library/summary", "/api/habbo/library/page", "/api/habbo/library/icon", "/api/habbo/file", "/api/scenes/default", "/api/scenes/load"], "POST": ["/api/prefabs/save", "/api/scenes/save", "/api/habbo/config", "/api/self-check/report", "/api/self-check/text-report"]}}
+[P0][SUMMARY] server-paths {"habboRootMeta": "config\\habbo_asset_root.json", "prefabDir": "assets\\prefabs", "sceneDir": "assets\\scenes"}
+[P1][BOOT] source-of-truth-ready {"deprecatedRootFiles": ["app.js", "state.js", "app-shell.js", "lighting-editor.js"], "server": "server/local_server.py", "sourceDoc": "001_SOURCE_OF_TRUTH.md"}
+[P1][SUMMARY] phase-ready {"canonicalServerPath": "server\\local_server.py", "currentLogFile": "logs\\server\\server-main-20260425-155858.log", "hasRootLocalServer": false, "latestLogFile": "logs\\server\\server-main-latest.log", "phase": "P1", "root": "D:\\Document\\Github\\Isometric-2D-Engine-Demo", "serverLogDir": "logs\\server"}
+[P2][SUMMARY] namespace-bootstrap {"backendOwnershipChanged": false, "frontendOwnsNamespaceBootstrap": true, "notes": ["emit explanatory P2 summary only", "no backend behavior changes"], "phase": "P2-A-fix", "scope": "server-observability-only"}
+[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/health", "status": 200}
+[habbo-config:get] root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified exists=True itemCount=17464
+[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/habbo/config", "status": 200}
+[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/prefabs/index", "status": 200}
+[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/scenes/default", "status": 200}
+[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/health", "status": 200}
+[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/scenes/default", "status": 200}
+[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/prefabs/index", "status": 200}
+[habbo-diag] endpoint:summary reqId=p0-habbo-summary root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified
+[habbo-diag] direct-index:read:start root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified file=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified\index.json
+[habbo-diag] direct-index:read:done root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified bytes=9416225
+[habbo-diag] direct-index:parse:done root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified payloadKind=list recordSource=root-list recordCount=17464 totalItemsField=0 topKeys=[] firstRecordKeys=['category', 'classname', 'dest_dir', 'furni_id', 'furni_line', 'has_icon', 'has_swf', 'revision', 'source_icon', 'source_swf', 'special_type', 'status', 'type']
+[habbo-diag] endpoint:summary probe reqId=p0-habbo-summary branch=prefer-existing-index-summary rootCount=17464 indexExists=True indexSize=9678186 payloadKind=list recordSource=root-list itemsFieldKind=list-self itemsFieldCount=17464 totalItemsField=0 topKeys=[] summaryKeys=[] firstRecordKeys=['category', 'classname', 'dest_dir', 'furni_id', 'furni_line', 'has_icon', 'has_swf', 'revision', 'source_icon', 'source_swf', 'special_type', 'status', 'type']
+[habbo-diag] direct-summary:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=1/17464 total=1
+[habbo-diag] direct-summary:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=5000/17464 total=5000
+[habbo-diag] direct-summary:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=10000/17464 total=10000
+[habbo-diag] direct-summary:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=15000/17464 total=15000
+[habbo-diag] direct-summary:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=17464/17464 total=17464
+[habbo-diag] endpoint:summary result reqId=p0-habbo-summary branch=derive-from-index-records-fast rootCount=17464 indexExists=True indexSize=9678186 payloadKind=list recordSource=root-list itemsFieldKind=list-self itemsFieldCount=17464 totalItemsField=0 topKeys=[] summaryKeys=[] firstRecordKeys=['category', 'classname', 'dest_dir', 'furni_id', 'furni_line', 'has_icon', 'has_swf', 'revision', 'source_icon', 'source_swf', 'special_type', 'status', 'type']
+[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/habbo/library/summary", "status": 200}
+[habbo-diag] endpoint:page reqId=p0-habbo-page root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified type=room category=all search='' page=1 pageSize=1
+[habbo-diag] endpoint:page probe reqId=p0-habbo-page branch=prefer-existing-index-page rootCount=17464 indexExists=True indexSize=9678186 payloadKind=list recordSource=root-list itemsFieldKind=list-self itemsFieldCount=17464 totalItemsField=0 topKeys=[] summaryKeys=[] firstRecordKeys=['category', 'classname', 'dest_dir', 'furni_id', 'furni_line', 'has_icon', 'has_swf', 'revision', 'source_icon', 'source_swf', 'special_type', 'status', 'type']
+[habbo-diag] direct-page:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=1/17464 matched=1
+[habbo-diag] direct-page:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=5000/17464 matched=4840
+[habbo-diag] direct-page:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=10000/17464 matched=9578
+[habbo-diag] direct-page:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=15000/17464 matched=14358
+[habbo-diag] direct-page:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=17464/17464 matched=16662
+[habbo-diag] endpoint:page result reqId=p0-habbo-page branch=query-existing-index-page-fast rootCount=17464 indexExists=True indexSize=9678186 payloadKind=list recordSource=root-list itemsFieldKind=list-self itemsFieldCount=17464 totalItemsField=0 topKeys=[] summaryKeys=[] firstRecordKeys=['category', 'classname', 'dest_dir', 'furni_id', 'furni_line', 'has_icon', 'has_swf', 'revision', 'source_icon', 'source_swf', 'special_type', 'status', 'type']
+[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/habbo/library/page", "status": 200}

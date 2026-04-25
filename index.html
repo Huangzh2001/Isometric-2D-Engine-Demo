@@ -248,53 +248,184 @@
       <section id="tabTerrainPage" class="tabPage">
       <div class="controls">
         <div class="group inspectorGroup">
-          <h2>地形 / Terrain</h2>
-          <div class="hintBox">第一版只做：根据平滑噪声 + octave/fBm + height profile 生成整数高度，然后在每个格子上沿 z 方向堆叠对应数量的方块。不会生成斜坡、mesh、植被或河流。</div>
+          <h2>地形基础 / Terrain Basics</h2>
+          <div class="hintBox">先设置所有算法共用的基础范围：地面长宽、最低/最高高度、水位与整体高度偏移。下面再选择生成算法；算法切换后，只显示该算法需要的参数。</div>
           <label>Seed <input id="terrainSeed" type="text" value="1337"></label>
-          <label>Width <input id="terrainWidth" type="number" min="1" max="128" step="1" value="11"></label>
-          <label>Height <input id="terrainHeight" type="number" min="1" max="128" step="1" value="9"></label>
-        </div>
-
-        <div class="group inspectorGroup">
-          <h2>细节噪声 / detailNoise</h2>
-          <label>Detail Scale <input id="terrainDetailScale" type="number" min="0.1" max="512" step="0.1" value="8"></label>
-          <label>Detail Octaves <input id="terrainDetailOctaves" type="number" min="1" max="8" step="1" value="4"></label>
-          <label>Detail Persistence <input id="terrainDetailPersistence" type="number" min="0" max="1.5" step="0.01" value="0.5"></label>
-          <label>Detail Lacunarity <input id="terrainDetailLacunarity" type="number" min="1" max="6" step="0.01" value="2"></label>
-          <label>Detail Strength <input id="terrainDetailStrength" type="number" min="0" max="64" step="0.1" value="4"></label>
-        </div>
-
-        <div class="group inspectorGroup">
-          <h2>宏观噪声 / macroNoise</h2>
-          <label>Macro Scale <input id="terrainMacroScale" type="number" min="0.1" max="1024" step="0.1" value="28"></label>
-          <label>Macro Octaves <input id="terrainMacroOctaves" type="number" min="1" max="8" step="1" value="3"></label>
-          <label>Macro Persistence <input id="terrainMacroPersistence" type="number" min="0" max="1.5" step="0.01" value="0.55"></label>
-          <label>Macro Lacunarity <input id="terrainMacroLacunarity" type="number" min="1" max="6" step="0.01" value="2"></label>
-        </div>
-
-        <div class="group inspectorGroup">
-          <h2>高度范围</h2>
-          <label>Min Height <input id="terrainMinHeight" type="number" min="0" max="128" step="1" value="0"></label>
-          <label>Max Height <input id="terrainMaxHeight" type="number" min="0" max="128" step="1" value="18"></label>
+          <label>Width / 宽 <input id="terrainWidth" type="number" min="1" max="128" step="1" value="11"></label>
+          <label>Length / 长 <input id="terrainHeight" type="number" min="1" max="128" step="1" value="9"></label>
+          <label>Min Height / 最低高度 <input id="terrainMinHeight" type="number" min="-64" max="128" step="1" value="-10"></label>
+          <label>Max Height / 最高高度 <input id="terrainMaxHeight" type="number" min="-64" max="128" step="1" value="25"></label>
           <label>Water Level <input id="terrainWaterLevel" type="number" min="-64" max="128" step="1" value="0"></label>
-          <label>Base Height Offset <input id="terrainBaseHeightOffset" type="number" min="-64" max="128" step="1" value="0"></label>
+          <label>Base Height / Offset <input id="terrainBaseHeightOffset" type="number" min="-64" max="128" step="1" value="0"></label>
         </div>
 
         <div class="group inspectorGroup">
-          <h2>高度剖面 / Height Profile</h2>
-          <div class="hintBox">每一段表示：当 macroNoise 落在该区间时，本区域的基础海拔档位。</div>
-          <label>Profile 1 Start <input id="terrainProfile0Start" type="number" min="0" max="1" step="0.01" value="0.00"></label>
-          <label>Profile 1 End <input id="terrainProfile0End" type="number" min="0" max="1.01" step="0.01" value="0.28"></label>
-          <label>Profile 1 Base Height <input id="terrainProfile0Base" type="number" min="-64" max="128" step="1" value="0"></label>
-          <label>Profile 2 Start <input id="terrainProfile1Start" type="number" min="0" max="1" step="0.01" value="0.28"></label>
-          <label>Profile 2 End <input id="terrainProfile1End" type="number" min="0" max="1.01" step="0.01" value="0.56"></label>
-          <label>Profile 2 Base Height <input id="terrainProfile1Base" type="number" min="-64" max="128" step="1" value="3"></label>
-          <label>Profile 3 Start <input id="terrainProfile2Start" type="number" min="0" max="1" step="0.01" value="0.56"></label>
-          <label>Profile 3 End <input id="terrainProfile2End" type="number" min="0" max="1.01" step="0.01" value="0.80"></label>
-          <label>Profile 3 Base Height <input id="terrainProfile2Base" type="number" min="-64" max="128" step="1" value="7"></label>
-          <label>Profile 4 Start <input id="terrainProfile3Start" type="number" min="0" max="1" step="0.01" value="0.80"></label>
-          <label>Profile 4 End <input id="terrainProfile3End" type="number" min="0" max="1.01" step="0.01" value="1.01"></label>
-          <label>Profile 4 Base Height <input id="terrainProfile3Base" type="number" min="-64" max="128" step="1" value="12"></label>
+          <h2>生成算法 / Generation Algorithm</h2>
+          <label>Algorithm
+            <select id="terrainAlgorithm">
+              <option value="random_height">1. Random：随机高度</option>
+              <option value="sin_wave">2. Sin：正弦波地形</option>
+              <option value="perlin">3. Perlin(x,z)：单层 Perlin 噪声</option>
+              <option value="perlin_octaves">4. Perlin + Octaves：八度叠加</option>
+              <option value="multi_perlin">5. Multiple Perlin：多个 Perlin 函数叠加</option>
+              <option value="profile_fbm" selected>6. Perlin + Height Profile：Perlin 叠加自定义高度函数</option>
+            </select>
+          </label>
+          <div id="terrainAlgorithmHint" class="hintBox">Perlin + Height Profile：用 macro noise 选择基础海拔档位，再叠加 detail noise 形成局部起伏，可做出比较突兀的悬崖和山体。</div>
+
+          <div id="terrainAlgorithmParamsBox" class="terrainAlgorithmParamsBox">
+            <div id="terrainRandomParamsPanel" class="terrainAlgorithmPanel terrainParamPanel" hidden>
+              <div class="terrainParamGroup">
+                <button type="button" class="terrainParamGroupToggle" data-terrain-param-toggle aria-expanded="true">
+                  <span>随机参数 / Random</span><span class="terrainParamChevron">▾</span>
+                </button>
+                <div class="terrainParamGroupBody" data-terrain-param-body>
+                  <div class="hintBox">随机模式没有额外连续噪声参数。每个格子的高度直接在 Min Height 到 Max Height 之间随机取值，适合做最基础对照。</div>
+                </div>
+              </div>
+            </div>
+
+            <div id="terrainSinParamsPanel" class="terrainAlgorithmPanel terrainParamPanel" hidden>
+              <div class="terrainParamGroup">
+                <button type="button" class="terrainParamGroupToggle" data-terrain-param-toggle aria-expanded="true">
+                  <span>Sin 采样参数 / Sin Sampling</span><span class="terrainParamChevron">▾</span>
+                </button>
+                <div class="terrainParamGroupBody terrainParamGrid" data-terrain-param-body>
+                  <label>Sin Scale X <input id="terrainSinScaleX" type="number" min="0.1" max="1024" step="0.1" value="8"></label>
+                  <label>Sin Scale Z <input id="terrainSinScaleZ" type="number" min="0.1" max="1024" step="0.1" value="8"></label>
+                  <label>Sin Phase X <input id="terrainSinPhaseX" type="number" min="-12.56" max="12.56" step="0.01" value="0"></label>
+                  <label>Sin Phase Z <input id="terrainSinPhaseZ" type="number" min="-12.56" max="12.56" step="0.01" value="0"></label>
+                  <label>Sin Mix Mode
+                    <select id="terrainSinMixMode">
+                      <option value="add">add / 相加</option>
+                      <option value="multiply">multiply / 相乘</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div id="terrainPerlinParamsPanel" class="terrainAlgorithmPanel terrainParamPanel" hidden>
+              <div class="terrainParamGroup">
+                <button type="button" class="terrainParamGroupToggle" data-terrain-param-toggle aria-expanded="true">
+                  <span>单层 Perlin 参数 / Single Perlin</span><span class="terrainParamChevron">▾</span>
+                </button>
+                <div class="terrainParamGroupBody terrainParamGrid" data-terrain-param-body>
+                  <label>Perlin Scale <input id="terrainPerlinScale" type="number" min="0.1" max="1024" step="0.1" value="16"></label>
+                  <label>Offset X <input id="terrainPerlinOffsetX" type="number" min="-10000" max="10000" step="0.1" value="0"></label>
+                  <label>Offset Z <input id="terrainPerlinOffsetZ" type="number" min="-10000" max="10000" step="0.1" value="0"></label>
+                </div>
+              </div>
+            </div>
+
+            <div id="terrainOctaveParamsPanel" class="terrainAlgorithmPanel terrainParamPanel" hidden>
+              <div class="terrainParamGroup">
+                <button type="button" class="terrainParamGroupToggle" data-terrain-param-toggle aria-expanded="true">
+                  <span>八度叠加参数 / Perlin + Octaves</span><span class="terrainParamChevron">▾</span>
+                </button>
+                <div class="terrainParamGroupBody terrainParamGrid" data-terrain-param-body>
+                  <label>Scale <input id="terrainOctaveScale" type="number" min="0.1" max="1024" step="0.1" value="8"></label>
+                  <label>Octaves <input id="terrainOctaves" type="number" min="1" max="8" step="1" value="4"></label>
+                  <label>Persistence <input id="terrainPersistence" type="number" min="0" max="1.5" step="0.01" value="0.5"></label>
+                  <label>Lacunarity <input id="terrainLacunarity" type="number" min="1" max="6" step="0.01" value="2"></label>
+                  <label>Offset X <input id="terrainOctaveOffsetX" type="number" min="-10000" max="10000" step="0.1" value="0"></label>
+                  <label>Offset Z <input id="terrainOctaveOffsetZ" type="number" min="-10000" max="10000" step="0.1" value="0"></label>
+                </div>
+              </div>
+            </div>
+
+            <div id="terrainMultiPerlinParamsPanel" class="terrainAlgorithmPanel terrainParamPanel" hidden>
+              <div class="hintBox">多个 Perlin 函数叠加时，每一层都应有自己的 scale、weight、offset 与 seed offset。这里先固定为 3 层，便于 UI 控制。</div>
+              <div class="terrainParamGroup">
+                <button type="button" class="terrainParamGroupToggle" data-terrain-param-toggle aria-expanded="true">
+                  <span>Perlin A</span><span class="terrainParamChevron">▾</span>
+                </button>
+                <div class="terrainParamGroupBody terrainParamGrid" data-terrain-param-body>
+                  <label>Scale <input id="terrainMultiScale1" type="number" min="0.1" max="1024" step="0.1" value="10"></label>
+                  <label>Weight <input id="terrainMultiWeight1" type="number" min="0" max="10" step="0.1" value="1.0"></label>
+                  <label>Offset X <input id="terrainMultiOffsetX1" type="number" min="-10000" max="10000" step="0.1" value="0"></label>
+                  <label>Offset Z <input id="terrainMultiOffsetZ1" type="number" min="-10000" max="10000" step="0.1" value="0"></label>
+                  <label>Seed Offset <input id="terrainMultiSeedOffset1" type="number" min="-999999" max="999999" step="1" value="101"></label>
+                </div>
+              </div>
+              <div class="terrainParamGroup collapsed">
+                <button type="button" class="terrainParamGroupToggle" data-terrain-param-toggle aria-expanded="false">
+                  <span>Perlin B</span><span class="terrainParamChevron">▾</span>
+                </button>
+                <div class="terrainParamGroupBody terrainParamGrid" data-terrain-param-body>
+                  <label>Scale <input id="terrainMultiScale2" type="number" min="0.1" max="1024" step="0.1" value="22"></label>
+                  <label>Weight <input id="terrainMultiWeight2" type="number" min="0" max="10" step="0.1" value="0.65"></label>
+                  <label>Offset X <input id="terrainMultiOffsetX2" type="number" min="-10000" max="10000" step="0.1" value="0"></label>
+                  <label>Offset Z <input id="terrainMultiOffsetZ2" type="number" min="-10000" max="10000" step="0.1" value="0"></label>
+                  <label>Seed Offset <input id="terrainMultiSeedOffset2" type="number" min="-999999" max="999999" step="1" value="202"></label>
+                </div>
+              </div>
+              <div class="terrainParamGroup collapsed">
+                <button type="button" class="terrainParamGroupToggle" data-terrain-param-toggle aria-expanded="false">
+                  <span>Perlin C</span><span class="terrainParamChevron">▾</span>
+                </button>
+                <div class="terrainParamGroupBody terrainParamGrid" data-terrain-param-body>
+                  <label>Scale <input id="terrainMultiScale3" type="number" min="0.1" max="1024" step="0.1" value="48"></label>
+                  <label>Weight <input id="terrainMultiWeight3" type="number" min="0" max="10" step="0.1" value="0.35"></label>
+                  <label>Offset X <input id="terrainMultiOffsetX3" type="number" min="-10000" max="10000" step="0.1" value="0"></label>
+                  <label>Offset Z <input id="terrainMultiOffsetZ3" type="number" min="-10000" max="10000" step="0.1" value="0"></label>
+                  <label>Seed Offset <input id="terrainMultiSeedOffset3" type="number" min="-999999" max="999999" step="1" value="303"></label>
+                </div>
+              </div>
+            </div>
+
+            <div id="terrainProfileParamsPanel" class="terrainAlgorithmPanel terrainParamPanel">
+              <div class="hintBox">视频里的“突兀山体/悬崖”对应这里：Macro Perlin 先进入自定义高度函数，决定基础海拔；Detail Perlin 再叠加局部起伏。</div>
+              <div class="terrainParamGroup">
+                <button type="button" class="terrainParamGroupToggle" data-terrain-param-toggle aria-expanded="true">
+                  <span>Macro Perlin：基础海拔采样</span><span class="terrainParamChevron">▾</span>
+                </button>
+                <div class="terrainParamGroupBody terrainParamGrid" data-terrain-param-body>
+                  <label>Macro Scale <input id="terrainMacroScale" type="number" min="0.1" max="1024" step="0.1" value="28"></label>
+                  <label>Macro Octaves <input id="terrainMacroOctaves" type="number" min="1" max="8" step="1" value="3"></label>
+                  <label>Macro Persistence <input id="terrainMacroPersistence" type="number" min="0" max="1.5" step="0.01" value="0.55"></label>
+                  <label>Macro Lacunarity <input id="terrainMacroLacunarity" type="number" min="1" max="6" step="0.01" value="2"></label>
+                  <label>Macro Offset X <input id="terrainMacroOffsetX" type="number" min="-10000" max="10000" step="0.1" value="0"></label>
+                  <label>Macro Offset Z <input id="terrainMacroOffsetZ" type="number" min="-10000" max="10000" step="0.1" value="0"></label>
+                </div>
+              </div>
+
+              <div class="terrainParamGroup">
+                <button type="button" class="terrainParamGroupToggle" data-terrain-param-toggle aria-expanded="true">
+                  <span>Height Profile：自定义高度函数</span><span class="terrainParamChevron">▾</span>
+                </button>
+                <div class="terrainParamGroupBody terrainParamGrid" data-terrain-param-body>
+                  <label>Profile 1 Start <input id="terrainProfile0Start" type="number" min="0" max="1" step="0.01" value="0.00"></label>
+                  <label>Profile 1 End <input id="terrainProfile0End" type="number" min="0" max="1.01" step="0.01" value="0.25"></label>
+                  <label>Profile 1 Base Height <input id="terrainProfile0Base" type="number" min="-64" max="128" step="1" value="-10"></label>
+                  <label>Profile 2 Start <input id="terrainProfile1Start" type="number" min="0" max="1" step="0.01" value="0.25"></label>
+                  <label>Profile 2 End <input id="terrainProfile1End" type="number" min="0" max="1.01" step="0.01" value="0.58"></label>
+                  <label>Profile 2 Base Height <input id="terrainProfile1Base" type="number" min="-64" max="128" step="1" value="5"></label>
+                  <label>Profile 3 Start <input id="terrainProfile2Start" type="number" min="0" max="1" step="0.01" value="0.58"></label>
+                  <label>Profile 3 End <input id="terrainProfile2End" type="number" min="0" max="1.01" step="0.01" value="0.60"></label>
+                  <label>Profile 3 Base Height <input id="terrainProfile2Base" type="number" min="-64" max="128" step="1" value="25"></label>
+                  <label>Profile 4 Start <input id="terrainProfile3Start" type="number" min="0" max="1" step="0.01" value="0.60"></label>
+                  <label>Profile 4 End <input id="terrainProfile3End" type="number" min="0" max="1.01" step="0.01" value="1.01"></label>
+                  <label>Profile 4 Base Height <input id="terrainProfile3Base" type="number" min="-64" max="128" step="1" value="25"></label>
+                </div>
+              </div>
+
+              <div class="terrainParamGroup collapsed">
+                <button type="button" class="terrainParamGroupToggle" data-terrain-param-toggle aria-expanded="false">
+                  <span>Detail Perlin：局部起伏叠加</span><span class="terrainParamChevron">▾</span>
+                </button>
+                <div class="terrainParamGroupBody terrainParamGrid" data-terrain-param-body>
+                  <label>Detail Scale <input id="terrainDetailScale" type="number" min="0.1" max="512" step="0.1" value="8"></label>
+                  <label>Detail Octaves <input id="terrainDetailOctaves" type="number" min="1" max="8" step="1" value="4"></label>
+                  <label>Detail Persistence <input id="terrainDetailPersistence" type="number" min="0" max="1.5" step="0.01" value="0.5"></label>
+                  <label>Detail Lacunarity <input id="terrainDetailLacunarity" type="number" min="1" max="6" step="0.01" value="2"></label>
+                  <label>Detail Strength <input id="terrainDetailStrength" type="number" min="0" max="64" step="0.1" value="4"></label>
+                  <label>Detail Offset X <input id="terrainDetailOffsetX" type="number" min="-10000" max="10000" step="0.1" value="0"></label>
+                  <label>Detail Offset Z <input id="terrainDetailOffsetZ" type="number" min="-10000" max="10000" step="0.1" value="0"></label>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="group inspectorGroup">
