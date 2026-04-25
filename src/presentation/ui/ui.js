@@ -900,6 +900,242 @@ function uiApplyMainTerrainSettingsToForm(settings) {
   });
 }
 
+function uiGetRuntimeStateApiForTerrainMap() {
+  try {
+    if (typeof window !== 'undefined' && window.App && window.App.state && window.App.state.runtimeState) return window.App.state.runtimeState;
+  } catch (_) {}
+  try {
+    if (typeof window !== 'undefined' && window.__APP_NAMESPACE && typeof window.__APP_NAMESPACE.resolve === 'function') return window.__APP_NAMESPACE.resolve('state.runtimeState') || null;
+  } catch (_) {}
+  return null;
+}
+
+function uiGetTerrainRuntimeModelForMap() {
+  var runtimeApi = uiGetRuntimeStateApiForTerrainMap();
+  if (!runtimeApi) return null;
+  if (typeof runtimeApi.getTerrainRuntimeModelValue === 'function') {
+    try { return runtimeApi.getTerrainRuntimeModelValue(); } catch (_) {}
+  }
+  return runtimeApi.terrainLogic || null;
+}
+
+function uiSyncTerrainMapColorMode(source) {
+  var sourceText = String(source || '');
+  var preferWindow = sourceText.indexOf('window') >= 0;
+  var mode = preferWindow
+    ? String((ui.terrainMapWindowColorMode && ui.terrainMapWindowColorMode.value) || (ui.terrainMapColorMode && ui.terrainMapColorMode.value) || 'height')
+    : String((ui.terrainMapColorMode && ui.terrainMapColorMode.value) || (ui.terrainMapWindowColorMode && ui.terrainMapWindowColorMode.value) || 'height');
+  if (ui.terrainMapColorMode && ui.terrainMapColorMode.value !== mode) ui.terrainMapColorMode.value = mode;
+  if (ui.terrainMapWindowColorMode && ui.terrainMapWindowColorMode.value !== mode) ui.terrainMapWindowColorMode.value = mode;
+  if (ui.terrainMapInlineSummary && source) {
+    ui.terrainMapInlineSummary.textContent = 'Terrain Map：' + ((ui.terrainMapWindow && ui.terrainMapWindow.hidden === false) ? '已打开' : '未打开') + ' · mode=' + mode;
+  }
+  return mode;
+}
+
+function uiSetTerrainMapWindowVisible(visible, source) {
+  if (!ui.terrainMapWindow) return { ok: false, reason: 'missing-window' };
+  try { ui.terrainMapWindow.hidden = !visible; } catch (_) {}
+  if (ui.terrainMapInlineSummary) {
+    var mode = uiSyncTerrainMapColorMode();
+    ui.terrainMapInlineSummary.textContent = visible ? ('Terrain Map：已打开 · mode=' + mode) : 'Terrain Map：已关闭。';
+  }
+  if (visible) uiRenderTerrainMapWindow(source || 'terrain-map:open');
+  return { ok: true, visible: !!visible, source: String(source || 'terrain-map:visibility') };
+}
+
+function uiHandleTerrainMapToggle(source) {
+  var visible = !!(ui.terrainMapWindow && ui.terrainMapWindow.hidden === false);
+  return uiSetTerrainMapWindowVisible(!visible, source || 'terrain-map:toggle');
+}
+
+function uiHandleTerrainMapClose(source) {
+  return uiSetTerrainMapWindowVisible(false, source || 'terrain-map:close');
+}
+
+function uiClamp01(value) {
+  var n = Number(value) || 0;
+  if (n < 0) return 0;
+  if (n > 1) return 1;
+  return n;
+}
+
+function uiMixRgb(a, b, t) {
+  var x = uiClamp01(t);
+  return {
+    r: Math.round((Number(a.r) || 0) + ((Number(b.r) || 0) - (Number(a.r) || 0)) * x),
+    g: Math.round((Number(a.g) || 0) + ((Number(b.g) || 0) - (Number(a.g) || 0)) * x),
+    b: Math.round((Number(a.b) || 0) + ((Number(b.b) || 0) - (Number(a.b) || 0)) * x)
+  };
+}
+
+function uiRgbToCss(rgb) {
+  var src = rgb && typeof rgb === 'object' ? rgb : { r: 127, g: 127, b: 127 };
+  return 'rgb(' + Math.round(Number(src.r) || 0) + ',' + Math.round(Number(src.g) || 0) + ',' + Math.round(Number(src.b) || 0) + ')';
+}
+
+function uiSampleGradient(stops, t) {
+  var list = Array.isArray(stops) ? stops : [];
+  if (list.length <= 0) return 'rgb(127,127,127)';
+  if (list.length === 1) return uiRgbToCss(list[0].color || { r: 127, g: 127, b: 127 });
+  var x = uiClamp01(t);
+  for (var i = 0; i < list.length - 1; i++) {
+    var a = list[i];
+    var b = list[i + 1];
+    var aAt = Number(a.at);
+    var bAt = Number(b.at);
+    if (x >= aAt && x <= bAt) {
+      var span = Math.max(1e-6, bAt - aAt);
+      return uiRgbToCss(uiMixRgb(a.color || { r: 127, g: 127, b: 127 }, b.color || { r: 127, g: 127, b: 127 }, (x - aAt) / span));
+    }
+  }
+  return uiRgbToCss((x <= Number(list[0].at)) ? (list[0].color || { r: 127, g: 127, b: 127 }) : (list[list.length - 1].color || { r: 127, g: 127, b: 127 }));
+}
+
+function uiResolveTerrainBiomeColor(heightValue, x, y, runtimeModel) {
+  var runtime = runtimeModel && typeof runtimeModel === 'object' ? runtimeModel : {};
+  var params = runtime.params && typeof runtime.params === 'object' ? runtime.params : {};
+  var materialMap = runtime.materialMap || null;
+  var waterLevel = Math.round(Number(params.waterLevel) || 0);
+  var minHeight = Number(params.minHeight);
+  var maxHeight = Number(params.maxHeight);
+  if (!Number.isFinite(minHeight)) minHeight = Number((runtime.lastSummary && runtime.lastSummary.minHeightObserved) || 0);
+  if (!Number.isFinite(maxHeight)) maxHeight = Number((runtime.lastSummary && runtime.lastSummary.maxHeightObserved) || 1);
+  var span = Math.max(1, maxHeight - minHeight);
+  var snowCutoff = maxHeight - Math.max(2, Math.round(span * 0.18));
+  var h = Math.round(Number(heightValue) || 0);
+  if (h <= waterLevel) return '#4f8cff';
+  if (h >= snowCutoff) return '#f4f8ff';
+  var materialId = null;
+  try {
+    if (typeof window !== 'undefined' && window.__TERRAIN_MATERIAL_CORE__ && typeof window.__TERRAIN_MATERIAL_CORE__.getTerrainMaterialIdAt === 'function') {
+      materialId = window.__TERRAIN_MATERIAL_CORE__.getTerrainMaterialIdAt(materialMap, x, y, 'grass');
+    }
+  } catch (_) {}
+  if (!materialId) {
+    var ratio = (h - minHeight) / span;
+    if (ratio < 0.12) materialId = 'sand';
+    else if (ratio < 0.72) materialId = 'grass';
+    else materialId = 'rock';
+  }
+  if (materialId === 'sand') return '#d8c285';
+  if (materialId === 'rock') return '#8f949b';
+  return '#73b64f';
+}
+
+function uiResolveTerrainHeightColor(heightValue, runtimeModel) {
+  var runtime = runtimeModel && typeof runtimeModel === 'object' ? runtimeModel : {};
+  var params = runtime.params && typeof runtime.params === 'object' ? runtime.params : {};
+  var waterLevel = Math.round(Number(params.waterLevel) || 0);
+  var minHeight = Number(params.minHeight);
+  var maxHeight = Number(params.maxHeight);
+  if (!Number.isFinite(minHeight)) minHeight = Number((runtime.lastSummary && runtime.lastSummary.minHeightObserved) || 0);
+  if (!Number.isFinite(maxHeight)) maxHeight = Number((runtime.lastSummary && runtime.lastSummary.maxHeightObserved) || 1);
+  var h = Number(heightValue) || 0;
+  if (h <= waterLevel) {
+    var low = Math.min(minHeight, waterLevel - 1);
+    var denom = Math.max(1, waterLevel - low);
+    return uiSampleGradient([{ at: 0, color: { r: 26, g: 58, b: 120 } }, { at: 1, color: { r: 95, g: 168, b: 255 } }], (h - low) / denom);
+  }
+  return uiSampleGradient([
+    { at: 0.00, color: { r: 212, g: 196, b: 127 } },
+    { at: 0.18, color: { r: 115, g: 182, b: 79 } },
+    { at: 0.55, color: { r: 89, g: 144, b: 61 } },
+    { at: 0.78, color: { r: 143, g: 148, b: 155 } },
+    { at: 1.00, color: { r: 244, g: 248, b: 255 } }
+  ], (h - Math.max(waterLevel + 1, minHeight)) / Math.max(1, maxHeight - Math.max(waterLevel + 1, minHeight)));
+}
+
+function uiBuildTerrainMapLegend(mode, runtimeModel) {
+  var runtime = runtimeModel && typeof runtimeModel === 'object' ? runtimeModel : {};
+  var params = runtime.params && typeof runtime.params === 'object' ? runtime.params : {};
+  var waterLevel = Math.round(Number(params.waterLevel) || 0);
+  var minHeight = Number(params.minHeight);
+  var maxHeight = Number(params.maxHeight);
+  if (!Number.isFinite(minHeight)) minHeight = Number((runtime.lastSummary && runtime.lastSummary.minHeightObserved) || 0);
+  if (!Number.isFinite(maxHeight)) maxHeight = Number((runtime.lastSummary && runtime.lastSummary.maxHeightObserved) || 0);
+  var items = mode === 'biome'
+    ? [
+        { color: '#4f8cff', label: 'Water / 水域 ≤ ' + waterLevel },
+        { color: '#d8c285', label: 'Sand / 沙地' },
+        { color: '#73b64f', label: 'Grass / 草地' },
+        { color: '#8f949b', label: 'Rock / 岩石' },
+        { color: '#f4f8ff', label: 'Snow / 雪线高地' }
+      ]
+    : [
+        { color: '#3b78dd', label: 'Low / 低海拔' },
+        { color: '#73b64f', label: 'Mid / 中海拔' },
+        { color: '#8f949b', label: 'High / 高海拔' },
+        { color: '#f4f8ff', label: 'Peak / 最高处' }
+      ];
+  if (ui.terrainMapLegend) {
+    ui.terrainMapLegend.innerHTML = items.map(function (item) {
+      return '<div class="terrainMapLegendItem"><span class="terrainMapLegendSwatch" style="background:' + String(item.color) + ';"></span><span>' + String(item.label) + '</span></div>';
+    }).join('') + '<div class="terrainMapLegendMeta">Height range：' + String(minHeight) + ' ~ ' + String(maxHeight) + '</div>';
+  }
+}
+
+function uiRenderTerrainMapWindow(source) {
+  var runtime = uiGetTerrainRuntimeModelForMap();
+  var canvas = ui.terrainMapCanvas;
+  if (!canvas) return { ok: false, reason: 'missing-canvas' };
+  var ctx2d = typeof canvas.getContext === 'function' ? canvas.getContext('2d') : null;
+  if (!ctx2d) return { ok: false, reason: 'missing-context' };
+  var mode = uiSyncTerrainMapColorMode(source || 'terrain-map:render');
+  var width = Math.max(0, Math.round(Number(runtime && runtime.width) || 0));
+  var height = Math.max(0, Math.round(Number(runtime && runtime.height) || 0));
+  var heightMap = runtime && Array.isArray(runtime.heightMap) ? runtime.heightMap : [];
+  if (!runtime || !width || !height || !heightMap.length) {
+    canvas.width = 512;
+    canvas.height = 512;
+    ctx2d.clearRect(0, 0, canvas.width, canvas.height);
+    ctx2d.fillStyle = '#0d1421';
+    ctx2d.fillRect(0, 0, canvas.width, canvas.height);
+    ctx2d.fillStyle = '#d7e7ff';
+    ctx2d.font = '16px sans-serif';
+    ctx2d.textAlign = 'center';
+    ctx2d.textBaseline = 'middle';
+    ctx2d.fillText('No terrain data', canvas.width / 2, canvas.height / 2 - 10);
+    ctx2d.font = '12px sans-serif';
+    ctx2d.fillStyle = '#90a4c8';
+    ctx2d.fillText('请先生成地形，然后再打开大地图。', canvas.width / 2, canvas.height / 2 + 14);
+    if (ui.terrainMapSummary) ui.terrainMapSummary.textContent = 'Terrain Map：暂无数据。请先生成地形。';
+    if (ui.terrainMapLegend) ui.terrainMapLegend.innerHTML = '<div class="terrainMapLegendMeta">暂无可显示的图例。</div>';
+    if (ui.terrainMapInlineSummary) ui.terrainMapInlineSummary.textContent = (ui.terrainMapWindow && ui.terrainMapWindow.hidden === false) ? 'Terrain Map：已打开，但当前没有地形数据。' : 'Terrain Map：尚未打开。';
+    return { ok: true, empty: true, source: String(source || 'terrain-map:render-empty') };
+  }
+  var maxCanvasSize = 520;
+  var maxDim = Math.max(width, height);
+  var cellSize = Math.max(3, Math.floor(maxCanvasSize / Math.max(1, maxDim)));
+  if (maxDim <= 24) cellSize = Math.max(cellSize, 18);
+  else if (maxDim <= 48) cellSize = Math.max(cellSize, 10);
+  canvas.width = Math.max(1, width * cellSize);
+  canvas.height = Math.max(1, height * cellSize);
+  ctx2d.imageSmoothingEnabled = false;
+  ctx2d.clearRect(0, 0, canvas.width, canvas.height);
+  for (var x = 0; x < width; x++) {
+    var col = Array.isArray(heightMap[x]) ? heightMap[x] : [];
+    for (var y = 0; y < height; y++) {
+      var h = Number(col[y]) || 0;
+      ctx2d.fillStyle = mode === 'biome' ? uiResolveTerrainBiomeColor(h, x, y, runtime) : uiResolveTerrainHeightColor(h, runtime);
+      ctx2d.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+      if (cellSize >= 8) {
+        ctx2d.strokeStyle = 'rgba(8,12,20,.22)';
+        ctx2d.strokeRect(x * cellSize + 0.5, y * cellSize + 0.5, cellSize - 1, cellSize - 1);
+      }
+    }
+  }
+  var summary = runtime.lastSummary || {};
+  if (ui.terrainMapSummary) {
+    ui.terrainMapSummary.textContent = 'Terrain Map：batch=' + String(summary.terrainBatchId || '-') + ' · size=' + width + '×' + height + ' · min/max=' + String(summary.minHeightObserved != null ? summary.minHeightObserved : '?') + '/' + String(summary.maxHeightObserved != null ? summary.maxHeightObserved : '?') + ' · mode=' + mode;
+  }
+  if (ui.terrainMapInlineSummary) {
+    ui.terrainMapInlineSummary.textContent = 'Terrain Map：' + ((ui.terrainMapWindow && ui.terrainMapWindow.hidden === false) ? '已打开' : '未打开') + ' · size=' + width + '×' + height + ' · mode=' + mode;
+  }
+  uiBuildTerrainMapLegend(mode, runtime);
+  return { ok: true, width: width, height: height, cellSize: cellSize, mode: mode, source: String(source || 'terrain-map:render') };
+}
+
 function uiRefreshMainTerrainPanel(source) {
   var settings = uiGetMainTerrainSettings(source || 'terrain-panel:refresh') || null;
   if (!settings) return null;
@@ -913,6 +1149,8 @@ function uiRefreshMainTerrainPanel(source) {
   if (ui.terrainDetails) {
     try { ui.terrainDetails.textContent = JSON.stringify(settings, null, 2); } catch (_) { ui.terrainDetails.textContent = String(settings); }
   }
+  uiSyncTerrainMapColorMode(source || 'terrain-panel:refresh');
+  if (ui.terrainMapWindow && ui.terrainMapWindow.hidden === false) uiRenderTerrainMapWindow((source || 'terrain-panel:refresh') + ':terrain-map');
   return settings;
 }
 
@@ -1025,6 +1263,12 @@ if (typeof document !== 'undefined' && document.querySelectorAll) {
 safeListen(ui.terrainGenerate, 'click', () => uiHandleTerrainGenerate('terrain-panel:generate'));
 safeListen(ui.terrainClear, 'click', () => uiHandleTerrainClear('terrain-panel:clear'));
 safeListen(ui.terrainResetParams, 'click', () => uiHandleTerrainReset('terrain-panel:reset'));
+safeListen(ui.terrainMapToggle, 'click', () => uiHandleTerrainMapToggle('terrain-panel:map-toggle'));
+safeListen(ui.terrainMapRefresh, 'click', () => uiRenderTerrainMapWindow('terrain-panel:map-refresh'));
+safeListen(ui.terrainMapClose, 'click', () => uiHandleTerrainMapClose('terrain-panel:map-close'));
+safeListen(ui.terrainMapWindowRefresh, 'click', () => uiRenderTerrainMapWindow('terrain-panel:map-window-refresh'));
+safeListen(ui.terrainMapColorMode, 'change', () => { uiSyncTerrainMapColorMode('terrain-panel:map-color-mode'); uiRenderTerrainMapWindow('terrain-panel:map-color-mode'); });
+safeListen(ui.terrainMapWindowColorMode, 'change', () => { uiSyncTerrainMapColorMode('terrain-panel:map-window-color-mode'); uiRenderTerrainMapWindow('terrain-panel:map-window-color-mode'); });
 safeListen(ui.terrainBuildColorMode, 'change', () => uiHandleTerrainBuildColorModeChange('terrain-panel:build-color-mode'));
 safeListen(ui.terrainBuildLightingBypass, 'change', () => uiHandleTerrainBuildLightingBypassToggle('terrain-panel:build-lighting-bypass'));
 safeListen(ui.terrainDetailedProfilingEnabled, 'change', () => uiHandleTerrainDetailedProfilingToggle('terrain-panel:detailed-terrain-profiling'));

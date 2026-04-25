@@ -451,6 +451,22 @@
           <div id="terrainSummary" class="hintBox">Terrain：尚未生成。</div>
           <pre id="terrainDetails" class="inspectorPre"></pre>
         </div>
+
+        <div class="group inspectorGroup">
+          <h2>大地图 / Terrain Map</h2>
+          <div class="hintBox">根据当前生成好的地形高度图，绘制一张 2D 大地图。点击按钮打开悬浮窗；可切换“高度着色”和“地貌/材质着色”。后续也可以继续扩展到更细的草地、雪山、沙地等显示。</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <button id="terrainMapToggle">Open Terrain Map</button>
+            <button id="terrainMapRefresh">Refresh Map</button>
+            <label>Color Mode
+              <select id="terrainMapColorMode">
+                <option value="height" selected>Height / 高度</option>
+                <option value="biome">Biome / 地貌材质</option>
+              </select>
+            </label>
+          </div>
+          <div id="terrainMapInlineSummary" class="hintBox">Terrain Map：尚未打开。</div>
+        </div>
       </div>
       </section>
 
@@ -645,7 +661,35 @@
   <script src="src/infrastructure/logging/p0-phase-logger.js"></script>
   <script src="src/infrastructure/bootstrap/app-namespace.js"></script>
   <script src="src/infrastructure/audit/architecture-layer-audit.js"></script>
-  <script src="src/core/state/state-owner-map.js"></script>
+    <div id="terrainMapWindow" class="terrainMapWindow" hidden>
+    <div class="terrainMapWindowHeader">
+      <div>
+        <strong>Terrain Map</strong>
+        <div class="terrainMapWindowSub">根据已生成地形绘制的 2D 大地图</div>
+      </div>
+      <div class="terrainMapWindowActions">
+        <label>Color
+          <select id="terrainMapWindowColorMode">
+            <option value="height" selected>Height</option>
+            <option value="biome">Biome</option>
+          </select>
+        </label>
+        <button id="terrainMapWindowRefresh" type="button">Refresh</button>
+        <button id="terrainMapClose" type="button">×</button>
+      </div>
+    </div>
+    <div class="terrainMapWindowBody">
+      <div class="terrainMapCanvasWrap">
+        <canvas id="terrainMapCanvas" width="512" height="512"></canvas>
+      </div>
+      <div class="terrainMapSidePanel">
+        <div id="terrainMapSummary" class="hintBox">Terrain Map：暂无数据。</div>
+        <div id="terrainMapLegend" class="terrainMapLegend"></div>
+      </div>
+    </div>
+  </div>
+
+<script src="src/core/state/state-owner-map.js"></script>
   <script src="src/core/state/state-selectors.js"></script>
   <script src="src/infrastructure/audit/placement-route-audit.js"></script>
   <script src="src/infrastructure/audit/runtime-route-audit.js"></script>

@@ -1,90 +1,90 @@
-[P0][BOOT] server-starting {"latestLogFile": "logs\\server\\server-main-latest.log", "logFile": "logs\\server\\server-main-20260425-160306.log", "port": 3206, "role": "main", "root": "D:\\Document\\Github\\Isometric-2D-Engine-Demo"}
+[P0][BOOT] server-starting {"latestLogFile": "logs\\server\\server-main-latest.log", "logFile": "logs\\server\\server-main-20260425-165453.log", "port": 46313, "role": "main", "root": "D:\\Document\\Github\\Isometric-2D-Engine-Demo"}
 [P0][BOUNDARY] routes-registered {"counts": {"GET": 11, "POST": 5}, "routes": {"GET": ["/api/health", "/api/prefabs/index", "/api/habbo/config", "/api/habbo/index", "/api/habbo/library/index", "/api/habbo/library/summary", "/api/habbo/library/page", "/api/habbo/library/icon", "/api/habbo/file", "/api/scenes/default", "/api/scenes/load"], "POST": ["/api/prefabs/save", "/api/scenes/save", "/api/habbo/config", "/api/self-check/report", "/api/self-check/text-report"]}}
 [P0][SUMMARY] server-paths {"habboRootMeta": "config\\habbo_asset_root.json", "prefabDir": "assets\\prefabs", "sceneDir": "assets\\scenes"}
 [P1][BOOT] source-of-truth-ready {"deprecatedRootFiles": ["app.js", "state.js", "app-shell.js", "lighting-editor.js"], "server": "server/local_server.py", "sourceDoc": "001_SOURCE_OF_TRUTH.md"}
-[P1][SUMMARY] phase-ready {"canonicalServerPath": "server\\local_server.py", "currentLogFile": "logs\\server\\server-main-20260425-160306.log", "hasRootLocalServer": false, "latestLogFile": "logs\\server\\server-main-latest.log", "phase": "P1", "root": "D:\\Document\\Github\\Isometric-2D-Engine-Demo", "serverLogDir": "logs\\server"}
+[P1][SUMMARY] phase-ready {"canonicalServerPath": "server\\local_server.py", "currentLogFile": "logs\\server\\server-main-20260425-165453.log", "hasRootLocalServer": false, "latestLogFile": "logs\\server\\server-main-latest.log", "phase": "P1", "root": "D:\\Document\\Github\\Isometric-2D-Engine-Demo", "serverLogDir": "logs\\server"}
 [P2][SUMMARY] namespace-bootstrap {"backendOwnershipChanged": false, "frontendOwnsNamespaceBootstrap": true, "notes": ["emit explanatory P2 summary only", "no backend behavior changes"], "phase": "P2-A-fix", "scope": "server-observability-only"}
-Serving D:\Document\Github\Isometric-2D-Engine-Demo at http://127.0.0.1:3206 role=main
+Serving D:\Document\Github\Isometric-2D-Engine-Demo at http://127.0.0.1:46313 role=main
 [P0][BOUNDARY] json-response {"method": "GET", "path": "/api/health", "status": 200}
-127.0.0.1 - - [25/Apr/2026 16:03:07] "GET /api/health HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /index.html?v=20260323P-ui-button-iconfix HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /styles/main.css HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/infrastructure/logging/logging.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/infrastructure/logging/p0-phase-logger.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/infrastructure/audit/architecture-layer-audit.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/infrastructure/bootstrap/app-namespace.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/core/state/state-owner-map.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/core/state/state-selectors.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/infrastructure/audit/placement-route-audit.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/infrastructure/audit/runtime-route-audit.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/application/placement/placement.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/core/scene/scene-keys.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/presentation/lighting/lighting-editor.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/core/lighting/lighting-state.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/presentation/lighting/lighting-render.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/presentation/lighting/lighting.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/core/state/prefab-registry.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/core/state/runtime-state.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/core/state/scene-session-state.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/presentation/shell/dom-registry.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/application/state/state-actions.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/infrastructure/adapters/placement-effects.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/core/domain/scene-domain-core.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/core/domain/view-rotation-core.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/core/domain/render-face-oracle-core.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/core/domain/item-facing-core.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/core/domain/terrain-generator-core.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/core/domain/terrain-material-core.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/core/domain/occupancy-reader-core.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/core/domain/render-visibility-core.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/core/domain/static-world-face-merge-core.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/core/domain/terrain-face-merge-core.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/infrastructure/logging/item-rotation-diagnostic-log.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/core/domain/portable-core.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/infrastructure/legacy/state.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/infrastructure/services/scene-api.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/infrastructure/bootstrap/core-domain-bindings.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/infrastructure/services/prefab-api.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/infrastructure/services/habbo-api.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/infrastructure/services/asset-api.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/infrastructure/services/editor-handoff-api.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/application/assets/asset-import.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/infrastructure/assets/asset-management.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/infrastructure/storage/scene-storage.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/application/controllers/app-controllers.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/infrastructure/legacy/placement-legacy-bridge.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/infrastructure/self-check/self-check.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/application/player/player.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/presentation/ui/ui-inspectors.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/presentation/ui/ui-tabs.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/presentation/ui/ui-habbo-library.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/presentation/ui/ui.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/presentation/render/logic.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/presentation/render/static-world-cache.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/presentation/render/renderer/canvas2d-renderer.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/presentation/render/render.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/presentation/shell/app-shell.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/presentation/shell/app.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /src/infrastructure/self-check/scenario-runner.js HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:08] "GET /assets/chibi_walk.png HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:54] "GET /api/health HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /index.html?v=20260323P-ui-button-iconfix HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /styles/main.css HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/infrastructure/logging/logging.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/infrastructure/logging/p0-phase-logger.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/infrastructure/bootstrap/app-namespace.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/infrastructure/audit/architecture-layer-audit.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/core/state/state-owner-map.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/core/state/state-selectors.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/infrastructure/audit/placement-route-audit.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/core/lighting/lighting-state.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/application/placement/placement.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/infrastructure/audit/runtime-route-audit.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/core/scene/scene-keys.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/presentation/lighting/lighting-editor.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/presentation/lighting/lighting-render.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/presentation/lighting/lighting.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/presentation/shell/dom-registry.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/core/state/runtime-state.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/application/state/state-actions.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/core/state/scene-session-state.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/core/state/prefab-registry.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/infrastructure/adapters/placement-effects.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/core/domain/scene-domain-core.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/core/domain/view-rotation-core.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/core/domain/item-facing-core.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/core/domain/render-face-oracle-core.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/core/domain/terrain-generator-core.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/core/domain/terrain-material-core.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/core/domain/render-visibility-core.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/core/domain/occupancy-reader-core.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/core/domain/terrain-face-merge-core.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/core/domain/static-world-face-merge-core.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/infrastructure/logging/item-rotation-diagnostic-log.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/core/domain/portable-core.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/infrastructure/bootstrap/core-domain-bindings.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/infrastructure/legacy/state.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/infrastructure/services/prefab-api.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/infrastructure/services/scene-api.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/infrastructure/services/habbo-api.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/infrastructure/services/asset-api.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/infrastructure/services/editor-handoff-api.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/infrastructure/assets/asset-management.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/infrastructure/storage/scene-storage.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/application/assets/asset-import.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/application/controllers/app-controllers.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/infrastructure/legacy/placement-legacy-bridge.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/infrastructure/self-check/self-check.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/application/player/player.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/presentation/ui/ui-tabs.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/presentation/ui/ui-habbo-library.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/presentation/ui/ui-inspectors.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/presentation/ui/ui.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/presentation/render/logic.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/presentation/render/static-world-cache.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/presentation/render/render.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/presentation/render/renderer/canvas2d-renderer.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/presentation/shell/app-shell.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/presentation/shell/app.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /src/infrastructure/self-check/scenario-runner.js HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /assets/chibi_walk.png HTTP/1.1" 200 -
 [P0][BOUNDARY] json-response {"method": "GET", "path": "/api/habbo/config", "status": 200}
-127.0.0.1 - - [25/Apr/2026 16:03:09] "GET /api/habbo/config?t=1777104188969&reqId=1 HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:54:56] "GET /api/habbo/config?t=1777107296826&reqId=1 HTTP/1.1" 200 -
+[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/prefabs/index", "status": 200}
+127.0.0.1 - - [25/Apr/2026 16:54:59] "GET /api/prefabs/index?t=1777107299872&reqId=1 HTTP/1.1" 200 -
 [P0][BOUNDARY] json-response {"method": "GET", "path": "/api/scenes/default", "status": 200}
-127.0.0.1 - - [25/Apr/2026 16:03:11] "GET /api/scenes/default HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:11] code 404, message File not found
-127.0.0.1 - - [25/Apr/2026 16:03:11] "GET /favicon.ico HTTP/1.1" 404 -
+127.0.0.1 - - [25/Apr/2026 16:55:00] "GET /api/scenes/default HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:55:00] "GET /assets/prefabs/Custom%20Prefab%20YOR3YS.json?t=1776744689000 HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:55:00] code 404, message File not found
+127.0.0.1 - - [25/Apr/2026 16:55:00] "GET /favicon.ico HTTP/1.1" 404 -
 [P0][BOUNDARY] json-response {"method": "GET", "path": "/api/health", "status": 200}
-127.0.0.1 - - [25/Apr/2026 16:03:11] "GET /api/health?t=1777104191346 HTTP/1.1" 200 -
-[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/prefabs/index", "status": 200}
-127.0.0.1 - - [25/Apr/2026 16:03:11] "GET /api/prefabs/index?t=1777104191340&reqId=1 HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:11] "GET /assets/prefabs/Custom%20Prefab%20YOR3YS.json?t=1776744689000 HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:55:00] "GET /api/health?t=1777107300677 HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:55:00] "GET /assets/prefabs/Custom%20Prefab%20YOWU6L.json?t=1776744689000 HTTP/1.1" 200 -
 [P0][BOUNDARY] json-response {"method": "GET", "path": "/api/scenes/default", "status": 200}
-127.0.0.1 - - [25/Apr/2026 16:03:11] "GET /api/scenes/default HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:11] "GET /assets/prefabs/Custom%20Prefab%20YOWU6L.json?t=1776744689000 HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:55:00] "GET /api/scenes/default HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:55:00] "GET /assets/prefabs/stair_3step.json?t=1776744689000 HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:55:00] "GET /assets/prefabs/t_shape.json?t=1776744689000 HTTP/1.1" 200 -
 [P0][BOUNDARY] json-response {"method": "GET", "path": "/api/prefabs/index", "status": 200}
-127.0.0.1 - - [25/Apr/2026 16:03:11] "GET /api/prefabs/index?t=1777104191604&reqId=p0-prefab-index HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:11] "GET /assets/prefabs/stair_3step.json?t=1776744689000 HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:11] "GET /assets/prefabs/t_shape.json?t=1776744689000 HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:55:00] "GET /api/prefabs/index?t=1777107300795&reqId=p0-prefab-index HTTP/1.1" 200 -
 [habbo-diag] endpoint:summary reqId=p0-habbo-summary root=E:\hzh\02_”È¿÷\Habbo\habbofurni_models_classified
 [habbo-diag] direct-index:read:start root=E:\hzh\02_”È¿÷\Habbo\habbofurni_models_classified file=E:\hzh\02_”È¿÷\Habbo\habbofurni_models_classified\index.json
 [habbo-diag] direct-index:read:done root=E:\hzh\02_”È¿÷\Habbo\habbofurni_models_classified bytes=9416225
@@ -97,18 +97,14 @@ Serving D:\Document\Github\Isometric-2D-Engine-Demo at http://127.0.0.1:3206 rol
 [habbo-diag] direct-summary:progress root=E:\hzh\02_”È¿÷\Habbo\habbofurni_models_classified scanned=17464/17464 total=17464
 [habbo-diag] endpoint:summary result reqId=p0-habbo-summary branch=derive-from-index-records-fast rootCount=17464 indexExists=True indexSize=9678186 payloadKind=list recordSource=root-list itemsFieldKind=list-self itemsFieldCount=17464 totalItemsField=0 topKeys=[] summaryKeys=[] firstRecordKeys=['category', 'classname', 'dest_dir', 'furni_id', 'furni_line', 'has_icon', 'has_swf', 'revision', 'source_icon', 'source_swf', 'special_type', 'status', 'type']
 [P0][BOUNDARY] json-response {"method": "GET", "path": "/api/habbo/library/summary", "status": 200}
-127.0.0.1 - - [25/Apr/2026 16:03:12] "GET /api/habbo/library/summary?t=1777104191683&reqId=p0-habbo-summary HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:55:01] "GET /api/habbo/library/summary?t=1777107300907&reqId=p0-habbo-summary HTTP/1.1" 200 -
 [habbo-diag] endpoint:page reqId=p0-habbo-page root=E:\hzh\02_”È¿÷\Habbo\habbofurni_models_classified type=room category=all search='' page=1 pageSize=1
 [habbo-diag] endpoint:page probe reqId=p0-habbo-page branch=prefer-existing-index-page rootCount=17464 indexExists=True indexSize=9678186 payloadKind=list recordSource=root-list itemsFieldKind=list-self itemsFieldCount=17464 totalItemsField=0 topKeys=[] summaryKeys=[] firstRecordKeys=['category', 'classname', 'dest_dir', 'furni_id', 'furni_line', 'has_icon', 'has_swf', 'revision', 'source_icon', 'source_swf', 'special_type', 'status', 'type']
 [habbo-diag] direct-page:progress root=E:\hzh\02_”È¿÷\Habbo\habbofurni_models_classified scanned=1/17464 matched=1
-[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/prefabs/index", "status": 200}
-127.0.0.1 - - [25/Apr/2026 16:03:15] "GET /api/prefabs/index?t=1777104195277&reqId=2 HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:15] "GET /assets/prefabs/stair_3step.json?t=1776744689000 HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2026 16:03:16] "GET /assets/prefabs/t_shape.json?t=1776744689000 HTTP/1.1" 200 -
 [habbo-diag] direct-page:progress root=E:\hzh\02_”È¿÷\Habbo\habbofurni_models_classified scanned=5000/17464 matched=4840
 [habbo-diag] direct-page:progress root=E:\hzh\02_”È¿÷\Habbo\habbofurni_models_classified scanned=10000/17464 matched=9578
 [habbo-diag] direct-page:progress root=E:\hzh\02_”È¿÷\Habbo\habbofurni_models_classified scanned=15000/17464 matched=14358
 [habbo-diag] direct-page:progress root=E:\hzh\02_”È¿÷\Habbo\habbofurni_models_classified scanned=17464/17464 matched=16662
 [habbo-diag] endpoint:page result reqId=p0-habbo-page branch=query-existing-index-page-fast rootCount=17464 indexExists=True indexSize=9678186 payloadKind=list recordSource=root-list itemsFieldKind=list-self itemsFieldCount=17464 totalItemsField=0 topKeys=[] summaryKeys=[] firstRecordKeys=['category', 'classname', 'dest_dir', 'furni_id', 'furni_line', 'has_icon', 'has_swf', 'revision', 'source_icon', 'source_swf', 'special_type', 'status', 'type']
 [P0][BOUNDARY] json-response {"method": "GET", "path": "/api/habbo/library/page", "status": 200}
-127.0.0.1 - - [25/Apr/2026 16:03:35] "GET /api/habbo/library/page?type=room&category=all&page=1&pageSize=1&t=1777104192117&reqId=p0-habbo-page HTTP/1.1" 200 -
+127.0.0.1 - - [25/Apr/2026 16:55:40] "GET /api/habbo/library/page?type=room&category=all&page=1&pageSize=1&t=1777107301565&reqId=p0-habbo-page HTTP/1.1" 200 -
