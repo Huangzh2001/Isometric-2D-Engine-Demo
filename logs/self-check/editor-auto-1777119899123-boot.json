@@ -1,0 +1,41 @@
+{
+  "phase": "P8X",
+  "owner": "AUTO_EDITOR_SAVE_X5.html",
+  "kind": "editor-auto",
+  "tag": "boot",
+  "sessionId": "1777119899123",
+  "autoScenario": "save-x5",
+  "href": "http://127.0.0.1:4013/AUTO_EDITOR_SAVE_X5.html?fromMain=1&autoScenario=save-x5&replaySession=1777119899123",
+  "at": "2026-04-25T12:25:15.044Z",
+  "payload": {
+    "readyState": "loading"
+  },
+  "platformBoundary": {
+    "label": "boot",
+    "prefabApi": {
+      "owner": "src/infrastructure/services/prefab-api.js",
+      "label": "boot",
+      "counters": {
+        "fetchIndexCalls": 0,
+        "savePrefabToServerCalls": 0,
+        "listBrowserLibraryCalls": 0,
+        "savePrefabToBrowserLibraryCalls": 0,
+        "errors": 0
+      },
+      "lastEvent": null,
+      "recentEvents": []
+    },
+    "editorHandoff": {
+      "owner": "src/infrastructure/services/editor-handoff-api.js",
+      "label": "boot",
+      "counters": {
+        "readCalls": 0,
+        "clearCalls": 0,
+        "writeCalls": 0,
+        "errors": 0
+      },
+      "lastEvent": null,
+      "recentEvents": []
+    }
+  }
+}

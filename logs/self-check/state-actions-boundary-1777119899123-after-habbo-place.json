@@ -1,0 +1,218 @@
+{
+  "phase": "P8X",
+  "owner": "src/infrastructure/self-check/scenario-runner.js",
+  "sessionId": "1777119899123",
+  "entry": {
+    "kind": "main",
+    "label": "主程序",
+    "entryFile": "index.html",
+    "launcherHint": "start.bat",
+    "build": "20260326-shadow-controls-v8"
+  },
+  "query": "?acceptanceReplay=1",
+  "kind": "state-actions-boundary",
+  "stage": "after-habbo-place",
+  "summary": {
+    "phase": "P19-SA",
+    "owner": "src/application/state/state-actions.js",
+    "label": "after-habbo-place",
+    "available": true,
+    "counters": {
+      "runtimeStateHits": 2,
+      "selectorHits": 12,
+      "prefabRegistryHits": 2,
+      "legacyGlobalHits": 0,
+      "oldEntryHits": 0,
+      "fallbackCount": 0
+    },
+    "lastEvent": {
+      "at": "2026-04-25T12:25:08.566Z",
+      "kind": "selector",
+      "route": "state.selectors.getEditorMode",
+      "detail": {
+        "mode": "place",
+        "source": "state-actions:readEditorMode"
+      }
+    },
+    "lastFallback": null,
+    "recentEvents": [
+      {
+        "at": "2026-04-25T12:25:08.565Z",
+        "kind": "selector",
+        "route": "state.selectors.getSelectedPrototypeIndex",
+        "detail": {
+          "index": 0,
+          "source": "state-actions:readSelectedPrototypeIndex"
+        }
+      },
+      {
+        "at": "2026-04-25T12:25:08.565Z",
+        "kind": "selector",
+        "route": "state.selectors.getSelectedPrefabId",
+        "detail": {
+          "prefabId": "debug_cube_5faces",
+          "source": "state-actions:readSelectedPrefabId"
+        }
+      },
+      {
+        "at": "2026-04-25T12:25:08.566Z",
+        "kind": "prefab-registry",
+        "route": "state.prefabRegistry.setSelectedPrefabId",
+        "detail": {
+          "source": "ui-habbo-library:place-selected:prefab-id",
+          "prefabId": "habbo_room_bed_ad_sales_ads_spang_sleep_ads_spang_sleep",
+          "result": 11
+        }
+      },
+      {
+        "at": "2026-04-25T12:25:08.566Z",
+        "kind": "selector",
+        "route": "state.selectors.getSelectedPrototypeIndex",
+        "detail": {
+          "index": 11,
+          "source": "state-actions:readSelectedPrototypeIndex"
+        }
+      },
+      {
+        "at": "2026-04-25T12:25:08.566Z",
+        "kind": "selector",
+        "route": "state.selectors.getSelectedPrefabId",
+        "detail": {
+          "prefabId": "habbo_room_bed_ad_sales_ads_spang_sleep_ads_spang_sleep",
+          "source": "state-actions:readSelectedPrefabId"
+        }
+      },
+      {
+        "at": "2026-04-25T12:25:08.566Z",
+        "kind": "selector",
+        "route": "state.selectors.getEditorMode",
+        "detail": {
+          "mode": "view",
+          "source": "state-actions:readEditorMode"
+        }
+      },
+      {
+        "at": "2026-04-25T12:25:08.566Z",
+        "kind": "runtime-state",
+        "route": "state.runtimeState.setEditorModeValue",
+        "detail": {
+          "source": "ui-habbo-library:place-selected:mode",
+          "mode": "place"
+        }
+      },
+      {
+        "at": "2026-04-25T12:25:08.566Z",
+        "kind": "selector",
+        "route": "state.selectors.getEditorMode",
+        "detail": {
+          "mode": "place",
+          "source": "state-actions:readEditorMode"
+        }
+      }
+    ],
+    "recentFallbacks": []
+  },
+  "extra": {
+    "step": "state-actions-boundary-after-habbo-place",
+    "detail": {
+      "phase": "P19-SA",
+      "owner": "src/application/state/state-actions.js",
+      "label": "after-habbo-place",
+      "available": true,
+      "counters": {
+        "runtimeStateHits": 2,
+        "selectorHits": 12,
+        "prefabRegistryHits": 2,
+        "legacyGlobalHits": 0,
+        "oldEntryHits": 0,
+        "fallbackCount": 0
+      },
+      "lastEvent": {
+        "at": "2026-04-25T12:25:08.566Z",
+        "kind": "selector",
+        "route": "state.selectors.getEditorMode",
+        "detail": {
+          "mode": "place",
+          "source": "state-actions:readEditorMode"
+        }
+      },
+      "lastFallback": null,
+      "recentEvents": [
+        {
+          "at": "2026-04-25T12:25:08.565Z",
+          "kind": "selector",
+          "route": "state.selectors.getSelectedPrototypeIndex",
+          "detail": {
+            "index": 0,
+            "source": "state-actions:readSelectedPrototypeIndex"
+          }
+        },
+        {
+          "at": "2026-04-25T12:25:08.565Z",
+          "kind": "selector",
+          "route": "state.selectors.getSelectedPrefabId",
+          "detail": {
+            "prefabId": "debug_cube_5faces",
+            "source": "state-actions:readSelectedPrefabId"
+          }
+        },
+        {
+          "at": "2026-04-25T12:25:08.566Z",
+          "kind": "prefab-registry",
+          "route": "state.prefabRegistry.setSelectedPrefabId",
+          "detail": {
+            "source": "ui-habbo-library:place-selected:prefab-id",
+            "prefabId": "habbo_room_bed_ad_sales_ads_spang_sleep_ads_spang_sleep",
+            "result": 11
+          }
+        },
+        {
+          "at": "2026-04-25T12:25:08.566Z",
+          "kind": "selector",
+          "route": "state.selectors.getSelectedPrototypeIndex",
+          "detail": {
+            "index": 11,
+            "source": "state-actions:readSelectedPrototypeIndex"
+          }
+        },
+        {
+          "at": "2026-04-25T12:25:08.566Z",
+          "kind": "selector",
+          "route": "state.selectors.getSelectedPrefabId",
+          "detail": {
+            "prefabId": "habbo_room_bed_ad_sales_ads_spang_sleep_ads_spang_sleep",
+            "source": "state-actions:readSelectedPrefabId"
+          }
+        },
+        {
+          "at": "2026-04-25T12:25:08.566Z",
+          "kind": "selector",
+          "route": "state.selectors.getEditorMode",
+          "detail": {
+            "mode": "view",
+            "source": "state-actions:readEditorMode"
+          }
+        },
+        {
+          "at": "2026-04-25T12:25:08.566Z",
+          "kind": "runtime-state",
+          "route": "state.runtimeState.setEditorModeValue",
+          "detail": {
+            "source": "ui-habbo-library:place-selected:mode",
+            "mode": "place"
+          }
+        },
+        {
+          "at": "2026-04-25T12:25:08.566Z",
+          "kind": "selector",
+          "route": "state.selectors.getEditorMode",
+          "detail": {
+            "mode": "place",
+            "source": "state-actions:readEditorMode"
+          }
+        }
+      ],
+      "recentFallbacks": []
+    }
+  }
+}

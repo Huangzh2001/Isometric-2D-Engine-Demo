@@ -1,0 +1,25 @@
+{
+  "phase": "P8X",
+  "owner": "START_V18_ONLY.html",
+  "kind": "editor-normal-health",
+  "tag": "html-before-script",
+  "ok": true,
+  "sessionId": "1777119899123",
+  "entry": {
+    "kind": "editor",
+    "label": "编辑器",
+    "entryFile": "START_V18_ONLY.html",
+    "launcherHint": "start_editor.bat",
+    "build": "20260320-v18-box-occlusion"
+  },
+  "query": "?fromMain=1&healthCheck=1&replaySession=1777119899123",
+  "generatedAt": "2026-04-25T12:30:37.352Z",
+  "details": {
+    "href": "http://127.0.0.1:4013/START_V18_ONLY.html?fromMain=1&healthCheck=1&replaySession=1777119899123"
+  },
+  "platformBoundary": {
+    "label": "html-before-script",
+    "prefabApi": null,
+    "editorHandoff": null
+  }
+}

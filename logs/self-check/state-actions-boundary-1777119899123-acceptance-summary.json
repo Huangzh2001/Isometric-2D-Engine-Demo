@@ -1,0 +1,217 @@
+{
+  "phase": "P8X",
+  "owner": "src/infrastructure/self-check/scenario-runner.js",
+  "sessionId": "1777119899123",
+  "entry": {
+    "kind": "main",
+    "label": "主程序",
+    "entryFile": "index.html",
+    "launcherHint": "start.bat",
+    "build": "20260326-shadow-controls-v8"
+  },
+  "query": "?fromEditor=1&t=1777119917081&reason=scenario-editor-save&prefabId=auto_x5_777119899123",
+  "kind": "state-actions-boundary",
+  "stage": "acceptance-summary",
+  "summary": {
+    "phase": "P19-SA",
+    "owner": "src/application/state/state-actions.js",
+    "label": "acceptance-summary",
+    "available": true,
+    "counters": {
+      "runtimeStateHits": 14,
+      "selectorHits": 39,
+      "prefabRegistryHits": 2,
+      "legacyGlobalHits": 0,
+      "oldEntryHits": 0,
+      "fallbackCount": 0
+    },
+    "lastEvent": {
+      "at": "2026-04-25T12:30:08.396Z",
+      "kind": "selector",
+      "route": "state.selectors.getEditorMode",
+      "detail": {
+        "mode": "view",
+        "source": "state-actions:readEditorMode"
+      }
+    },
+    "lastFallback": null,
+    "recentEvents": [
+      {
+        "at": "2026-04-25T12:29:47.638Z",
+        "kind": "runtime-state",
+        "route": "state.runtimeState.setEditorModeValue",
+        "detail": {
+          "source": "ui.modeView.click",
+          "mode": "view"
+        }
+      },
+      {
+        "at": "2026-04-25T12:29:47.638Z",
+        "kind": "selector",
+        "route": "state.selectors.getEditorMode",
+        "detail": {
+          "mode": "view",
+          "source": "state-actions:readEditorMode"
+        }
+      },
+      {
+        "at": "2026-04-25T12:30:01.317Z",
+        "kind": "selector",
+        "route": "state.selectors.getEditorMode",
+        "detail": {
+          "mode": "view",
+          "source": "state-actions:readEditorMode"
+        }
+      },
+      {
+        "at": "2026-04-25T12:30:01.317Z",
+        "kind": "runtime-state",
+        "route": "state.runtimeState.setEditorModeValue",
+        "detail": {
+          "source": "replay:terrain-navigation-post-wheel:request-view",
+          "mode": "view"
+        }
+      },
+      {
+        "at": "2026-04-25T12:30:01.317Z",
+        "kind": "selector",
+        "route": "state.selectors.getEditorMode",
+        "detail": {
+          "mode": "view",
+          "source": "state-actions:readEditorMode"
+        }
+      },
+      {
+        "at": "2026-04-25T12:30:08.396Z",
+        "kind": "selector",
+        "route": "state.selectors.getEditorMode",
+        "detail": {
+          "mode": "view",
+          "source": "state-actions:readEditorMode"
+        }
+      },
+      {
+        "at": "2026-04-25T12:30:08.396Z",
+        "kind": "runtime-state",
+        "route": "state.runtimeState.setEditorModeValue",
+        "detail": {
+          "source": "ui.modeView.click",
+          "mode": "view"
+        }
+      },
+      {
+        "at": "2026-04-25T12:30:08.396Z",
+        "kind": "selector",
+        "route": "state.selectors.getEditorMode",
+        "detail": {
+          "mode": "view",
+          "source": "state-actions:readEditorMode"
+        }
+      }
+    ],
+    "recentFallbacks": []
+  },
+  "extra": {
+    "summaryField": "stateActionsBoundary",
+    "detail": {
+      "phase": "P19-SA",
+      "owner": "src/application/state/state-actions.js",
+      "label": "acceptance-summary",
+      "available": true,
+      "counters": {
+        "runtimeStateHits": 14,
+        "selectorHits": 39,
+        "prefabRegistryHits": 2,
+        "legacyGlobalHits": 0,
+        "oldEntryHits": 0,
+        "fallbackCount": 0
+      },
+      "lastEvent": {
+        "at": "2026-04-25T12:30:08.396Z",
+        "kind": "selector",
+        "route": "state.selectors.getEditorMode",
+        "detail": {
+          "mode": "view",
+          "source": "state-actions:readEditorMode"
+        }
+      },
+      "lastFallback": null,
+      "recentEvents": [
+        {
+          "at": "2026-04-25T12:29:47.638Z",
+          "kind": "runtime-state",
+          "route": "state.runtimeState.setEditorModeValue",
+          "detail": {
+            "source": "ui.modeView.click",
+            "mode": "view"
+          }
+        },
+        {
+          "at": "2026-04-25T12:29:47.638Z",
+          "kind": "selector",
+          "route": "state.selectors.getEditorMode",
+          "detail": {
+            "mode": "view",
+            "source": "state-actions:readEditorMode"
+          }
+        },
+        {
+          "at": "2026-04-25T12:30:01.317Z",
+          "kind": "selector",
+          "route": "state.selectors.getEditorMode",
+          "detail": {
+            "mode": "view",
+            "source": "state-actions:readEditorMode"
+          }
+        },
+        {
+          "at": "2026-04-25T12:30:01.317Z",
+          "kind": "runtime-state",
+          "route": "state.runtimeState.setEditorModeValue",
+          "detail": {
+            "source": "replay:terrain-navigation-post-wheel:request-view",
+            "mode": "view"
+          }
+        },
+        {
+          "at": "2026-04-25T12:30:01.317Z",
+          "kind": "selector",
+          "route": "state.selectors.getEditorMode",
+          "detail": {
+            "mode": "view",
+            "source": "state-actions:readEditorMode"
+          }
+        },
+        {
+          "at": "2026-04-25T12:30:08.396Z",
+          "kind": "selector",
+          "route": "state.selectors.getEditorMode",
+          "detail": {
+            "mode": "view",
+            "source": "state-actions:readEditorMode"
+          }
+        },
+        {
+          "at": "2026-04-25T12:30:08.396Z",
+          "kind": "runtime-state",
+          "route": "state.runtimeState.setEditorModeValue",
+          "detail": {
+            "source": "ui.modeView.click",
+            "mode": "view"
+          }
+        },
+        {
+          "at": "2026-04-25T12:30:08.396Z",
+          "kind": "selector",
+          "route": "state.selectors.getEditorMode",
+          "detail": {
+            "mode": "view",
+            "source": "state-actions:readEditorMode"
+          }
+        }
+      ],
+      "recentFallbacks": []
+    },
+    "status": "checkpoint:07-player-walk"
+  }
+}

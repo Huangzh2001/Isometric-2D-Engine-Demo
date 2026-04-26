@@ -1,0 +1,1177 @@
+{
+  "phase": "P8X",
+  "owner": "src/infrastructure/self-check/scenario-runner.js",
+  "sessionId": "1777119899123",
+  "entry": {
+    "kind": "main",
+    "label": "主程序",
+    "entryFile": "index.html",
+    "launcherHint": "start.bat",
+    "build": "20260326-shadow-controls-v8"
+  },
+  "query": "?acceptanceReplay=1",
+  "flow": {
+    "name": "01-baseline",
+    "startedAt": "2026-04-25T12:24:59.125Z",
+    "steps": [
+      {
+        "name": "bootstrap-wait",
+        "at": "2026-04-25T12:24:59.125Z",
+        "detail": {}
+      },
+      {
+        "name": "placement-dispatch-ready",
+        "at": "2026-04-25T12:24:59.125Z",
+        "detail": {
+          "hasControllersRoot": true,
+          "hasRootDispatch": true,
+          "hasPlacementDispatch": true,
+          "route": "controllers.dispatch"
+        }
+      },
+      {
+        "name": "counts",
+        "at": "2026-04-25T12:24:59.125Z",
+        "detail": {
+          "prefabs": 11,
+          "instances": 5,
+          "lights": 5
+        }
+      },
+      {
+        "name": "state-actions-reset",
+        "at": "2026-04-25T12:24:59.126Z",
+        "detail": {
+          "ok": true,
+          "summary": {
+            "phase": "P19-SA",
+            "owner": "src/application/state/state-actions.js",
+            "counters": {
+              "modeChangeCalls": 0,
+              "prefabSelectByIndexCalls": 0,
+              "prefabSelectByIdCalls": 0,
+              "modeFallbacks": 0,
+              "prefabFallbacks": 0
+            },
+            "lastModeChange": null,
+            "lastPrefabSelection": null,
+            "recentModeChanges": [],
+            "recentPrefabSelections": []
+          }
+        }
+      },
+      {
+        "name": "state-actions-boundary-reset",
+        "at": "2026-04-25T12:24:59.126Z",
+        "detail": {
+          "ok": true,
+          "summary": {
+            "phase": "P19-SA",
+            "owner": "src/application/state/state-actions.js",
+            "label": "replay:baseline-reset",
+            "available": true,
+            "counters": {
+              "runtimeStateHits": 0,
+              "selectorHits": 0,
+              "prefabRegistryHits": 0,
+              "legacyGlobalHits": 0,
+              "oldEntryHits": 0,
+              "fallbackCount": 0
+            },
+            "lastEvent": {
+              "at": "2026-04-25T12:24:59.126Z",
+              "kind": "reset",
+              "route": "state-actions.boundary.reset",
+              "detail": {
+                "source": "replay:baseline-reset",
+                "label": "replay:baseline-reset"
+              }
+            },
+            "lastFallback": null,
+            "recentEvents": [
+              {
+                "at": "2026-04-25T12:24:59.126Z",
+                "kind": "reset",
+                "route": "state-actions.boundary.reset",
+                "detail": {
+                  "source": "replay:baseline-reset",
+                  "label": "replay:baseline-reset"
+                }
+              }
+            ],
+            "recentFallbacks": []
+          }
+        }
+      },
+      {
+        "name": "application-boundary-reset",
+        "at": "2026-04-25T12:24:59.148Z",
+        "detail": {
+          "ok": true,
+          "summary": {
+            "owner": "src/application/controllers/app-controllers.js",
+            "phase": "P15-APP",
+            "label": "replay:baseline-reset",
+            "available": true,
+            "counters": {
+              "stateActionHits": 0,
+              "prefabRegistryHits": 0,
+              "runtimeStateHits": 0,
+              "serviceWorkflowHits": 0,
+              "selectorHits": 0,
+              "legacyGlobalHits": 0,
+              "fallbackCount": 0
+            },
+            "lastEvent": {
+              "at": "2026-04-25T12:24:59.148Z",
+              "kind": "reset",
+              "route": "application-boundary.reset",
+              "detail": {
+                "source": "replay:baseline-reset",
+                "label": "replay:baseline-reset"
+              }
+            },
+            "lastFallback": null,
+            "recentEvents": [
+              {
+                "at": "2026-04-25T12:24:59.148Z",
+                "kind": "reset",
+                "route": "application-boundary.reset",
+                "detail": {
+                  "source": "replay:baseline-reset",
+                  "label": "replay:baseline-reset"
+                }
+              }
+            ],
+            "recentFallbacks": []
+          }
+        }
+      },
+      {
+        "name": "asset-import-boundary-reset",
+        "at": "2026-04-25T12:24:59.148Z",
+        "detail": {
+          "ok": true,
+          "summary": {
+            "owner": "src/application/assets/asset-import.js",
+            "phase": "P16-ASSET",
+            "label": "replay:baseline-reset",
+            "available": true,
+            "counters": {
+              "stateActionHits": 0,
+              "prefabRegistryHits": 0,
+              "runtimeStateHits": 0,
+              "placementControllerHits": 0,
+              "selectorHits": 0,
+              "serviceWorkflowHits": 0,
+              "legacyGlobalHits": 0,
+              "fallbackCount": 0
+            },
+            "lastEvent": {
+              "at": "2026-04-25T12:24:59.148Z",
+              "kind": "reset",
+              "route": "asset-import-boundary.reset",
+              "detail": {
+                "source": "replay:baseline-reset",
+                "label": "replay:baseline-reset"
+              }
+            },
+            "lastFallback": null,
+            "recentEvents": [
+              {
+                "at": "2026-04-25T12:24:59.148Z",
+                "kind": "reset",
+                "route": "asset-import-boundary.reset",
+                "detail": {
+                  "source": "replay:baseline-reset",
+                  "label": "replay:baseline-reset"
+                }
+              }
+            ],
+            "recentFallbacks": []
+          }
+        }
+      },
+      {
+        "name": "placement-boundary-reset",
+        "at": "2026-04-25T12:24:59.148Z",
+        "detail": {
+          "ok": true,
+          "summary": {
+            "owner": "src/application/placement/placement.js",
+            "phase": "P20-PLACEMENT",
+            "label": "replay:baseline-reset",
+            "available": true,
+            "counters": {
+              "runtimeStateHits": 0,
+              "selectorHits": 0,
+              "placementEffectsHits": 0,
+              "routeAuditHits": 0,
+              "controllerHits": 0,
+              "ownerApiHits": 0,
+              "legacyGlobalHits": 0,
+              "compatExportHits": 0,
+              "compatHelperHits": 0,
+              "compatTotalHits": 0,
+              "fallbackCount": 0
+            },
+            "compatByName": {},
+            "compatMainPathExports": [
+              "startDragging",
+              "commitPreview",
+              "cancelDrag"
+            ],
+            "lastEvent": {
+              "at": "2026-04-25T12:24:59.148Z",
+              "kind": "reset",
+              "route": "placement.boundary.reset",
+              "detail": {
+                "source": "replay:baseline-reset",
+                "label": "replay:baseline-reset"
+              }
+            },
+            "lastFallback": null,
+            "recentEvents": [
+              {
+                "at": "2026-04-25T12:24:59.148Z",
+                "kind": "reset",
+                "route": "placement.boundary.reset",
+                "detail": {
+                  "source": "replay:baseline-reset",
+                  "label": "replay:baseline-reset"
+                }
+              }
+            ],
+            "recentFallbacks": [],
+            "recentCompatExports": []
+          }
+        }
+      },
+      {
+        "name": "scene-session-reset",
+        "at": "2026-04-25T12:24:59.149Z",
+        "detail": {
+          "ok": true,
+          "summary": {
+            "owner": "src/core/state/scene-session-state.js",
+            "phase": "P9-A",
+            "label": "reset",
+            "counters": {
+              "replaceSceneGraphCalls": 0,
+              "replaceInstancesCalls": 0,
+              "addInstanceCalls": 0,
+              "removeInstanceCalls": 0,
+              "removeLooseBoxCalls": 0,
+              "restoreDefaultSceneCalls": 0,
+              "ensureNonEmptySceneCalls": 0,
+              "syncDerivedStateCalls": 0,
+              "allocateInstanceIdCalls": 0,
+              "allocateBoxIdRangeCalls": 0,
+              "legacyFallbacks": 0
+            },
+            "lastWrite": null,
+            "recentWrites": [],
+            "session": {
+              "owner": "src/core/state/scene-session-state.js",
+              "phase": "P9-A",
+              "instances": 5,
+              "boxes": 9,
+              "nextId": 10,
+              "nextInstanceSerial": 6,
+              "selectedInstanceId": null,
+              "editorMode": "view"
+            }
+          }
+        }
+      },
+      {
+        "name": "placement-route-reset",
+        "at": "2026-04-25T12:24:59.149Z",
+        "detail": {
+          "ok": true,
+          "summary": {
+            "phase": "P8-S3",
+            "owner": "src/infrastructure/audit/placement-route-audit.js",
+            "counters": {
+              "controllerCalls": 0,
+              "controllerStateActionHits": 0,
+              "controllerUiAdapterHits": 0,
+              "controllerLegacyFallbacks": 0,
+              "controllerUiFallbacks": 0,
+              "controllerMissingRoutes": 0,
+              "coreEvents": 0,
+              "coreNewPathHits": 0,
+              "coreLegacyFallbacks": 0,
+              "coreUiSyncHits": 0,
+              "coreUiSyncFallbacks": 0
+            },
+            "lastEvent": null,
+            "lastFallback": null,
+            "recentEvents": [],
+            "label": "",
+            "available": true
+          }
+        }
+      },
+      {
+        "name": "placement-effects-reset",
+        "at": "2026-04-25T12:24:59.149Z",
+        "detail": {
+          "ok": true,
+          "summary": {
+            "phase": "P8-S2",
+            "owner": "src/infrastructure/adapters/placement-effects.js",
+            "counters": {
+              "beginDragCalls": 0,
+              "completeDragCalls": 0,
+              "cancelDragCalls": 0,
+              "syncUiCalls": 0,
+              "runtimeModeWrites": 0,
+              "legacyModeWrites": 0,
+              "draggingWrites": 0,
+              "previewClears": 0,
+              "previewRefreshCalls": 0,
+              "modeButtonRefreshCalls": 0,
+              "uiFallbacks": 0
+            },
+            "lastEvent": null,
+            "recentEvents": [],
+            "label": "",
+            "available": true
+          }
+        }
+      },
+      {
+        "name": "runtime-routes-reset",
+        "at": "2026-04-25T12:24:59.149Z",
+        "detail": {
+          "ok": true,
+          "summary": {
+            "phase": "P13-RUNTIME",
+            "owner": "src/infrastructure/audit/runtime-route-audit.js",
+            "counters": {
+              "ownerApiHits": 0,
+              "legacyBridgeHits": 0,
+              "directGlobalHits": 0,
+              "fallbackCount": 0
+            },
+            "lastEvent": {
+              "at": "2026-04-25T12:24:59.149Z",
+              "kind": "reset",
+              "route": "runtime-routes.reset",
+              "detail": {
+                "source": "replay:baseline-reset"
+              }
+            },
+            "lastFallback": null,
+            "recentEvents": [
+              {
+                "at": "2026-04-25T12:24:59.149Z",
+                "kind": "reset",
+                "route": "runtime-routes.reset",
+                "detail": {
+                  "source": "replay:baseline-reset"
+                }
+              }
+            ],
+            "label": "",
+            "available": true
+          }
+        }
+      },
+      {
+        "name": "state-actions-probe",
+        "at": "2026-04-25T12:24:59.150Z",
+        "detail": {
+          "mode": "view",
+          "prefabId": "debug_cube_5faces",
+          "modeDispatch": {
+            "ok": true,
+            "route": "controllers.dispatch",
+            "result": true
+          },
+          "prefabDispatch": {
+            "ok": true,
+            "route": "controllers.dispatch",
+            "result": 0
+          }
+        }
+      },
+      {
+        "name": "state-actions-baseline",
+        "at": "2026-04-25T12:24:59.150Z",
+        "detail": {
+          "phase": "P19-SA",
+          "owner": "src/application/state/state-actions.js",
+          "counters": {
+            "modeChangeCalls": 1,
+            "prefabSelectByIndexCalls": 0,
+            "prefabSelectByIdCalls": 1,
+            "modeFallbacks": 0,
+            "prefabFallbacks": 0
+          },
+          "lastModeChange": {
+            "at": "2026-04-25T12:24:59.150Z",
+            "source": "replay:baseline-mode-probe",
+            "requestedMode": "view",
+            "beforeMode": "view",
+            "afterMode": "view",
+            "ok": true,
+            "route": "state.runtimeState.setEditorModeValue",
+            "fallbackUsed": false
+          },
+          "lastPrefabSelection": {
+            "at": "2026-04-25T12:24:59.150Z",
+            "source": "replay:baseline-prefab-probe",
+            "kind": "id",
+            "requestedPrefabId": "debug_cube_5faces",
+            "beforeIndex": 0,
+            "afterIndex": 0,
+            "beforePrefabId": "debug_cube_5faces",
+            "afterPrefabId": "debug_cube_5faces",
+            "ok": true,
+            "route": "state.prefabRegistry.setSelectedPrefabId",
+            "fallbackUsed": false
+          },
+          "recentModeChanges": [
+            {
+              "at": "2026-04-25T12:24:59.150Z",
+              "source": "replay:baseline-mode-probe",
+              "requestedMode": "view",
+              "beforeMode": "view",
+              "afterMode": "view",
+              "ok": true,
+              "route": "state.runtimeState.setEditorModeValue",
+              "fallbackUsed": false
+            }
+          ],
+          "recentPrefabSelections": [
+            {
+              "at": "2026-04-25T12:24:59.150Z",
+              "source": "replay:baseline-prefab-probe",
+              "kind": "id",
+              "requestedPrefabId": "debug_cube_5faces",
+              "beforeIndex": 0,
+              "afterIndex": 0,
+              "beforePrefabId": "debug_cube_5faces",
+              "afterPrefabId": "debug_cube_5faces",
+              "ok": true,
+              "route": "state.prefabRegistry.setSelectedPrefabId",
+              "fallbackUsed": false
+            }
+          ],
+          "label": "baseline",
+          "available": true
+        }
+      },
+      {
+        "name": "state-actions-boundary-baseline",
+        "at": "2026-04-25T12:24:59.150Z",
+        "detail": {
+          "phase": "P19-SA",
+          "owner": "src/application/state/state-actions.js",
+          "label": "baseline",
+          "available": true,
+          "counters": {
+            "runtimeStateHits": 1,
+            "selectorHits": 6,
+            "prefabRegistryHits": 1,
+            "legacyGlobalHits": 0,
+            "oldEntryHits": 0,
+            "fallbackCount": 0
+          },
+          "lastEvent": {
+            "at": "2026-04-25T12:24:59.150Z",
+            "kind": "selector",
+            "route": "state.selectors.getSelectedPrefabId",
+            "detail": {
+              "prefabId": "debug_cube_5faces",
+              "source": "state-actions:readSelectedPrefabId"
+            }
+          },
+          "lastFallback": null,
+          "recentEvents": [
+            {
+              "at": "2026-04-25T12:24:59.149Z",
+              "kind": "selector",
+              "route": "state.selectors.getEditorMode",
+              "detail": {
+                "mode": "view",
+                "source": "state-actions:readEditorMode"
+              }
+            },
+            {
+              "at": "2026-04-25T12:24:59.150Z",
+              "kind": "runtime-state",
+              "route": "state.runtimeState.setEditorModeValue",
+              "detail": {
+                "source": "replay:baseline-mode-probe",
+                "mode": "view"
+              }
+            },
+            {
+              "at": "2026-04-25T12:24:59.150Z",
+              "kind": "selector",
+              "route": "state.selectors.getEditorMode",
+              "detail": {
+                "mode": "view",
+                "source": "state-actions:readEditorMode"
+              }
+            },
+            {
+              "at": "2026-04-25T12:24:59.150Z",
+              "kind": "selector",
+              "route": "state.selectors.getSelectedPrototypeIndex",
+              "detail": {
+                "index": 0,
+                "source": "state-actions:readSelectedPrototypeIndex"
+              }
+            },
+            {
+              "at": "2026-04-25T12:24:59.150Z",
+              "kind": "selector",
+              "route": "state.selectors.getSelectedPrefabId",
+              "detail": {
+                "prefabId": "debug_cube_5faces",
+                "source": "state-actions:readSelectedPrefabId"
+              }
+            },
+            {
+              "at": "2026-04-25T12:24:59.150Z",
+              "kind": "prefab-registry",
+              "route": "state.prefabRegistry.setSelectedPrefabId",
+              "detail": {
+                "source": "replay:baseline-prefab-probe",
+                "prefabId": "debug_cube_5faces",
+                "result": 0
+              }
+            },
+            {
+              "at": "2026-04-25T12:24:59.150Z",
+              "kind": "selector",
+              "route": "state.selectors.getSelectedPrototypeIndex",
+              "detail": {
+                "index": 0,
+                "source": "state-actions:readSelectedPrototypeIndex"
+              }
+            },
+            {
+              "at": "2026-04-25T12:24:59.150Z",
+              "kind": "selector",
+              "route": "state.selectors.getSelectedPrefabId",
+              "detail": {
+                "prefabId": "debug_cube_5faces",
+                "source": "state-actions:readSelectedPrefabId"
+              }
+            }
+          ],
+          "recentFallbacks": []
+        }
+      },
+      {
+        "name": "application-boundary-baseline",
+        "at": "2026-04-25T12:24:59.159Z",
+        "detail": {
+          "owner": "src/application/controllers/app-controllers.js",
+          "phase": "P15-APP",
+          "label": "baseline",
+          "available": true,
+          "counters": {
+            "stateActionHits": 2,
+            "prefabRegistryHits": 0,
+            "runtimeStateHits": 0,
+            "serviceWorkflowHits": 0,
+            "selectorHits": 0,
+            "legacyGlobalHits": 0,
+            "fallbackCount": 0
+          },
+          "lastEvent": {
+            "at": "2026-04-25T12:24:59.150Z",
+            "kind": "state-action",
+            "route": "state.actions.selectPrefabById",
+            "detail": {
+              "source": "replay:baseline-prefab-probe",
+              "prefabId": "debug_cube_5faces",
+              "result": 0
+            }
+          },
+          "lastFallback": null,
+          "recentEvents": [
+            {
+              "at": "2026-04-25T12:24:59.148Z",
+              "kind": "reset",
+              "route": "application-boundary.reset",
+              "detail": {
+                "source": "replay:baseline-reset",
+                "label": "replay:baseline-reset"
+              }
+            },
+            {
+              "at": "2026-04-25T12:24:59.150Z",
+              "kind": "state-action",
+              "route": "state.actions.requestModeChange",
+              "detail": {
+                "source": "replay:baseline-mode-probe",
+                "mode": "view",
+                "result": true
+              }
+            },
+            {
+              "at": "2026-04-25T12:24:59.150Z",
+              "kind": "state-action",
+              "route": "state.actions.selectPrefabById",
+              "detail": {
+                "source": "replay:baseline-prefab-probe",
+                "prefabId": "debug_cube_5faces",
+                "result": 0
+              }
+            }
+          ],
+          "recentFallbacks": []
+        }
+      },
+      {
+        "name": "asset-import-boundary-baseline",
+        "at": "2026-04-25T12:24:59.159Z",
+        "detail": {
+          "owner": "src/application/assets/asset-import.js",
+          "phase": "P16-ASSET",
+          "label": "baseline",
+          "available": true,
+          "counters": {
+            "stateActionHits": 0,
+            "prefabRegistryHits": 0,
+            "runtimeStateHits": 0,
+            "placementControllerHits": 0,
+            "selectorHits": 0,
+            "serviceWorkflowHits": 0,
+            "legacyGlobalHits": 0,
+            "fallbackCount": 0
+          },
+          "lastEvent": {
+            "at": "2026-04-25T12:24:59.148Z",
+            "kind": "reset",
+            "route": "asset-import-boundary.reset",
+            "detail": {
+              "source": "replay:baseline-reset",
+              "label": "replay:baseline-reset"
+            }
+          },
+          "lastFallback": null,
+          "recentEvents": [
+            {
+              "at": "2026-04-25T12:24:59.148Z",
+              "kind": "reset",
+              "route": "asset-import-boundary.reset",
+              "detail": {
+                "source": "replay:baseline-reset",
+                "label": "replay:baseline-reset"
+              }
+            }
+          ],
+          "recentFallbacks": []
+        }
+      },
+      {
+        "name": "placement-boundary-baseline",
+        "at": "2026-04-25T12:24:59.159Z",
+        "detail": {
+          "owner": "src/application/placement/placement.js",
+          "phase": "P20-PLACEMENT",
+          "label": "baseline",
+          "available": true,
+          "counters": {
+            "runtimeStateHits": 0,
+            "selectorHits": 0,
+            "placementEffectsHits": 0,
+            "routeAuditHits": 0,
+            "controllerHits": 0,
+            "ownerApiHits": 0,
+            "legacyGlobalHits": 0,
+            "compatExportHits": 0,
+            "compatHelperHits": 0,
+            "compatTotalHits": 0,
+            "fallbackCount": 0
+          },
+          "compatByName": {},
+          "compatMainPathExports": [
+            "startDragging",
+            "commitPreview",
+            "cancelDrag"
+          ],
+          "lastEvent": {
+            "at": "2026-04-25T12:24:59.148Z",
+            "kind": "reset",
+            "route": "placement.boundary.reset",
+            "detail": {
+              "source": "replay:baseline-reset",
+              "label": "replay:baseline-reset"
+            }
+          },
+          "lastFallback": null,
+          "recentEvents": [
+            {
+              "at": "2026-04-25T12:24:59.148Z",
+              "kind": "reset",
+              "route": "placement.boundary.reset",
+              "detail": {
+                "source": "replay:baseline-reset",
+                "label": "replay:baseline-reset"
+              }
+            }
+          ],
+          "recentFallbacks": [],
+          "recentCompatExports": []
+        }
+      },
+      {
+        "name": "scene-session-baseline",
+        "at": "2026-04-25T12:24:59.159Z",
+        "detail": {
+          "label": "baseline",
+          "available": true,
+          "session": {
+            "owner": "src/core/state/scene-session-state.js",
+            "phase": "P9-A",
+            "instances": 5,
+            "boxes": 9,
+            "nextId": 10,
+            "nextInstanceSerial": 6,
+            "selectedInstanceId": null,
+            "editorMode": "view"
+          },
+          "writes": {
+            "owner": "src/core/state/scene-session-state.js",
+            "phase": "P9-A",
+            "label": "baseline",
+            "counters": {
+              "replaceSceneGraphCalls": 0,
+              "replaceInstancesCalls": 0,
+              "addInstanceCalls": 0,
+              "removeInstanceCalls": 0,
+              "removeLooseBoxCalls": 0,
+              "restoreDefaultSceneCalls": 0,
+              "ensureNonEmptySceneCalls": 0,
+              "syncDerivedStateCalls": 0,
+              "allocateInstanceIdCalls": 0,
+              "allocateBoxIdRangeCalls": 0,
+              "legacyFallbacks": 0
+            },
+            "lastWrite": null,
+            "recentWrites": [],
+            "session": {
+              "owner": "src/core/state/scene-session-state.js",
+              "phase": "P9-A",
+              "instances": 5,
+              "boxes": 9,
+              "nextId": 10,
+              "nextInstanceSerial": 6,
+              "selectedInstanceId": null,
+              "editorMode": "view"
+            }
+          }
+        }
+      },
+      {
+        "name": "placement-routes-baseline",
+        "at": "2026-04-25T12:24:59.159Z",
+        "detail": {
+          "phase": "P8-S3",
+          "owner": "src/infrastructure/audit/placement-route-audit.js",
+          "counters": {
+            "controllerCalls": 2,
+            "controllerStateActionHits": 2,
+            "controllerUiAdapterHits": 0,
+            "controllerLegacyFallbacks": 0,
+            "controllerUiFallbacks": 0,
+            "controllerMissingRoutes": 0,
+            "coreEvents": 0,
+            "coreNewPathHits": 0,
+            "coreLegacyFallbacks": 0,
+            "coreUiSyncHits": 0,
+            "coreUiSyncFallbacks": 0
+          },
+          "lastEvent": {
+            "at": "2026-04-25T12:24:59.150Z",
+            "kind": "controller",
+            "action": "selectPrefabById",
+            "route": "state-actions.selectPrefabById",
+            "detail": {
+              "source": "replay:baseline-prefab-probe",
+              "prefabId": "debug_cube_5faces",
+              "result": 0
+            }
+          },
+          "lastFallback": null,
+          "recentEvents": [
+            {
+              "at": "2026-04-25T12:24:59.150Z",
+              "kind": "controller",
+              "action": "requestModeChange",
+              "route": "state-actions.requestModeChange",
+              "detail": {
+                "source": "replay:baseline-mode-probe",
+                "mode": "view",
+                "result": true
+              }
+            },
+            {
+              "at": "2026-04-25T12:24:59.150Z",
+              "kind": "controller",
+              "action": "selectPrefabById",
+              "route": "state-actions.selectPrefabById",
+              "detail": {
+                "source": "replay:baseline-prefab-probe",
+                "prefabId": "debug_cube_5faces",
+                "result": 0
+              }
+            }
+          ],
+          "label": "baseline",
+          "available": true
+        }
+      },
+      {
+        "name": "placement-effects-baseline",
+        "at": "2026-04-25T12:24:59.159Z",
+        "detail": {
+          "phase": "P8-S2",
+          "owner": "src/infrastructure/adapters/placement-effects.js",
+          "counters": {
+            "beginDragCalls": 0,
+            "completeDragCalls": 0,
+            "cancelDragCalls": 0,
+            "syncUiCalls": 0,
+            "runtimeModeWrites": 0,
+            "legacyModeWrites": 0,
+            "draggingWrites": 0,
+            "previewClears": 0,
+            "previewRefreshCalls": 0,
+            "modeButtonRefreshCalls": 0,
+            "uiFallbacks": 0
+          },
+          "lastEvent": null,
+          "recentEvents": [],
+          "label": "baseline",
+          "available": true
+        }
+      },
+      {
+        "name": "runtime-routes-baseline",
+        "at": "2026-04-25T12:24:59.159Z",
+        "detail": {
+          "phase": "P13-RUNTIME",
+          "owner": "src/infrastructure/audit/runtime-route-audit.js",
+          "counters": {
+            "ownerApiHits": 0,
+            "legacyBridgeHits": 0,
+            "directGlobalHits": 0,
+            "fallbackCount": 0
+          },
+          "lastEvent": {
+            "at": "2026-04-25T12:24:59.149Z",
+            "kind": "reset",
+            "route": "runtime-routes.reset",
+            "detail": {
+              "source": "replay:baseline-reset"
+            }
+          },
+          "lastFallback": null,
+          "recentEvents": [
+            {
+              "at": "2026-04-25T12:24:59.149Z",
+              "kind": "reset",
+              "route": "runtime-routes.reset",
+              "detail": {
+                "source": "replay:baseline-reset"
+              }
+            }
+          ],
+          "label": "baseline",
+          "available": true
+        }
+      },
+      {
+        "name": "architecture-layers-baseline",
+        "at": "2026-04-25T12:24:59.159Z",
+        "detail": {
+          "phase": "P12-LAYER",
+          "owner": "src/infrastructure/audit/architecture-layer-audit.js",
+          "label": "baseline",
+          "layerCounts": {
+            "presentation": 15,
+            "application": 6,
+            "core": 13,
+            "infrastructure": 17
+          },
+          "preserveLayers": [
+            "application",
+            "core"
+          ],
+          "rewriteLayers": [
+            "presentation"
+          ],
+          "rewriteInfrastructure": [
+            "platform adapters",
+            "storage/network implementations"
+          ],
+          "temporaryCompat": [
+            "legacy",
+            "audit",
+            "bridge"
+          ],
+          "available": true
+        }
+      },
+      {
+        "name": "portable-boundary-baseline",
+        "at": "2026-04-25T12:24:59.159Z",
+        "detail": {
+          "phase": "P14-B",
+          "owner": "src/core/domain/portable-core.js",
+          "portableModules": [
+            "domain.sceneCore",
+            "domain.portableCore"
+          ],
+          "engineBoundModules": [
+            "presentation.render",
+            "presentation.ui",
+            "presentation.shell",
+            "infrastructure.storage.scene-storage"
+          ],
+          "inputContract": {
+            "required": [
+              "sceneCore",
+              "prefabs",
+              "existingBoxes",
+              "grid"
+            ],
+            "optional": [
+              "sceneSnapshot",
+              "playerBox",
+              "runtimeSummary",
+              "lightingSummary",
+              "domSummary",
+              "selectedPrefabId"
+            ]
+          },
+          "purity": {
+            "rulesReadWindowDirectly": false,
+            "rulesReadSettingsDirectly": false,
+            "rulesReadBoxesDirectly": false,
+            "rulesReadPlatformDirectly": false,
+            "requiresExplicitContext": true
+          },
+          "label": "baseline",
+          "available": true
+        }
+      },
+      {
+        "name": "platform-boundary-baseline",
+        "at": "2026-04-25T12:24:59.160Z",
+        "detail": {
+          "label": "baseline",
+          "available": true,
+          "sceneWorkflow": {
+            "currentFile": "",
+            "counters": {
+              "saveSceneTargetCalls": 0,
+              "loadSceneTargetCalls": 0,
+              "startupRestoreCalls": 1
+            },
+            "lastEvent": {
+              "at": "2026-04-25T12:24:57.951Z",
+              "kind": "runStartupRestore",
+              "detail": {
+                "source": "app-shell:startup-restore",
+                "defaultSource": "startup-default-file",
+                "localSource": "startup-auto-restore"
+              }
+            },
+            "recentEvents": [
+              {
+                "at": "2026-04-25T12:24:57.951Z",
+                "kind": "runStartupRestore",
+                "detail": {
+                  "source": "app-shell:startup-restore",
+                  "defaultSource": "startup-default-file",
+                  "localSource": "startup-auto-restore"
+                }
+              }
+            ],
+            "sceneStorageAvailable": true,
+            "sceneFilesSupported": true,
+            "instanceCount": 5,
+            "boxCount": 9,
+            "sceneSession": {
+              "owner": "src/core/state/scene-session-state.js",
+              "phase": "P9-A",
+              "instances": 5,
+              "boxes": 9,
+              "nextId": 10,
+              "nextInstanceSerial": 6,
+              "selectedInstanceId": null,
+              "editorMode": "view",
+              "label": "scene-workflow",
+              "available": true
+            },
+            "lightCount": 5
+          },
+          "assetWorkflow": {
+            "counters": {
+              "ensureHabboRootReadyCalls": 1,
+              "ensureHabboLibrarySummaryCalls": 0,
+              "ensureHabboLibraryPageCalls": 0,
+              "runAssetScanCalls": 1,
+              "persistCustomPrefabsCalls": 0,
+              "markAssetManagedPrefabCalls": 2
+            },
+            "lastEvent": {
+              "at": "2026-04-25T12:24:58.301Z",
+              "kind": "markAssetManagedPrefab",
+              "detail": {
+                "source": "assets:Custom Prefab YOWU6L.json",
+                "prefabId": "custom_prefab_yowu6l"
+              }
+            },
+            "recentEvents": [
+              {
+                "at": "2026-04-25T12:24:55.977Z",
+                "kind": "ensureHabboRootReady",
+                "detail": {
+                  "source": "app-shell:ensure-habbo-root-ready"
+                }
+              },
+              {
+                "at": "2026-04-25T12:24:58.084Z",
+                "kind": "runAssetScan",
+                "detail": {
+                  "source": "app-shell:startup-asset-scan",
+                  "force": true
+                }
+              },
+              {
+                "at": "2026-04-25T12:24:58.268Z",
+                "kind": "markAssetManagedPrefab",
+                "detail": {
+                  "source": "assets:Custom Prefab YOR3YS.json",
+                  "prefabId": "custom_prefab_yor3ys"
+                }
+              },
+              {
+                "at": "2026-04-25T12:24:58.301Z",
+                "kind": "markAssetManagedPrefab",
+                "detail": {
+                  "source": "assets:Custom Prefab YOWU6L.json",
+                  "prefabId": "custom_prefab_yowu6l"
+                }
+              }
+            ],
+            "rootConfigured": true,
+            "rootExists": true,
+            "itemCount": 17464,
+            "rootConfigInFlight": false,
+            "pendingRoot": "",
+            "summaryLoaded": false,
+            "pageLoaded": false,
+            "scanInFlight": false,
+            "totalFiles": 4,
+            "importedCount": 2
+          },
+          "editorHandoff": {
+            "owner": "src/infrastructure/services/editor-handoff-api.js",
+            "label": "baseline",
+            "counters": {
+              "readCalls": 1,
+              "clearCalls": 0,
+              "writeCalls": 0,
+              "errors": 0
+            },
+            "lastEvent": {
+              "at": "2026-04-25T12:24:55.982Z",
+              "kind": "read",
+              "detail": {
+                "source": "application:editor-handoff-read",
+                "hasValue": false
+              }
+            },
+            "recentEvents": [
+              {
+                "at": "2026-04-25T12:24:55.982Z",
+                "kind": "read",
+                "detail": {
+                  "source": "application:editor-handoff-read",
+                  "hasValue": false
+                }
+              }
+            ]
+          },
+          "prefabApi": {
+            "owner": "src/infrastructure/services/prefab-api.js",
+            "label": "baseline",
+            "counters": {
+              "fetchIndexCalls": 2,
+              "savePrefabToServerCalls": 0,
+              "listBrowserLibraryCalls": 0,
+              "savePrefabToBrowserLibraryCalls": 0,
+              "errors": 0
+            },
+            "lastEvent": {
+              "at": "2026-04-25T12:24:58.304Z",
+              "kind": "fetch-index",
+              "detail": {
+                "requestId": "p0-prefab-index",
+                "count": 4
+              }
+            },
+            "recentEvents": [
+              {
+                "at": "2026-04-25T12:24:58.246Z",
+                "kind": "fetch-index",
+                "detail": {
+                  "requestId": 1,
+                  "count": 4
+                }
+              },
+              {
+                "at": "2026-04-25T12:24:58.304Z",
+                "kind": "fetch-index",
+                "detail": {
+                  "requestId": "p0-prefab-index",
+                  "count": 4
+                }
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "ok": true,
+    "finishedAt": "2026-04-25T12:24:59.160Z"
+  },
+  "session": {
+    "scenarioNames": [
+      "baseline",
+      "habbo-root-open",
+      "habbo-first-place",
+      "editor-x5-roundtrip",
+      "scene-save-load",
+      "main-camera-rotation",
+      "lighting-visual",
+      "player-walk",
+      "editor-normal-health"
+    ],
+    "currentIndex": 0
+  },
+  "visibleRuntimeErrors": {
+    "label": "01-baseline",
+    "bannerVisible": false,
+    "bannerText": "",
+    "bannerUpdatedAt": "",
+    "historyCount": 0,
+    "newEntryCount": 0,
+    "latestHistory": [],
+    "newEntries": [],
+    "lastEntry": null
+  }
+}

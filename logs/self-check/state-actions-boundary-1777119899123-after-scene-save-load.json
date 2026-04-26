@@ -1,0 +1,216 @@
+{
+  "phase": "P8X",
+  "owner": "src/infrastructure/self-check/scenario-runner.js",
+  "sessionId": "1777119899123",
+  "entry": {
+    "kind": "main",
+    "label": "主程序",
+    "entryFile": "index.html",
+    "launcherHint": "start.bat",
+    "build": "20260326-shadow-controls-v8"
+  },
+  "query": "?fromEditor=1&t=1777119917081&reason=scenario-editor-save&prefabId=auto_x5_777119899123",
+  "kind": "state-actions-boundary",
+  "stage": "after-scene-save-load",
+  "summary": {
+    "phase": "P19-SA",
+    "owner": "src/application/state/state-actions.js",
+    "label": "after-scene-save-load",
+    "available": true,
+    "counters": {
+      "runtimeStateHits": 6,
+      "selectorHits": 23,
+      "prefabRegistryHits": 2,
+      "legacyGlobalHits": 0,
+      "oldEntryHits": 0,
+      "fallbackCount": 0
+    },
+    "lastEvent": {
+      "at": "2026-04-25T12:26:45.403Z",
+      "kind": "selector",
+      "route": "state.selectors.getEditorMode",
+      "detail": {
+        "mode": "place",
+        "source": "state-actions:readEditorMode"
+      }
+    },
+    "lastFallback": null,
+    "recentEvents": [
+      {
+        "at": "2026-04-25T12:26:44.337Z",
+        "kind": "selector",
+        "route": "state.selectors.getSelectedPrefabId",
+        "detail": {
+          "prefabId": "debug_cube_5faces",
+          "source": "state-actions:readSelectedPrefabId"
+        }
+      },
+      {
+        "at": "2026-04-25T12:26:44.337Z",
+        "kind": "selector",
+        "route": "state.selectors.getEditorMode",
+        "detail": {
+          "mode": "place",
+          "source": "state-actions:readEditorMode"
+        }
+      },
+      {
+        "at": "2026-04-25T12:26:44.337Z",
+        "kind": "selector",
+        "route": "state.selectors.getEditorMode",
+        "detail": {
+          "mode": "place",
+          "source": "state-actions:readEditorMode"
+        }
+      },
+      {
+        "at": "2026-04-25T12:26:44.337Z",
+        "kind": "runtime-state",
+        "route": "state.runtimeState.setEditorModeValue",
+        "detail": {
+          "source": "ui.prefabSelect.change:mode",
+          "mode": "place"
+        }
+      },
+      {
+        "at": "2026-04-25T12:26:44.337Z",
+        "kind": "selector",
+        "route": "state.selectors.getEditorMode",
+        "detail": {
+          "mode": "place",
+          "source": "state-actions:readEditorMode"
+        }
+      },
+      {
+        "at": "2026-04-25T12:26:45.402Z",
+        "kind": "selector",
+        "route": "state.selectors.getEditorMode",
+        "detail": {
+          "mode": "place",
+          "source": "state-actions:readEditorMode"
+        }
+      },
+      {
+        "at": "2026-04-25T12:26:45.403Z",
+        "kind": "runtime-state",
+        "route": "state.runtimeState.setEditorModeValue",
+        "detail": {
+          "source": "ui.modePlace.click",
+          "mode": "place"
+        }
+      },
+      {
+        "at": "2026-04-25T12:26:45.403Z",
+        "kind": "selector",
+        "route": "state.selectors.getEditorMode",
+        "detail": {
+          "mode": "place",
+          "source": "state-actions:readEditorMode"
+        }
+      }
+    ],
+    "recentFallbacks": []
+  },
+  "extra": {
+    "step": "state-actions-boundary-after-scene-save-load",
+    "detail": {
+      "phase": "P19-SA",
+      "owner": "src/application/state/state-actions.js",
+      "label": "after-scene-save-load",
+      "available": true,
+      "counters": {
+        "runtimeStateHits": 6,
+        "selectorHits": 23,
+        "prefabRegistryHits": 2,
+        "legacyGlobalHits": 0,
+        "oldEntryHits": 0,
+        "fallbackCount": 0
+      },
+      "lastEvent": {
+        "at": "2026-04-25T12:26:45.403Z",
+        "kind": "selector",
+        "route": "state.selectors.getEditorMode",
+        "detail": {
+          "mode": "place",
+          "source": "state-actions:readEditorMode"
+        }
+      },
+      "lastFallback": null,
+      "recentEvents": [
+        {
+          "at": "2026-04-25T12:26:44.337Z",
+          "kind": "selector",
+          "route": "state.selectors.getSelectedPrefabId",
+          "detail": {
+            "prefabId": "debug_cube_5faces",
+            "source": "state-actions:readSelectedPrefabId"
+          }
+        },
+        {
+          "at": "2026-04-25T12:26:44.337Z",
+          "kind": "selector",
+          "route": "state.selectors.getEditorMode",
+          "detail": {
+            "mode": "place",
+            "source": "state-actions:readEditorMode"
+          }
+        },
+        {
+          "at": "2026-04-25T12:26:44.337Z",
+          "kind": "selector",
+          "route": "state.selectors.getEditorMode",
+          "detail": {
+            "mode": "place",
+            "source": "state-actions:readEditorMode"
+          }
+        },
+        {
+          "at": "2026-04-25T12:26:44.337Z",
+          "kind": "runtime-state",
+          "route": "state.runtimeState.setEditorModeValue",
+          "detail": {
+            "source": "ui.prefabSelect.change:mode",
+            "mode": "place"
+          }
+        },
+        {
+          "at": "2026-04-25T12:26:44.337Z",
+          "kind": "selector",
+          "route": "state.selectors.getEditorMode",
+          "detail": {
+            "mode": "place",
+            "source": "state-actions:readEditorMode"
+          }
+        },
+        {
+          "at": "2026-04-25T12:26:45.402Z",
+          "kind": "selector",
+          "route": "state.selectors.getEditorMode",
+          "detail": {
+            "mode": "place",
+            "source": "state-actions:readEditorMode"
+          }
+        },
+        {
+          "at": "2026-04-25T12:26:45.403Z",
+          "kind": "runtime-state",
+          "route": "state.runtimeState.setEditorModeValue",
+          "detail": {
+            "source": "ui.modePlace.click",
+            "mode": "place"
+          }
+        },
+        {
+          "at": "2026-04-25T12:26:45.403Z",
+          "kind": "selector",
+          "route": "state.selectors.getEditorMode",
+          "detail": {
+            "mode": "place",
+            "source": "state-actions:readEditorMode"
+          }
+        }
+      ],
+      "recentFallbacks": []
+    }
+  }
+}

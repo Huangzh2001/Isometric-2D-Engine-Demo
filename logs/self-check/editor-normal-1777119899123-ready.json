@@ -1,0 +1,87 @@
+{
+  "phase": "P8X",
+  "owner": "START_V18_ONLY.html",
+  "kind": "editor-normal-health",
+  "tag": "ready",
+  "ok": true,
+  "sessionId": "1777119899123",
+  "entry": {
+    "kind": "editor",
+    "label": "编辑器",
+    "entryFile": "START_V18_ONLY.html",
+    "launcherHint": "start_editor.bat",
+    "build": "20260320-v18-box-occlusion"
+  },
+  "query": "?fromMain=1&healthCheck=1&replaySession=1777119899123",
+  "generatedAt": "2026-04-25T12:30:37.372Z",
+  "details": {
+    "build": "20260320-v18-box-occlusion",
+    "hasGridCanvas": true,
+    "hasPreviewCanvas": true,
+    "sidebarStep": "image",
+    "grid": {
+      "w": 10,
+      "h": 10
+    }
+  },
+  "platformBoundary": {
+    "label": "ready",
+    "prefabApi": {
+      "owner": "src/infrastructure/services/prefab-api.js",
+      "label": "ready",
+      "counters": {
+        "fetchIndexCalls": 0,
+        "savePrefabToServerCalls": 0,
+        "listBrowserLibraryCalls": 1,
+        "savePrefabToBrowserLibraryCalls": 0,
+        "errors": 0
+      },
+      "lastEvent": {
+        "at": "2026-04-25T12:30:37.372Z",
+        "kind": "list-browser-library",
+        "detail": {
+          "source": "editor:write-built-in-prefabs-hint",
+          "count": 0
+        }
+      },
+      "recentEvents": [
+        {
+          "at": "2026-04-25T12:30:37.372Z",
+          "kind": "list-browser-library",
+          "detail": {
+            "source": "editor:write-built-in-prefabs-hint",
+            "count": 0
+          }
+        }
+      ]
+    },
+    "editorHandoff": {
+      "owner": "src/infrastructure/services/editor-handoff-api.js",
+      "label": "ready",
+      "counters": {
+        "readCalls": 1,
+        "clearCalls": 0,
+        "writeCalls": 0,
+        "errors": 0
+      },
+      "lastEvent": {
+        "at": "2026-04-25T12:30:37.368Z",
+        "kind": "read",
+        "detail": {
+          "source": "editor:read-main-handoff",
+          "hasValue": false
+        }
+      },
+      "recentEvents": [
+        {
+          "at": "2026-04-25T12:30:37.368Z",
+          "kind": "read",
+          "detail": {
+            "source": "editor:read-main-handoff",
+            "hasValue": false
+          }
+        }
+      ]
+    }
+  }
+}

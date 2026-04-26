@@ -1,0 +1,204 @@
+# server log session
+# role=main
+# startedAt=20260425-202454
+# root=D:\Document\Github\Isometric-2D-Engine-Demo
+# currentLog=logs\server\server-main-20260425-202454.log
+# latestLog=logs\server\server-main-latest.log
+[P0][BOOT] server-starting {"latestLogFile": "logs\\server\\server-main-latest.log", "logFile": "logs\\server\\server-main-20260425-202454.log", "port": 4013, "role": "main", "root": "D:\\Document\\Github\\Isometric-2D-Engine-Demo"}
+[P0][BOUNDARY] routes-registered {"counts": {"GET": 11, "POST": 5}, "routes": {"GET": ["/api/health", "/api/prefabs/index", "/api/habbo/config", "/api/habbo/index", "/api/habbo/library/index", "/api/habbo/library/summary", "/api/habbo/library/page", "/api/habbo/library/icon", "/api/habbo/file", "/api/scenes/default", "/api/scenes/load"], "POST": ["/api/prefabs/save", "/api/scenes/save", "/api/habbo/config", "/api/self-check/report", "/api/self-check/text-report"]}}
+[P0][SUMMARY] server-paths {"habboRootMeta": "config\\habbo_asset_root.json", "prefabDir": "assets\\prefabs", "sceneDir": "assets\\scenes"}
+[P1][BOOT] source-of-truth-ready {"deprecatedRootFiles": ["app.js", "state.js", "app-shell.js", "lighting-editor.js"], "server": "server/local_server.py", "sourceDoc": "001_SOURCE_OF_TRUTH.md"}
+[P1][SUMMARY] phase-ready {"canonicalServerPath": "server\\local_server.py", "currentLogFile": "logs\\server\\server-main-20260425-202454.log", "hasRootLocalServer": false, "latestLogFile": "logs\\server\\server-main-latest.log", "phase": "P1", "root": "D:\\Document\\Github\\Isometric-2D-Engine-Demo", "serverLogDir": "logs\\server"}
+[P2][SUMMARY] namespace-bootstrap {"backendOwnershipChanged": false, "frontendOwnsNamespaceBootstrap": true, "notes": ["emit explanatory P2 summary only", "no backend behavior changes"], "phase": "P2-A-fix", "scope": "server-observability-only"}
+[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/health", "status": 200}
+[habbo-config:get] root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified exists=True itemCount=17464
+[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/habbo/config", "status": 200}
+[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/scenes/default", "status": 200}
+[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/health", "status": 200}
+[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/prefabs/index", "status": 200}
+[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/scenes/default", "status": 200}
+[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/prefabs/index", "status": 200}
+[habbo-diag] endpoint:summary reqId=p0-habbo-summary root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified
+[habbo-diag] direct-index:read:start root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified file=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified\index.json
+[habbo-diag] direct-index:read:done root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified bytes=9416225
+[habbo-diag] direct-index:parse:done root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified payloadKind=list recordSource=root-list recordCount=17464 totalItemsField=0 topKeys=[] firstRecordKeys=['category', 'classname', 'dest_dir', 'furni_id', 'furni_line', 'has_icon', 'has_swf', 'revision', 'source_icon', 'source_swf', 'special_type', 'status', 'type']
+[habbo-diag] endpoint:summary probe reqId=p0-habbo-summary branch=prefer-existing-index-summary rootCount=17464 indexExists=True indexSize=9678186 payloadKind=list recordSource=root-list itemsFieldKind=list-self itemsFieldCount=17464 totalItemsField=0 topKeys=[] summaryKeys=[] firstRecordKeys=['category', 'classname', 'dest_dir', 'furni_id', 'furni_line', 'has_icon', 'has_swf', 'revision', 'source_icon', 'source_swf', 'special_type', 'status', 'type']
+[habbo-diag] direct-summary:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=1/17464 total=1
+[habbo-diag] direct-summary:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=5000/17464 total=5000
+[habbo-diag] direct-summary:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=10000/17464 total=10000
+[habbo-diag] direct-summary:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=15000/17464 total=15000
+[habbo-diag] direct-summary:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=17464/17464 total=17464
+[habbo-diag] endpoint:summary result reqId=p0-habbo-summary branch=derive-from-index-records-fast rootCount=17464 indexExists=True indexSize=9678186 payloadKind=list recordSource=root-list itemsFieldKind=list-self itemsFieldCount=17464 totalItemsField=0 topKeys=[] summaryKeys=[] firstRecordKeys=['category', 'classname', 'dest_dir', 'furni_id', 'furni_line', 'has_icon', 'has_swf', 'revision', 'source_icon', 'source_swf', 'special_type', 'status', 'type']
+[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/habbo/library/summary", "status": 200}
+[habbo-diag] endpoint:page reqId=p0-habbo-page root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified type=room category=all search='' page=1 pageSize=1
+[habbo-diag] endpoint:page probe reqId=p0-habbo-page branch=prefer-existing-index-page rootCount=17464 indexExists=True indexSize=9678186 payloadKind=list recordSource=root-list itemsFieldKind=list-self itemsFieldCount=17464 totalItemsField=0 topKeys=[] summaryKeys=[] firstRecordKeys=['category', 'classname', 'dest_dir', 'furni_id', 'furni_line', 'has_icon', 'has_swf', 'revision', 'source_icon', 'source_swf', 'special_type', 'status', 'type']
+[habbo-diag] direct-page:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=1/17464 matched=1
+[P0][SUMMARY] self-check-report-saved {"file": "state-actions-boundary-1777119899123-reset.json", "path": "logs\\self-check\\state-actions-boundary-1777119899123-reset.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "state-actions-boundary-1777119899123-baseline.json", "path": "logs\\self-check\\state-actions-boundary-1777119899123-baseline.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "acceptance-1777119899123-01-baseline.json", "path": "logs\\self-check\\acceptance-1777119899123-01-baseline.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "state-actions-boundary-1777119899123-acceptance-summary.json", "path": "logs\\self-check\\state-actions-boundary-1777119899123-acceptance-summary.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "acceptance-summary-1777119899123.json", "path": "logs\\self-check\\acceptance-summary-1777119899123.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[habbo-config:set] root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified exists=True itemCount=17464
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/habbo/config", "status": 200}
+[habbo-diag] endpoint:summary reqId=1 root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified
+[habbo-diag] endpoint:summary probe reqId=1 branch=prefer-existing-index-summary rootCount=17464 indexExists=True indexSize=9678186 payloadKind=list recordSource=root-list itemsFieldKind=list-self itemsFieldCount=17464 totalItemsField=0 topKeys=[] summaryKeys=[] firstRecordKeys=['category', 'classname', 'dest_dir', 'furni_id', 'furni_line', 'has_icon', 'has_swf', 'revision', 'source_icon', 'source_swf', 'special_type', 'status', 'type']
+[habbo-diag] direct-summary:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=1/17464 total=1
+[habbo-diag] direct-summary:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=5000/17464 total=5000
+[habbo-diag] direct-summary:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=10000/17464 total=10000
+[habbo-diag] direct-summary:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=15000/17464 total=15000
+[habbo-diag] direct-summary:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=17464/17464 total=17464
+[habbo-diag] endpoint:summary result reqId=1 branch=derive-from-index-records-fast rootCount=17464 indexExists=True indexSize=9678186 payloadKind=list recordSource=root-list itemsFieldKind=list-self itemsFieldCount=17464 totalItemsField=0 topKeys=[] summaryKeys=[] firstRecordKeys=['category', 'classname', 'dest_dir', 'furni_id', 'furni_line', 'has_icon', 'has_swf', 'revision', 'source_icon', 'source_swf', 'special_type', 'status', 'type']
+[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/habbo/library/summary", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 513, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 357, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 384, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[habbo-diag] direct-page:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=5000/17464 matched=4840
+[P0][BOUNDARY] bytes-response {"bytes": 985, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 464, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 235, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 409, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 588, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 504, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 471, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 263, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 324, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 359, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 518, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 402, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 347, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 473, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 751, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 238, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 611, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 321, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 503, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 505, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 347, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 3141, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 289, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[habbo-diag] endpoint:page reqId=1 root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified type=room category=bed search='' page=1 pageSize=15
+[habbo-diag] endpoint:page probe reqId=1 branch=prefer-existing-index-page rootCount=17464 indexExists=True indexSize=9678186 payloadKind=list recordSource=root-list itemsFieldKind=list-self itemsFieldCount=17464 totalItemsField=0 topKeys=[] summaryKeys=[] firstRecordKeys=['category', 'classname', 'dest_dir', 'furni_id', 'furni_line', 'has_icon', 'has_swf', 'revision', 'source_icon', 'source_swf', 'special_type', 'status', 'type']
+[habbo-diag] endpoint:page result reqId=1 branch=query-existing-index-page-fast rootCount=17464 indexExists=True indexSize=9678186 payloadKind=list recordSource=root-list itemsFieldKind=list-self itemsFieldCount=17464 totalItemsField=0 topKeys=[] summaryKeys=[] firstRecordKeys=['category', 'classname', 'dest_dir', 'furni_id', 'furni_line', 'has_icon', 'has_swf', 'revision', 'source_icon', 'source_swf', 'special_type', 'status', 'type']
+[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/habbo/library/page", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 666, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "acceptance-1777119899123-02-habbo-root-and-open.json", "path": "logs\\self-check\\acceptance-1777119899123-02-habbo-root-and-open.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 314, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "state-actions-boundary-1777119899123-acceptance-summary.json", "path": "logs\\self-check\\state-actions-boundary-1777119899123-acceptance-summary.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 321, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 264, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 304, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 299, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "acceptance-summary-1777119899123.json", "path": "logs\\self-check\\acceptance-summary-1777119899123.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 319, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 318, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 325, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 322, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 320, "contentType": "image/png", "method": "GET", "path": "/api/habbo/library/icon", "status": 200}
+[P0][BOUNDARY] bytes-response {"bytes": 11520, "contentType": "application/x-shockwave-flash", "method": "GET", "path": "/api/habbo/file", "status": 200}
+[habbo-diag] direct-page:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=10000/17464 matched=9578
+[P0][SUMMARY] self-check-report-saved {"file": "state-actions-boundary-1777119899123-after-habbo-place.json", "path": "logs\\self-check\\state-actions-boundary-1777119899123-after-habbo-place.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "acceptance-1777119899123-03-habbo-first-item-place.json", "path": "logs\\self-check\\acceptance-1777119899123-03-habbo-first-item-place.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "state-actions-boundary-1777119899123-acceptance-summary.json", "path": "logs\\self-check\\state-actions-boundary-1777119899123-acceptance-summary.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "acceptance-summary-1777119899123.json", "path": "logs\\self-check\\acceptance-summary-1777119899123.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "acceptance-1777119899123-04-editor-x5-save-return-place.json", "path": "logs\\self-check\\acceptance-1777119899123-04-editor-x5-save-return-place.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "state-actions-boundary-1777119899123-acceptance-summary.json", "path": "logs\\self-check\\state-actions-boundary-1777119899123-acceptance-summary.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "acceptance-summary-1777119899123.json", "path": "logs\\self-check\\acceptance-summary-1777119899123.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "editor-auto-1777119899123-boot.json", "path": "logs\\self-check\\editor-auto-1777119899123-boot.json"}
+[P0][SUMMARY] self-check-report-saved {"file": "editor-auto-1777119899123-save-start.json", "path": "logs\\self-check\\editor-auto-1777119899123-save-start.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/prefabs/save", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "editor-auto-1777119899123-save-success.json", "path": "logs\\self-check\\editor-auto-1777119899123-save-success.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[habbo-diag] direct-page:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=15000/17464 matched=14358
+[habbo-config:get] root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified exists=True itemCount=17464
+[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/habbo/config", "status": 200}
+[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/prefabs/index", "status": 200}
+[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/scenes/default", "status": 200}
+[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/health", "status": 200}
+[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/scenes/default", "status": 200}
+[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/prefabs/index", "status": 200}
+[habbo-diag] endpoint:summary reqId=p0-habbo-summary root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified
+[habbo-diag] endpoint:summary probe reqId=p0-habbo-summary branch=prefer-existing-index-summary rootCount=17464 indexExists=True indexSize=9678186 payloadKind=list recordSource=root-list itemsFieldKind=list-self itemsFieldCount=17464 totalItemsField=0 topKeys=[] summaryKeys=[] firstRecordKeys=['category', 'classname', 'dest_dir', 'furni_id', 'furni_line', 'has_icon', 'has_swf', 'revision', 'source_icon', 'source_swf', 'special_type', 'status', 'type']
+[habbo-diag] direct-summary:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=1/17464 total=1
+[habbo-diag] direct-summary:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=5000/17464 total=5000
+[habbo-diag] direct-summary:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=10000/17464 total=10000
+[habbo-diag] direct-summary:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=15000/17464 total=15000
+[habbo-diag] direct-summary:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=17464/17464 total=17464
+[habbo-diag] endpoint:summary result reqId=p0-habbo-summary branch=derive-from-index-records-fast rootCount=17464 indexExists=True indexSize=9678186 payloadKind=list recordSource=root-list itemsFieldKind=list-self itemsFieldCount=17464 totalItemsField=0 topKeys=[] summaryKeys=[] firstRecordKeys=['category', 'classname', 'dest_dir', 'furni_id', 'furni_line', 'has_icon', 'has_swf', 'revision', 'source_icon', 'source_swf', 'special_type', 'status', 'type']
+[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/habbo/library/summary", "status": 200}
+[habbo-diag] endpoint:page reqId=p0-habbo-page root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified type=room category=all search='' page=1 pageSize=1
+[habbo-diag] endpoint:page probe reqId=p0-habbo-page branch=prefer-existing-index-page rootCount=17464 indexExists=True indexSize=9678186 payloadKind=list recordSource=root-list itemsFieldKind=list-self itemsFieldCount=17464 totalItemsField=0 topKeys=[] summaryKeys=[] firstRecordKeys=['category', 'classname', 'dest_dir', 'furni_id', 'furni_line', 'has_icon', 'has_swf', 'revision', 'source_icon', 'source_swf', 'special_type', 'status', 'type']
+[habbo-diag] direct-page:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=1/17464 matched=1
+[habbo-diag] direct-page:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=17464/17464 matched=16662
+[habbo-diag] endpoint:page result reqId=p0-habbo-page branch=query-existing-index-page-fast rootCount=17464 indexExists=True indexSize=9678186 payloadKind=list recordSource=root-list itemsFieldKind=list-self itemsFieldCount=17464 totalItemsField=0 topKeys=[] summaryKeys=[] firstRecordKeys=['category', 'classname', 'dest_dir', 'furni_id', 'furni_line', 'has_icon', 'has_swf', 'revision', 'source_icon', 'source_swf', 'special_type', 'status', 'type']
+[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/habbo/library/page", "status": 200}
+[P1b][BOUNDARY] client-disconnected {"during": "json-write", "error": "[WinError 10053] 你的主机中的软件中止了一个已建立的连接。", "errorClass": "ConnectionAbortedError", "method": "GET", "path": "/api/habbo/library/page", "status": 200}
+[habbo-diag] direct-page:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=5000/17464 matched=4840
+[habbo-diag] direct-page:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=10000/17464 matched=9578
+[habbo-diag] direct-page:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=15000/17464 matched=14358
+[habbo-diag] direct-page:progress root=E:\hzh\02_娱乐\Habbo\habbofurni_models_classified scanned=17464/17464 matched=16662
+[habbo-diag] endpoint:page result reqId=p0-habbo-page branch=query-existing-index-page-fast rootCount=17464 indexExists=True indexSize=9678186 payloadKind=list recordSource=root-list itemsFieldKind=list-self itemsFieldCount=17464 totalItemsField=0 topKeys=[] summaryKeys=[] firstRecordKeys=['category', 'classname', 'dest_dir', 'furni_id', 'furni_line', 'has_icon', 'has_swf', 'revision', 'source_icon', 'source_swf', 'special_type', 'status', 'type']
+[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/habbo/library/page", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "state-actions-boundary-1777119899123-after-editor-roundtrip.json", "path": "logs\\self-check\\state-actions-boundary-1777119899123-after-editor-roundtrip.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "acceptance-1777119899123-04-editor-x5-save-return-place.json", "path": "logs\\self-check\\acceptance-1777119899123-04-editor-x5-save-return-place.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "state-actions-boundary-1777119899123-acceptance-summary.json", "path": "logs\\self-check\\state-actions-boundary-1777119899123-acceptance-summary.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "acceptance-summary-1777119899123.json", "path": "logs\\self-check\\acceptance-summary-1777119899123.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "state-actions-boundary-1777119899123-after-scene-save-load.json", "path": "logs\\self-check\\state-actions-boundary-1777119899123-after-scene-save-load.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "acceptance-1777119899123-05-scene-save-load.json", "path": "logs\\self-check\\acceptance-1777119899123-05-scene-save-load.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "state-actions-boundary-1777119899123-acceptance-summary.json", "path": "logs\\self-check\\state-actions-boundary-1777119899123-acceptance-summary.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "acceptance-summary-1777119899123.json", "path": "logs\\self-check\\acceptance-summary-1777119899123.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "acceptance-1777119899123-06-main-camera-rotation.json", "path": "logs\\self-check\\acceptance-1777119899123-06-main-camera-rotation.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "state-actions-boundary-1777119899123-acceptance-summary.json", "path": "logs\\self-check\\state-actions-boundary-1777119899123-acceptance-summary.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "acceptance-summary-1777119899123.json", "path": "logs\\self-check\\acceptance-summary-1777119899123.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "acceptance-1777119899123-06-lighting-visual-replay.json", "path": "logs\\self-check\\acceptance-1777119899123-06-lighting-visual-replay.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "state-actions-boundary-1777119899123-acceptance-summary.json", "path": "logs\\self-check\\state-actions-boundary-1777119899123-acceptance-summary.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "acceptance-summary-1777119899123.json", "path": "logs\\self-check\\acceptance-summary-1777119899123.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "acceptance-1777119899123-07-player-walk.json", "path": "logs\\self-check\\acceptance-1777119899123-07-player-walk.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "state-actions-boundary-1777119899123-acceptance-summary.json", "path": "logs\\self-check\\state-actions-boundary-1777119899123-acceptance-summary.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "acceptance-summary-1777119899123.json", "path": "logs\\self-check\\acceptance-summary-1777119899123.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/health", "status": 200}
+e-script.json", "path": "logs\\self-check\\editor-normal-1777119899123-html-before-script.json"}
+[P0][SUMMARY] self-check-report-saved {"file": "editor-normal-1777119899123-script-dom-ready.json", "path": "logs\\self-check\\editor-normal-1777119899123-script-dom-ready.json"}
+[P0][SUMMARY] self-check-report-saved {"file": "editor-normal-1777119899123-script-begin.json", "path": "logs\\self-check\\editor-normal-1777119899123-script-begin.json"}
+[P0][SUMMARY] self-check-report-saved {"file": "editor-normal-1777119899123-ready.json", "path": "logs\\self-check\\editor-normal-1777119899123-ready.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "editor-normal-1777119899123-dom-content-loaded.json", "path": "logs\\self-check\\editor-normal-1777119899123-dom-content-loaded.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}
+[P0][BOUNDARY] json-response {"method": "GET", "path": "/api/prefabs/index", "status": 200}
+[P0][SUMMARY] self-check-report-saved {"file": "editor-normal-1777119899123-window-load.json", "path": "logs\\self-check\\editor-normal-1777119899123-window-load.json"}
+[P0][BOUNDARY] json-response {"method": "POST", "path": "/api/self-check/report", "status": 200}

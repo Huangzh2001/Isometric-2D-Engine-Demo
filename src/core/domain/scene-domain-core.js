@@ -346,21 +346,77 @@ var __APP_CORE_SCENE_DOMAIN_CORE__ = (function () {
     };
   }
 
-  function computePlayerSliceRenderableSort(playerBox, sliceZ, sortBias) {
-    var payload = playerBox && playerBox.slice ? playerBox : { player: playerBox || null, slice: { z: sliceZ } };
-    var box = payload.player || playerBox || {};
-    var slice = payload.slice || { z: sliceZ };
-    var x = toInt(box.x != null ? box.x : (payload.player && payload.player.x), 0);
-    var y = toInt(box.y != null ? box.y : (payload.player && payload.player.y), 0);
-    var z = toInt(slice && slice.z, toInt(box.z, 0));
+
+  function computePlayerActorRenderableSort(playerBox, sortBias) {
+    var payload = playerBox && typeof playerBox === 'object' ? playerBox : {};
+    var player = payload.player && typeof payload.player === 'object' ? payload.player : payload;
+    var x = Number(player && player.x);
+    if (!Number.isFinite(x)) x = 0;
+    var y = Number(player && player.y);
+    if (!Number.isFinite(y)) y = 0;
+    var z = Number(player && player.z);
+    if (!Number.isFinite(z)) z = 0;
     var viewRotation = normalizeViewRotationLocal(payload.viewRotation != null ? payload.viewRotation : 0);
     var sortMeta = computeViewAwareSortMeta({ x: x, y: y, z: z }, 0, viewRotation, sortBias);
     return {
-      sortKey: sortMeta.sortKey,
-      tie: 500000 + sortMeta.tie,
+      sortKey: Number(sortMeta.sortKey || 0) + 0.0007,
+      tie: 700000 + Number(sortMeta.tie || 0),
       occludesPlayer: false,
-      sortMode: 'player-slice'
+      sortMode: 'player-foot-anchor',
+      depthAnchor: { x: x, y: y, z: z },
+      rotatedPoint: sortMeta.rotatedPoint || null
     };
+  }
+
+  function buildTileAlignedSpriteRenderParts(input) {
+    var safe = input && typeof input === 'object' ? input : {};
+    var maxParts = Math.max(1, toInt(safe.maxParts, 4));
+    var viewRotation = normalizeViewRotationLocal(safe.viewRotation != null ? safe.viewRotation : 0);
+    var rawCells = Array.isArray(safe.cells) ? safe.cells : [];
+    var byFootCell = Object.create(null);
+    for (var i = 0; i < rawCells.length; i++) {
+      var raw = rawCells[i] || {};
+      var x = toInt(raw.x, 0);
+      var y = toInt(raw.y, 0);
+      var z = toInt(raw.z, 0);
+      var h = Math.max(1, toInt(raw.h, 1));
+      var key = String(x) + ',' + String(y);
+      var existing = byFootCell[key];
+      if (!existing || z < existing.z) {
+        byFootCell[key] = { x: x, y: y, z: z, h: h, columnTopZ: z + h };
+      } else if (existing && z + h > existing.columnTopZ) {
+        existing.columnTopZ = z + h;
+        existing.h = Math.max(existing.h, existing.columnTopZ - existing.z);
+      }
+    }
+    var cells = Object.keys(byFootCell).map(function (key) { return byFootCell[key]; });
+    cells.sort(function (a, b) {
+      var am = computeViewAwareSortMeta({ x: a.x, y: a.y, z: a.z }, a.h, viewRotation, 0);
+      var bm = computeViewAwareSortMeta({ x: b.x, y: b.y, z: b.z }, b.h, viewRotation, 0);
+      if (am.rotatedPoint.x !== bm.rotatedPoint.x) return am.rotatedPoint.x - bm.rotatedPoint.x;
+      if (am.rotatedPoint.y !== bm.rotatedPoint.y) return am.rotatedPoint.y - bm.rotatedPoint.y;
+      if (a.z !== b.z) return a.z - b.z;
+      return 0;
+    });
+    if (cells.length <= 1) {
+      return { split: false, reason: cells.length ? 'single-footprint-cell' : 'missing-footprint-cells', partCount: cells.length, parts: cells };
+    }
+    if (cells.length > maxParts) {
+      return { split: false, reason: 'too-many-footprint-cells', partCount: cells.length, maxParts: maxParts, parts: cells };
+    }
+    var parts = cells.map(function (cell, index) {
+      var order = computeViewAwareSortMeta({ x: cell.x, y: cell.y, z: cell.z }, cell.h, viewRotation, 0);
+      return {
+        partId: 'cell-' + String(cell.x) + '-' + String(cell.y) + '-' + String(cell.z),
+        cell: { x: cell.x, y: cell.y, z: cell.z, h: cell.h },
+        sourceIndex: index,
+        sourceCount: cells.length,
+        sortKey: order.sortKey,
+        tie: order.tie,
+        rotatedPoint: order.rotatedPoint
+      };
+    });
+    return { split: true, reason: 'tile-aligned-footprint-split', partCount: parts.length, maxParts: maxParts, parts: parts };
   }
 
   function compareRenderableOrder(a, b) {
@@ -407,7 +463,7 @@ var __APP_CORE_SCENE_DOMAIN_CORE__ = (function () {
     return {
       phase: PHASE,
       owner: OWNER,
-      pureFunctions: ['deriveBoxesFromInstances', 'buildOccupancyIndex', 'canPlaceBoxes', 'buildColumnTopIndex', 'summarizeSupportPlane', 'resolveSupportPlane', 'projectWorldBoxes', 'getInstanceBoundsFromBoxes', 'computeProjectedPlayerSpriteOcclusion', 'computeVoxelRenderableSort', 'computeSpriteRenderableSort', 'computePlayerSliceRenderableSort', 'compareRenderableOrder', 'evaluatePlacementCandidate', 'deriveSceneGraph'],
+      pureFunctions: ['deriveBoxesFromInstances', 'buildOccupancyIndex', 'canPlaceBoxes', 'buildColumnTopIndex', 'summarizeSupportPlane', 'resolveSupportPlane', 'projectWorldBoxes', 'getInstanceBoundsFromBoxes', 'computeProjectedPlayerSpriteOcclusion', 'computeVoxelRenderableSort', 'computeSpriteRenderableSort', 'computePlayerActorRenderableSort', 'buildTileAlignedSpriteRenderParts', 'compareRenderableOrder', 'evaluatePlacementCandidate', 'deriveSceneGraph'],
       wiredInto: ['src/application/placement/placement.js:rebuildBoxesFromInstances', 'src/application/placement/placement.js:placeCurrentPrefab', 'src/application/placement/placement.js:commitPreview.drag', 'src/presentation/render/render.js:computeCandidate', 'src/presentation/render/render.js:buildStaticVoxelRenderable', 'src/presentation/render/render.js:computeSpriteRenderableSort', 'src/presentation/render/render.js:buildRenderables'],
       notes: ['P4-E keeps placement authority in domain and exposes only pure placement / scene rule functions. Platform binding moved out of core.']
     };
@@ -427,7 +483,8 @@ var __APP_CORE_SCENE_DOMAIN_CORE__ = (function () {
     computeProjectedPlayerSpriteOcclusion: computeProjectedPlayerSpriteOcclusion,
     computeVoxelRenderableSort: computeVoxelRenderableSort,
     computeSpriteRenderableSort: computeSpriteRenderableSort,
-    computePlayerSliceRenderableSort: computePlayerSliceRenderableSort,
+        computePlayerActorRenderableSort: computePlayerActorRenderableSort,
+    buildTileAlignedSpriteRenderParts: buildTileAlignedSpriteRenderParts,
     compareRenderableOrder: compareRenderableOrder,
     evaluatePlacementCandidate: evaluatePlacementCandidate,
     deriveSceneGraph: deriveSceneGraph,

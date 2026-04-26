@@ -1,0 +1,116 @@
+{
+  "phase": "P8X",
+  "owner": "src/infrastructure/self-check/scenario-runner.js",
+  "sessionId": "1777119899123",
+  "entry": {
+    "kind": "main",
+    "label": "主程序",
+    "entryFile": "index.html",
+    "launcherHint": "start.bat",
+    "build": "20260326-shadow-controls-v8"
+  },
+  "query": "?fromEditor=1&t=1777119917081&reason=scenario-editor-save&prefabId=auto_x5_777119899123",
+  "flow": {
+    "name": "06-main-camera-rotation",
+    "startedAt": "2026-04-25T12:27:05.332Z",
+    "steps": [
+      {
+        "name": "rotate-right-animated-1",
+        "at": "2026-04-25T12:27:19.307Z",
+        "detail": {
+          "replayStep": "rotate-right-animated-1",
+          "animationEnabled": true,
+          "rotationAnimationMs": 160,
+          "interpolationEnabled": true,
+          "interpolationMode": "easeInOut",
+          "beforeViewRotation": 0,
+          "afterViewRotation": 1,
+          "passed": true
+        }
+      },
+      {
+        "name": "rotate-right-animated-2",
+        "at": "2026-04-25T12:27:20.347Z",
+        "detail": {
+          "replayStep": "rotate-right-animated-2",
+          "animationEnabled": true,
+          "rotationAnimationMs": 160,
+          "interpolationEnabled": true,
+          "interpolationMode": "easeInOut",
+          "beforeViewRotation": 1,
+          "afterViewRotation": 2,
+          "passed": true
+        }
+      },
+      {
+        "name": "rotate-left-discrete-1",
+        "at": "2026-04-25T12:27:22.562Z",
+        "detail": {
+          "replayStep": "rotate-left-discrete-1",
+          "animationEnabled": false,
+          "rotationAnimationMs": 160,
+          "interpolationEnabled": true,
+          "interpolationMode": "easeInOut",
+          "beforeViewRotation": 2,
+          "afterViewRotation": 1,
+          "passed": true
+        }
+      },
+      {
+        "name": "rotate-right-animated-no-interp",
+        "at": "2026-04-25T12:27:27.563Z",
+        "detail": {
+          "replayStep": "rotate-right-animated-no-interp",
+          "animationEnabled": true,
+          "rotationAnimationMs": 320,
+          "interpolationEnabled": false,
+          "interpolationMode": "easeInOut",
+          "beforeViewRotation": 1,
+          "afterViewRotation": 2,
+          "passed": true
+        }
+      },
+      {
+        "name": "rotate-left-linear",
+        "at": "2026-04-25T12:27:31.264Z",
+        "detail": {
+          "replayStep": "rotate-left-linear",
+          "animationEnabled": true,
+          "rotationAnimationMs": 320,
+          "interpolationEnabled": true,
+          "interpolationMode": "linear",
+          "beforeViewRotation": 2,
+          "afterViewRotation": 1,
+          "passed": true
+        }
+      }
+    ],
+    "ok": true,
+    "finishedAt": "2026-04-25T12:27:32.363Z"
+  },
+  "session": {
+    "scenarioNames": [
+      "baseline",
+      "habbo-root-open",
+      "habbo-first-place",
+      "editor-x5-roundtrip",
+      "scene-save-load",
+      "main-camera-rotation",
+      "lighting-visual",
+      "player-walk",
+      "editor-normal-health"
+    ],
+    "currentIndex": 5
+  },
+  "visibleRuntimeErrors": {
+    "label": "06-main-camera-rotation",
+    "bannerVisible": false,
+    "bannerText": "",
+    "bannerUpdatedAt": "",
+    "historyCount": 0,
+    "newEntryCount": 0,
+    "latestHistory": [],
+    "newEntries": [],
+    "lastEntry": null
+  }
+}

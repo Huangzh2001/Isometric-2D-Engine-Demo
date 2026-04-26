@@ -1,0 +1,814 @@
+{
+  "phase": "P8X",
+  "owner": "src/infrastructure/self-check/scenario-runner.js",
+  "sessionId": "1777119899123",
+  "entry": {
+    "kind": "main",
+    "label": "主程序",
+    "entryFile": "index.html",
+    "launcherHint": "start.bat",
+    "build": "20260326-shadow-controls-v8"
+  },
+  "query": "?fromEditor=1&t=1777119917081&reason=scenario-editor-save&prefabId=auto_x5_777119899123",
+  "flow": {
+    "name": "05-scene-save-load",
+    "startedAt": "2026-04-25T12:26:09.104Z",
+    "steps": [
+      {
+        "name": "preview-target",
+        "at": "2026-04-25T12:26:47.487Z",
+        "detail": {
+          "ok": true,
+          "cell": {
+            "x": 2,
+            "y": 0
+          },
+          "preview": {
+            "prefabId": "debug_cube_5faces",
+            "origin": {
+              "x": 2,
+              "y": 0,
+              "z": 0
+            },
+            "valid": true
+          }
+        }
+      },
+      {
+        "name": "restored",
+        "at": "2026-04-25T12:27:01.818Z",
+        "detail": {
+          "beforeInstances": 6,
+          "afterInstances": 6
+        }
+      },
+      {
+        "name": "state-actions-boundary-after-scene-save-load",
+        "at": "2026-04-25T12:27:01.818Z",
+        "detail": {
+          "phase": "P19-SA",
+          "owner": "src/application/state/state-actions.js",
+          "label": "after-scene-save-load",
+          "available": true,
+          "counters": {
+            "runtimeStateHits": 6,
+            "selectorHits": 23,
+            "prefabRegistryHits": 2,
+            "legacyGlobalHits": 0,
+            "oldEntryHits": 0,
+            "fallbackCount": 0
+          },
+          "lastEvent": {
+            "at": "2026-04-25T12:26:45.403Z",
+            "kind": "selector",
+            "route": "state.selectors.getEditorMode",
+            "detail": {
+              "mode": "place",
+              "source": "state-actions:readEditorMode"
+            }
+          },
+          "lastFallback": null,
+          "recentEvents": [
+            {
+              "at": "2026-04-25T12:26:44.337Z",
+              "kind": "selector",
+              "route": "state.selectors.getSelectedPrefabId",
+              "detail": {
+                "prefabId": "debug_cube_5faces",
+                "source": "state-actions:readSelectedPrefabId"
+              }
+            },
+            {
+              "at": "2026-04-25T12:26:44.337Z",
+              "kind": "selector",
+              "route": "state.selectors.getEditorMode",
+              "detail": {
+                "mode": "place",
+                "source": "state-actions:readEditorMode"
+              }
+            },
+            {
+              "at": "2026-04-25T12:26:44.337Z",
+              "kind": "selector",
+              "route": "state.selectors.getEditorMode",
+              "detail": {
+                "mode": "place",
+                "source": "state-actions:readEditorMode"
+              }
+            },
+            {
+              "at": "2026-04-25T12:26:44.337Z",
+              "kind": "runtime-state",
+              "route": "state.runtimeState.setEditorModeValue",
+              "detail": {
+                "source": "ui.prefabSelect.change:mode",
+                "mode": "place"
+              }
+            },
+            {
+              "at": "2026-04-25T12:26:44.337Z",
+              "kind": "selector",
+              "route": "state.selectors.getEditorMode",
+              "detail": {
+                "mode": "place",
+                "source": "state-actions:readEditorMode"
+              }
+            },
+            {
+              "at": "2026-04-25T12:26:45.402Z",
+              "kind": "selector",
+              "route": "state.selectors.getEditorMode",
+              "detail": {
+                "mode": "place",
+                "source": "state-actions:readEditorMode"
+              }
+            },
+            {
+              "at": "2026-04-25T12:26:45.403Z",
+              "kind": "runtime-state",
+              "route": "state.runtimeState.setEditorModeValue",
+              "detail": {
+                "source": "ui.modePlace.click",
+                "mode": "place"
+              }
+            },
+            {
+              "at": "2026-04-25T12:26:45.403Z",
+              "kind": "selector",
+              "route": "state.selectors.getEditorMode",
+              "detail": {
+                "mode": "place",
+                "source": "state-actions:readEditorMode"
+              }
+            }
+          ],
+          "recentFallbacks": []
+        }
+      },
+      {
+        "name": "application-boundary-after-scene-save-load",
+        "at": "2026-04-25T12:27:02.724Z",
+        "detail": {
+          "owner": "src/application/controllers/app-controllers.js",
+          "phase": "P15-APP",
+          "label": "after-scene-save-load",
+          "available": true,
+          "counters": {
+            "stateActionHits": 7,
+            "prefabRegistryHits": 2,
+            "runtimeStateHits": 165905,
+            "serviceWorkflowHits": 8,
+            "selectorHits": 2,
+            "legacyGlobalHits": 0,
+            "fallbackCount": 0
+          },
+          "lastEvent": {
+            "at": "2026-04-25T12:27:02.583Z",
+            "kind": "runtime-state",
+            "route": "state.runtimeState.editor.cameraSettings.read",
+            "detail": {
+              "source": "presentation.ui.ui-inspectors",
+              "settings": {
+                "viewRotation": 0,
+                "visualRotation": 0,
+                "isViewRotating": false,
+                "rotationAnimationEnabled": true,
+                "rotationAnimationMs": 160,
+                "rotationInterpolationEnabled": true,
+                "rotationInterpolationMode": "easeInOut",
+                "zoom": 1,
+                "minZoom": 0.5,
+                "maxZoom": 2,
+                "cameraCullingEnabled": true,
+                "cullingMargin": 2,
+                "showCameraBounds": false,
+                "showCullingBounds": false,
+                "surfaceOnlyRenderingEnabled": true,
+                "debugVisibleSurfaces": false,
+                "staticWorldFaceMergeEnabled": true,
+                "disableFaceMergeAtOrAboveZoomEnabled": false,
+                "disableFaceMergeAtOrAboveZoomThreshold": 1.6
+              }
+            }
+          },
+          "lastFallback": null,
+          "recentEvents": [
+            {
+              "at": "2026-04-25T12:27:02.583Z",
+              "kind": "runtime-state",
+              "route": "state.runtimeState.editor.visualRotation.read",
+              "detail": {
+                "source": "presentation.render.logic",
+                "visualRotation": 0,
+                "isViewRotating": false
+              }
+            },
+            {
+              "at": "2026-04-25T12:27:02.583Z",
+              "kind": "runtime-state",
+              "route": "state.runtimeState.editor.visualRotation.read",
+              "detail": {
+                "source": "presentation.render.logic",
+                "visualRotation": 0,
+                "isViewRotating": false
+              }
+            },
+            {
+              "at": "2026-04-25T12:27:02.583Z",
+              "kind": "runtime-state",
+              "route": "state.runtimeState.editor.visualRotation.read",
+              "detail": {
+                "source": "presentation.render.logic",
+                "visualRotation": 0,
+                "isViewRotating": false
+              }
+            },
+            {
+              "at": "2026-04-25T12:27:02.583Z",
+              "kind": "runtime-state",
+              "route": "state.runtimeState.editor.rotation.read",
+              "detail": {
+                "source": "presentation.ui.ui-inspectors",
+                "viewRotation": 0
+              }
+            },
+            {
+              "at": "2026-04-25T12:27:02.583Z",
+              "kind": "runtime-state",
+              "route": "state.runtimeState.editor.cameraSettings.read",
+              "detail": {
+                "source": "presentation.ui.ui-inspectors",
+                "settings": {
+                  "viewRotation": 0,
+                  "visualRotation": 0,
+                  "isViewRotating": false,
+                  "rotationAnimationEnabled": true,
+                  "rotationAnimationMs": 160,
+                  "rotationInterpolationEnabled": true,
+                  "rotationInterpolationMode": "easeInOut",
+                  "zoom": 1,
+                  "minZoom": 0.5,
+                  "maxZoom": 2,
+                  "cameraCullingEnabled": true,
+                  "cullingMargin": 2,
+                  "showCameraBounds": false,
+                  "showCullingBounds": false,
+                  "surfaceOnlyRenderingEnabled": true,
+                  "debugVisibleSurfaces": false,
+                  "staticWorldFaceMergeEnabled": true,
+                  "disableFaceMergeAtOrAboveZoomEnabled": false,
+                  "disableFaceMergeAtOrAboveZoomThreshold": 1.6
+                }
+              }
+            },
+            {
+              "at": "2026-04-25T12:27:02.583Z",
+              "kind": "runtime-state",
+              "route": "state.runtimeState.editor.rotation.read",
+              "detail": {
+                "source": "presentation.ui.ui-inspectors",
+                "viewRotation": 0
+              }
+            },
+            {
+              "at": "2026-04-25T12:27:02.583Z",
+              "kind": "runtime-state",
+              "route": "state.runtimeState.editor.cameraSettings.read",
+              "detail": {
+                "source": "presentation.ui.ui-inspectors",
+                "settings": {
+                  "viewRotation": 0,
+                  "visualRotation": 0,
+                  "isViewRotating": false,
+                  "rotationAnimationEnabled": true,
+                  "rotationAnimationMs": 160,
+                  "rotationInterpolationEnabled": true,
+                  "rotationInterpolationMode": "easeInOut",
+                  "zoom": 1,
+                  "minZoom": 0.5,
+                  "maxZoom": 2,
+                  "cameraCullingEnabled": true,
+                  "cullingMargin": 2,
+                  "showCameraBounds": false,
+                  "showCullingBounds": false,
+                  "surfaceOnlyRenderingEnabled": true,
+                  "debugVisibleSurfaces": false,
+                  "staticWorldFaceMergeEnabled": true,
+                  "disableFaceMergeAtOrAboveZoomEnabled": false,
+                  "disableFaceMergeAtOrAboveZoomThreshold": 1.6
+                }
+              }
+            },
+            {
+              "at": "2026-04-25T12:27:02.583Z",
+              "kind": "runtime-state",
+              "route": "state.runtimeState.editor.cameraSettings.read",
+              "detail": {
+                "source": "presentation.ui.ui-inspectors",
+                "settings": {
+                  "viewRotation": 0,
+                  "visualRotation": 0,
+                  "isViewRotating": false,
+                  "rotationAnimationEnabled": true,
+                  "rotationAnimationMs": 160,
+                  "rotationInterpolationEnabled": true,
+                  "rotationInterpolationMode": "easeInOut",
+                  "zoom": 1,
+                  "minZoom": 0.5,
+                  "maxZoom": 2,
+                  "cameraCullingEnabled": true,
+                  "cullingMargin": 2,
+                  "showCameraBounds": false,
+                  "showCullingBounds": false,
+                  "surfaceOnlyRenderingEnabled": true,
+                  "debugVisibleSurfaces": false,
+                  "staticWorldFaceMergeEnabled": true,
+                  "disableFaceMergeAtOrAboveZoomEnabled": false,
+                  "disableFaceMergeAtOrAboveZoomThreshold": 1.6
+                }
+              }
+            }
+          ],
+          "recentFallbacks": []
+        }
+      },
+      {
+        "name": "placement-boundary-after-scene-save-load",
+        "at": "2026-04-25T12:27:02.724Z",
+        "detail": {
+          "owner": "src/application/placement/placement.js",
+          "phase": "P20-PLACEMENT",
+          "label": "after-scene-save-load",
+          "available": true,
+          "counters": {
+            "runtimeStateHits": 10,
+            "selectorHits": 4,
+            "placementEffectsHits": 2,
+            "routeAuditHits": 85,
+            "controllerHits": 4,
+            "ownerApiHits": 54,
+            "legacyGlobalHits": 0,
+            "compatExportHits": 0,
+            "compatHelperHits": 24,
+            "compatTotalHits": 24,
+            "fallbackCount": 0
+          },
+          "compatByName": {
+            "defaultInstances": {
+              "total": 2,
+              "mainPath": 0,
+              "helper": 2,
+              "lastSource": "placement:compat-export-call",
+              "lastCaller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at createDefaultSceneData (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:490:16) | at applySceneSnapshot (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:516:16) | at applySceneSnapshotWithExternalAssets (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:307:3)"
+            },
+            "rebuildBoxesFromInstances": {
+              "total": 6,
+              "mainPath": 0,
+              "helper": 6,
+              "lastSource": "placement:compat-export-call",
+              "lastCaller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at applySceneSnapshot (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:569:3) | at applySceneSnapshotWithExternalAssets (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:307:3) | at async loadSceneFromLocalStorage (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:662:5)"
+            },
+            "recomputeNextInstanceSerial": {
+              "total": 8,
+              "mainPath": 0,
+              "helper": 8,
+              "lastSource": "placement:compat-export-call",
+              "lastCaller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at applySceneSnapshot (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:568:3) | at applySceneSnapshotWithExternalAssets (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:307:3) | at async loadSceneFromLocalStorage (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:662:5)"
+            },
+            "assertPlacementOwnership": {
+              "total": 1,
+              "mainPath": 0,
+              "helper": 1,
+              "lastSource": "placement:compat-export-call",
+              "lastCaller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at bindApplicationModules (http://127.0.0.1:4013/src/presentation/shell/app-shell.js:86:7) | at bootstrapApplication (http://127.0.0.1:4013/src/presentation/shell/app-shell.js:182:25) | at Object.initializeMainApp (http://127.0.0.1:4013/src/presentation/shell/app-shell.js:249:20)"
+            },
+            "filterInstancesToGrid": {
+              "total": 6,
+              "mainPath": 0,
+              "helper": 6,
+              "lastSource": "placement:compat-export-call",
+              "lastCaller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at applySceneSnapshot (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:567:3) | at applySceneSnapshotWithExternalAssets (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:307:3) | at async loadSceneFromLocalStorage (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:662:5)"
+            },
+            "defaultBoxes": {
+              "total": 1,
+              "mainPath": 0,
+              "helper": 1,
+              "lastSource": "placement:compat-export-call",
+              "lastCaller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at createDefaultSceneData (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:491:12) | at applySceneSnapshot (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:516:16) | at applySceneSnapshotWithExternalAssets (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:307:3)"
+            }
+          },
+          "compatMainPathExports": [
+            "startDragging",
+            "commitPreview",
+            "cancelDrag"
+          ],
+          "lastEvent": {
+            "at": "2026-04-25T12:27:00.550Z",
+            "kind": "route-audit",
+            "route": "placement.routeAudit",
+            "detail": {
+              "source": "placement:getPlacementRouteAuditApi"
+            }
+          },
+          "lastFallback": null,
+          "recentEvents": [
+            {
+              "at": "2026-04-25T12:27:00.550Z",
+              "kind": "owner-api",
+              "route": "state.sceneSession",
+              "detail": {
+                "source": "placement:getSceneSessionApi"
+              }
+            },
+            {
+              "at": "2026-04-25T12:27:00.550Z",
+              "kind": "route-audit",
+              "route": "placement.routeAudit",
+              "detail": {
+                "source": "placement:getPlacementRouteAuditApi"
+              }
+            },
+            {
+              "at": "2026-04-25T12:27:00.550Z",
+              "kind": "owner-api",
+              "route": "state.sceneSession",
+              "detail": {
+                "source": "placement:getSceneSessionApi"
+              }
+            },
+            {
+              "at": "2026-04-25T12:27:00.550Z",
+              "kind": "route-audit",
+              "route": "placement.routeAudit",
+              "detail": {
+                "source": "placement:getPlacementRouteAuditApi"
+              }
+            },
+            {
+              "at": "2026-04-25T12:27:00.550Z",
+              "kind": "owner-api",
+              "route": "state.sceneSession",
+              "detail": {
+                "source": "placement:getSceneSessionApi"
+              }
+            },
+            {
+              "at": "2026-04-25T12:27:00.550Z",
+              "kind": "route-audit",
+              "route": "placement.routeAudit",
+              "detail": {
+                "source": "placement:getPlacementRouteAuditApi"
+              }
+            },
+            {
+              "at": "2026-04-25T12:27:00.550Z",
+              "kind": "owner-api",
+              "route": "state.sceneSession",
+              "detail": {
+                "source": "placement:getSceneSessionApi"
+              }
+            },
+            {
+              "at": "2026-04-25T12:27:00.550Z",
+              "kind": "route-audit",
+              "route": "placement.routeAudit",
+              "detail": {
+                "source": "placement:getPlacementRouteAuditApi"
+              }
+            }
+          ],
+          "recentFallbacks": [],
+          "recentCompatExports": [
+            {
+              "at": "2026-04-25T12:27:00.543Z",
+              "exportName": "filterInstancesToGrid",
+              "compatKind": "helper",
+              "source": "placement:compat-export-call",
+              "caller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at applySettings (http://127.0.0.1:4013/src/presentation/ui/ui.js:211:3) | at applySceneSnapshot (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:531:3) | at applySceneSnapshotWithExternalAssets (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:307:3)"
+            },
+            {
+              "at": "2026-04-25T12:27:00.543Z",
+              "exportName": "filterInstancesToGrid",
+              "compatKind": "helper",
+              "source": "placement:compat-export-call",
+              "caller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at Object.syncDerivedState (http://127.0.0.1:4013/src/core/state/scene-session-state.js:827:54) | at applySettings (http://127.0.0.1:4013/src/presentation/ui/ui.js:217:98) | at applySceneSnapshot (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:531:3)"
+            },
+            {
+              "at": "2026-04-25T12:27:00.543Z",
+              "exportName": "rebuildBoxesFromInstances",
+              "compatKind": "helper",
+              "source": "placement:compat-export-call",
+              "caller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at rebuildSceneBoxes (http://127.0.0.1:4013/src/core/state/scene-session-state.js:559:7) | at Object.syncDerivedState (http://127.0.0.1:4013/src/core/state/scene-session-state.js:828:5) | at applySettings (http://127.0.0.1:4013/src/presentation/ui/ui.js:217:98)"
+            },
+            {
+              "at": "2026-04-25T12:27:00.545Z",
+              "exportName": "recomputeNextInstanceSerial",
+              "compatKind": "helper",
+              "source": "placement:compat-export-call",
+              "caller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at recomputeDerivedIdentifiers (http://127.0.0.1:4013/src/core/state/scene-session-state.js:571:60) | at Object.syncDerivedState (http://127.0.0.1:4013/src/core/state/scene-session-state.js:829:5) | at applySettings (http://127.0.0.1:4013/src/presentation/ui/ui.js:217:98)"
+            },
+            {
+              "at": "2026-04-25T12:27:00.545Z",
+              "exportName": "rebuildBoxesFromInstances",
+              "compatKind": "helper",
+              "source": "placement:compat-export-call",
+              "caller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at rebuildSceneBoxes (http://127.0.0.1:4013/src/core/state/scene-session-state.js:559:7) | at Object.replaceSceneGraph (http://127.0.0.1:4013/src/core/state/scene-session-state.js:596:12) | at applySceneSnapshot (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:556:21)"
+            },
+            {
+              "at": "2026-04-25T12:27:00.547Z",
+              "exportName": "recomputeNextInstanceSerial",
+              "compatKind": "helper",
+              "source": "placement:compat-export-call",
+              "caller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at recomputeDerivedIdentifiers (http://127.0.0.1:4013/src/core/state/scene-session-state.js:571:60) | at Object.replaceSceneGraph (http://127.0.0.1:4013/src/core/state/scene-session-state.js:597:5) | at applySceneSnapshot (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:556:21)"
+            },
+            {
+              "at": "2026-04-25T12:27:00.547Z",
+              "exportName": "filterInstancesToGrid",
+              "compatKind": "helper",
+              "source": "placement:compat-export-call",
+              "caller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at Object.syncDerivedState (http://127.0.0.1:4013/src/core/state/scene-session-state.js:827:54) | at applySceneSnapshot (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:559:25) | at applySceneSnapshotWithExternalAssets (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:307:3)"
+            },
+            {
+              "at": "2026-04-25T12:27:00.547Z",
+              "exportName": "rebuildBoxesFromInstances",
+              "compatKind": "helper",
+              "source": "placement:compat-export-call",
+              "caller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at rebuildSceneBoxes (http://127.0.0.1:4013/src/core/state/scene-session-state.js:559:7) | at Object.syncDerivedState (http://127.0.0.1:4013/src/core/state/scene-session-state.js:828:5) | at applySceneSnapshot (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:559:25)"
+            },
+            {
+              "at": "2026-04-25T12:27:00.549Z",
+              "exportName": "recomputeNextInstanceSerial",
+              "compatKind": "helper",
+              "source": "placement:compat-export-call",
+              "caller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at recomputeDerivedIdentifiers (http://127.0.0.1:4013/src/core/state/scene-session-state.js:571:60) | at Object.syncDerivedState (http://127.0.0.1:4013/src/core/state/scene-session-state.js:829:5) | at applySceneSnapshot (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:559:25)"
+            },
+            {
+              "at": "2026-04-25T12:27:00.549Z",
+              "exportName": "filterInstancesToGrid",
+              "compatKind": "helper",
+              "source": "placement:compat-export-call",
+              "caller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at applySceneSnapshot (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:567:3) | at applySceneSnapshotWithExternalAssets (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:307:3) | at async loadSceneFromLocalStorage (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:662:5)"
+            },
+            {
+              "at": "2026-04-25T12:27:00.549Z",
+              "exportName": "recomputeNextInstanceSerial",
+              "compatKind": "helper",
+              "source": "placement:compat-export-call",
+              "caller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at applySceneSnapshot (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:568:3) | at applySceneSnapshotWithExternalAssets (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:307:3) | at async loadSceneFromLocalStorage (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:662:5)"
+            },
+            {
+              "at": "2026-04-25T12:27:00.549Z",
+              "exportName": "rebuildBoxesFromInstances",
+              "compatKind": "helper",
+              "source": "placement:compat-export-call",
+              "caller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at applySceneSnapshot (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:569:3) | at applySceneSnapshotWithExternalAssets (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:307:3) | at async loadSceneFromLocalStorage (http://127.0.0.1:4013/src/infrastructure/storage/scene-storage.js:662:5)"
+            }
+          ]
+        }
+      },
+      {
+        "name": "platform-boundary-after-scene-save-load",
+        "at": "2026-04-25T12:27:02.724Z",
+        "detail": {
+          "label": "after-scene-save-load",
+          "available": true,
+          "sceneWorkflow": {
+            "currentFile": "",
+            "counters": {
+              "saveSceneTargetCalls": 1,
+              "loadSceneTargetCalls": 1,
+              "startupRestoreCalls": 1
+            },
+            "lastEvent": {
+              "at": "2026-04-25T12:27:00.538Z",
+              "kind": "loadSceneTarget",
+              "detail": {
+                "target": "local",
+                "source": "ui-load-local"
+              }
+            },
+            "recentEvents": [
+              {
+                "at": "2026-04-25T12:25:19.021Z",
+                "kind": "runStartupRestore",
+                "detail": {
+                  "source": "app-shell:startup-restore",
+                  "defaultSource": "startup-default-file",
+                  "localSource": "startup-auto-restore"
+                }
+              },
+              {
+                "at": "2026-04-25T12:26:31.456Z",
+                "kind": "saveSceneTarget",
+                "detail": {
+                  "target": "local",
+                  "source": "ui-save-local"
+                }
+              },
+              {
+                "at": "2026-04-25T12:27:00.538Z",
+                "kind": "loadSceneTarget",
+                "detail": {
+                  "target": "local",
+                  "source": "ui-load-local"
+                }
+              }
+            ],
+            "sceneStorageAvailable": true,
+            "sceneFilesSupported": true,
+            "instanceCount": 6,
+            "boxCount": 14,
+            "sceneSession": {
+              "owner": "src/core/state/scene-session-state.js",
+              "phase": "P9-A",
+              "instances": 6,
+              "boxes": 14,
+              "nextId": 15,
+              "nextInstanceSerial": 7,
+              "selectedInstanceId": null,
+              "editorMode": "view",
+              "label": "scene-workflow",
+              "available": true
+            },
+            "lightCount": 5
+          },
+          "assetWorkflow": {
+            "counters": {
+              "ensureHabboRootReadyCalls": 1,
+              "ensureHabboLibrarySummaryCalls": 0,
+              "ensureHabboLibraryPageCalls": 0,
+              "runAssetScanCalls": 2,
+              "persistCustomPrefabsCalls": 0,
+              "markAssetManagedPrefabCalls": 3
+            },
+            "lastEvent": {
+              "at": "2026-04-25T12:25:19.454Z",
+              "kind": "markAssetManagedPrefab",
+              "detail": {
+                "source": "assets:Custom Prefab YOWU6L.json",
+                "prefabId": "custom_prefab_yowu6l"
+              }
+            },
+            "recentEvents": [
+              {
+                "at": "2026-04-25T12:25:17.397Z",
+                "kind": "ensureHabboRootReady",
+                "detail": {
+                  "source": "app-shell:ensure-habbo-root-ready"
+                }
+              },
+              {
+                "at": "2026-04-25T12:25:17.400Z",
+                "kind": "runAssetScan",
+                "detail": {
+                  "source": "p7a:editor-return",
+                  "force": true
+                }
+              },
+              {
+                "at": "2026-04-25T12:25:19.236Z",
+                "kind": "markAssetManagedPrefab",
+                "detail": {
+                  "source": "assets:Auto X5 777119899123.json",
+                  "prefabId": "auto_x5_777119899123"
+                }
+              },
+              {
+                "at": "2026-04-25T12:25:19.241Z",
+                "kind": "runAssetScan",
+                "detail": {
+                  "source": "app-shell:startup-asset-scan",
+                  "force": true
+                }
+              },
+              {
+                "at": "2026-04-25T12:25:19.420Z",
+                "kind": "markAssetManagedPrefab",
+                "detail": {
+                  "source": "assets:Custom Prefab YOR3YS.json",
+                  "prefabId": "custom_prefab_yor3ys"
+                }
+              },
+              {
+                "at": "2026-04-25T12:25:19.454Z",
+                "kind": "markAssetManagedPrefab",
+                "detail": {
+                  "source": "assets:Custom Prefab YOWU6L.json",
+                  "prefabId": "custom_prefab_yowu6l"
+                }
+              }
+            ],
+            "rootConfigured": true,
+            "rootExists": true,
+            "itemCount": 17464,
+            "rootConfigInFlight": false,
+            "pendingRoot": "",
+            "summaryLoaded": false,
+            "pageLoaded": false,
+            "scanInFlight": false,
+            "totalFiles": 5,
+            "importedCount": 3
+          },
+          "editorHandoff": {
+            "owner": "src/infrastructure/services/editor-handoff-api.js",
+            "label": "after-scene-save-load",
+            "counters": {
+              "readCalls": 1,
+              "clearCalls": 1,
+              "writeCalls": 0,
+              "errors": 0
+            },
+            "lastEvent": {
+              "at": "2026-04-25T12:25:19.595Z",
+              "kind": "clear",
+              "detail": {
+                "source": "application:editor-handoff-clear"
+              }
+            },
+            "recentEvents": [
+              {
+                "at": "2026-04-25T12:25:17.400Z",
+                "kind": "read",
+                "detail": {
+                  "source": "application:editor-handoff-read",
+                  "hasValue": true
+                }
+              },
+              {
+                "at": "2026-04-25T12:25:19.595Z",
+                "kind": "clear",
+                "detail": {
+                  "source": "application:editor-handoff-clear"
+                }
+              }
+            ]
+          },
+          "prefabApi": {
+            "owner": "src/infrastructure/services/prefab-api.js",
+            "label": "after-scene-save-load",
+            "counters": {
+              "fetchIndexCalls": 2,
+              "savePrefabToServerCalls": 0,
+              "listBrowserLibraryCalls": 0,
+              "savePrefabToBrowserLibraryCalls": 0,
+              "errors": 0
+            },
+            "lastEvent": {
+              "at": "2026-04-25T12:25:19.596Z",
+              "kind": "fetch-index",
+              "detail": {
+                "requestId": "p0-prefab-index",
+                "count": 5
+              }
+            },
+            "recentEvents": [
+              {
+                "at": "2026-04-25T12:25:19.022Z",
+                "kind": "fetch-index",
+                "detail": {
+                  "requestId": 1,
+                  "count": 5
+                }
+              },
+              {
+                "at": "2026-04-25T12:25:19.596Z",
+                "kind": "fetch-index",
+                "detail": {
+                  "requestId": "p0-prefab-index",
+                  "count": 5
+                }
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "ok": true,
+    "finishedAt": "2026-04-25T12:27:02.724Z"
+  },
+  "session": {
+    "scenarioNames": [
+      "baseline",
+      "habbo-root-open",
+      "habbo-first-place",
+      "editor-x5-roundtrip",
+      "scene-save-load",
+      "main-camera-rotation",
+      "lighting-visual",
+      "player-walk",
+      "editor-normal-health"
+    ],
+    "currentIndex": 4
+  },
+  "visibleRuntimeErrors": {
+    "label": "05-scene-save-load",
+    "bannerVisible": false,
+    "bannerText": "",
+    "bannerUpdatedAt": "",
+    "historyCount": 0,
+    "newEntryCount": 0,
+    "latestHistory": [],
+    "newEntries": [],
+    "lastEntry": null
+  }
+}

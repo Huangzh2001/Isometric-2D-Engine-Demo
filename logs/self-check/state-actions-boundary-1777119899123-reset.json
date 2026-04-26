@@ -1,0 +1,93 @@
+{
+  "phase": "P8X",
+  "owner": "src/infrastructure/self-check/scenario-runner.js",
+  "sessionId": "1777119899123",
+  "entry": {
+    "kind": "main",
+    "label": "主程序",
+    "entryFile": "index.html",
+    "launcherHint": "start.bat",
+    "build": "20260326-shadow-controls-v8"
+  },
+  "query": "?acceptanceReplay=1",
+  "kind": "state-actions-boundary",
+  "stage": "reset",
+  "summary": {
+    "phase": "P19-SA",
+    "owner": "src/application/state/state-actions.js",
+    "label": "replay:baseline-reset",
+    "available": true,
+    "counters": {
+      "runtimeStateHits": 0,
+      "selectorHits": 0,
+      "prefabRegistryHits": 0,
+      "legacyGlobalHits": 0,
+      "oldEntryHits": 0,
+      "fallbackCount": 0
+    },
+    "lastEvent": {
+      "at": "2026-04-25T12:24:59.126Z",
+      "kind": "reset",
+      "route": "state-actions.boundary.reset",
+      "detail": {
+        "source": "replay:baseline-reset",
+        "label": "replay:baseline-reset"
+      }
+    },
+    "lastFallback": null,
+    "recentEvents": [
+      {
+        "at": "2026-04-25T12:24:59.126Z",
+        "kind": "reset",
+        "route": "state-actions.boundary.reset",
+        "detail": {
+          "source": "replay:baseline-reset",
+          "label": "replay:baseline-reset"
+        }
+      }
+    ],
+    "recentFallbacks": []
+  },
+  "extra": {
+    "step": "state-actions-boundary-reset",
+    "detail": {
+      "ok": true,
+      "summary": {
+        "phase": "P19-SA",
+        "owner": "src/application/state/state-actions.js",
+        "label": "replay:baseline-reset",
+        "available": true,
+        "counters": {
+          "runtimeStateHits": 0,
+          "selectorHits": 0,
+          "prefabRegistryHits": 0,
+          "legacyGlobalHits": 0,
+          "oldEntryHits": 0,
+          "fallbackCount": 0
+        },
+        "lastEvent": {
+          "at": "2026-04-25T12:24:59.126Z",
+          "kind": "reset",
+          "route": "state-actions.boundary.reset",
+          "detail": {
+            "source": "replay:baseline-reset",
+            "label": "replay:baseline-reset"
+          }
+        },
+        "lastFallback": null,
+        "recentEvents": [
+          {
+            "at": "2026-04-25T12:24:59.126Z",
+            "kind": "reset",
+            "route": "state-actions.boundary.reset",
+            "detail": {
+              "source": "replay:baseline-reset",
+              "label": "replay:baseline-reset"
+            }
+          }
+        ],
+        "recentFallbacks": []
+      }
+    }
+  }
+}

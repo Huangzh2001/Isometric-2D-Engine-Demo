@@ -1,0 +1,1356 @@
+{
+  "phase": "P8X",
+  "owner": "src/infrastructure/self-check/scenario-runner.js",
+  "sessionId": "1777119899123",
+  "entry": {
+    "kind": "main",
+    "label": "主程序",
+    "entryFile": "index.html",
+    "launcherHint": "start.bat",
+    "build": "20260326-shadow-controls-v8"
+  },
+  "query": "?fromEditor=1&t=1777119917081&reason=scenario-editor-save&prefabId=auto_x5_777119899123",
+  "flow": {
+    "name": "04-editor-x5-save-return-place",
+    "startedAt": "2026-04-25T12:25:19.923Z",
+    "steps": [
+      {
+        "name": "returned-main",
+        "at": "2026-04-25T12:25:19.923Z",
+        "detail": {
+          "prefabId": "auto_x5_777119899123",
+          "reason": "scenario-editor-save",
+          "href": "http://127.0.0.1:4013/index.html?fromEditor=1&t=1777119917081&reason=scenario-editor-save&prefabId=auto_x5_777119899123"
+        }
+      },
+      {
+        "name": "preview-target",
+        "at": "2026-04-25T12:25:44.161Z",
+        "detail": {
+          "ok": true,
+          "cell": {
+            "x": 4,
+            "y": 0
+          },
+          "preview": {
+            "prefabId": "auto_x5_777119899123",
+            "origin": {
+              "x": 4,
+              "y": 0,
+              "z": 0
+            },
+            "valid": true
+          }
+        }
+      },
+      {
+        "name": "placed",
+        "at": "2026-04-25T12:25:54.508Z",
+        "detail": {
+          "beforeInstances": 5,
+          "afterInstances": 6,
+          "prefabId": "auto_x5_777119899123"
+        }
+      },
+      {
+        "name": "exit-place-mode",
+        "at": "2026-04-25T12:26:05.157Z",
+        "detail": {
+          "mode": "view",
+          "selectedPrefabId": "auto_x5_777119899123"
+        }
+      },
+      {
+        "name": "state-actions-after-editor-roundtrip",
+        "at": "2026-04-25T12:26:05.157Z",
+        "detail": {
+          "phase": "P19-SA",
+          "owner": "src/application/state/state-actions.js",
+          "counters": {
+            "modeChangeCalls": 3,
+            "prefabSelectByIndexCalls": 0,
+            "prefabSelectByIdCalls": 1,
+            "modeFallbacks": 0,
+            "prefabFallbacks": 0
+          },
+          "lastModeChange": {
+            "at": "2026-04-25T12:26:04.430Z",
+            "source": "ui.modeView.click",
+            "requestedMode": "view",
+            "beforeMode": "view",
+            "afterMode": "view",
+            "ok": true,
+            "route": "state.runtimeState.setEditorModeValue",
+            "fallbackUsed": false
+          },
+          "lastPrefabSelection": {
+            "at": "2026-04-25T12:25:19.594Z",
+            "source": "p7a:return-from-editor:prefab-id",
+            "kind": "id",
+            "requestedPrefabId": "auto_x5_777119899123",
+            "beforeIndex": 0,
+            "afterIndex": 9,
+            "beforePrefabId": "debug_cube_5faces",
+            "afterPrefabId": "auto_x5_777119899123",
+            "ok": true,
+            "route": "state.prefabRegistry.setSelectedPrefabId",
+            "fallbackUsed": false
+          },
+          "recentModeChanges": [
+            {
+              "at": "2026-04-25T12:25:19.595Z",
+              "source": "p7a:return-from-editor:mode",
+              "requestedMode": "place",
+              "beforeMode": "view",
+              "afterMode": "place",
+              "ok": true,
+              "route": "state.runtimeState.setEditorModeValue",
+              "fallbackUsed": false
+            },
+            {
+              "at": "2026-04-25T12:25:54.508Z",
+              "source": "replay:post-editor-place",
+              "requestedMode": "view",
+              "beforeMode": "place",
+              "afterMode": "view",
+              "ok": true,
+              "route": "state.runtimeState.setEditorModeValue",
+              "fallbackUsed": false
+            },
+            {
+              "at": "2026-04-25T12:26:04.430Z",
+              "source": "ui.modeView.click",
+              "requestedMode": "view",
+              "beforeMode": "view",
+              "afterMode": "view",
+              "ok": true,
+              "route": "state.runtimeState.setEditorModeValue",
+              "fallbackUsed": false
+            }
+          ],
+          "recentPrefabSelections": [
+            {
+              "at": "2026-04-25T12:25:19.594Z",
+              "source": "p7a:return-from-editor:prefab-id",
+              "kind": "id",
+              "requestedPrefabId": "auto_x5_777119899123",
+              "beforeIndex": 0,
+              "afterIndex": 9,
+              "beforePrefabId": "debug_cube_5faces",
+              "afterPrefabId": "auto_x5_777119899123",
+              "ok": true,
+              "route": "state.prefabRegistry.setSelectedPrefabId",
+              "fallbackUsed": false
+            }
+          ],
+          "label": "after-editor-roundtrip",
+          "available": true
+        }
+      },
+      {
+        "name": "state-actions-boundary-after-editor-roundtrip",
+        "at": "2026-04-25T12:26:05.157Z",
+        "detail": {
+          "phase": "P19-SA",
+          "owner": "src/application/state/state-actions.js",
+          "label": "after-editor-roundtrip",
+          "available": true,
+          "counters": {
+            "runtimeStateHits": 3,
+            "selectorHits": 10,
+            "prefabRegistryHits": 1,
+            "legacyGlobalHits": 0,
+            "oldEntryHits": 0,
+            "fallbackCount": 0
+          },
+          "lastEvent": {
+            "at": "2026-04-25T12:26:04.430Z",
+            "kind": "selector",
+            "route": "state.selectors.getEditorMode",
+            "detail": {
+              "mode": "view",
+              "source": "state-actions:readEditorMode"
+            }
+          },
+          "lastFallback": null,
+          "recentEvents": [
+            {
+              "at": "2026-04-25T12:25:19.595Z",
+              "kind": "runtime-state",
+              "route": "state.runtimeState.setEditorModeValue",
+              "detail": {
+                "source": "p7a:return-from-editor:mode",
+                "mode": "place"
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:19.595Z",
+              "kind": "selector",
+              "route": "state.selectors.getEditorMode",
+              "detail": {
+                "mode": "place",
+                "source": "state-actions:readEditorMode"
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:54.508Z",
+              "kind": "selector",
+              "route": "state.selectors.getEditorMode",
+              "detail": {
+                "mode": "place",
+                "source": "state-actions:readEditorMode"
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:54.508Z",
+              "kind": "runtime-state",
+              "route": "state.runtimeState.setEditorModeValue",
+              "detail": {
+                "source": "replay:post-editor-place",
+                "mode": "view"
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:54.508Z",
+              "kind": "selector",
+              "route": "state.selectors.getEditorMode",
+              "detail": {
+                "mode": "view",
+                "source": "state-actions:readEditorMode"
+              }
+            },
+            {
+              "at": "2026-04-25T12:26:04.429Z",
+              "kind": "selector",
+              "route": "state.selectors.getEditorMode",
+              "detail": {
+                "mode": "view",
+                "source": "state-actions:readEditorMode"
+              }
+            },
+            {
+              "at": "2026-04-25T12:26:04.430Z",
+              "kind": "runtime-state",
+              "route": "state.runtimeState.setEditorModeValue",
+              "detail": {
+                "source": "ui.modeView.click",
+                "mode": "view"
+              }
+            },
+            {
+              "at": "2026-04-25T12:26:04.430Z",
+              "kind": "selector",
+              "route": "state.selectors.getEditorMode",
+              "detail": {
+                "mode": "view",
+                "source": "state-actions:readEditorMode"
+              }
+            }
+          ],
+          "recentFallbacks": []
+        }
+      },
+      {
+        "name": "application-boundary-after-editor-roundtrip",
+        "at": "2026-04-25T12:26:06.171Z",
+        "detail": {
+          "owner": "src/application/controllers/app-controllers.js",
+          "phase": "P15-APP",
+          "label": "after-editor-roundtrip",
+          "available": true,
+          "counters": {
+            "stateActionHits": 4,
+            "prefabRegistryHits": 2,
+            "runtimeStateHits": 69010,
+            "serviceWorkflowHits": 4,
+            "selectorHits": 1,
+            "legacyGlobalHits": 0,
+            "fallbackCount": 0
+          },
+          "lastEvent": {
+            "at": "2026-04-25T12:26:06.061Z",
+            "kind": "runtime-state",
+            "route": "state.runtimeState.editor.cameraSettings.read",
+            "detail": {
+              "source": "presentation.ui.ui-inspectors",
+              "settings": {
+                "viewRotation": 0,
+                "visualRotation": 0,
+                "isViewRotating": false,
+                "rotationAnimationEnabled": true,
+                "rotationAnimationMs": 160,
+                "rotationInterpolationEnabled": true,
+                "rotationInterpolationMode": "easeInOut",
+                "zoom": 1,
+                "minZoom": 0.5,
+                "maxZoom": 2,
+                "cameraCullingEnabled": true,
+                "cullingMargin": 2,
+                "showCameraBounds": false,
+                "showCullingBounds": false,
+                "surfaceOnlyRenderingEnabled": true,
+                "debugVisibleSurfaces": false,
+                "staticWorldFaceMergeEnabled": true,
+                "disableFaceMergeAtOrAboveZoomEnabled": false,
+                "disableFaceMergeAtOrAboveZoomThreshold": 1.6
+              }
+            }
+          },
+          "lastFallback": null,
+          "recentEvents": [
+            {
+              "at": "2026-04-25T12:26:06.060Z",
+              "kind": "runtime-state",
+              "route": "state.runtimeState.editor.visualRotation.read",
+              "detail": {
+                "source": "presentation.render.logic",
+                "visualRotation": 0,
+                "isViewRotating": false
+              }
+            },
+            {
+              "at": "2026-04-25T12:26:06.060Z",
+              "kind": "runtime-state",
+              "route": "state.runtimeState.editor.visualRotation.read",
+              "detail": {
+                "source": "presentation.render.logic",
+                "visualRotation": 0,
+                "isViewRotating": false
+              }
+            },
+            {
+              "at": "2026-04-25T12:26:06.060Z",
+              "kind": "runtime-state",
+              "route": "state.runtimeState.editor.visualRotation.read",
+              "detail": {
+                "source": "presentation.render.logic",
+                "visualRotation": 0,
+                "isViewRotating": false
+              }
+            },
+            {
+              "at": "2026-04-25T12:26:06.060Z",
+              "kind": "runtime-state",
+              "route": "state.runtimeState.editor.rotation.read",
+              "detail": {
+                "source": "presentation.ui.ui-inspectors",
+                "viewRotation": 0
+              }
+            },
+            {
+              "at": "2026-04-25T12:26:06.060Z",
+              "kind": "runtime-state",
+              "route": "state.runtimeState.editor.cameraSettings.read",
+              "detail": {
+                "source": "presentation.ui.ui-inspectors",
+                "settings": {
+                  "viewRotation": 0,
+                  "visualRotation": 0,
+                  "isViewRotating": false,
+                  "rotationAnimationEnabled": true,
+                  "rotationAnimationMs": 160,
+                  "rotationInterpolationEnabled": true,
+                  "rotationInterpolationMode": "easeInOut",
+                  "zoom": 1,
+                  "minZoom": 0.5,
+                  "maxZoom": 2,
+                  "cameraCullingEnabled": true,
+                  "cullingMargin": 2,
+                  "showCameraBounds": false,
+                  "showCullingBounds": false,
+                  "surfaceOnlyRenderingEnabled": true,
+                  "debugVisibleSurfaces": false,
+                  "staticWorldFaceMergeEnabled": true,
+                  "disableFaceMergeAtOrAboveZoomEnabled": false,
+                  "disableFaceMergeAtOrAboveZoomThreshold": 1.6
+                }
+              }
+            },
+            {
+              "at": "2026-04-25T12:26:06.061Z",
+              "kind": "runtime-state",
+              "route": "state.runtimeState.editor.rotation.read",
+              "detail": {
+                "source": "presentation.ui.ui-inspectors",
+                "viewRotation": 0
+              }
+            },
+            {
+              "at": "2026-04-25T12:26:06.061Z",
+              "kind": "runtime-state",
+              "route": "state.runtimeState.editor.cameraSettings.read",
+              "detail": {
+                "source": "presentation.ui.ui-inspectors",
+                "settings": {
+                  "viewRotation": 0,
+                  "visualRotation": 0,
+                  "isViewRotating": false,
+                  "rotationAnimationEnabled": true,
+                  "rotationAnimationMs": 160,
+                  "rotationInterpolationEnabled": true,
+                  "rotationInterpolationMode": "easeInOut",
+                  "zoom": 1,
+                  "minZoom": 0.5,
+                  "maxZoom": 2,
+                  "cameraCullingEnabled": true,
+                  "cullingMargin": 2,
+                  "showCameraBounds": false,
+                  "showCullingBounds": false,
+                  "surfaceOnlyRenderingEnabled": true,
+                  "debugVisibleSurfaces": false,
+                  "staticWorldFaceMergeEnabled": true,
+                  "disableFaceMergeAtOrAboveZoomEnabled": false,
+                  "disableFaceMergeAtOrAboveZoomThreshold": 1.6
+                }
+              }
+            },
+            {
+              "at": "2026-04-25T12:26:06.061Z",
+              "kind": "runtime-state",
+              "route": "state.runtimeState.editor.cameraSettings.read",
+              "detail": {
+                "source": "presentation.ui.ui-inspectors",
+                "settings": {
+                  "viewRotation": 0,
+                  "visualRotation": 0,
+                  "isViewRotating": false,
+                  "rotationAnimationEnabled": true,
+                  "rotationAnimationMs": 160,
+                  "rotationInterpolationEnabled": true,
+                  "rotationInterpolationMode": "easeInOut",
+                  "zoom": 1,
+                  "minZoom": 0.5,
+                  "maxZoom": 2,
+                  "cameraCullingEnabled": true,
+                  "cullingMargin": 2,
+                  "showCameraBounds": false,
+                  "showCullingBounds": false,
+                  "surfaceOnlyRenderingEnabled": true,
+                  "debugVisibleSurfaces": false,
+                  "staticWorldFaceMergeEnabled": true,
+                  "disableFaceMergeAtOrAboveZoomEnabled": false,
+                  "disableFaceMergeAtOrAboveZoomThreshold": 1.6
+                }
+              }
+            }
+          ],
+          "recentFallbacks": []
+        }
+      },
+      {
+        "name": "asset-import-boundary-after-editor-roundtrip",
+        "at": "2026-04-25T12:26:06.171Z",
+        "detail": {
+          "owner": "src/application/assets/asset-import.js",
+          "phase": "P16-ASSET",
+          "label": "after-editor-roundtrip",
+          "available": true,
+          "counters": {
+            "stateActionHits": 0,
+            "prefabRegistryHits": 17,
+            "runtimeStateHits": 0,
+            "placementControllerHits": 0,
+            "selectorHits": 0,
+            "serviceWorkflowHits": 3,
+            "legacyGlobalHits": 3,
+            "fallbackCount": 0
+          },
+          "lastEvent": {
+            "at": "2026-04-25T12:25:19.590Z",
+            "kind": "prefab-registry",
+            "route": "state.prefabRegistry.getPrefabById",
+            "detail": {
+              "prefabId": "t_shape",
+              "hit": true
+            }
+          },
+          "lastFallback": null,
+          "recentEvents": [
+            {
+              "at": "2026-04-25T12:25:19.454Z",
+              "kind": "prefab-registry",
+              "route": "state.prefabRegistry.getPrototypes",
+              "detail": {
+                "source": "asset-import:getImportedPrefabById",
+                "count": 11
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:19.454Z",
+              "kind": "prefab-registry",
+              "route": "state.prefabRegistry.registerPrefab",
+              "detail": {
+                "source": "assets:Custom Prefab YOWU6L.json",
+                "prefabId": "custom_prefab_yowu6l",
+                "action": "append-new"
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:19.454Z",
+              "kind": "prefab-registry",
+              "route": "state.prefabRegistry.getPrefabById",
+              "detail": {
+                "prefabId": "custom_prefab_yowu6l",
+                "hit": true
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:19.454Z",
+              "kind": "service-workflow",
+              "route": "services.assetWorkflow.markAssetManagedPrefab",
+              "detail": {
+                "source": "assets:Custom Prefab YOWU6L.json",
+                "prefabId": "custom_prefab_yowu6l",
+                "ok": true
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:19.454Z",
+              "kind": "legacy-global",
+              "route": "global.tracePrefabRegister",
+              "detail": {
+                "source": "assets:Custom Prefab YOWU6L.json",
+                "prefabId": "custom_prefab_yowu6l"
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:19.454Z",
+              "kind": "prefab-registry",
+              "route": "state.prefabRegistry.getPrototypes",
+              "detail": {
+                "source": "asset-import:register-done-index",
+                "count": 12
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:19.467Z",
+              "kind": "prefab-registry",
+              "route": "state.prefabRegistry.getPrefabById",
+              "detail": {
+                "prefabId": "stair_3step",
+                "hit": true
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:19.590Z",
+              "kind": "prefab-registry",
+              "route": "state.prefabRegistry.getPrefabById",
+              "detail": {
+                "prefabId": "t_shape",
+                "hit": true
+              }
+            }
+          ],
+          "recentFallbacks": []
+        }
+      },
+      {
+        "name": "placement-boundary-after-editor-roundtrip",
+        "at": "2026-04-25T12:26:06.171Z",
+        "detail": {
+          "owner": "src/application/placement/placement.js",
+          "phase": "P20-PLACEMENT",
+          "label": "after-editor-roundtrip",
+          "available": true,
+          "counters": {
+            "runtimeStateHits": 5,
+            "selectorHits": 2,
+            "placementEffectsHits": 1,
+            "routeAuditHits": 31,
+            "controllerHits": 2,
+            "ownerApiHits": 13,
+            "legacyGlobalHits": 0,
+            "compatExportHits": 0,
+            "compatHelperHits": 9,
+            "compatTotalHits": 9,
+            "fallbackCount": 0
+          },
+          "compatByName": {
+            "defaultInstances": {
+              "total": 1,
+              "mainPath": 0,
+              "helper": 1,
+              "lastSource": "placement:compat-export-call",
+              "lastCaller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at http://127.0.0.1:4013/src/core/state/scene-session-state.js:555:15 | at http://127.0.0.1:4013/src/core/state/scene-session-state.js:914:3"
+            },
+            "rebuildBoxesFromInstances": {
+              "total": 2,
+              "mainPath": 0,
+              "helper": 2,
+              "lastSource": "placement:compat-export-call",
+              "lastCaller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at rebuildSceneBoxes (http://127.0.0.1:4013/src/core/state/scene-session-state.js:559:7) | at Object.syncDerivedState (http://127.0.0.1:4013/src/core/state/scene-session-state.js:828:5) | at applySettings (http://127.0.0.1:4013/src/presentation/ui/ui.js:217:98)"
+            },
+            "recomputeNextInstanceSerial": {
+              "total": 3,
+              "mainPath": 0,
+              "helper": 3,
+              "lastSource": "placement:compat-export-call",
+              "lastCaller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at recomputeDerivedIdentifiers (http://127.0.0.1:4013/src/core/state/scene-session-state.js:571:60) | at Object.addInstance (http://127.0.0.1:4013/src/core/state/scene-session-state.js:612:5) | at placeCurrentPrefab (http://127.0.0.1:4013/src/application/placement/placement.js:866:89)"
+            },
+            "assertPlacementOwnership": {
+              "total": 1,
+              "mainPath": 0,
+              "helper": 1,
+              "lastSource": "placement:compat-export-call",
+              "lastCaller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at bindApplicationModules (http://127.0.0.1:4013/src/presentation/shell/app-shell.js:86:7) | at bootstrapApplication (http://127.0.0.1:4013/src/presentation/shell/app-shell.js:182:25) | at Object.initializeMainApp (http://127.0.0.1:4013/src/presentation/shell/app-shell.js:249:20)"
+            },
+            "filterInstancesToGrid": {
+              "total": 2,
+              "mainPath": 0,
+              "helper": 2,
+              "lastSource": "placement:compat-export-call",
+              "lastCaller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at Object.syncDerivedState (http://127.0.0.1:4013/src/core/state/scene-session-state.js:827:54) | at applySettings (http://127.0.0.1:4013/src/presentation/ui/ui.js:217:98) | at applyStartupUiDefaults (http://127.0.0.1:4013/src/presentation/shell/app-shell.js:125:7)"
+            }
+          },
+          "compatMainPathExports": [
+            "startDragging",
+            "commitPreview",
+            "cancelDrag"
+          ],
+          "lastEvent": {
+            "at": "2026-04-25T12:25:52.660Z",
+            "kind": "route-audit",
+            "route": "placement.routeAudit",
+            "detail": {
+              "source": "placement:getPlacementRouteAuditApi"
+            }
+          },
+          "lastFallback": null,
+          "recentEvents": [
+            {
+              "at": "2026-04-25T12:25:52.657Z",
+              "kind": "owner-api",
+              "route": "state.sceneSession",
+              "detail": {
+                "source": "placement:getSceneSessionApi"
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:52.657Z",
+              "kind": "route-audit",
+              "route": "placement.routeAudit",
+              "detail": {
+                "source": "placement:getPlacementRouteAuditApi"
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:52.659Z",
+              "kind": "compat-export",
+              "route": "window.recomputeNextInstanceSerial",
+              "detail": {
+                "source": "placement:compat-export-call",
+                "exportName": "recomputeNextInstanceSerial",
+                "compatKind": "helper",
+                "caller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at recomputeDerivedIdentifiers (http://127.0.0.1:4013/src/core/state/scene-session-state.js:571:60) | at Object.addInstance (http://127.0.0.1:4013/src/core/state/scene-session-state.js:612:5) | at placeCurrentPrefab (http://127.0.0.1:4013/src/application/placement/placement.js:866:89)",
+                "replayContext": null
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:52.659Z",
+              "kind": "route-audit",
+              "route": "placement.routeAudit",
+              "detail": {
+                "source": "placement:getPlacementRouteAuditApi"
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:52.659Z",
+              "kind": "controller",
+              "route": "controllers.placement",
+              "detail": {
+                "source": "placement:getPlacementControllerApi"
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:52.659Z",
+              "kind": "controller",
+              "route": "controllers.placement.syncPlacementUi",
+              "detail": {
+                "source": "placement:commitPreview.place",
+                "requeuePreview": true
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:52.659Z",
+              "kind": "placement-effects",
+              "route": "placement.effects.syncPlacementUi(via-controller)",
+              "detail": {
+                "source": "placement:commitPreview.place",
+                "viaController": true,
+                "requeuePreview": true
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:52.660Z",
+              "kind": "route-audit",
+              "route": "placement.routeAudit",
+              "detail": {
+                "source": "placement:getPlacementRouteAuditApi"
+              }
+            }
+          ],
+          "recentFallbacks": [],
+          "recentCompatExports": [
+            {
+              "at": "2026-04-25T12:25:17.303Z",
+              "exportName": "defaultInstances",
+              "compatKind": "helper",
+              "source": "placement:compat-export-call",
+              "caller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at http://127.0.0.1:4013/src/core/state/scene-session-state.js:555:15 | at http://127.0.0.1:4013/src/core/state/scene-session-state.js:914:3"
+            },
+            {
+              "at": "2026-04-25T12:25:17.303Z",
+              "exportName": "rebuildBoxesFromInstances",
+              "compatKind": "helper",
+              "source": "placement:compat-export-call",
+              "caller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at rebuildSceneBoxes (http://127.0.0.1:4013/src/core/state/scene-session-state.js:559:7) | at http://127.0.0.1:4013/src/core/state/scene-session-state.js:838:3 | at http://127.0.0.1:4013/src/core/state/scene-session-state.js:914:3"
+            },
+            {
+              "at": "2026-04-25T12:25:17.306Z",
+              "exportName": "recomputeNextInstanceSerial",
+              "compatKind": "helper",
+              "source": "placement:compat-export-call",
+              "caller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at recomputeDerivedIdentifiers (http://127.0.0.1:4013/src/core/state/scene-session-state.js:571:60) | at http://127.0.0.1:4013/src/core/state/scene-session-state.js:840:3 | at http://127.0.0.1:4013/src/core/state/scene-session-state.js:914:3"
+            },
+            {
+              "at": "2026-04-25T12:25:17.394Z",
+              "exportName": "assertPlacementOwnership",
+              "compatKind": "helper",
+              "source": "placement:compat-export-call",
+              "caller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at bindApplicationModules (http://127.0.0.1:4013/src/presentation/shell/app-shell.js:86:7) | at bootstrapApplication (http://127.0.0.1:4013/src/presentation/shell/app-shell.js:182:25) | at Object.initializeMainApp (http://127.0.0.1:4013/src/presentation/shell/app-shell.js:249:20)"
+            },
+            {
+              "at": "2026-04-25T12:25:19.238Z",
+              "exportName": "filterInstancesToGrid",
+              "compatKind": "helper",
+              "source": "placement:compat-export-call",
+              "caller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at applySettings (http://127.0.0.1:4013/src/presentation/ui/ui.js:211:3) | at applyStartupUiDefaults (http://127.0.0.1:4013/src/presentation/shell/app-shell.js:125:7) | at bootstrapApplication (http://127.0.0.1:4013/src/presentation/shell/app-shell.js:219:5)"
+            },
+            {
+              "at": "2026-04-25T12:25:19.238Z",
+              "exportName": "filterInstancesToGrid",
+              "compatKind": "helper",
+              "source": "placement:compat-export-call",
+              "caller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at Object.syncDerivedState (http://127.0.0.1:4013/src/core/state/scene-session-state.js:827:54) | at applySettings (http://127.0.0.1:4013/src/presentation/ui/ui.js:217:98) | at applyStartupUiDefaults (http://127.0.0.1:4013/src/presentation/shell/app-shell.js:125:7)"
+            },
+            {
+              "at": "2026-04-25T12:25:19.238Z",
+              "exportName": "rebuildBoxesFromInstances",
+              "compatKind": "helper",
+              "source": "placement:compat-export-call",
+              "caller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at rebuildSceneBoxes (http://127.0.0.1:4013/src/core/state/scene-session-state.js:559:7) | at Object.syncDerivedState (http://127.0.0.1:4013/src/core/state/scene-session-state.js:828:5) | at applySettings (http://127.0.0.1:4013/src/presentation/ui/ui.js:217:98)"
+            },
+            {
+              "at": "2026-04-25T12:25:19.240Z",
+              "exportName": "recomputeNextInstanceSerial",
+              "compatKind": "helper",
+              "source": "placement:compat-export-call",
+              "caller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at recomputeDerivedIdentifiers (http://127.0.0.1:4013/src/core/state/scene-session-state.js:571:60) | at Object.syncDerivedState (http://127.0.0.1:4013/src/core/state/scene-session-state.js:829:5) | at applySettings (http://127.0.0.1:4013/src/presentation/ui/ui.js:217:98)"
+            },
+            {
+              "at": "2026-04-25T12:25:52.659Z",
+              "exportName": "recomputeNextInstanceSerial",
+              "compatKind": "helper",
+              "source": "placement:compat-export-call",
+              "caller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at recomputeDerivedIdentifiers (http://127.0.0.1:4013/src/core/state/scene-session-state.js:571:60) | at Object.addInstance (http://127.0.0.1:4013/src/core/state/scene-session-state.js:612:5) | at placeCurrentPrefab (http://127.0.0.1:4013/src/application/placement/placement.js:866:89)"
+            }
+          ]
+        }
+      },
+      {
+        "name": "scene-session-after-editor-roundtrip",
+        "at": "2026-04-25T12:26:06.171Z",
+        "detail": {
+          "label": "after-editor-roundtrip",
+          "available": true,
+          "session": {
+            "owner": "src/core/state/scene-session-state.js",
+            "phase": "P9-A",
+            "instances": 6,
+            "boxes": 14,
+            "nextId": 15,
+            "nextInstanceSerial": 7,
+            "selectedInstanceId": null,
+            "editorMode": "view"
+          },
+          "writes": {
+            "owner": "src/core/state/scene-session-state.js",
+            "phase": "P9-A",
+            "label": "after-editor-roundtrip",
+            "counters": {
+              "replaceSceneGraphCalls": 0,
+              "replaceInstancesCalls": 0,
+              "addInstanceCalls": 1,
+              "removeInstanceCalls": 0,
+              "removeLooseBoxCalls": 0,
+              "restoreDefaultSceneCalls": 0,
+              "ensureNonEmptySceneCalls": 0,
+              "syncDerivedStateCalls": 1,
+              "allocateInstanceIdCalls": 1,
+              "allocateBoxIdRangeCalls": 6,
+              "legacyFallbacks": 0
+            },
+            "lastWrite": {
+              "at": "2026-04-25T12:25:52.659Z",
+              "owner": "src/core/state/scene-session-state.js",
+              "action": "addInstance",
+              "extra": {
+                "source": "placement:placeCurrentPrefab",
+                "instanceId": "obj_0006",
+                "prefabId": "auto_x5_777119899123",
+                "instances": 6,
+                "boxes": 14,
+                "incremental": true
+              },
+              "summary": {
+                "owner": "src/core/state/scene-session-state.js",
+                "phase": "P9-A",
+                "instances": 6,
+                "boxes": 14,
+                "nextId": 15,
+                "nextInstanceSerial": 7,
+                "selectedInstanceId": null,
+                "editorMode": "place"
+              }
+            },
+            "recentWrites": [
+              {
+                "at": "2026-04-25T12:25:19.239Z",
+                "owner": "src/core/state/scene-session-state.js",
+                "action": "allocateBoxIdRange",
+                "extra": {
+                  "source": "placement:expandInstanceToBoxes",
+                  "count": 2,
+                  "start": 3,
+                  "endExclusive": 5
+                },
+                "summary": {
+                  "owner": "src/core/state/scene-session-state.js",
+                  "phase": "P9-A",
+                  "instances": 5,
+                  "boxes": 9,
+                  "nextId": 5,
+                  "nextInstanceSerial": 6,
+                  "selectedInstanceId": null,
+                  "editorMode": "view"
+                }
+              },
+              {
+                "at": "2026-04-25T12:25:19.239Z",
+                "owner": "src/core/state/scene-session-state.js",
+                "action": "allocateBoxIdRange",
+                "extra": {
+                  "source": "placement:expandInstanceToBoxes",
+                  "count": 2,
+                  "start": 5,
+                  "endExclusive": 7
+                },
+                "summary": {
+                  "owner": "src/core/state/scene-session-state.js",
+                  "phase": "P9-A",
+                  "instances": 5,
+                  "boxes": 9,
+                  "nextId": 7,
+                  "nextInstanceSerial": 6,
+                  "selectedInstanceId": null,
+                  "editorMode": "view"
+                }
+              },
+              {
+                "at": "2026-04-25T12:25:19.239Z",
+                "owner": "src/core/state/scene-session-state.js",
+                "action": "allocateBoxIdRange",
+                "extra": {
+                  "source": "placement:expandInstanceToBoxes",
+                  "count": 2,
+                  "start": 7,
+                  "endExclusive": 9
+                },
+                "summary": {
+                  "owner": "src/core/state/scene-session-state.js",
+                  "phase": "P9-A",
+                  "instances": 5,
+                  "boxes": 9,
+                  "nextId": 9,
+                  "nextInstanceSerial": 6,
+                  "selectedInstanceId": null,
+                  "editorMode": "view"
+                }
+              },
+              {
+                "at": "2026-04-25T12:25:19.239Z",
+                "owner": "src/core/state/scene-session-state.js",
+                "action": "allocateBoxIdRange",
+                "extra": {
+                  "source": "placement:expandInstanceToBoxes",
+                  "count": 1,
+                  "start": 9,
+                  "endExclusive": 10
+                },
+                "summary": {
+                  "owner": "src/core/state/scene-session-state.js",
+                  "phase": "P9-A",
+                  "instances": 5,
+                  "boxes": 9,
+                  "nextId": 10,
+                  "nextInstanceSerial": 6,
+                  "selectedInstanceId": null,
+                  "editorMode": "view"
+                }
+              },
+              {
+                "at": "2026-04-25T12:25:19.240Z",
+                "owner": "src/core/state/scene-session-state.js",
+                "action": "syncDerivedState",
+                "extra": {
+                  "source": "ui:applySettings",
+                  "instances": 5,
+                  "boxes": 9
+                },
+                "summary": {
+                  "owner": "src/core/state/scene-session-state.js",
+                  "phase": "P9-A",
+                  "instances": 5,
+                  "boxes": 9,
+                  "nextId": 10,
+                  "nextInstanceSerial": 6,
+                  "selectedInstanceId": null,
+                  "editorMode": "view"
+                }
+              },
+              {
+                "at": "2026-04-25T12:25:52.656Z",
+                "owner": "src/core/state/scene-session-state.js",
+                "action": "allocateInstanceId",
+                "extra": {
+                  "source": "placement:makeInstance",
+                  "value": "obj_0006",
+                  "nextInstanceSerial": 7
+                },
+                "summary": {
+                  "owner": "src/core/state/scene-session-state.js",
+                  "phase": "P9-A",
+                  "instances": 5,
+                  "boxes": 9,
+                  "nextId": 10,
+                  "nextInstanceSerial": 7,
+                  "selectedInstanceId": null,
+                  "editorMode": "place"
+                }
+              },
+              {
+                "at": "2026-04-25T12:25:52.657Z",
+                "owner": "src/core/state/scene-session-state.js",
+                "action": "allocateBoxIdRange",
+                "extra": {
+                  "source": "placement:placeCurrentPrefab",
+                  "count": 5,
+                  "start": 10,
+                  "endExclusive": 15
+                },
+                "summary": {
+                  "owner": "src/core/state/scene-session-state.js",
+                  "phase": "P9-A",
+                  "instances": 6,
+                  "boxes": 9,
+                  "nextId": 15,
+                  "nextInstanceSerial": 7,
+                  "selectedInstanceId": null,
+                  "editorMode": "place"
+                }
+              },
+              {
+                "at": "2026-04-25T12:25:52.659Z",
+                "owner": "src/core/state/scene-session-state.js",
+                "action": "addInstance",
+                "extra": {
+                  "source": "placement:placeCurrentPrefab",
+                  "instanceId": "obj_0006",
+                  "prefabId": "auto_x5_777119899123",
+                  "instances": 6,
+                  "boxes": 14,
+                  "incremental": true
+                },
+                "summary": {
+                  "owner": "src/core/state/scene-session-state.js",
+                  "phase": "P9-A",
+                  "instances": 6,
+                  "boxes": 14,
+                  "nextId": 15,
+                  "nextInstanceSerial": 7,
+                  "selectedInstanceId": null,
+                  "editorMode": "place"
+                }
+              }
+            ],
+            "session": {
+              "owner": "src/core/state/scene-session-state.js",
+              "phase": "P9-A",
+              "instances": 6,
+              "boxes": 14,
+              "nextId": 15,
+              "nextInstanceSerial": 7,
+              "selectedInstanceId": null,
+              "editorMode": "view"
+            }
+          }
+        }
+      },
+      {
+        "name": "placement-routes-after-editor-roundtrip",
+        "at": "2026-04-25T12:26:06.171Z",
+        "detail": {
+          "phase": "P8-S3",
+          "owner": "src/infrastructure/audit/placement-route-audit.js",
+          "counters": {
+            "controllerCalls": 8,
+            "controllerStateActionHits": 4,
+            "controllerUiAdapterHits": 2,
+            "controllerLegacyFallbacks": 0,
+            "controllerUiFallbacks": 0,
+            "controllerMissingRoutes": 0,
+            "coreEvents": 31,
+            "coreNewPathHits": 1,
+            "coreLegacyFallbacks": 7,
+            "coreUiSyncHits": 0,
+            "coreUiSyncFallbacks": 0
+          },
+          "lastEvent": {
+            "at": "2026-04-25T12:26:04.430Z",
+            "kind": "controller",
+            "action": "requestModeChange",
+            "route": "state-actions.requestModeChange",
+            "detail": {
+              "source": "ui.modeView.click",
+              "mode": "view",
+              "result": true
+            }
+          },
+          "lastFallback": {
+            "at": "2026-04-25T12:25:19.238Z",
+            "kind": "core",
+            "route": "filterInstancesToGrid:legacy-fallback",
+            "detail": {
+              "reason": "missing-scene-session-api",
+              "instances": 5
+            }
+          },
+          "recentEvents": [
+            {
+              "at": "2026-04-25T12:25:52.656Z",
+              "kind": "core",
+              "action": "makeInstance",
+              "route": "makeInstance",
+              "detail": {
+                "prefabId": "auto_x5_777119899123",
+                "x": 4,
+                "y": 0,
+                "z": 0,
+                "rotation": 0,
+                "instanceId": null
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:52.656Z",
+              "kind": "core",
+              "action": "allocInstanceId:owner-hit",
+              "route": "allocInstanceId:owner-hit",
+              "detail": {
+                "source": "placement:makeInstance"
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:52.657Z",
+              "kind": "core",
+              "action": "placement-commit",
+              "route": "placement-commit",
+              "detail": {
+                "instanceId": "obj_0006",
+                "prefabId": "auto_x5_777119899123",
+                "committedFacing": 0,
+                "origin": {
+                  "x": 4,
+                  "y": 0,
+                  "z": 0
+                },
+                "footprint": {
+                  "w": 3,
+                  "d": 3,
+                  "h": 1
+                },
+                "previewFacing": 0,
+                "selectedInstanceUnchanged": true
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:52.657Z",
+              "kind": "core",
+              "action": "expandInstanceToBoxes:owner-hit",
+              "route": "expandInstanceToBoxes:owner-hit",
+              "detail": {
+                "source": "placement:placeCurrentPrefab",
+                "count": 5
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:52.659Z",
+              "kind": "core",
+              "action": "recomputeNextInstanceSerial",
+              "route": "recomputeNextInstanceSerial",
+              "detail": {
+                "nextInstanceSerial": 7
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:52.660Z",
+              "kind": "controller",
+              "action": "syncPlacementUi",
+              "route": "placement.effects.syncPlacementUi",
+              "detail": {
+                "source": "placement:commitPreview.place",
+                "result": {
+                  "source": "placement:commitPreview.place",
+                  "mode": "place",
+                  "modeButtons": {
+                    "ok": true,
+                    "route": "updateModeButtons",
+                    "source": "placement:commitPreview.place:mode-buttons"
+                  },
+                  "preview": {
+                    "ok": true,
+                    "route": "updatePreview",
+                    "source": "placement:commitPreview.place:preview"
+                  },
+                  "forcePreview": false,
+                  "requeuePreview": true
+                },
+                "forcePreview": false,
+                "requeuePreview": true
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:52.660Z",
+              "kind": "core",
+              "action": "commitPreview.place:application-ui-new-path-hit",
+              "route": "commitPreview.place:application-ui-new-path-hit",
+              "detail": {
+                "source": "placement:commitPreview.place",
+                "mode": "place",
+                "modeButtons": {
+                  "ok": true,
+                  "route": "updateModeButtons",
+                  "source": "placement:commitPreview.place:mode-buttons"
+                },
+                "preview": {
+                  "ok": true,
+                  "route": "updatePreview",
+                  "source": "placement:commitPreview.place:preview"
+                },
+                "forcePreview": false,
+                "requeuePreview": true
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:52.660Z",
+              "kind": "controller",
+              "action": "commitPreview",
+              "route": "application.placementCore.commitPreview",
+              "detail": {
+                "source": "canvas.mousedown.place",
+                "mode": "place",
+                "result": "void"
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:54.508Z",
+              "kind": "controller",
+              "action": "requestModeChange",
+              "route": "state-actions.requestModeChange",
+              "detail": {
+                "source": "replay:post-editor-place",
+                "mode": "view",
+                "result": true
+              }
+            },
+            {
+              "at": "2026-04-25T12:26:04.430Z",
+              "kind": "controller",
+              "action": "requestModeChange",
+              "route": "state-actions.requestModeChange",
+              "detail": {
+                "source": "ui.modeView.click",
+                "mode": "view",
+                "result": true
+              }
+            }
+          ],
+          "label": "after-editor-roundtrip",
+          "available": true
+        }
+      },
+      {
+        "name": "placement-effects-after-editor-roundtrip",
+        "at": "2026-04-25T12:26:06.172Z",
+        "detail": {
+          "phase": "P8-S2",
+          "owner": "src/infrastructure/adapters/placement-effects.js",
+          "counters": {
+            "beginDragCalls": 0,
+            "completeDragCalls": 0,
+            "cancelDragCalls": 0,
+            "syncUiCalls": 2,
+            "runtimeModeWrites": 0,
+            "legacyModeWrites": 0,
+            "draggingWrites": 0,
+            "previewClears": 0,
+            "previewRefreshCalls": 2,
+            "modeButtonRefreshCalls": 2,
+            "uiFallbacks": 0
+          },
+          "lastEvent": {
+            "at": "2026-04-25T12:25:52.660Z",
+            "name": "sync-placement-ui",
+            "detail": {
+              "source": "placement:commitPreview.place",
+              "mode": "place",
+              "modeButtons": {
+                "ok": true,
+                "route": "updateModeButtons",
+                "source": "placement:commitPreview.place:mode-buttons"
+              },
+              "preview": {
+                "ok": true,
+                "route": "updatePreview",
+                "source": "placement:commitPreview.place:preview"
+              },
+              "forcePreview": false,
+              "requeuePreview": true
+            }
+          },
+          "recentEvents": [
+            {
+              "at": "2026-04-25T12:25:19.595Z",
+              "name": "sync-placement-ui",
+              "detail": {
+                "source": "p7a:return-from-editor:ui",
+                "mode": "place",
+                "modeButtons": {
+                  "ok": true,
+                  "route": "updateModeButtons",
+                  "source": "p7a:return-from-editor:ui:mode-buttons"
+                },
+                "preview": {
+                  "ok": true,
+                  "route": "updatePreview",
+                  "source": "p7a:return-from-editor:ui:preview"
+                },
+                "forcePreview": true,
+                "requeuePreview": true
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:52.660Z",
+              "name": "sync-placement-ui",
+              "detail": {
+                "source": "placement:commitPreview.place",
+                "mode": "place",
+                "modeButtons": {
+                  "ok": true,
+                  "route": "updateModeButtons",
+                  "source": "placement:commitPreview.place:mode-buttons"
+                },
+                "preview": {
+                  "ok": true,
+                  "route": "updatePreview",
+                  "source": "placement:commitPreview.place:preview"
+                },
+                "forcePreview": false,
+                "requeuePreview": true
+              }
+            }
+          ],
+          "label": "after-editor-roundtrip",
+          "available": true
+        }
+      },
+      {
+        "name": "runtime-routes-after-editor-roundtrip",
+        "at": "2026-04-25T12:26:06.172Z",
+        "detail": {
+          "phase": "P13-RUNTIME",
+          "owner": "src/infrastructure/audit/runtime-route-audit.js",
+          "counters": {
+            "ownerApiHits": 0,
+            "legacyBridgeHits": 0,
+            "directGlobalHits": 0,
+            "fallbackCount": 0
+          },
+          "lastEvent": null,
+          "lastFallback": null,
+          "recentEvents": [],
+          "label": "after-editor-roundtrip",
+          "available": true
+        }
+      },
+      {
+        "name": "architecture-layers-after-editor-roundtrip",
+        "at": "2026-04-25T12:26:06.172Z",
+        "detail": {
+          "phase": "P12-LAYER",
+          "owner": "src/infrastructure/audit/architecture-layer-audit.js",
+          "label": "after-editor-roundtrip",
+          "layerCounts": {
+            "presentation": 15,
+            "application": 6,
+            "core": 13,
+            "infrastructure": 17
+          },
+          "preserveLayers": [
+            "application",
+            "core"
+          ],
+          "rewriteLayers": [
+            "presentation"
+          ],
+          "rewriteInfrastructure": [
+            "platform adapters",
+            "storage/network implementations"
+          ],
+          "temporaryCompat": [
+            "legacy",
+            "audit",
+            "bridge"
+          ],
+          "available": true
+        }
+      }
+    ],
+    "ok": true,
+    "finishedAt": "2026-04-25T12:26:06.172Z"
+  },
+  "session": {
+    "scenarioNames": [
+      "baseline",
+      "habbo-root-open",
+      "habbo-first-place",
+      "editor-x5-roundtrip",
+      "scene-save-load",
+      "main-camera-rotation",
+      "lighting-visual",
+      "player-walk",
+      "editor-normal-health"
+    ],
+    "currentIndex": 3
+  },
+  "visibleRuntimeErrors": {
+    "label": "04-editor-x5-save-return-place",
+    "bannerVisible": false,
+    "bannerText": "",
+    "bannerUpdatedAt": "",
+    "historyCount": 0,
+    "newEntryCount": 0,
+    "latestHistory": [],
+    "newEntries": [],
+    "lastEntry": null
+  }
+}

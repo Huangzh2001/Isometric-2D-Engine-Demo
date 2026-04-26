@@ -1,0 +1,1447 @@
+{
+  "phase": "P8X",
+  "owner": "src/infrastructure/self-check/scenario-runner.js",
+  "sessionId": "1777119899123",
+  "entry": {
+    "kind": "main",
+    "label": "主程序",
+    "entryFile": "index.html",
+    "launcherHint": "start.bat",
+    "build": "20260326-shadow-controls-v8"
+  },
+  "query": "?acceptanceReplay=1",
+  "flow": {
+    "name": "03-habbo-first-item-place",
+    "startedAt": "2026-04-25T12:25:06.116Z",
+    "steps": [
+      {
+        "name": "visible-runtime-errors-before-habbo-place",
+        "at": "2026-04-25T12:25:06.116Z",
+        "detail": {
+          "label": "before-habbo-place",
+          "bannerVisible": false,
+          "bannerText": "",
+          "bannerUpdatedAt": "",
+          "historyCount": 0,
+          "newEntryCount": 0,
+          "latestHistory": [],
+          "newEntries": [],
+          "lastEntry": null
+        }
+      },
+      {
+        "name": "preview-target",
+        "at": "2026-04-25T12:25:11.697Z",
+        "detail": {
+          "ok": true,
+          "cell": {
+            "x": 5,
+            "y": 0
+          },
+          "preview": {
+            "prefabId": "habbo_room_bed_ad_sales_ads_spang_sleep_ads_spang_sleep",
+            "origin": {
+              "x": 6,
+              "y": 3,
+              "z": 0
+            },
+            "valid": true
+          }
+        }
+      },
+      {
+        "name": "placed",
+        "at": "2026-04-25T12:25:13.886Z",
+        "detail": {
+          "beforeInstances": 5,
+          "afterInstances": 6,
+          "selectedPrefabId": "habbo_room_bed_ad_sales_ads_spang_sleep_ads_spang_sleep"
+        }
+      },
+      {
+        "name": "visible-runtime-errors-after-habbo-place",
+        "at": "2026-04-25T12:25:13.886Z",
+        "detail": {
+          "label": "after-habbo-place",
+          "bannerVisible": false,
+          "bannerText": "",
+          "bannerUpdatedAt": "",
+          "historyCount": 0,
+          "newEntryCount": 0,
+          "latestHistory": [],
+          "newEntries": [],
+          "lastEntry": null
+        }
+      },
+      {
+        "name": "state-actions-after-habbo-place",
+        "at": "2026-04-25T12:25:13.886Z",
+        "detail": {
+          "phase": "P19-SA",
+          "owner": "src/application/state/state-actions.js",
+          "counters": {
+            "modeChangeCalls": 2,
+            "prefabSelectByIndexCalls": 0,
+            "prefabSelectByIdCalls": 2,
+            "modeFallbacks": 0,
+            "prefabFallbacks": 0
+          },
+          "lastModeChange": {
+            "at": "2026-04-25T12:25:08.566Z",
+            "source": "ui-habbo-library:place-selected:mode",
+            "requestedMode": "place",
+            "beforeMode": "view",
+            "afterMode": "place",
+            "ok": true,
+            "route": "state.runtimeState.setEditorModeValue",
+            "fallbackUsed": false
+          },
+          "lastPrefabSelection": {
+            "at": "2026-04-25T12:25:08.566Z",
+            "source": "ui-habbo-library:place-selected:prefab-id",
+            "kind": "id",
+            "requestedPrefabId": "habbo_room_bed_ad_sales_ads_spang_sleep_ads_spang_sleep",
+            "beforeIndex": 0,
+            "afterIndex": 11,
+            "beforePrefabId": "debug_cube_5faces",
+            "afterPrefabId": "habbo_room_bed_ad_sales_ads_spang_sleep_ads_spang_sleep",
+            "ok": true,
+            "route": "state.prefabRegistry.setSelectedPrefabId",
+            "fallbackUsed": false
+          },
+          "recentModeChanges": [
+            {
+              "at": "2026-04-25T12:24:59.150Z",
+              "source": "replay:baseline-mode-probe",
+              "requestedMode": "view",
+              "beforeMode": "view",
+              "afterMode": "view",
+              "ok": true,
+              "route": "state.runtimeState.setEditorModeValue",
+              "fallbackUsed": false
+            },
+            {
+              "at": "2026-04-25T12:25:08.566Z",
+              "source": "ui-habbo-library:place-selected:mode",
+              "requestedMode": "place",
+              "beforeMode": "view",
+              "afterMode": "place",
+              "ok": true,
+              "route": "state.runtimeState.setEditorModeValue",
+              "fallbackUsed": false
+            }
+          ],
+          "recentPrefabSelections": [
+            {
+              "at": "2026-04-25T12:24:59.150Z",
+              "source": "replay:baseline-prefab-probe",
+              "kind": "id",
+              "requestedPrefabId": "debug_cube_5faces",
+              "beforeIndex": 0,
+              "afterIndex": 0,
+              "beforePrefabId": "debug_cube_5faces",
+              "afterPrefabId": "debug_cube_5faces",
+              "ok": true,
+              "route": "state.prefabRegistry.setSelectedPrefabId",
+              "fallbackUsed": false
+            },
+            {
+              "at": "2026-04-25T12:25:08.566Z",
+              "source": "ui-habbo-library:place-selected:prefab-id",
+              "kind": "id",
+              "requestedPrefabId": "habbo_room_bed_ad_sales_ads_spang_sleep_ads_spang_sleep",
+              "beforeIndex": 0,
+              "afterIndex": 11,
+              "beforePrefabId": "debug_cube_5faces",
+              "afterPrefabId": "habbo_room_bed_ad_sales_ads_spang_sleep_ads_spang_sleep",
+              "ok": true,
+              "route": "state.prefabRegistry.setSelectedPrefabId",
+              "fallbackUsed": false
+            }
+          ],
+          "label": "after-habbo-place",
+          "available": true
+        }
+      },
+      {
+        "name": "state-actions-boundary-after-habbo-place",
+        "at": "2026-04-25T12:25:13.886Z",
+        "detail": {
+          "phase": "P19-SA",
+          "owner": "src/application/state/state-actions.js",
+          "label": "after-habbo-place",
+          "available": true,
+          "counters": {
+            "runtimeStateHits": 2,
+            "selectorHits": 12,
+            "prefabRegistryHits": 2,
+            "legacyGlobalHits": 0,
+            "oldEntryHits": 0,
+            "fallbackCount": 0
+          },
+          "lastEvent": {
+            "at": "2026-04-25T12:25:08.566Z",
+            "kind": "selector",
+            "route": "state.selectors.getEditorMode",
+            "detail": {
+              "mode": "place",
+              "source": "state-actions:readEditorMode"
+            }
+          },
+          "lastFallback": null,
+          "recentEvents": [
+            {
+              "at": "2026-04-25T12:25:08.565Z",
+              "kind": "selector",
+              "route": "state.selectors.getSelectedPrototypeIndex",
+              "detail": {
+                "index": 0,
+                "source": "state-actions:readSelectedPrototypeIndex"
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:08.565Z",
+              "kind": "selector",
+              "route": "state.selectors.getSelectedPrefabId",
+              "detail": {
+                "prefabId": "debug_cube_5faces",
+                "source": "state-actions:readSelectedPrefabId"
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:08.566Z",
+              "kind": "prefab-registry",
+              "route": "state.prefabRegistry.setSelectedPrefabId",
+              "detail": {
+                "source": "ui-habbo-library:place-selected:prefab-id",
+                "prefabId": "habbo_room_bed_ad_sales_ads_spang_sleep_ads_spang_sleep",
+                "result": 11
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:08.566Z",
+              "kind": "selector",
+              "route": "state.selectors.getSelectedPrototypeIndex",
+              "detail": {
+                "index": 11,
+                "source": "state-actions:readSelectedPrototypeIndex"
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:08.566Z",
+              "kind": "selector",
+              "route": "state.selectors.getSelectedPrefabId",
+              "detail": {
+                "prefabId": "habbo_room_bed_ad_sales_ads_spang_sleep_ads_spang_sleep",
+                "source": "state-actions:readSelectedPrefabId"
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:08.566Z",
+              "kind": "selector",
+              "route": "state.selectors.getEditorMode",
+              "detail": {
+                "mode": "view",
+                "source": "state-actions:readEditorMode"
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:08.566Z",
+              "kind": "runtime-state",
+              "route": "state.runtimeState.setEditorModeValue",
+              "detail": {
+                "source": "ui-habbo-library:place-selected:mode",
+                "mode": "place"
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:08.566Z",
+              "kind": "selector",
+              "route": "state.selectors.getEditorMode",
+              "detail": {
+                "mode": "place",
+                "source": "state-actions:readEditorMode"
+              }
+            }
+          ],
+          "recentFallbacks": []
+        }
+      },
+      {
+        "name": "application-boundary-after-habbo-place",
+        "at": "2026-04-25T12:25:13.897Z",
+        "detail": {
+          "owner": "src/application/controllers/app-controllers.js",
+          "phase": "P15-APP",
+          "label": "after-habbo-place",
+          "available": true,
+          "counters": {
+            "stateActionHits": 4,
+            "prefabRegistryHits": 0,
+            "runtimeStateHits": 121471,
+            "serviceWorkflowHits": 4,
+            "selectorHits": 1,
+            "legacyGlobalHits": 0,
+            "fallbackCount": 0
+          },
+          "lastEvent": {
+            "at": "2026-04-25T12:25:13.884Z",
+            "kind": "runtime-state",
+            "route": "state.runtimeState.editor.cameraSettings.read",
+            "detail": {
+              "source": "presentation.ui.ui-inspectors",
+              "settings": {
+                "viewRotation": 0,
+                "visualRotation": 0,
+                "isViewRotating": false,
+                "rotationAnimationEnabled": true,
+                "rotationAnimationMs": 160,
+                "rotationInterpolationEnabled": true,
+                "rotationInterpolationMode": "easeInOut",
+                "zoom": 1,
+                "minZoom": 0.5,
+                "maxZoom": 2,
+                "cameraCullingEnabled": true,
+                "cullingMargin": 2,
+                "showCameraBounds": false,
+                "showCullingBounds": false,
+                "surfaceOnlyRenderingEnabled": true,
+                "debugVisibleSurfaces": false,
+                "staticWorldFaceMergeEnabled": true,
+                "disableFaceMergeAtOrAboveZoomEnabled": false,
+                "disableFaceMergeAtOrAboveZoomThreshold": 1.6
+              }
+            }
+          },
+          "lastFallback": null,
+          "recentEvents": [
+            {
+              "at": "2026-04-25T12:25:13.883Z",
+              "kind": "runtime-state",
+              "route": "state.runtimeState.editor.visualRotation.read",
+              "detail": {
+                "source": "presentation.render.logic",
+                "visualRotation": 0,
+                "isViewRotating": false
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:13.883Z",
+              "kind": "runtime-state",
+              "route": "state.runtimeState.editor.visualRotation.read",
+              "detail": {
+                "source": "presentation.render.logic",
+                "visualRotation": 0,
+                "isViewRotating": false
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:13.883Z",
+              "kind": "runtime-state",
+              "route": "state.runtimeState.editor.visualRotation.read",
+              "detail": {
+                "source": "presentation.render.logic",
+                "visualRotation": 0,
+                "isViewRotating": false
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:13.884Z",
+              "kind": "runtime-state",
+              "route": "state.runtimeState.editor.rotation.read",
+              "detail": {
+                "source": "presentation.ui.ui-inspectors",
+                "viewRotation": 0
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:13.884Z",
+              "kind": "runtime-state",
+              "route": "state.runtimeState.editor.cameraSettings.read",
+              "detail": {
+                "source": "presentation.ui.ui-inspectors",
+                "settings": {
+                  "viewRotation": 0,
+                  "visualRotation": 0,
+                  "isViewRotating": false,
+                  "rotationAnimationEnabled": true,
+                  "rotationAnimationMs": 160,
+                  "rotationInterpolationEnabled": true,
+                  "rotationInterpolationMode": "easeInOut",
+                  "zoom": 1,
+                  "minZoom": 0.5,
+                  "maxZoom": 2,
+                  "cameraCullingEnabled": true,
+                  "cullingMargin": 2,
+                  "showCameraBounds": false,
+                  "showCullingBounds": false,
+                  "surfaceOnlyRenderingEnabled": true,
+                  "debugVisibleSurfaces": false,
+                  "staticWorldFaceMergeEnabled": true,
+                  "disableFaceMergeAtOrAboveZoomEnabled": false,
+                  "disableFaceMergeAtOrAboveZoomThreshold": 1.6
+                }
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:13.884Z",
+              "kind": "runtime-state",
+              "route": "state.runtimeState.editor.rotation.read",
+              "detail": {
+                "source": "presentation.ui.ui-inspectors",
+                "viewRotation": 0
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:13.884Z",
+              "kind": "runtime-state",
+              "route": "state.runtimeState.editor.cameraSettings.read",
+              "detail": {
+                "source": "presentation.ui.ui-inspectors",
+                "settings": {
+                  "viewRotation": 0,
+                  "visualRotation": 0,
+                  "isViewRotating": false,
+                  "rotationAnimationEnabled": true,
+                  "rotationAnimationMs": 160,
+                  "rotationInterpolationEnabled": true,
+                  "rotationInterpolationMode": "easeInOut",
+                  "zoom": 1,
+                  "minZoom": 0.5,
+                  "maxZoom": 2,
+                  "cameraCullingEnabled": true,
+                  "cullingMargin": 2,
+                  "showCameraBounds": false,
+                  "showCullingBounds": false,
+                  "surfaceOnlyRenderingEnabled": true,
+                  "debugVisibleSurfaces": false,
+                  "staticWorldFaceMergeEnabled": true,
+                  "disableFaceMergeAtOrAboveZoomEnabled": false,
+                  "disableFaceMergeAtOrAboveZoomThreshold": 1.6
+                }
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:13.884Z",
+              "kind": "runtime-state",
+              "route": "state.runtimeState.editor.cameraSettings.read",
+              "detail": {
+                "source": "presentation.ui.ui-inspectors",
+                "settings": {
+                  "viewRotation": 0,
+                  "visualRotation": 0,
+                  "isViewRotating": false,
+                  "rotationAnimationEnabled": true,
+                  "rotationAnimationMs": 160,
+                  "rotationInterpolationEnabled": true,
+                  "rotationInterpolationMode": "easeInOut",
+                  "zoom": 1,
+                  "minZoom": 0.5,
+                  "maxZoom": 2,
+                  "cameraCullingEnabled": true,
+                  "cullingMargin": 2,
+                  "showCameraBounds": false,
+                  "showCullingBounds": false,
+                  "surfaceOnlyRenderingEnabled": true,
+                  "debugVisibleSurfaces": false,
+                  "staticWorldFaceMergeEnabled": true,
+                  "disableFaceMergeAtOrAboveZoomEnabled": false,
+                  "disableFaceMergeAtOrAboveZoomThreshold": 1.6
+                }
+              }
+            }
+          ],
+          "recentFallbacks": []
+        }
+      },
+      {
+        "name": "asset-import-boundary-after-habbo-place",
+        "at": "2026-04-25T12:25:13.898Z",
+        "detail": {
+          "owner": "src/application/assets/asset-import.js",
+          "phase": "P16-ASSET",
+          "label": "after-habbo-place",
+          "available": true,
+          "counters": {
+            "stateActionHits": 0,
+            "prefabRegistryHits": 6,
+            "runtimeStateHits": 0,
+            "placementControllerHits": 1,
+            "selectorHits": 1,
+            "serviceWorkflowHits": 0,
+            "legacyGlobalHits": 1,
+            "fallbackCount": 0
+          },
+          "lastEvent": {
+            "at": "2026-04-25T12:25:08.566Z",
+            "kind": "selector",
+            "route": "state.selectors.getEditorMode",
+            "detail": {
+              "source": "asset-import:done-mode",
+              "mode": "place"
+            }
+          },
+          "lastFallback": null,
+          "recentEvents": [
+            {
+              "at": "2026-04-25T12:25:08.565Z",
+              "kind": "prefab-registry",
+              "route": "state.prefabRegistry.getPrototypes",
+              "detail": {
+                "source": "asset-import:getImportedPrefabById",
+                "count": 11
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:08.565Z",
+              "kind": "prefab-registry",
+              "route": "state.prefabRegistry.registerPrefab",
+              "detail": {
+                "source": "ui-habbo-library:place-selected",
+                "prefabId": "habbo_room_bed_ad_sales_ads_spang_sleep_ads_spang_sleep",
+                "action": "append-new"
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:08.565Z",
+              "kind": "prefab-registry",
+              "route": "state.prefabRegistry.getPrefabById",
+              "detail": {
+                "prefabId": "habbo_room_bed_ad_sales_ads_spang_sleep_ads_spang_sleep",
+                "hit": true
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:08.565Z",
+              "kind": "legacy-global",
+              "route": "global.tracePrefabRegister",
+              "detail": {
+                "source": "ui-habbo-library:place-selected",
+                "prefabId": "habbo_room_bed_ad_sales_ads_spang_sleep_ads_spang_sleep"
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:08.565Z",
+              "kind": "prefab-registry",
+              "route": "state.prefabRegistry.getPrototypes",
+              "detail": {
+                "source": "asset-import:register-done-index",
+                "count": 12
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:08.566Z",
+              "kind": "prefab-registry",
+              "route": "state.prefabRegistry.getPrototypes",
+              "detail": {
+                "source": "asset-import:apply-intent-index",
+                "count": 12
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:08.566Z",
+              "kind": "placement-controller",
+              "route": "controllers.placement.applyPlacementIntent",
+              "detail": {
+                "source": "ui-habbo-library:place-selected",
+                "prefabId": "habbo_room_bed_ad_sales_ads_spang_sleep_ads_spang_sleep",
+                "mode": "place",
+                "index": 11
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:08.566Z",
+              "kind": "selector",
+              "route": "state.selectors.getEditorMode",
+              "detail": {
+                "source": "asset-import:done-mode",
+                "mode": "place"
+              }
+            }
+          ],
+          "recentFallbacks": []
+        }
+      },
+      {
+        "name": "placement-boundary-after-habbo-place",
+        "at": "2026-04-25T12:25:13.898Z",
+        "detail": {
+          "owner": "src/application/placement/placement.js",
+          "phase": "P20-PLACEMENT",
+          "label": "after-habbo-place",
+          "available": true,
+          "counters": {
+            "runtimeStateHits": 5,
+            "selectorHits": 2,
+            "placementEffectsHits": 1,
+            "routeAuditHits": 7,
+            "controllerHits": 2,
+            "ownerApiHits": 4,
+            "legacyGlobalHits": 0,
+            "compatExportHits": 0,
+            "compatHelperHits": 1,
+            "compatTotalHits": 1,
+            "fallbackCount": 0
+          },
+          "compatByName": {
+            "recomputeNextInstanceSerial": {
+              "total": 1,
+              "mainPath": 0,
+              "helper": 1,
+              "lastSource": "placement:compat-export-call",
+              "lastCaller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at recomputeDerivedIdentifiers (http://127.0.0.1:4013/src/core/state/scene-session-state.js:571:60) | at Object.addInstance (http://127.0.0.1:4013/src/core/state/scene-session-state.js:612:5) | at placeCurrentPrefab (http://127.0.0.1:4013/src/application/placement/placement.js:866:89)"
+            }
+          },
+          "compatMainPathExports": [
+            "startDragging",
+            "commitPreview",
+            "cancelDrag"
+          ],
+          "lastEvent": {
+            "at": "2026-04-25T12:25:12.233Z",
+            "kind": "route-audit",
+            "route": "placement.routeAudit",
+            "detail": {
+              "source": "placement:getPlacementRouteAuditApi"
+            }
+          },
+          "lastFallback": null,
+          "recentEvents": [
+            {
+              "at": "2026-04-25T12:25:12.231Z",
+              "kind": "owner-api",
+              "route": "state.sceneSession",
+              "detail": {
+                "source": "placement:getSceneSessionApi"
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:12.231Z",
+              "kind": "route-audit",
+              "route": "placement.routeAudit",
+              "detail": {
+                "source": "placement:getPlacementRouteAuditApi"
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:12.233Z",
+              "kind": "compat-export",
+              "route": "window.recomputeNextInstanceSerial",
+              "detail": {
+                "source": "placement:compat-export-call",
+                "exportName": "recomputeNextInstanceSerial",
+                "compatKind": "helper",
+                "caller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at recomputeDerivedIdentifiers (http://127.0.0.1:4013/src/core/state/scene-session-state.js:571:60) | at Object.addInstance (http://127.0.0.1:4013/src/core/state/scene-session-state.js:612:5) | at placeCurrentPrefab (http://127.0.0.1:4013/src/application/placement/placement.js:866:89)",
+                "replayContext": {
+                  "active": true,
+                  "tab": null,
+                  "rootStage": null,
+                  "source": null
+                }
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:12.233Z",
+              "kind": "route-audit",
+              "route": "placement.routeAudit",
+              "detail": {
+                "source": "placement:getPlacementRouteAuditApi"
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:12.233Z",
+              "kind": "controller",
+              "route": "controllers.placement",
+              "detail": {
+                "source": "placement:getPlacementControllerApi"
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:12.233Z",
+              "kind": "controller",
+              "route": "controllers.placement.syncPlacementUi",
+              "detail": {
+                "source": "placement:commitPreview.place",
+                "requeuePreview": true
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:12.233Z",
+              "kind": "placement-effects",
+              "route": "placement.effects.syncPlacementUi(via-controller)",
+              "detail": {
+                "source": "placement:commitPreview.place",
+                "viaController": true,
+                "requeuePreview": true
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:12.233Z",
+              "kind": "route-audit",
+              "route": "placement.routeAudit",
+              "detail": {
+                "source": "placement:getPlacementRouteAuditApi"
+              }
+            }
+          ],
+          "recentFallbacks": [],
+          "recentCompatExports": [
+            {
+              "at": "2026-04-25T12:25:12.233Z",
+              "exportName": "recomputeNextInstanceSerial",
+              "compatKind": "helper",
+              "source": "placement:compat-export-call",
+              "caller": "at wrapped (http://127.0.0.1:4013/src/application/placement/placement.js:427:17) | at recomputeDerivedIdentifiers (http://127.0.0.1:4013/src/core/state/scene-session-state.js:571:60) | at Object.addInstance (http://127.0.0.1:4013/src/core/state/scene-session-state.js:612:5) | at placeCurrentPrefab (http://127.0.0.1:4013/src/application/placement/placement.js:866:89)"
+            }
+          ]
+        }
+      },
+      {
+        "name": "scene-session-after-habbo-place",
+        "at": "2026-04-25T12:25:13.898Z",
+        "detail": {
+          "label": "after-habbo-place",
+          "available": true,
+          "session": {
+            "owner": "src/core/state/scene-session-state.js",
+            "phase": "P9-A",
+            "instances": 6,
+            "boxes": 12,
+            "nextId": 13,
+            "nextInstanceSerial": 7,
+            "selectedInstanceId": null,
+            "editorMode": "place"
+          },
+          "writes": {
+            "owner": "src/core/state/scene-session-state.js",
+            "phase": "P9-A",
+            "label": "after-habbo-place",
+            "counters": {
+              "replaceSceneGraphCalls": 0,
+              "replaceInstancesCalls": 0,
+              "addInstanceCalls": 1,
+              "removeInstanceCalls": 0,
+              "removeLooseBoxCalls": 0,
+              "restoreDefaultSceneCalls": 0,
+              "ensureNonEmptySceneCalls": 0,
+              "syncDerivedStateCalls": 0,
+              "allocateInstanceIdCalls": 1,
+              "allocateBoxIdRangeCalls": 1,
+              "legacyFallbacks": 0
+            },
+            "lastWrite": {
+              "at": "2026-04-25T12:25:12.233Z",
+              "owner": "src/core/state/scene-session-state.js",
+              "action": "addInstance",
+              "extra": {
+                "source": "placement:placeCurrentPrefab",
+                "instanceId": "obj_0006",
+                "prefabId": "habbo_room_bed_ad_sales_ads_spang_sleep_ads_spang_sleep",
+                "instances": 6,
+                "boxes": 12,
+                "incremental": true
+              },
+              "summary": {
+                "owner": "src/core/state/scene-session-state.js",
+                "phase": "P9-A",
+                "instances": 6,
+                "boxes": 12,
+                "nextId": 13,
+                "nextInstanceSerial": 7,
+                "selectedInstanceId": null,
+                "editorMode": "place"
+              }
+            },
+            "recentWrites": [
+              {
+                "at": "2026-04-25T12:25:12.231Z",
+                "owner": "src/core/state/scene-session-state.js",
+                "action": "allocateInstanceId",
+                "extra": {
+                  "source": "placement:makeInstance",
+                  "value": "obj_0006",
+                  "nextInstanceSerial": 7
+                },
+                "summary": {
+                  "owner": "src/core/state/scene-session-state.js",
+                  "phase": "P9-A",
+                  "instances": 5,
+                  "boxes": 9,
+                  "nextId": 10,
+                  "nextInstanceSerial": 7,
+                  "selectedInstanceId": null,
+                  "editorMode": "place"
+                }
+              },
+              {
+                "at": "2026-04-25T12:25:12.231Z",
+                "owner": "src/core/state/scene-session-state.js",
+                "action": "allocateBoxIdRange",
+                "extra": {
+                  "source": "placement:placeCurrentPrefab",
+                  "count": 3,
+                  "start": 10,
+                  "endExclusive": 13
+                },
+                "summary": {
+                  "owner": "src/core/state/scene-session-state.js",
+                  "phase": "P9-A",
+                  "instances": 6,
+                  "boxes": 9,
+                  "nextId": 13,
+                  "nextInstanceSerial": 7,
+                  "selectedInstanceId": null,
+                  "editorMode": "place"
+                }
+              },
+              {
+                "at": "2026-04-25T12:25:12.233Z",
+                "owner": "src/core/state/scene-session-state.js",
+                "action": "addInstance",
+                "extra": {
+                  "source": "placement:placeCurrentPrefab",
+                  "instanceId": "obj_0006",
+                  "prefabId": "habbo_room_bed_ad_sales_ads_spang_sleep_ads_spang_sleep",
+                  "instances": 6,
+                  "boxes": 12,
+                  "incremental": true
+                },
+                "summary": {
+                  "owner": "src/core/state/scene-session-state.js",
+                  "phase": "P9-A",
+                  "instances": 6,
+                  "boxes": 12,
+                  "nextId": 13,
+                  "nextInstanceSerial": 7,
+                  "selectedInstanceId": null,
+                  "editorMode": "place"
+                }
+              }
+            ],
+            "session": {
+              "owner": "src/core/state/scene-session-state.js",
+              "phase": "P9-A",
+              "instances": 6,
+              "boxes": 12,
+              "nextId": 13,
+              "nextInstanceSerial": 7,
+              "selectedInstanceId": null,
+              "editorMode": "place"
+            }
+          }
+        }
+      },
+      {
+        "name": "placement-routes-after-habbo-place",
+        "at": "2026-04-25T12:25:13.898Z",
+        "detail": {
+          "phase": "P8-S3",
+          "owner": "src/infrastructure/audit/placement-route-audit.js",
+          "counters": {
+            "controllerCalls": 9,
+            "controllerStateActionHits": 4,
+            "controllerUiAdapterHits": 2,
+            "controllerLegacyFallbacks": 0,
+            "controllerUiFallbacks": 0,
+            "controllerMissingRoutes": 0,
+            "coreEvents": 7,
+            "coreNewPathHits": 1,
+            "coreLegacyFallbacks": 0,
+            "coreUiSyncHits": 0,
+            "coreUiSyncFallbacks": 0
+          },
+          "lastEvent": {
+            "at": "2026-04-25T12:25:12.234Z",
+            "kind": "controller",
+            "action": "commitPreview",
+            "route": "application.placementCore.commitPreview",
+            "detail": {
+              "source": "canvas.mousedown.place",
+              "mode": "place",
+              "result": "void"
+            }
+          },
+          "lastFallback": null,
+          "recentEvents": [
+            {
+              "at": "2026-04-25T12:25:08.567Z",
+              "kind": "controller",
+              "action": "handlePlaceSelectedHabboItem",
+              "route": "placement.application.habbofile-selection",
+              "detail": {
+                "source": "ui-habbo-library:place-selected",
+                "prefabId": "habbo_room_bed_ad_sales_ads_spang_sleep_ads_spang_sleep",
+                "loadedPrefabId": "habbo_room_bed_ad_sales_ads_spang_sleep_ads_spang_sleep",
+                "reused": false
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:12.230Z",
+              "kind": "core",
+              "action": "commitPreview",
+              "route": "commitPreview",
+              "detail": {
+                "mode": "place",
+                "prefabId": "habbo_room_bed_ad_sales_ads_spang_sleep_ads_spang_sleep",
+                "origin": {
+                  "x": 6,
+                  "y": 3,
+                  "z": 0
+                },
+                "boxes": 3
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:12.231Z",
+              "kind": "core",
+              "action": "makeInstance",
+              "route": "makeInstance",
+              "detail": {
+                "prefabId": "habbo_room_bed_ad_sales_ads_spang_sleep_ads_spang_sleep",
+                "x": 6,
+                "y": 3,
+                "z": 0,
+                "rotation": 0,
+                "instanceId": null
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:12.231Z",
+              "kind": "core",
+              "action": "allocInstanceId:owner-hit",
+              "route": "allocInstanceId:owner-hit",
+              "detail": {
+                "source": "placement:makeInstance"
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:12.231Z",
+              "kind": "core",
+              "action": "placement-commit",
+              "route": "placement-commit",
+              "detail": {
+                "instanceId": "obj_0006",
+                "prefabId": "habbo_room_bed_ad_sales_ads_spang_sleep_ads_spang_sleep",
+                "committedFacing": 0,
+                "origin": {
+                  "x": 6,
+                  "y": 3,
+                  "z": 0
+                },
+                "footprint": {
+                  "w": 1,
+                  "d": 3,
+                  "h": 1
+                },
+                "previewFacing": 0,
+                "selectedInstanceUnchanged": true
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:12.231Z",
+              "kind": "core",
+              "action": "expandInstanceToBoxes:owner-hit",
+              "route": "expandInstanceToBoxes:owner-hit",
+              "detail": {
+                "source": "placement:placeCurrentPrefab",
+                "count": 3
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:12.233Z",
+              "kind": "core",
+              "action": "recomputeNextInstanceSerial",
+              "route": "recomputeNextInstanceSerial",
+              "detail": {
+                "nextInstanceSerial": 7
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:12.233Z",
+              "kind": "controller",
+              "action": "syncPlacementUi",
+              "route": "placement.effects.syncPlacementUi",
+              "detail": {
+                "source": "placement:commitPreview.place",
+                "result": {
+                  "source": "placement:commitPreview.place",
+                  "mode": "place",
+                  "modeButtons": {
+                    "ok": true,
+                    "route": "updateModeButtons",
+                    "source": "placement:commitPreview.place:mode-buttons"
+                  },
+                  "preview": {
+                    "ok": true,
+                    "route": "updatePreview",
+                    "source": "placement:commitPreview.place:preview"
+                  },
+                  "forcePreview": false,
+                  "requeuePreview": true
+                },
+                "forcePreview": false,
+                "requeuePreview": true
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:12.233Z",
+              "kind": "core",
+              "action": "commitPreview.place:application-ui-new-path-hit",
+              "route": "commitPreview.place:application-ui-new-path-hit",
+              "detail": {
+                "source": "placement:commitPreview.place",
+                "mode": "place",
+                "modeButtons": {
+                  "ok": true,
+                  "route": "updateModeButtons",
+                  "source": "placement:commitPreview.place:mode-buttons"
+                },
+                "preview": {
+                  "ok": true,
+                  "route": "updatePreview",
+                  "source": "placement:commitPreview.place:preview"
+                },
+                "forcePreview": false,
+                "requeuePreview": true
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:12.234Z",
+              "kind": "controller",
+              "action": "commitPreview",
+              "route": "application.placementCore.commitPreview",
+              "detail": {
+                "source": "canvas.mousedown.place",
+                "mode": "place",
+                "result": "void"
+              }
+            }
+          ],
+          "label": "after-habbo-place",
+          "available": true
+        }
+      },
+      {
+        "name": "placement-effects-after-habbo-place",
+        "at": "2026-04-25T12:25:13.898Z",
+        "detail": {
+          "phase": "P8-S2",
+          "owner": "src/infrastructure/adapters/placement-effects.js",
+          "counters": {
+            "beginDragCalls": 0,
+            "completeDragCalls": 0,
+            "cancelDragCalls": 0,
+            "syncUiCalls": 2,
+            "runtimeModeWrites": 0,
+            "legacyModeWrites": 0,
+            "draggingWrites": 0,
+            "previewClears": 0,
+            "previewRefreshCalls": 2,
+            "modeButtonRefreshCalls": 2,
+            "uiFallbacks": 0
+          },
+          "lastEvent": {
+            "at": "2026-04-25T12:25:12.233Z",
+            "name": "sync-placement-ui",
+            "detail": {
+              "source": "placement:commitPreview.place",
+              "mode": "place",
+              "modeButtons": {
+                "ok": true,
+                "route": "updateModeButtons",
+                "source": "placement:commitPreview.place:mode-buttons"
+              },
+              "preview": {
+                "ok": true,
+                "route": "updatePreview",
+                "source": "placement:commitPreview.place:preview"
+              },
+              "forcePreview": false,
+              "requeuePreview": true
+            }
+          },
+          "recentEvents": [
+            {
+              "at": "2026-04-25T12:25:08.566Z",
+              "name": "sync-placement-ui",
+              "detail": {
+                "source": "ui-habbo-library:place-selected:ui",
+                "mode": "place",
+                "modeButtons": {
+                  "ok": true,
+                  "route": "updateModeButtons",
+                  "source": "ui-habbo-library:place-selected:ui:mode-buttons"
+                },
+                "preview": {
+                  "ok": true,
+                  "route": "updatePreview",
+                  "source": "ui-habbo-library:place-selected:ui:preview"
+                },
+                "forcePreview": true,
+                "requeuePreview": false
+              }
+            },
+            {
+              "at": "2026-04-25T12:25:12.233Z",
+              "name": "sync-placement-ui",
+              "detail": {
+                "source": "placement:commitPreview.place",
+                "mode": "place",
+                "modeButtons": {
+                  "ok": true,
+                  "route": "updateModeButtons",
+                  "source": "placement:commitPreview.place:mode-buttons"
+                },
+                "preview": {
+                  "ok": true,
+                  "route": "updatePreview",
+                  "source": "placement:commitPreview.place:preview"
+                },
+                "forcePreview": false,
+                "requeuePreview": true
+              }
+            }
+          ],
+          "label": "after-habbo-place",
+          "available": true
+        }
+      },
+      {
+        "name": "runtime-routes-after-habbo-place",
+        "at": "2026-04-25T12:25:13.898Z",
+        "detail": {
+          "phase": "P13-RUNTIME",
+          "owner": "src/infrastructure/audit/runtime-route-audit.js",
+          "counters": {
+            "ownerApiHits": 0,
+            "legacyBridgeHits": 0,
+            "directGlobalHits": 0,
+            "fallbackCount": 0
+          },
+          "lastEvent": {
+            "at": "2026-04-25T12:24:59.149Z",
+            "kind": "reset",
+            "route": "runtime-routes.reset",
+            "detail": {
+              "source": "replay:baseline-reset"
+            }
+          },
+          "lastFallback": null,
+          "recentEvents": [
+            {
+              "at": "2026-04-25T12:24:59.149Z",
+              "kind": "reset",
+              "route": "runtime-routes.reset",
+              "detail": {
+                "source": "replay:baseline-reset"
+              }
+            }
+          ],
+          "label": "after-habbo-place",
+          "available": true
+        }
+      },
+      {
+        "name": "architecture-layers-after-habbo-place",
+        "at": "2026-04-25T12:25:13.898Z",
+        "detail": {
+          "phase": "P12-LAYER",
+          "owner": "src/infrastructure/audit/architecture-layer-audit.js",
+          "label": "after-habbo-place",
+          "layerCounts": {
+            "presentation": 15,
+            "application": 6,
+            "core": 13,
+            "infrastructure": 17
+          },
+          "preserveLayers": [
+            "application",
+            "core"
+          ],
+          "rewriteLayers": [
+            "presentation"
+          ],
+          "rewriteInfrastructure": [
+            "platform adapters",
+            "storage/network implementations"
+          ],
+          "temporaryCompat": [
+            "legacy",
+            "audit",
+            "bridge"
+          ],
+          "available": true
+        }
+      },
+      {
+        "name": "portable-boundary-after-habbo-place",
+        "at": "2026-04-25T12:25:13.898Z",
+        "detail": {
+          "phase": "P14-B",
+          "owner": "src/core/domain/portable-core.js",
+          "portableModules": [
+            "domain.sceneCore",
+            "domain.portableCore"
+          ],
+          "engineBoundModules": [
+            "presentation.render",
+            "presentation.ui",
+            "presentation.shell",
+            "infrastructure.storage.scene-storage"
+          ],
+          "inputContract": {
+            "required": [
+              "sceneCore",
+              "prefabs",
+              "existingBoxes",
+              "grid"
+            ],
+            "optional": [
+              "sceneSnapshot",
+              "playerBox",
+              "runtimeSummary",
+              "lightingSummary",
+              "domSummary",
+              "selectedPrefabId"
+            ]
+          },
+          "purity": {
+            "rulesReadWindowDirectly": false,
+            "rulesReadSettingsDirectly": false,
+            "rulesReadBoxesDirectly": false,
+            "rulesReadPlatformDirectly": false,
+            "requiresExplicitContext": true
+          },
+          "label": "after-habbo-place",
+          "available": true
+        }
+      },
+      {
+        "name": "platform-boundary-after-habbo-place",
+        "at": "2026-04-25T12:25:13.898Z",
+        "detail": {
+          "label": "after-habbo-place",
+          "available": true,
+          "sceneWorkflow": {
+            "currentFile": "",
+            "counters": {
+              "saveSceneTargetCalls": 0,
+              "loadSceneTargetCalls": 0,
+              "startupRestoreCalls": 1
+            },
+            "lastEvent": {
+              "at": "2026-04-25T12:24:57.951Z",
+              "kind": "runStartupRestore",
+              "detail": {
+                "source": "app-shell:startup-restore",
+                "defaultSource": "startup-default-file",
+                "localSource": "startup-auto-restore"
+              }
+            },
+            "recentEvents": [
+              {
+                "at": "2026-04-25T12:24:57.951Z",
+                "kind": "runStartupRestore",
+                "detail": {
+                  "source": "app-shell:startup-restore",
+                  "defaultSource": "startup-default-file",
+                  "localSource": "startup-auto-restore"
+                }
+              }
+            ],
+            "sceneStorageAvailable": true,
+            "sceneFilesSupported": true,
+            "instanceCount": 6,
+            "boxCount": 12,
+            "sceneSession": {
+              "owner": "src/core/state/scene-session-state.js",
+              "phase": "P9-A",
+              "instances": 6,
+              "boxes": 12,
+              "nextId": 13,
+              "nextInstanceSerial": 7,
+              "selectedInstanceId": null,
+              "editorMode": "place",
+              "label": "scene-workflow",
+              "available": true
+            },
+            "lightCount": 5
+          },
+          "assetWorkflow": {
+            "counters": {
+              "ensureHabboRootReadyCalls": 1,
+              "ensureHabboLibrarySummaryCalls": 1,
+              "ensureHabboLibraryPageCalls": 1,
+              "runAssetScanCalls": 1,
+              "persistCustomPrefabsCalls": 0,
+              "markAssetManagedPrefabCalls": 2
+            },
+            "lastEvent": {
+              "at": "2026-04-25T12:25:05.477Z",
+              "kind": "ensureHabboLibraryPage",
+              "detail": {
+                "source": "ui-habbo-library:category-card",
+                "force": true,
+                "type": "room",
+                "category": "bed"
+              }
+            },
+            "recentEvents": [
+              {
+                "at": "2026-04-25T12:24:55.977Z",
+                "kind": "ensureHabboRootReady",
+                "detail": {
+                  "source": "app-shell:ensure-habbo-root-ready"
+                }
+              },
+              {
+                "at": "2026-04-25T12:24:58.084Z",
+                "kind": "runAssetScan",
+                "detail": {
+                  "source": "app-shell:startup-asset-scan",
+                  "force": true
+                }
+              },
+              {
+                "at": "2026-04-25T12:24:58.268Z",
+                "kind": "markAssetManagedPrefab",
+                "detail": {
+                  "source": "assets:Custom Prefab YOR3YS.json",
+                  "prefabId": "custom_prefab_yor3ys"
+                }
+              },
+              {
+                "at": "2026-04-25T12:24:58.301Z",
+                "kind": "markAssetManagedPrefab",
+                "detail": {
+                  "source": "assets:Custom Prefab YOWU6L.json",
+                  "prefabId": "custom_prefab_yowu6l"
+                }
+              },
+              {
+                "at": "2026-04-25T12:25:04.384Z",
+                "kind": "ensureHabboLibrarySummary",
+                "detail": {
+                  "source": "ui-habbo-library:open-browser",
+                  "force": false
+                }
+              },
+              {
+                "at": "2026-04-25T12:25:05.477Z",
+                "kind": "ensureHabboLibraryPage",
+                "detail": {
+                  "source": "ui-habbo-library:category-card",
+                  "force": true,
+                  "type": "room",
+                  "category": "bed"
+                }
+              }
+            ],
+            "rootConfigured": true,
+            "rootExists": true,
+            "itemCount": 17464,
+            "rootConfigInFlight": false,
+            "pendingRoot": "",
+            "summaryLoaded": true,
+            "pageLoaded": true,
+            "scanInFlight": false,
+            "totalFiles": 4,
+            "importedCount": 2
+          },
+          "editorHandoff": {
+            "owner": "src/infrastructure/services/editor-handoff-api.js",
+            "label": "after-habbo-place",
+            "counters": {
+              "readCalls": 1,
+              "clearCalls": 0,
+              "writeCalls": 0,
+              "errors": 0
+            },
+            "lastEvent": {
+              "at": "2026-04-25T12:24:55.982Z",
+              "kind": "read",
+              "detail": {
+                "source": "application:editor-handoff-read",
+                "hasValue": false
+              }
+            },
+            "recentEvents": [
+              {
+                "at": "2026-04-25T12:24:55.982Z",
+                "kind": "read",
+                "detail": {
+                  "source": "application:editor-handoff-read",
+                  "hasValue": false
+                }
+              }
+            ]
+          },
+          "prefabApi": {
+            "owner": "src/infrastructure/services/prefab-api.js",
+            "label": "after-habbo-place",
+            "counters": {
+              "fetchIndexCalls": 2,
+              "savePrefabToServerCalls": 0,
+              "listBrowserLibraryCalls": 0,
+              "savePrefabToBrowserLibraryCalls": 0,
+              "errors": 0
+            },
+            "lastEvent": {
+              "at": "2026-04-25T12:24:58.304Z",
+              "kind": "fetch-index",
+              "detail": {
+                "requestId": "p0-prefab-index",
+                "count": 4
+              }
+            },
+            "recentEvents": [
+              {
+                "at": "2026-04-25T12:24:58.246Z",
+                "kind": "fetch-index",
+                "detail": {
+                  "requestId": 1,
+                  "count": 4
+                }
+              },
+              {
+                "at": "2026-04-25T12:24:58.304Z",
+                "kind": "fetch-index",
+                "detail": {
+                  "requestId": "p0-prefab-index",
+                  "count": 4
+                }
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "ok": true,
+    "finishedAt": "2026-04-25T12:25:13.898Z"
+  },
+  "session": {
+    "scenarioNames": [
+      "baseline",
+      "habbo-root-open",
+      "habbo-first-place",
+      "editor-x5-roundtrip",
+      "scene-save-load",
+      "main-camera-rotation",
+      "lighting-visual",
+      "player-walk",
+      "editor-normal-health"
+    ],
+    "currentIndex": 2
+  },
+  "visibleRuntimeErrors": {
+    "label": "03-habbo-first-item-place",
+    "bannerVisible": false,
+    "bannerText": "",
+    "bannerUpdatedAt": "",
+    "historyCount": 0,
+    "newEntryCount": 0,
+    "latestHistory": [],
+    "newEntries": [],
+    "lastEntry": null
+  }
+}

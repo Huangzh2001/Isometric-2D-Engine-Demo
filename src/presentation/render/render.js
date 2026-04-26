@@ -1680,6 +1680,8 @@ function buildStaticWorldChunkRenderables(chunk, options) {
       cellY: Number(cell.y || 0),
       cellZ: Number(cell.z || 0),
       faceKey: faceKey,
+      actorInteractionMemberFaceKeys: buildActorInteractionMemberFaceKeysFromFaceDescriptor(descriptor, currentViewRotation),
+      actorInteractionMemberDescriptors: getActorInteractionMemberDescriptorsFromFaceDescriptor(descriptor),
       packetNormal: normal,
       mergedFace: descriptor.merged === true,
       mergedFaceCount: Number(descriptor.memberCount || 1),
@@ -3310,6 +3312,75 @@ function drawPrefabSpriteInstance(instance, alpha) {
   return drawPrefabSpriteAt(prefab, instance, alpha);
 }
 
+function getSpriteDepthSplitCandidate(instance, prefab, viewRotation) {
+  if (!instance || !prefab || !prefabHasSprite(prefab)) return null;
+  if (prefab.kind === 'habbo_import' && prefab.habboLayerDirections) return null;
+  var spriteCfg = getPrefabSpriteConfig(prefab, instance && instance.rotation != null ? instance.rotation : 0);
+  var img = getPrefabSpriteImage(prefab, instance && instance.rotation != null ? instance.rotation : 0);
+  if (!spriteCfg || !img || !img.complete || !img.naturalWidth || !img.naturalHeight) return null;
+  if (spriteCfg.flipX) return null;
+  var splitMode = String(spriteCfg.depthSplitMode || prefab.depthSplitMode || 'auto-small-footprint');
+  if (splitMode === 'off' || splitMode === 'disabled' || splitMode === 'none') return null;
+  var instBoxes = boxes.filter(function (b) { return b && b.instanceId === instance.instanceId; });
+  if (!instBoxes.length) return null;
+  var domainCore = getDomainSceneCoreApi();
+  if (!domainCore || typeof domainCore.buildTileAlignedSpriteRenderParts !== 'function') return null;
+  var maxParts = Math.max(1, Number(spriteCfg.depthSplitMaxParts || prefab.depthSplitMaxParts || 4) || 4);
+  var result = domainCore.buildTileAlignedSpriteRenderParts({
+    cells: instBoxes.map(function (b) { return { x: b.x, y: b.y, z: b.z, h: b.h || 1 }; }),
+    maxParts: maxParts,
+    viewRotation: normalizeMainEditorViewRotationValue(viewRotation)
+  });
+  if (!result || result.split !== true || !Array.isArray(result.parts) || result.parts.length <= 1) return null;
+  return result;
+}
+
+function drawPrefabSpritePartInstance(instance, prefab, part, alpha) {
+  if (!instance || !prefab || !part) return false;
+  if (prefab.kind === 'habbo_import' && prefab.habboLayerDirections) return false;
+  var rotation = instance && instance.rotation != null ? instance.rotation : 0;
+  var spriteCfg = getPrefabSpriteConfig(prefab, rotation);
+  var img = getPrefabSpriteImage(prefab, rotation);
+  if (!spriteCfg || !img || !img.complete || !img.naturalWidth || !img.naturalHeight) return false;
+  if (spriteCfg.flipX) return drawPrefabSpriteAt(prefab, instance, alpha);
+  var anchor = prefab.anchor || { x: 0, y: 0, z: 0 };
+  var spritePixelScale = settings.tileW / 64;
+  if (prefab.kind === 'habbo_import') {
+    var visualSize = Math.max(1, Number(spriteCfg.visualSize) || 64);
+    spritePixelScale = settings.tileW / visualSize;
+  }
+  var totalScale = Math.max(0.05, Number(spriteCfg.scale) || 1) * spritePixelScale;
+  var drawW = Math.max(1, Math.round(img.naturalWidth * totalScale));
+  var drawH = Math.max(1, Math.round(img.naturalHeight * totalScale));
+  var offsetX = Math.round((spriteCfg.offsetPx && spriteCfg.offsetPx.x || 0) * spritePixelScale);
+  var offsetY = Math.round((spriteCfg.offsetPx && spriteCfg.offsetPx.y || 0) * spritePixelScale);
+  var x = 0;
+  var y = 0;
+  if (String(spriteCfg.anchorMode || '') === 'scuti-floor-origin') {
+    var roomOrigin2 = getHabboRoomOrigin(prefab, instance, anchor, rotation);
+    x = Math.round(roomOrigin2.x + offsetX);
+    y = Math.round(roomOrigin2.y + offsetY);
+  } else {
+    var foot = iso((instance.x || 0) + (anchor.x || 0), (instance.y || 0) + (anchor.y || 0), (instance.z || 0) + (anchor.z || 0));
+    x = Math.round(foot.x - drawW / 2 + offsetX);
+    y = Math.round(foot.y - drawH + offsetY);
+  }
+  var count = Math.max(1, Math.round(Number(part.sourceCount) || 1));
+  var index = Math.max(0, Math.min(count - 1, Math.round(Number(part.sourceIndex) || 0)));
+  var srcX0 = Math.floor((img.naturalWidth * index) / count);
+  var srcX1 = Math.floor((img.naturalWidth * (index + 1)) / count);
+  var dstX0 = x + Math.floor((drawW * index) / count);
+  var dstX1 = x + Math.floor((drawW * (index + 1)) / count);
+  var srcW = Math.max(1, srcX1 - srcX0);
+  var dstW = Math.max(1, dstX1 - dstX0);
+  ctx.save();
+  ctx.globalAlpha = alpha == null ? 1 : alpha;
+  ctx.imageSmoothingEnabled = prefab.kind === 'habbo_import' ? false : true;
+  ctx.drawImage(img, srcX0, 0, srcW, img.naturalHeight, dstX0, y, dstW, drawH);
+  ctx.restore();
+  return true;
+}
+
 function drawHabboDebugOverlay() {
   if (!ui.showHabboDebugOverlay || !ui.showHabboDebugOverlay.checked || typeof prototypes === 'undefined') return;
   ctx.save();
@@ -3977,28 +4048,9 @@ function playerPlacementAABB() {
 }
 
 const PLAYER_VISUAL_BASE_HEIGHT = 1.7;
-const PLAYER_SLICE_RATIOS = [0.00, 0.16, 0.32, 0.48, 0.64, 0.80, 0.96, 1.08, 1.18, 1.28, 1.38, 1.48, 1.58, 1.72].map(function(v){ return v / 1.72; });
 
 function getPlayerVisualScale() {
   return Math.max(0.2, (settings.playerHeightCells / PLAYER_VISUAL_BASE_HEIGHT) * settings.tileScale);
-}
-
-function getPlayerSlices() {
-  const totalH = Math.max(0.2, settings.playerHeightCells);
-  const footprint = {
-    x: player.x - Math.max(0.14, settings.playerProxyW * 0.44),
-    y: player.y - Math.max(0.09, settings.playerProxyD * 0.42),
-    w: Math.max(0.28, settings.playerProxyW * 0.88),
-    d: Math.max(0.18, settings.playerProxyD * 0.86),
-  };
-
-  // 切得更细，尤其是头部区域切片更密，减少“半个头提前露出来”的穿模感。
-  const zCuts = PLAYER_SLICE_RATIOS.map(function(r){ return totalH * r; });
-  const out = [];
-  for (let i = 0; i < zCuts.length - 1; i++) {
-    out.push({ id: `playerSlice${i}`, x: footprint.x, y: footprint.y, z: zCuts[i], w: footprint.w, d: footprint.d, h: zCuts[i + 1] - zCuts[i] });
-  }
-  return out;
 }
 
 function currentAnimFrame() {
@@ -4021,7 +4073,7 @@ function preparePlayerSpriteFrame() {
   var row = SPRITE.rows[player.dir] ?? 0;
   var frameX = frame * SPRITE.frameW;
   var rowY = row * SPRITE.frameH;
-  var foot = iso(player.x, player.y, 0);
+  var foot = iso(player.x, player.y, Number(player && player.visualZ != null ? player.visualZ : player && player.z || 0));
   var spriteScale = getPlayerVisualScale();
   var scaledFrameW = Math.max(1, Math.round(SPRITE.frameW * spriteScale));
   var scaledFrameH = Math.max(1, Math.round(SPRITE.frameH * spriteScale));
@@ -4091,35 +4143,29 @@ function preparePlayerSpriteFrame() {
   return playerSpriteFrameCache;
 }
 
-function drawPlayerSlice(s) {
-var prepared = preparePlayerSpriteFrame();
-var totalH = prepared ? prepared.totalH : Math.max(0.2, settings.playerHeightCells);
-var visibleHeight = prepared ? prepared.visibleHeight : (SPRITE.bottom - SPRITE.top);
-var spriteScale = prepared ? prepared.spriteScale : getPlayerVisualScale();
-var rowY = (prepared ? prepared.row : (SPRITE.rows[player.dir] ?? 0)) * SPRITE.frameH;
-var z1 = s.z, z2 = s.z + s.h;
-var srcY0 = rowY + Math.round(SPRITE.bottom - (z2 / totalH) * visibleHeight);
-var srcY1 = rowY + Math.round(SPRITE.bottom - (z1 / totalH) * visibleHeight);
-var srcH = Math.max(1, srcY1 - srcY0);
-var localSrcY = srcY0 - rowY;
-var destY = (prepared ? prepared.yTop : Math.round(iso(player.x, player.y, 0).y - SPRITE.bottom * spriteScale)) + Math.round(localSrcY * spriteScale);
+function drawPlayerAvatar() {
+  var prepared = preparePlayerSpriteFrame();
+  var spriteScale = prepared ? prepared.spriteScale : getPlayerVisualScale();
+  if (assetsReady && prepared) {
+    ctx.drawImage(playerSpriteFrameBuffer, 0, 0, SPRITE.frameW, SPRITE.frameH, prepared.xLeft, prepared.yTop, prepared.scaledFrameW, prepared.scaledFrameH);
+  } else {
+    var foot = iso(player.x, player.y, Number(player && player.visualZ != null ? player.visualZ : player && player.z || 0));
+    var xLeft = Math.round(foot.x - (SPRITE.frameW * spriteScale) / 2);
+    var yTop = Math.round(foot.y - SPRITE.bottom * spriteScale);
+    var boxW = Math.max(2, Math.round(16 * spriteScale));
+    var boxH = Math.max(8, Math.round((SPRITE.bottom - SPRITE.top) * spriteScale));
+    var center = getPlayerUnifiedLightCenter();
+    var c = rgbToCss(litColor({ r: 106, g: 177, b: 255 }, center, { x: 0, y: 0, z: 1 }));
+    ctx.fillStyle = c;
+    ctx.fillRect(xLeft + Math.round(28 * spriteScale), yTop + Math.round(SPRITE.top * spriteScale), boxW, boxH);
+  }
 
-if (assetsReady && prepared) {
-  ctx.drawImage(playerSpriteFrameBuffer, 0, localSrcY, SPRITE.frameW, srcH, prepared.xLeft, destY, prepared.scaledFrameW, Math.max(1, Math.round(srcH * spriteScale)));
-} else {
-  var center = { x: s.x + s.w * 0.5, y: s.y + s.d * 0.5, z: s.z + s.h * 0.5 };
-  const c = rgbToCss(litColor({ r: 106, g: 177, b: 255 }, center, { x: 0, y: 0, z: 1 }));
-  const xLeft = prepared ? prepared.xLeft : Math.round(iso(player.x, player.y, 0).x - (SPRITE.frameW * spriteScale) / 2);
-  ctx.fillStyle = c;
-  ctx.fillRect(xLeft + Math.round(28 * spriteScale), destY, Math.max(2, Math.round(16 * spriteScale)), Math.max(1, Math.round(srcH * spriteScale)));
+  if (showDebug) {
+    var proxy = playerPlacementAABB();
+    var pts = cubePoints(proxy.x, proxy.y, proxy.z || 0, proxy.w, proxy.d, proxy.h);
+    drawPoly([pts.p000, pts.p100, pts.p110, pts.p010], 'rgba(124,242,154,.05)', 'rgba(124,242,154,.85)');
+  }
 }
-
-if (showDebug) {
-  const pts = cubePoints(s.x, s.y, s.z, s.w, s.d, s.h);
-  drawPoly([pts.p000,pts.p100,pts.p110,pts.p010], 'rgba(124,242,154,.05)', 'rgba(124,242,154,.85)');
-}
-}
-
 function highestTopAtCell(cellX, cellY, ignoreId = null, ignoreInstanceId = null) {
   let top = 0;
   for (const b of boxes) {
@@ -7184,6 +7230,405 @@ function drawPlacementPreview() {
   }
 }
 
+
+var ACTOR_INTERACTION_SORT_RADIUS = 2;
+
+function getActorInteractionSortRadiusForRender() {
+  return Math.max(1, Number(ACTOR_INTERACTION_SORT_RADIUS || 2));
+}
+
+function buildActorInteractionCellFaceKey(cell, semanticFace, viewRotation) {
+  if (!cell) return null;
+  var sf = String(semanticFace || '');
+  if (!sf) return null;
+  var screenFace = getScreenFaceForSemanticFace(sf, normalizeMainEditorViewRotationValue(viewRotation));
+  return [
+    cell.instanceId || 'unknown',
+    [Number(cell.x || 0), Number(cell.y || 0), Number(cell.z || 0)].join(','),
+    sf,
+    screenFace || ''
+  ].join('|');
+}
+
+function getActorInteractionMemberDescriptorsFromFaceDescriptor(descriptor) {
+  if (!descriptor || typeof descriptor !== 'object') return [];
+  if (Array.isArray(descriptor.members) && descriptor.members.length) return descriptor.members.filter(Boolean);
+  return [descriptor];
+}
+
+function buildActorInteractionMemberFaceKeysFromFaceDescriptor(descriptor, viewRotation) {
+  var members = getActorInteractionMemberDescriptorsFromFaceDescriptor(descriptor);
+  var keys = [];
+  for (var i = 0; i < members.length; i++) {
+    var m = members[i];
+    if (!m) continue;
+    var cell = m.cell || m.box || null;
+    var sf = String(m.semanticFace || descriptor.semanticFace || '');
+    var key = buildActorInteractionCellFaceKey(cell, sf, viewRotation);
+    if (key) keys.push(key);
+  }
+  return keys;
+}
+
+
+function buildActorInteractionBoxGroupSummaryMap(sourceBoxes) {
+  var map = new Map();
+  var boxes = Array.isArray(sourceBoxes) ? sourceBoxes : [];
+  for (var i = 0; i < boxes.length; i++) {
+    var box = boxes[i];
+    if (!box || typeof box !== 'object') continue;
+    var instanceId = box.instanceId != null ? String(box.instanceId) : '';
+    if (!instanceId) continue;
+    var x = Math.floor(Number(box.x || 0));
+    var y = Math.floor(Number(box.y || 0));
+    var z = Math.floor(Number(box.z || 0));
+    var w = Math.max(1, Math.floor(Number(box.w || 1)));
+    var d = Math.max(1, Math.floor(Number(box.d || 1)));
+    var h = Math.max(1, Math.floor(Number(box.h || 1)));
+    var entry = map.get(instanceId);
+    if (!entry) {
+      entry = {
+        instanceId: instanceId,
+        footprintKeys: new Set(),
+        minZ: z,
+        maxZ: z + h,
+        boxCount: 0
+      };
+      map.set(instanceId, entry);
+    }
+    entry.boxCount += 1;
+    entry.minZ = Math.min(entry.minZ, z);
+    entry.maxZ = Math.max(entry.maxZ, z + h);
+    for (var dx = 0; dx < w; dx++) {
+      for (var dy = 0; dy < d; dy++) {
+        entry.footprintKeys.add(String(x + dx) + ',' + String(y + dy));
+      }
+    }
+  }
+  return map;
+}
+
+function isActorInteractionSingleColumnTallGroup(box, groupSummaryMap) {
+  if (!box || !groupSummaryMap || typeof groupSummaryMap.get !== 'function') return false;
+  var instanceId = box.instanceId != null ? String(box.instanceId) : '';
+  if (!instanceId) return false;
+  var group = groupSummaryMap.get(instanceId);
+  if (!group) return false;
+  var footprintCount = group.footprintKeys && typeof group.footprintKeys.size === 'number' ? group.footprintKeys.size : 0;
+  var verticalSpan = Math.max(0, Number(group.maxZ || 0) - Number(group.minZ || 0));
+  return footprintCount === 1 && verticalSpan > 1;
+}
+
+function isActorInteractionReplacementEligibleBox(box, groupSummaryMap) {
+  if (!box || typeof box !== 'object') return false;
+  // 单 footprint 高柱 / 同 footprint 竖向堆叠也要进入 interaction replacement；
+  // 后续会基于底层 footprint 排序线，把整组面统一放到玩家前或后。
+  return true;
+}
+
+function buildActorInteractionGroupSummaryMapFromPackets(renderables) {
+  var list = Array.isArray(renderables) ? renderables : [];
+  var map = new Map();
+  for (var i = 0; i < list.length; i++) {
+    var packet = list[i];
+    if (!packet || packet.kind !== 'static-world-face-packet') continue;
+    var members = Array.isArray(packet.actorInteractionMemberDescriptors) && packet.actorInteractionMemberDescriptors.length
+      ? packet.actorInteractionMemberDescriptors
+      : [packet.box || null];
+    for (var mi = 0; mi < members.length; mi++) {
+      var member = members[mi];
+      var cell = member && (member.cell || member.box || member);
+      if (!cell) continue;
+      var instanceId = cell.instanceId != null ? String(cell.instanceId) : (packet.instanceId != null ? String(packet.instanceId) : '');
+      if (!instanceId) continue;
+      var x = Math.floor(Number(cell.x || 0));
+      var y = Math.floor(Number(cell.y || 0));
+      var z = Math.floor(Number(cell.z || 0));
+      var w = Math.max(1, Math.floor(Number(cell.w || 1)));
+      var d = Math.max(1, Math.floor(Number(cell.d || 1)));
+      var h = Math.max(1, Math.floor(Number(cell.h || 1)));
+      var entry = map.get(instanceId);
+      if (!entry) {
+        entry = {
+          instanceId: instanceId,
+          minX: x,
+          minY: y,
+          maxX: x + w,
+          maxY: y + d,
+          minZ: z,
+          maxZ: z + h,
+          footprintKeys: new Set(),
+          anchorCellX: x,
+          anchorCellY: y
+        };
+        map.set(instanceId, entry);
+      }
+      entry.minX = Math.min(entry.minX, x);
+      entry.minY = Math.min(entry.minY, y);
+      entry.maxX = Math.max(entry.maxX, x + w);
+      entry.maxY = Math.max(entry.maxY, y + d);
+      entry.minZ = Math.min(entry.minZ, z);
+      entry.maxZ = Math.max(entry.maxZ, z + h);
+      for (var dx = 0; dx < w; dx++) {
+        for (var dy = 0; dy < d; dy++) {
+          var fx = x + dx;
+          var fy = y + dy;
+          entry.footprintKeys.add(String(fx) + ',' + String(fy));
+          if (fx < entry.anchorCellX || (fx === entry.anchorCellX && fy < entry.anchorCellY)) {
+            entry.anchorCellX = fx;
+            entry.anchorCellY = fy;
+          }
+        }
+      }
+    }
+  }
+  return map;
+}
+
+function projectActorInteractionWorldPointNoCamera(point, viewRotation) {
+  var api = getMainViewRotationCoreApi();
+  var cfg = getMainViewProjectionConfigWithoutCamera();
+  var p = point && typeof point === 'object' ? point : { x: 0, y: 0, z: 0 };
+  if (api && typeof api.worldToScreenWithViewRotation === 'function') {
+    var out = api.worldToScreenWithViewRotation({ x: Number(p.x || 0), y: Number(p.y || 0), z: Number(p.z || 0) }, viewRotation, cfg);
+    return { x: Number(out && out.x || 0), y: Number(out && out.y || 0) };
+  }
+  return {
+    x: cfg.originX + (Number(p.x || 0) - Number(p.y || 0)) * cfg.tileW / 2,
+    y: cfg.originY + (Number(p.x || 0) + Number(p.y || 0)) * cfg.tileH / 2 - Number(p.z || 0) * cfg.tileH
+  };
+}
+
+function computeActorInteractionPlayerSortMeta(playerRef, viewRotation) {
+  var playerObj = playerRef && typeof playerRef === 'object' ? playerRef : { x: 0, y: 0, z: 0 };
+  var domainCore = getDomainSceneCoreApi();
+  if (domainCore && typeof domainCore.computePlayerActorRenderableSort === 'function') {
+    return domainCore.computePlayerActorRenderableSort({ player: playerObj, viewRotation: normalizeMainEditorViewRotationValue(viewRotation) }) || { sortKey: 0, tie: 700000 };
+  }
+  var playerZ = Number(playerObj && playerObj.z != null ? playerObj.z : 0);
+  var fallback = computeViewAwareSortMeta({ x: Number(playerObj.x || 0), y: Number(playerObj.y || 0), z: playerZ }, 0, normalizeMainEditorViewRotationValue(viewRotation));
+  return { sortKey: Number(fallback.sortKey || 0) + 0.0007, tie: 700000 + Number(fallback.tie || 0) };
+}
+
+function classifyActorInteractionSingleFootprintGroupAgainstPlayer(group, playerRef, viewRotation) {
+  if (!group || !playerRef) return 'none';
+  var footprintCount = group.footprintKeys && typeof group.footprintKeys.size === 'number' ? group.footprintKeys.size : 0;
+  if (footprintCount !== 1) return 'none';
+  var px = Number(playerRef.x || 0);
+  var py = Number(playerRef.y || 0);
+  var pz = Number(playerRef.z || 0);
+  var lineZ = Number(group.minZ || 0);
+  var left = projectActorInteractionWorldPointNoCamera({ x: Number(group.anchorCellX || 0), y: Number(group.anchorCellY || 0) + 1, z: lineZ }, viewRotation);
+  var right = projectActorInteractionWorldPointNoCamera({ x: Number(group.anchorCellX || 0) + 1, y: Number(group.anchorCellY || 0), z: lineZ }, viewRotation);
+  var playerFoot = projectActorInteractionWorldPointNoCamera({ x: px, y: py, z: pz }, viewRotation);
+  var lineY = lineYAtX(left, right, playerFoot.x);
+  return playerFoot.y >= lineY ? 'player-in-front' : 'player-behind';
+}
+
+function applyActorInteractionGroupSortOverride(renderable, sourcePacket, groupSummaryMap, playerRef, viewRotation) {
+  if (!renderable || !sourcePacket || !groupSummaryMap || !playerRef) return renderable;
+  var instanceId = renderable.instanceId != null ? String(renderable.instanceId) : (sourcePacket.instanceId != null ? String(sourcePacket.instanceId) : '');
+  if (!instanceId) return renderable;
+  var group = groupSummaryMap.get(instanceId);
+  if (!group) return renderable;
+  var footprintCount = group.footprintKeys && typeof group.footprintKeys.size === 'number' ? group.footprintKeys.size : 0;
+  if (footprintCount !== 1) return renderable;
+  var relation = classifyActorInteractionSingleFootprintGroupAgainstPlayer(group, playerRef, viewRotation);
+  if (relation === 'none') return renderable;
+  var playerSortMeta = computeActorInteractionPlayerSortMeta(playerRef, viewRotation);
+  var intraTie = Number(renderable.tie != null ? renderable.tie : (sourcePacket.tie || 0));
+  var tieOffset = (Math.abs(intraTie) % 1000) * 0.000001;
+  if (relation === 'player-in-front') {
+    renderable.sortKey = Number(playerSortMeta.sortKey || 0) - 0.0006;
+    renderable.tie = Number(playerSortMeta.tie || 0) - 50 + tieOffset;
+  } else if (relation === 'player-behind') {
+    renderable.sortKey = Number(playerSortMeta.sortKey || 0) + 0.0006;
+    renderable.tie = Number(playerSortMeta.tie || 0) + 50 + tieOffset;
+  }
+  renderable.actorInteractionGroupSortRelation = relation;
+  renderable.actorInteractionGroupFootprintMode = 'single-footprint-line-anchor';
+  return renderable;
+}
+
+function buildActorInteractionCandidateFaceKeySetForPlayer(options) {
+  var safe = options && typeof options === 'object' ? options : {};
+  var playerRef = safe.player && typeof safe.player === 'object' ? safe.player : null;
+  var sourceBoxes = Array.isArray(safe.sourceBoxes) ? safe.sourceBoxes : [];
+  var occ = safe.occ && typeof safe.occ.has === 'function' ? safe.occ : new Map();
+  var dynamicInstanceIdSet = safe.dynamicInstanceIdSet && typeof safe.dynamicInstanceIdSet.has === 'function' ? safe.dynamicInstanceIdSet : null;
+  var viewRotation = normalizeMainEditorViewRotationValue(safe.viewRotation != null ? safe.viewRotation : getSafeMainEditorViewRotation(null).viewRotation);
+  var radius = Math.max(1, Number(safe.radius || getActorInteractionSortRadiusForRender()));
+  var out = new Set();
+  if (!playerRef || !sourceBoxes.length) return out;
+  var groupSummaryMap = buildActorInteractionBoxGroupSummaryMap(sourceBoxes);
+  var px = Number(playerRef.x || 0);
+  var py = Number(playerRef.y || 0);
+  var pz = Number(playerRef.z || 0);
+  var faces = ['top', 'east', 'south', 'west', 'north'];
+  for (var bi = 0; bi < sourceBoxes.length; bi++) {
+    var box = sourceBoxes[bi];
+    if (!box) continue;
+    if (box.instanceId && dynamicInstanceIdSet && dynamicInstanceIdSet.has(String(box.instanceId))) continue;
+    if (!isActorInteractionReplacementEligibleBox(box, groupSummaryMap)) continue;
+    var bx = Math.floor(Number(box.x || 0));
+    var by = Math.floor(Number(box.y || 0));
+    var bz = Math.floor(Number(box.z || 0));
+    var bw = Math.max(1, Math.floor(Number(box.w || 1)));
+    var bd = Math.max(1, Math.floor(Number(box.d || 1)));
+    var bh = Math.max(1, Math.floor(Number(box.h || 1)));
+    if ((bz + bh) <= pz) continue;
+    if ((bx - radius) > px || (bx + bw + radius) < px) continue;
+    if ((by - radius) > py || (by + bd + radius) < py) continue;
+    for (var dx = 0; dx < bw; dx++) {
+      for (var dy = 0; dy < bd; dy++) {
+        var cx = bx + dx;
+        var cy = by + dy;
+        if (Math.abs((cx + 0.5) - px) > (radius + 0.5)) continue;
+        if (Math.abs((cy + 0.5) - py) > (radius + 0.5)) continue;
+        for (var dz = 0; dz < bh; dz++) {
+          var cz = bz + dz;
+          if ((cz + 1) <= pz) continue;
+          var cell = { x: cx, y: cy, z: cz, instanceId: box.instanceId || null };
+          for (var fi = 0; fi < faces.length; fi++) {
+            var sf = faces[fi];
+            var delta = getSemanticFaceNeighborDeltaForRender(sf);
+            if (occ.has(String(cx + delta.x) + ',' + String(cy + delta.y) + ',' + String(cz + delta.z))) continue;
+            var key = buildActorInteractionCellFaceKey(cell, sf, viewRotation);
+            if (key) out.add(key);
+          }
+        }
+      }
+    }
+  }
+  return out;
+}
+
+function shouldSuppressStaticPacketForActorInteraction(packet, actorFaceKeySet) {
+  if (!packet || packet.kind !== 'static-world-face-packet') return false;
+  if (!actorFaceKeySet || typeof actorFaceKeySet.has !== 'function' || actorFaceKeySet.size <= 0) return false;
+  var keys = Array.isArray(packet.actorInteractionMemberFaceKeys) ? packet.actorInteractionMemberFaceKeys : [];
+  if (!keys.length) return false;
+  for (var i = 0; i < keys.length; i++) {
+    if (!actorFaceKeySet.has(keys[i])) return false;
+  }
+  return true;
+}
+
+function buildActorInteractionReplacementRenderableFromDescriptor(descriptor, sourcePacket, viewRotation) {
+  if (!descriptor || !sourcePacket) return null;
+  var sf = String(descriptor.semanticFace || sourcePacket.semanticFace || '');
+  if (!sf) return null;
+  var cell = descriptor.cell || descriptor.box || sourcePacket.box || null;
+  if (!cell) return null;
+  var normal = descriptor.normal || getSemanticFaceNormal(sf);
+  var worldGeometry = buildMergedVoxelFaceWorldGeometry(Object.assign({}, descriptor, {
+    merged: false,
+    mergeWidth: 1,
+    mergeHeight: 1,
+    memberCount: 1
+  }));
+  var worldPts = Array.isArray(worldGeometry && worldGeometry.worldPts) ? worldGeometry.worldPts : [];
+  var worldLoops = Array.isArray(worldGeometry && worldGeometry.worldLoops) ? worldGeometry.worldLoops : null;
+  var worldOutlineSegments = Array.isArray(worldGeometry && worldGeometry.worldOutlineSegments) ? worldGeometry.worldOutlineSegments : null;
+  if (!worldPts.length) return null;
+  var screenFace = descriptor.screenFace || getScreenFaceForSemanticFace(sf, viewRotation);
+  var terrainPatternDescriptor = getTerrainMaterialPatternDescriptorForRenderCell(cell, sf);
+  var terrainFc = getTerrainMaterialBaseFaceColorsForRenderCell(cell);
+  var fc = terrainFc || getCachedBaseFaceColorsForRenderable((cell && cell.base) || '#7aa2f7');
+  var stroke = terrainPatternDescriptor && terrainPatternDescriptor.lineColor ? terrainPatternDescriptor.lineColor : fc.line;
+  var fill = getCachedStaticRenderableFill(cell, sf, worldPts, normal, viewRotation, null).fill;
+  var terrainSettings = getTerrainRenderSettingsForRender();
+  var lightingActive = isStaticRenderableLightingActiveForBuild(terrainSettings);
+  var shadowOverlaysWorld = lightingActive ? buildVoxelFaceShadowWorldOverlays(worldPts, normal, cell.instanceId || null, null) : [];
+  var faceKey = buildActorInteractionCellFaceKey(cell, sf, viewRotation);
+  if (!faceKey) return null;
+  return {
+    id: 'actor-interaction-packet-' + String(sourcePacket.id || 'packet') + '-' + String(faceKey || 'face'),
+    kind: 'static-world-face-packet',
+    sortKey: Number(descriptor.sortKey != null ? descriptor.sortKey : sourcePacket.sortKey || 0),
+    tie: Number(descriptor.tie != null ? descriptor.tie : sourcePacket.tie || 0),
+    instanceId: cell.instanceId || sourcePacket.instanceId || null,
+    prefabId: cell.prefabId || sourcePacket.prefabId || null,
+    renderPath: 'actor-interaction-replacement-packet',
+    cacheViewRotation: viewRotation,
+    cacheContentType: 'world-face-packets',
+    cameraIndependent: true,
+    usesScreenSpaceCache: false,
+    semanticFace: sf,
+    screenFace: screenFace,
+    depthKey: descriptor.depthKey != null ? descriptor.depthKey : sourcePacket.depthKey || 0,
+    fill: fill,
+    stroke: stroke,
+    texture: sourcePacket.texture || null,
+    textureColor: sourcePacket.textureColor || null,
+    semanticTextureSlot: sourcePacket.semanticTextureSlot || null,
+    semanticTextureSlotColor: sourcePacket.semanticTextureSlotColor || null,
+    width: 1,
+    worldPts: worldPts,
+    worldLoops: worldLoops,
+    worldOutlineSegments: worldOutlineSegments,
+    shadowOverlaysWorld: shadowOverlaysWorld,
+    box: cell,
+    cellX: Number(cell.x || 0),
+    cellY: Number(cell.y || 0),
+    cellZ: Number(cell.z || 0),
+    faceKey: faceKey,
+    actorInteractionMemberFaceKeys: [faceKey],
+    actorInteractionMemberDescriptors: [descriptor],
+    packetNormal: normal,
+    mergedFace: false,
+    mergedFaceCount: 1,
+    mergeWidth: 1,
+    mergeHeight: 1,
+    terrainMaterialMergeKey: descriptor.terrainMaterialMergeKey || sourcePacket.terrainMaterialMergeKey || null,
+    terrainMaterialId: getTerrainMaterialIdForRenderCell(cell),
+    terrainMaterialLabel: terrainPatternDescriptor && terrainPatternDescriptor.label ? terrainPatternDescriptor.label : null,
+    materialType: cell && (cell.materialType || cell.terrainBand) ? String(cell.materialType || cell.terrainBand) : null,
+    terrainPatternDescriptor: terrainPatternDescriptor || null,
+    terrainPatternOpacity: terrainPatternDescriptor && Number.isFinite(Number(terrainPatternDescriptor.opacity)) ? Number(terrainPatternDescriptor.opacity) : null,
+    actorInteractionReplacement: true,
+    actorInteractionSourcePacketId: sourcePacket.id || null
+  };
+}
+
+function applyActorInteractionReplacementToRenderables(staticRenderables, actorFaceKeySet, viewRotation, playerRef) {
+  var list = Array.isArray(staticRenderables) ? staticRenderables : [];
+  var filtered = [];
+  var replacements = [];
+  var suppressedPacketCount = 0;
+  var checkedPacketCount = 0;
+  var suppressedFaceKeySet = new Set();
+  var groupSummaryMap = buildActorInteractionGroupSummaryMapFromPackets(list);
+  for (var i = 0; i < list.length; i++) {
+    var packet = list[i];
+    if (packet && packet.kind === 'static-world-face-packet') checkedPacketCount += 1;
+    if (shouldSuppressStaticPacketForActorInteraction(packet, actorFaceKeySet)) {
+      suppressedPacketCount += 1;
+      var keys = Array.isArray(packet.actorInteractionMemberFaceKeys) ? packet.actorInteractionMemberFaceKeys : [];
+      for (var ki = 0; ki < keys.length; ki++) suppressedFaceKeySet.add(keys[ki]);
+      var members = Array.isArray(packet.actorInteractionMemberDescriptors) ? packet.actorInteractionMemberDescriptors : [];
+      for (var mi = 0; mi < members.length; mi++) {
+        var replacement = buildActorInteractionReplacementRenderableFromDescriptor(members[mi], packet, viewRotation);
+        if (replacement && replacement.faceKey && suppressedFaceKeySet.has(replacement.faceKey)) {
+          replacement = applyActorInteractionGroupSortOverride(replacement, packet, groupSummaryMap, playerRef, viewRotation);
+          replacements.push(replacement);
+        }
+      }
+      continue;
+    }
+    filtered.push(packet);
+  }
+  for (var ri = 0; ri < replacements.length; ri++) filtered.push(replacements[ri]);
+  filtered.sort(compareRenderablesByDomain);
+  return {
+    staticRenderables: filtered,
+    replacementRenderables: replacements,
+    suppressedPacketCount: suppressedPacketCount,
+    checkedPacketCount: checkedPacketCount,
+    suppressedFaceKeyCount: suppressedFaceKeySet.size
+  };
+}
+
 function buildRenderables() {
   const faceMergeControlState = getStaticWorldFaceMergeControlStateSnapshotForRender();
   beginRenderFrameDiagnosticState();
@@ -7219,6 +7664,7 @@ function buildRenderables() {
   const dynamicInstanceSplit = getDynamicInstanceSplitForRender(instances);
   recordRenderFunctionTiming('render.buildMainFrameRenderables.getDynamicInstanceSplitForRender', perfNow() - dynamicSplitStartAt, { totalInstancesForSplit: Number(instances && instances.length || 0) });
   const dynamicCandidates = Array.isArray(dynamicInstanceSplit.dynamicInstances) ? dynamicInstanceSplit.dynamicInstances : [];
+  const dynamicInstanceIdSet = new Set(dynamicCandidates.map(function (inst) { return inst && inst.instanceId ? String(inst.instanceId) : null; }).filter(Boolean));
   const dynamicFilterStartAt = perfNow();
   const visibleDynamicInstances = filterInstancesForMainCameraScope(dynamicCandidates, cameraScope);
   const dynamicFilterMs = Math.max(0, perfNow() - dynamicFilterStartAt);
@@ -7256,31 +7702,67 @@ function buildRenderables() {
     }
     if (prefabHasSprite(prefab)) {
       const spriteSortStartAt = perfNow();
-      const spriteSort = computeSpriteRenderableSort(inst, prefab);
-      spriteSortBuildMs += Math.max(0, perfNow() - spriteSortStartAt);
-      if (inst.__lastSpriteOcclusion !== spriteSort.occlusion) {
-        inst.__lastSpriteOcclusion = spriteSort.occlusion;
-        detailLog(`sprite-sort: ${inst.instanceId} prefab=${prefab.id} mode=${getSpriteProxySortMode(prefab)} occlusion=${spriteSort.occlusion} sortKey=${spriteSort.sortKey.toFixed(4)}`);
+      const spriteParts = getSpriteDepthSplitCandidate(inst, prefab, viewRotationInfo.viewRotation);
+      if (spriteParts && Array.isArray(spriteParts.parts) && spriteParts.parts.length > 1) {
+        const domainCoreForSpriteParts = getDomainSceneCoreApi();
+        for (let partIndex = 0; partIndex < spriteParts.parts.length; partIndex++) {
+          const part = spriteParts.parts[partIndex];
+          const partSort = domainCoreForSpriteParts && typeof domainCoreForSpriteParts.computeVoxelRenderableSort === 'function'
+            ? domainCoreForSpriteParts.computeVoxelRenderableSort({ cell: part.cell || { x: inst.x, y: inst.y, z: inst.z, h: 1 }, viewRotation: normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation) })
+            : computeViewAwareSortMeta(part.cell || { x: inst.x, y: inst.y, z: inst.z }, 1, normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation));
+          const spriteRenderableStartAt = perfNow();
+          dynamicRenderables.push({
+            id: 'sprite-part-' + inst.instanceId + '-' + String(partIndex),
+            kind: 'prefab-sprite-part',
+            sortKey: Number(partSort.sortKey || 0) + 0.0005,
+            tie: Number(partSort.tie || 0) + 300000 + partIndex,
+            instanceId: inst.instanceId || null,
+            prefabId: prefab && prefab.id || null,
+            renderPath: 'dynamic-renderables',
+            spritePart: part,
+            spritePartCount: spriteParts.parts.length,
+            worldBounds: getInstanceWorldBoundsForRender(inst),
+            drawScreenPosition: deriveRenderableDrawPosition({ debugFoot: iso(Number(part.cell && part.cell.x || inst.x || 0) + 0.5, Number(part.cell && part.cell.y || inst.y || 0) + 0.5, Number(part.cell && part.cell.z || inst.z || 0)) }),
+            worldX: Number(part.cell && part.cell.x || inst.x || 0) + 0.5,
+            worldY: Number(part.cell && part.cell.y || inst.y || 0) + 0.5,
+            draw: () => {
+              const drawn = drawPrefabSpritePartInstance(inst, prefab, part, 1);
+              if (!drawn && !prefabDrawsVoxels(prefab)) drawInstanceProxyBoxes(inst, 0.82);
+            },
+          });
+          spriteRenderableBuildMs += Math.max(0, perfNow() - spriteRenderableStartAt);
+        }
+        if (inst.__lastSpriteDepthSplitSignature !== spriteParts.reason + ':' + spriteParts.parts.length) {
+          inst.__lastSpriteDepthSplitSignature = spriteParts.reason + ':' + spriteParts.parts.length;
+          detailLog('sprite-depth-split: ' + String(inst.instanceId) + ' prefab=' + String(prefab && prefab.id || 'unknown') + ' parts=' + String(spriteParts.parts.length) + ' reason=' + String(spriteParts.reason || 'tile-aligned-footprint-split'));
+        }
+      } else {
+        const spriteSort = computeSpriteRenderableSort(inst, prefab);
+        if (inst.__lastSpriteOcclusion !== spriteSort.occlusion) {
+          inst.__lastSpriteOcclusion = spriteSort.occlusion;
+          detailLog(`sprite-sort: ${inst.instanceId} prefab=${prefab.id} mode=${getSpriteProxySortMode(prefab)} occlusion=${spriteSort.occlusion} sortKey=${spriteSort.sortKey.toFixed(4)}`);
+        }
+        const spriteRenderableStartAt = perfNow();
+        dynamicRenderables.push({
+          id: 'sprite-' + inst.instanceId,
+          kind: 'prefab-sprite',
+          sortKey: spriteSort.sortKey,
+          tie: spriteSort.tie,
+          instanceId: inst.instanceId || null,
+          prefabId: prefab && prefab.id || null,
+          renderPath: 'dynamic-renderables',
+          worldBounds: getInstanceWorldBoundsForRender(inst),
+          drawScreenPosition: deriveRenderableDrawPosition({ debugFoot: iso(Number(inst && inst.x || 0) + 0.5, Number(inst && inst.y || 0) + 0.5, Number(inst && inst.z || 0)) }),
+          worldX: Number(inst && inst.x || 0) + 0.5,
+          worldY: Number(inst && inst.y || 0) + 0.5,
+          draw: () => {
+            const drawn = drawPrefabSpriteInstance(inst, 1);
+            if (!drawn && !prefabDrawsVoxels(prefab)) drawInstanceProxyBoxes(inst, 0.82);
+          },
+        });
+        spriteRenderableBuildMs += Math.max(0, perfNow() - spriteRenderableStartAt);
       }
-      const spriteRenderableStartAt = perfNow();
-      dynamicRenderables.push({
-        id: 'sprite-' + inst.instanceId,
-        kind: 'prefab-sprite',
-        sortKey: spriteSort.sortKey,
-        tie: spriteSort.tie,
-        instanceId: inst.instanceId || null,
-        prefabId: boxSemanticInput && boxSemanticInput.id || prefab && prefab.id || null,
-        renderPath: 'dynamic-renderables',
-        worldBounds: getInstanceWorldBoundsForRender(inst),
-        drawScreenPosition: deriveRenderableDrawPosition({ debugFoot: iso(Number(inst && inst.x || 0) + 0.5, Number(inst && inst.y || 0) + 0.5, Number(inst && inst.z || 0)) }),
-        worldX: Number(inst && inst.x || 0) + 0.5,
-        worldY: Number(inst && inst.y || 0) + 0.5,
-        draw: () => {
-          const drawn = drawPrefabSpriteInstance(inst, 1);
-          if (!drawn && !prefabDrawsVoxels(prefab)) drawInstanceProxyBoxes(inst, 0.82);
-        },
-      });
-      spriteRenderableBuildMs += Math.max(0, perfNow() - spriteRenderableStartAt);
+      spriteSortBuildMs += Math.max(0, perfNow() - spriteSortStartAt);
     }
   }
 
@@ -7291,34 +7773,63 @@ function buildRenderables() {
   recordRenderFunctionTiming('render.buildMainFrameRenderables.dynamicLoop.computeSpriteRenderableSort', spriteSortBuildMs);
   recordRenderFunctionTiming('render.buildMainFrameRenderables.dynamicLoop.pushSpriteRenderable', spriteRenderableBuildMs);
 
-  var playerSliceBuildMs = 0;
+  var playerActorBuildMs = 0;
   if (SHOW_PLAYER && pointWithinWorldBoundsXY(player.x, player.y, cameraScope.cullingWorldBounds)) {
-    const playerLine = player.x + player.y + 0.001;
-    for (const s of getPlayerSlices()) {
-      var playerSliceStartAt = perfNow();
-      var playerSortMeta = (getDomainSceneCoreApi() && typeof getDomainSceneCoreApi().computePlayerSliceRenderableSort === 'function')
-        ? getDomainSceneCoreApi().computePlayerSliceRenderableSort({ slice: s, player: player, viewRotation: normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation) })
-        : Object.assign({ tie: 500000 + s.z * 1000 }, computeViewAwareSortMeta({ x: player.x, y: player.y, z: s.z }, 0, normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation)));
-      dynamicRenderables.push({
-        id: s.id,
-        kind: 'player-slice',
-        sortKey: playerSortMeta.sortKey,
-        tie: playerSortMeta.tie,
-        worldX: Number(player.x || 0),
-        worldY: Number(player.y || 0),
-        draw: () => drawPlayerSlice(s),
-      });
-      playerSliceBuildMs += Math.max(0, perfNow() - playerSliceStartAt);
-    }
+    var playerActorStartAt = perfNow();
+    var playerZ = Number(player && player.z != null ? player.z : 0);
+    var playerSortMeta = (getDomainSceneCoreApi() && typeof getDomainSceneCoreApi().computePlayerActorRenderableSort === 'function')
+      ? getDomainSceneCoreApi().computePlayerActorRenderableSort({ player: player, viewRotation: normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation) })
+      : Object.assign({ tie: 700000 }, computeViewAwareSortMeta({ x: player.x, y: player.y, z: playerZ }, 0, normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation)));
+    dynamicRenderables.push({
+      id: 'player-avatar',
+      kind: 'player-avatar',
+      sortMode: 'player-foot-anchor',
+      sortKey: playerSortMeta.sortKey,
+      tie: playerSortMeta.tie,
+      depthAnchor: playerSortMeta.depthAnchor || { x: Number(player.x || 0), y: Number(player.y || 0), z: playerZ },
+      worldX: Number(player.x || 0),
+      worldY: Number(player.y || 0),
+      worldZ: playerZ,
+      draw: () => drawPlayerAvatar(),
+    });
+    playerActorBuildMs += Math.max(0, perfNow() - playerActorStartAt);
   }
-  recordRenderFunctionTiming('render.buildMainFrameRenderables.playerSlices', playerSliceBuildMs, { playerSliceCount: Number(SHOW_PLAYER ? getPlayerSlices().length || 0 : 0) });
+  recordRenderFunctionTiming('render.buildMainFrameRenderables.playerActor', playerActorBuildMs, { playerRenderableCount: SHOW_PLAYER ? 1 : 0, playerSortMode: 'player-foot-anchor' });
+
+  var actorInteractionReplacementMs = 0;
+  var actorInteractionFaceKeySet = new Set();
+  var actorInteractionResult = { staticRenderables: staticRenderablesAll, replacementRenderables: [], suppressedPacketCount: 0, checkedPacketCount: 0, suppressedFaceKeyCount: 0 };
+  if (SHOW_PLAYER && pointWithinWorldBoundsXY(player.x, player.y, cameraScope.cullingWorldBounds)) {
+    var actorInteractionStartAt = perfNow();
+    actorInteractionFaceKeySet = buildActorInteractionCandidateFaceKeySetForPlayer({
+      player: player,
+      sourceBoxes: boxes,
+      occ: visibleOcc,
+      viewRotation: viewRotationInfo.viewRotation,
+      radius: getActorInteractionSortRadiusForRender(),
+      dynamicInstanceIdSet: dynamicInstanceIdSet
+    });
+    actorInteractionResult = applyActorInteractionReplacementToRenderables(
+      staticRenderablesAll,
+      actorInteractionFaceKeySet,
+      normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation),
+      SHOW_PLAYER ? player : null
+    );
+    actorInteractionReplacementMs += Math.max(0, perfNow() - actorInteractionStartAt);
+  }
+  recordRenderFunctionTiming('render.buildMainFrameRenderables.actorInteractionReplacement', actorInteractionReplacementMs, {
+    actorInteractionCandidateFaceKeyCount: Number(actorInteractionFaceKeySet && actorInteractionFaceKeySet.size || 0),
+    actorInteractionReplacementRenderableCount: Number(actorInteractionResult && actorInteractionResult.replacementRenderables && actorInteractionResult.replacementRenderables.length || 0),
+    actorInteractionSuppressedStaticPacketCount: Number(actorInteractionResult && actorInteractionResult.suppressedPacketCount || 0),
+    actorInteractionRadius: Number(getActorInteractionSortRadiusForRender() || 0)
+  });
 
   const dynamicSortStartAt = perfNow();
   dynamicRenderables.sort(compareRenderablesByDomain);
   recordRenderFunctionTiming('render.buildMainFrameRenderables.dynamicRenderables.sort', perfNow() - dynamicSortStartAt, { dynamicRenderableCount: Number(dynamicRenderables.length || 0) });
   const dynamicObjectBuildMs = Math.max(0, perfNow() - dynamicBuildStartAt);
   const mergeStartAt = perfNow();
-  const staticRenderables = staticRenderablesAll;
+  const staticRenderables = actorInteractionResult && Array.isArray(actorInteractionResult.staticRenderables) ? actorInteractionResult.staticRenderables : staticRenderablesAll;
   const dynamicRenderablesCulled = dynamicRenderables;
   const renderables = mergeSortedRenderables(staticRenderables, dynamicRenderablesCulled);
   recordRenderFunctionTiming('render.buildMainFrameRenderables.mergeSortedRenderables', perfNow() - mergeStartAt, { staticRenderableCount: Number(staticRenderables.length || 0), dynamicRenderableCount: Number(dynamicRenderablesCulled.length || 0), mergedRenderableCount: Number(renderables.length || 0) });
@@ -7365,6 +7876,12 @@ function buildRenderables() {
     dynamicLoopCandidatesBeforeFilter: Number(dynamicCandidates.length || 0),
     dynamicLoopInstanceCount: Number(visibleDynamicInstances.length || 0),
     dynamicObjectCount: Number(dynamicRenderablesCulled.length || 0),
+    actorInteractionCandidateFaceKeyCount: Number(actorInteractionFaceKeySet && actorInteractionFaceKeySet.size || 0),
+    actorInteractionReplacementRenderableCount: Number(actorInteractionResult && actorInteractionResult.replacementRenderables && actorInteractionResult.replacementRenderables.length || 0),
+    actorInteractionSuppressedStaticPacketCount: Number(actorInteractionResult && actorInteractionResult.suppressedPacketCount || 0),
+    actorInteractionSuppressionCheckedStaticPacketCount: Number(actorInteractionResult && actorInteractionResult.checkedPacketCount || 0),
+    actorInteractionSuppressedFaceKeyCount: Number(actorInteractionResult && actorInteractionResult.suppressedFaceKeyCount || 0),
+    actorInteractionRadius: Number(getActorInteractionSortRadiusForRender() || 0),
     staticInstanceSkippedByDynamicLoop: Number(visibleInstanceSummary.staticSkippedByDynamicLoop || 0),
     occupancyCacheVersion: occupancyCacheVersion,
     occupancyRebuiltThisFrame: occupancyRebuiltThisFrame,

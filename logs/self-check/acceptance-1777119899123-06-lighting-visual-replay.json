@@ -1,0 +1,71 @@
+{
+  "phase": "P8X",
+  "owner": "src/infrastructure/self-check/scenario-runner.js",
+  "sessionId": "1777119899123",
+  "entry": {
+    "kind": "main",
+    "label": "主程序",
+    "entryFile": "index.html",
+    "launcherHint": "start.bat",
+    "build": "20260326-shadow-controls-v8"
+  },
+  "query": "?fromEditor=1&t=1777119917081&reason=scenario-editor-save&prefabId=auto_x5_777119899123",
+  "flow": {
+    "name": "06-lighting-visual-replay",
+    "startedAt": "2026-04-25T12:27:32.433Z",
+    "steps": [
+      {
+        "name": "pre-lighting-view-mode",
+        "at": "2026-04-25T12:27:33.307Z",
+        "detail": {
+          "mode": "view"
+        }
+      },
+      {
+        "name": "light-position-before",
+        "at": "2026-04-25T12:27:47.860Z",
+        "detail": {
+          "x": 5.5,
+          "y": 3.4,
+          "z": 3.7
+        }
+      },
+      {
+        "name": "light-position-after",
+        "at": "2026-04-25T12:27:55.960Z",
+        "detail": {
+          "x": 6.3,
+          "y": 2.9,
+          "z": 4.9
+        }
+      }
+    ],
+    "ok": true,
+    "finishedAt": "2026-04-25T12:27:55.960Z"
+  },
+  "session": {
+    "scenarioNames": [
+      "baseline",
+      "habbo-root-open",
+      "habbo-first-place",
+      "editor-x5-roundtrip",
+      "scene-save-load",
+      "main-camera-rotation",
+      "lighting-visual",
+      "player-walk",
+      "editor-normal-health"
+    ],
+    "currentIndex": 6
+  },
+  "visibleRuntimeErrors": {
+    "label": "06-lighting-visual-replay",
+    "bannerVisible": false,
+    "bannerText": "",
+    "bannerUpdatedAt": "",
+    "historyCount": 0,
+    "newEntryCount": 0,
+    "latestHistory": [],
+    "newEntries": [],
+    "lastEntry": null
+  }
+}

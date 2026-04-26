@@ -1,0 +1,218 @@
+{
+  "phase": "P8X",
+  "owner": "src/infrastructure/self-check/scenario-runner.js",
+  "sessionId": "1777119899123",
+  "entry": {
+    "kind": "main",
+    "label": "主程序",
+    "entryFile": "index.html",
+    "launcherHint": "start.bat",
+    "build": "20260326-shadow-controls-v8"
+  },
+  "query": "?acceptanceReplay=1",
+  "kind": "state-actions-boundary",
+  "stage": "baseline",
+  "summary": {
+    "phase": "P19-SA",
+    "owner": "src/application/state/state-actions.js",
+    "label": "baseline",
+    "available": true,
+    "counters": {
+      "runtimeStateHits": 1,
+      "selectorHits": 6,
+      "prefabRegistryHits": 1,
+      "legacyGlobalHits": 0,
+      "oldEntryHits": 0,
+      "fallbackCount": 0
+    },
+    "lastEvent": {
+      "at": "2026-04-25T12:24:59.150Z",
+      "kind": "selector",
+      "route": "state.selectors.getSelectedPrefabId",
+      "detail": {
+        "prefabId": "debug_cube_5faces",
+        "source": "state-actions:readSelectedPrefabId"
+      }
+    },
+    "lastFallback": null,
+    "recentEvents": [
+      {
+        "at": "2026-04-25T12:24:59.149Z",
+        "kind": "selector",
+        "route": "state.selectors.getEditorMode",
+        "detail": {
+          "mode": "view",
+          "source": "state-actions:readEditorMode"
+        }
+      },
+      {
+        "at": "2026-04-25T12:24:59.150Z",
+        "kind": "runtime-state",
+        "route": "state.runtimeState.setEditorModeValue",
+        "detail": {
+          "source": "replay:baseline-mode-probe",
+          "mode": "view"
+        }
+      },
+      {
+        "at": "2026-04-25T12:24:59.150Z",
+        "kind": "selector",
+        "route": "state.selectors.getEditorMode",
+        "detail": {
+          "mode": "view",
+          "source": "state-actions:readEditorMode"
+        }
+      },
+      {
+        "at": "2026-04-25T12:24:59.150Z",
+        "kind": "selector",
+        "route": "state.selectors.getSelectedPrototypeIndex",
+        "detail": {
+          "index": 0,
+          "source": "state-actions:readSelectedPrototypeIndex"
+        }
+      },
+      {
+        "at": "2026-04-25T12:24:59.150Z",
+        "kind": "selector",
+        "route": "state.selectors.getSelectedPrefabId",
+        "detail": {
+          "prefabId": "debug_cube_5faces",
+          "source": "state-actions:readSelectedPrefabId"
+        }
+      },
+      {
+        "at": "2026-04-25T12:24:59.150Z",
+        "kind": "prefab-registry",
+        "route": "state.prefabRegistry.setSelectedPrefabId",
+        "detail": {
+          "source": "replay:baseline-prefab-probe",
+          "prefabId": "debug_cube_5faces",
+          "result": 0
+        }
+      },
+      {
+        "at": "2026-04-25T12:24:59.150Z",
+        "kind": "selector",
+        "route": "state.selectors.getSelectedPrototypeIndex",
+        "detail": {
+          "index": 0,
+          "source": "state-actions:readSelectedPrototypeIndex"
+        }
+      },
+      {
+        "at": "2026-04-25T12:24:59.150Z",
+        "kind": "selector",
+        "route": "state.selectors.getSelectedPrefabId",
+        "detail": {
+          "prefabId": "debug_cube_5faces",
+          "source": "state-actions:readSelectedPrefabId"
+        }
+      }
+    ],
+    "recentFallbacks": []
+  },
+  "extra": {
+    "step": "state-actions-boundary-baseline",
+    "detail": {
+      "phase": "P19-SA",
+      "owner": "src/application/state/state-actions.js",
+      "label": "baseline",
+      "available": true,
+      "counters": {
+        "runtimeStateHits": 1,
+        "selectorHits": 6,
+        "prefabRegistryHits": 1,
+        "legacyGlobalHits": 0,
+        "oldEntryHits": 0,
+        "fallbackCount": 0
+      },
+      "lastEvent": {
+        "at": "2026-04-25T12:24:59.150Z",
+        "kind": "selector",
+        "route": "state.selectors.getSelectedPrefabId",
+        "detail": {
+          "prefabId": "debug_cube_5faces",
+          "source": "state-actions:readSelectedPrefabId"
+        }
+      },
+      "lastFallback": null,
+      "recentEvents": [
+        {
+          "at": "2026-04-25T12:24:59.149Z",
+          "kind": "selector",
+          "route": "state.selectors.getEditorMode",
+          "detail": {
+            "mode": "view",
+            "source": "state-actions:readEditorMode"
+          }
+        },
+        {
+          "at": "2026-04-25T12:24:59.150Z",
+          "kind": "runtime-state",
+          "route": "state.runtimeState.setEditorModeValue",
+          "detail": {
+            "source": "replay:baseline-mode-probe",
+            "mode": "view"
+          }
+        },
+        {
+          "at": "2026-04-25T12:24:59.150Z",
+          "kind": "selector",
+          "route": "state.selectors.getEditorMode",
+          "detail": {
+            "mode": "view",
+            "source": "state-actions:readEditorMode"
+          }
+        },
+        {
+          "at": "2026-04-25T12:24:59.150Z",
+          "kind": "selector",
+          "route": "state.selectors.getSelectedPrototypeIndex",
+          "detail": {
+            "index": 0,
+            "source": "state-actions:readSelectedPrototypeIndex"
+          }
+        },
+        {
+          "at": "2026-04-25T12:24:59.150Z",
+          "kind": "selector",
+          "route": "state.selectors.getSelectedPrefabId",
+          "detail": {
+            "prefabId": "debug_cube_5faces",
+            "source": "state-actions:readSelectedPrefabId"
+          }
+        },
+        {
+          "at": "2026-04-25T12:24:59.150Z",
+          "kind": "prefab-registry",
+          "route": "state.prefabRegistry.setSelectedPrefabId",
+          "detail": {
+            "source": "replay:baseline-prefab-probe",
+            "prefabId": "debug_cube_5faces",
+            "result": 0
+          }
+        },
+        {
+          "at": "2026-04-25T12:24:59.150Z",
+          "kind": "selector",
+          "route": "state.selectors.getSelectedPrototypeIndex",
+          "detail": {
+            "index": 0,
+            "source": "state-actions:readSelectedPrototypeIndex"
+          }
+        },
+        {
+          "at": "2026-04-25T12:24:59.150Z",
+          "kind": "selector",
+          "route": "state.selectors.getSelectedPrefabId",
+          "detail": {
+            "prefabId": "debug_cube_5faces",
+            "source": "state-actions:readSelectedPrefabId"
+          }
+        }
+      ],
+      "recentFallbacks": []
+    }
+  }
+}

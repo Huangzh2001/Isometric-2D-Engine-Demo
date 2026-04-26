@@ -1,0 +1,79 @@
+{
+  "phase": "P8X",
+  "owner": "AUTO_EDITOR_SAVE_X5.html",
+  "kind": "editor-auto",
+  "tag": "save-success",
+  "sessionId": "1777119899123",
+  "autoScenario": "save-x5",
+  "href": "http://127.0.0.1:4013/AUTO_EDITOR_SAVE_X5.html?fromMain=1&autoScenario=save-x5&replaySession=1777119899123",
+  "at": "2026-04-25T12:25:16.458Z",
+  "payload": {
+    "prefabId": "auto_x5_777119899123",
+    "file": "Auto X5 777119899123.json",
+    "path": "assets\\prefabs\\Auto X5 777119899123.json"
+  },
+  "platformBoundary": {
+    "label": "save-success",
+    "prefabApi": {
+      "owner": "src/infrastructure/services/prefab-api.js",
+      "label": "save-success",
+      "counters": {
+        "fetchIndexCalls": 0,
+        "savePrefabToServerCalls": 1,
+        "listBrowserLibraryCalls": 0,
+        "savePrefabToBrowserLibraryCalls": 0,
+        "errors": 0
+      },
+      "lastEvent": {
+        "at": "2026-04-25T12:25:16.458Z",
+        "kind": "save-server",
+        "detail": {
+          "source": "editor-auto:save-prefab",
+          "filename": "Auto X5 777119899123.json",
+          "prefabId": "auto_x5_777119899123",
+          "ok": true
+        }
+      },
+      "recentEvents": [
+        {
+          "at": "2026-04-25T12:25:16.458Z",
+          "kind": "save-server",
+          "detail": {
+            "source": "editor-auto:save-prefab",
+            "filename": "Auto X5 777119899123.json",
+            "prefabId": "auto_x5_777119899123",
+            "ok": true
+          }
+        }
+      ]
+    },
+    "editorHandoff": {
+      "owner": "src/infrastructure/services/editor-handoff-api.js",
+      "label": "save-success",
+      "counters": {
+        "readCalls": 0,
+        "clearCalls": 0,
+        "writeCalls": 1,
+        "errors": 0
+      },
+      "lastEvent": {
+        "at": "2026-04-25T12:25:16.458Z",
+        "kind": "write",
+        "detail": {
+          "source": "editor-auto:write-main-handoff",
+          "hasValue": true
+        }
+      },
+      "recentEvents": [
+        {
+          "at": "2026-04-25T12:25:16.458Z",
+          "kind": "write",
+          "detail": {
+            "source": "editor-auto:write-main-handoff",
+            "hasValue": true
+          }
+        }
+      ]
+    }
+  }
+}

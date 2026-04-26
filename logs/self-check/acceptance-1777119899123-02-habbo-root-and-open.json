@@ -1,0 +1,65 @@
+{
+  "phase": "P8X",
+  "owner": "src/infrastructure/self-check/scenario-runner.js",
+  "sessionId": "1777119899123",
+  "entry": {
+    "kind": "main",
+    "label": "主程序",
+    "entryFile": "index.html",
+    "launcherHint": "start.bat",
+    "build": "20260326-shadow-controls-v8"
+  },
+  "query": "?acceptanceReplay=1",
+  "flow": {
+    "name": "02-habbo-root-and-open",
+    "startedAt": "2026-04-25T12:24:59.201Z",
+    "steps": [
+      {
+        "name": "root-set",
+        "at": "2026-04-25T12:25:02.364Z",
+        "detail": {
+          "configured": true,
+          "root": "E:\\hzh\\02_娱乐\\Habbo\\habbofurni_models_classified",
+          "exists": true,
+          "itemCount": 17464,
+          "lastError": "",
+          "fetchedAt": 1777119901547
+        }
+      },
+      {
+        "name": "first-category",
+        "at": "2026-04-25T12:25:05.979Z",
+        "detail": {
+          "text": "Bed物品188 项"
+        }
+      }
+    ],
+    "ok": true,
+    "finishedAt": "2026-04-25T12:25:05.979Z"
+  },
+  "session": {
+    "scenarioNames": [
+      "baseline",
+      "habbo-root-open",
+      "habbo-first-place",
+      "editor-x5-roundtrip",
+      "scene-save-load",
+      "main-camera-rotation",
+      "lighting-visual",
+      "player-walk",
+      "editor-normal-health"
+    ],
+    "currentIndex": 1
+  },
+  "visibleRuntimeErrors": {
+    "label": "02-habbo-root-and-open",
+    "bannerVisible": false,
+    "bannerText": "",
+    "bannerUpdatedAt": "",
+    "historyCount": 0,
+    "newEntryCount": 0,
+    "latestHistory": [],
+    "newEntries": [],
+    "lastEntry": null
+  }
+}

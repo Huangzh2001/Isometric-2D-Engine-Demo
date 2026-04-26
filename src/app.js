@@ -80,7 +80,7 @@ var __functionTraceSpec = {
   'src/render.js': [
     'prefabDrawsVoxels','prefabHasSprite','getPrefabSpriteConfig','getHabboLayerConfigList','getCachedImageFromDataUrl','getPrefabSpriteImage','rotKeyForSprite',
     'drawPrefabSpriteAt','drawPrefabSpriteInstance','drawHabboDebugOverlay','getInstanceProxyBounds','classifyPlayerAgainstProxyBox','computeSpriteRenderableSort',
-    'rebuildStaticBoxRenderCacheIfNeeded','mergeSortedRenderables','drawFloor','drawPlayerSlice','updatePreview','pickBoxAtScreen','update','render'
+    'rebuildStaticBoxRenderCacheIfNeeded','mergeSortedRenderables','drawFloor','drawPlayerAvatar','updatePreview','pickBoxAtScreen','update','render'
   ],
   'src/app.js': ['loop']
 };

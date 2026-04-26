@@ -113,7 +113,7 @@ var __functionTraceSpec = {
   'src/presentation/render/render.js': [
     'prefabDrawsVoxels','prefabHasSprite','getPrefabSpriteConfig','getHabboLayerConfigList','getCachedImageFromDataUrl','getPrefabSpriteImage','rotKeyForSprite',
     'drawPrefabSpriteAt','drawPrefabSpriteInstance','drawHabboDebugOverlay','getInstanceProxyBounds','classifyPlayerAgainstProxyBox','computeSpriteRenderableSort',
-    'rebuildStaticBoxRenderCacheIfNeeded','mergeSortedRenderables','drawFloor','drawPlayerSlice','updatePreview','pickBoxAtScreen','update','render'
+    'rebuildStaticBoxRenderCacheIfNeeded','mergeSortedRenderables','drawFloor','drawPlayerAvatar','updatePreview','pickBoxAtScreen','update','render'
   ],
   'src/presentation/render/renderer/canvas2d-renderer.js': ['renderFrame', 'runFramePipeline', 'getRenderablesApi', 'drawRenderableOrder', 'drawOverlayPasses', 'drawHudPass'],
   'src/presentation/shell/app.js': ['loop']
