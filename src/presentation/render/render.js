@@ -4059,10 +4059,11 @@ function currentAnimFrame() {
 }
 
 function getPlayerUnifiedLightCenter() {
+  var baseZ = Number(player && player.visualZ != null ? player.visualZ : player && player.z || 0);
   return {
     x: player.x,
     y: player.y,
-    z: Math.max(0.55, settings.playerHeightCells * 0.52),
+    z: baseZ + Math.max(0.55, settings.playerHeightCells * 0.52),
   };
 }
 
@@ -8460,7 +8461,7 @@ function drawMainHudPassLocal() {
     if (!pb) detailLog(`[debug:hud-preview-null] ${previewLabel}`);
     ctx.fillText(previewLabel, 18, 72);
   }
-  if (showDebug) ctx.fillText(`${SHOW_PLAYER ? `player=(${player.x.toFixed(2)}, ${player.y.toFixed(2)}) dir=${player.dir}  ` : ''}light=(${l.x.toFixed(2)},${l.y.toFixed(2)},${l.z.toFixed(2)}) angle=${l.angle.toFixed(0)} pitch=${l.pitch.toFixed(0)}`, 18, 94);
+  if (showDebug) ctx.fillText(`${SHOW_PLAYER ? `player=(${player.x.toFixed(2)}, ${player.y.toFixed(2)}, z=${Number(player.z || 0).toFixed(2)}, vZ=${Number(player.visualZ || 0).toFixed(2)}) dir=${player.dir}  ` : ''}light=(${l.x.toFixed(2)},${l.y.toFixed(2)},${l.z.toFixed(2)}) angle=${l.angle.toFixed(0)} pitch=${l.pitch.toFixed(0)}`, 18, 94);
   if (typeof shadowProbeState !== 'undefined' && shadowProbeState) {
     var probeLabel = shadowProbeState.activeMarker ? shadowProbeMarkerLabel(shadowProbeState.activeMarker) : 'none';
     ctx.fillText('阴影探针: M=标记模式 P=记录当前帧 N=清除  模式=' + (shadowProbeState.markMode ? 'ON' : 'OFF') + '  当前=' + probeLabel, 18, showDebug ? 116 : 94);

@@ -42,6 +42,11 @@ var settings = {
   playerHeightCells: 1.7,
   playerProxyW: 0.32,
   playerProxyD: 0.24,
+  playerMaxStepUpCells: 1,
+  playerJumpDurationSec: 0.18,
+  playerJumpLiftCells: 0.35,
+  playerDropDurationSec: 0.16,
+  playerDropLiftCells: 0.16,
   tileW: BASE_TILE_W,
   tileH: BASE_TILE_H,
   originX: 1180 * 0.57,
@@ -51,11 +56,21 @@ var settings = {
 var player = {
   x: 1.1,
   y: 1.1,
+  z: 0,
+  visualZ: 0,
   r: 0.22,
   speed: 2.6,
   walk: 0,
   moving: false,
   dir: 'down',
+  jump: {
+    active: false,
+    fromZ: 0,
+    toZ: 0,
+    t: 0,
+    duration: 0.18,
+    lift: 0.35,
+  },
 };
 var editor = {
   mode: 'view',

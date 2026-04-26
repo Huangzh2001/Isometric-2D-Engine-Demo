@@ -135,16 +135,17 @@ function refreshItemInspector() {
 
 function refreshPlayerInspector() {
   var proxy = getPlayerProxyBox();
-  if (ui.playerInspectorSummary) ui.playerInspectorSummary.textContent = `角色位置=(${player.x.toFixed(2)}, ${player.y.toFixed(2)}) · 朝向=${player.dir} · moving=${!!player.moving}`;
+  if (ui.playerInspectorSummary) ui.playerInspectorSummary.textContent = `角色位置=(${player.x.toFixed(2)}, ${player.y.toFixed(2)}, z=${Number(player.z || 0).toFixed(2)}, vZ=${Number(player.visualZ || 0).toFixed(2)}) · 朝向=${player.dir} · moving=${!!player.moving}`;
   if (ui.playerInspectorDetails) ui.playerInspectorDetails.textContent = prettyJson({
-    position: { x: Number(player.x.toFixed(3)), y: Number(player.y.toFixed(3)) },
+    position: { x: Number(player.x.toFixed(3)), y: Number(player.y.toFixed(3)), z: Number((player.z || 0).toFixed(3)), visualZ: Number((player.visualZ || 0).toFixed(3)) },
     radius: player.r,
     speed: player.speed,
     moving: !!player.moving,
     dir: player.dir,
     walkPhase: Number(player.walk.toFixed(3)),
+    jump: player.jump ? { active: !!player.jump.active, fromZ: Number((player.jump.fromZ || 0).toFixed(3)), toZ: Number((player.jump.toZ || 0).toFixed(3)), t: Number((player.jump.t || 0).toFixed(3)), duration: Number((player.jump.duration || 0).toFixed(3)), lift: Number((player.jump.lift || 0).toFixed(3)) } : null,
     proxyBox: { x: Number(proxy.x.toFixed(3)), y: Number(proxy.y.toFixed(3)), z: proxy.z, w: Number(proxy.w.toFixed(3)), d: Number(proxy.d.toFixed(3)), h: Number(proxy.h.toFixed(3)) },
-    settings: { playerHeightCells: settings.playerHeightCells, playerProxyW: settings.playerProxyW, playerProxyD: settings.playerProxyD }
+    settings: { playerHeightCells: settings.playerHeightCells, playerProxyW: settings.playerProxyW, playerProxyD: settings.playerProxyD, playerMaxStepUpCells: settings.playerMaxStepUpCells, playerJumpDurationSec: settings.playerJumpDurationSec, playerJumpLiftCells: settings.playerJumpLiftCells }
   });
 }
 

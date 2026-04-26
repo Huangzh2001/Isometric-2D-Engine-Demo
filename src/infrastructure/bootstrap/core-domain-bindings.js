@@ -38,6 +38,7 @@
 
   var sceneCore = typeof __APP_CORE_SCENE_DOMAIN_CORE__ !== 'undefined' ? __APP_CORE_SCENE_DOMAIN_CORE__ : null;
   var portableCore = typeof __APP_CORE_PORTABLE_CORE__ !== 'undefined' ? __APP_CORE_PORTABLE_CORE__ : null;
+  var playerStepCore = typeof __APP_CORE_PLAYER_STEP_CORE__ !== 'undefined' ? __APP_CORE_PLAYER_STEP_CORE__ : null;
 
   if (sceneCore) {
     emit('BOOT', 'bind-scene-core', { route: bind('domain.sceneCore', sceneCore), phase: sceneCore.phase || null, owner: sceneCore.owner || null });
@@ -49,5 +50,11 @@
     emit('BOOT', 'bind-portable-core', { route: bind('domain.portableCore', portableCore), phase: portableCore.phase || null, owner: portableCore.owner || null, requiresExplicitContext: !!(portableCore.summarizeBoundary && portableCore.summarizeBoundary().purity && portableCore.summarizeBoundary().purity.requiresExplicitContext) });
   } else {
     emit('BOOT', 'bind-portable-core-missing', { available: false });
+  }
+
+  if (playerStepCore) {
+    emit('BOOT', 'bind-player-step-core', { route: bind('domain.playerStepCore', playerStepCore), phase: playerStepCore.phase || null, owner: playerStepCore.owner || null });
+  } else {
+    emit('BOOT', 'bind-player-step-core-missing', { available: false });
   }
 })();

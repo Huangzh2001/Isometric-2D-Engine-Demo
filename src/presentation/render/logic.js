@@ -316,12 +316,13 @@ var center = getPlayerShadowCenter();
 for (const light of activeShadowLights) drawProjectedShadow(worldPts, light, center, 'player-proxy');
 
 var bounds = getPlayerGroundBounds();
-var foot = iso(player.x, player.y, 0);
+var groundZ = Number(player && player.z != null ? player.z : 0);
+var foot = iso(player.x, player.y, groundZ);
 var widthPx = Math.max(10, bounds.maxX - bounds.minX);
 var heightPx = Math.max(6, bounds.maxY - bounds.minY);
 var contactAlpha = clamp(0.12 + settings.ambient * 0.20, 0.10, 0.24);
 for (const light of activeShadowLights) {
-  contactAlpha += clamp(evaluateLight(light, { x: player.x, y: player.y, z: 0.12 }, { x: 0, y: 0, z: 1 }).raw * 0.025, 0, 0.045);
+  contactAlpha += clamp(evaluateLight(light, { x: player.x, y: player.y, z: groundZ + 0.12 }, { x: 0, y: 0, z: 1 }).raw * 0.025, 0, 0.045);
 }
 ctx.save();
 ctx.translate(foot.x, foot.y + 4);
@@ -1527,12 +1528,13 @@ var center = getPlayerShadowCenter();
 for (const light of activeShadowLights) drawProjectedShadow(worldPts, light, center, 'player-proxy');
 
 var bounds = getPlayerGroundBounds();
-var foot = iso(player.x, player.y, 0);
+var groundZ = Number(player && player.z != null ? player.z : 0);
+var foot = iso(player.x, player.y, groundZ);
 var widthPx = Math.max(10, bounds.maxX - bounds.minX);
 var heightPx = Math.max(6, bounds.maxY - bounds.minY);
 var contactAlpha = clamp(0.12 + settings.ambient * 0.20, 0.10, 0.24);
 for (const light of activeShadowLights) {
-  contactAlpha += clamp(evaluateLight(light, { x: player.x, y: player.y, z: 0.12 }, { x: 0, y: 0, z: 1 }).raw * 0.025, 0, 0.045);
+  contactAlpha += clamp(evaluateLight(light, { x: player.x, y: player.y, z: groundZ + 0.12 }, { x: 0, y: 0, z: 1 }).raw * 0.025, 0, 0.045);
 }
 ctx.save();
 ctx.translate(foot.x, foot.y + 4);
