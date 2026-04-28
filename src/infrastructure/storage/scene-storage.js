@@ -73,6 +73,91 @@ function currentSceneBoxes() {
   try { return Array.isArray(boxes) ? boxes : []; } catch (_) { return []; }
 }
 
+
+function cloneSceneSerializable(value, fallback) {
+  try {
+    if (typeof value === 'undefined') return fallback;
+    return JSON.parse(JSON.stringify(value));
+  } catch (_) {
+    return typeof fallback === 'undefined' ? null : fallback;
+  }
+}
+
+function getRuntimeStateStorageApi() {
+  try {
+    if (typeof window === 'undefined') return null;
+    if (window.App && window.App.state && window.App.state.runtimeState) return window.App.state.runtimeState;
+    if (typeof __runtimeStateApi !== 'undefined' && __runtimeStateApi) return __runtimeStateApi;
+  } catch (_) {}
+  return null;
+}
+
+function getCurrentTerrainGeneratorSnapshot() {
+  var runtimeApi = getRuntimeStateStorageApi();
+  try {
+    if (runtimeApi && typeof runtimeApi.getTerrainGeneratorSettingsValue === 'function') return cloneSceneSerializable(runtimeApi.getTerrainGeneratorSettingsValue(), null);
+    if (runtimeApi && runtimeApi.terrainGenerator) return cloneSceneSerializable(runtimeApi.terrainGenerator, null);
+  } catch (_) {}
+  return null;
+}
+
+function getCurrentTerrainRuntimeSnapshot() {
+  var runtimeApi = getRuntimeStateStorageApi();
+  try {
+    if (runtimeApi && typeof runtimeApi.getTerrainRuntimeModelValue === 'function') return cloneSceneSerializable(runtimeApi.getTerrainRuntimeModelValue(), null);
+    if (runtimeApi && runtimeApi.terrainLogic) return cloneSceneSerializable(runtimeApi.terrainLogic, null);
+  } catch (_) {}
+  return null;
+}
+
+function restoreTerrainStateFromSnapshot(incoming, sourceName) {
+  var runtimeApi = getRuntimeStateStorageApi();
+  if (!runtimeApi || typeof incoming !== 'object' || !incoming) return { generator: false, runtime: false };
+  var source = String(sourceName || 'scene-storage:applySceneSnapshot');
+  var restoredGenerator = false;
+  var restoredRuntime = false;
+  var terrainGeneratorSnapshot = incoming.terrainGenerator && typeof incoming.terrainGenerator === 'object' ? incoming.terrainGenerator : null;
+  var terrainRuntimeSnapshot = incoming.terrainRuntime && typeof incoming.terrainRuntime === 'object' ? incoming.terrainRuntime : (incoming.terrainLogic && typeof incoming.terrainLogic === 'object' ? incoming.terrainLogic : null);
+  try {
+    if (terrainGeneratorSnapshot && typeof runtimeApi.patchTerrainGeneratorSettings === 'function') {
+      runtimeApi.patchTerrainGeneratorSettings(cloneSceneSerializable(terrainGeneratorSnapshot, {}), { source: source + ':restore-terrain-generator' });
+      restoredGenerator = true;
+    }
+  } catch (err) {
+    try { pushLog('scene-terrain-restore:generator-error ' + (err && err.message ? err.message : err)); } catch (_) {}
+  }
+  try {
+    if (terrainRuntimeSnapshot && typeof runtimeApi.patchTerrainRuntimeModel === 'function') {
+      var restored = cloneSceneSerializable(terrainRuntimeSnapshot, {});
+      restored.terrainChunkCacheVersion = Math.max(0, Math.round(Number(restored.terrainChunkCacheVersion) || 0)) + 1;
+      restored.dirtyChunkKeys = Array.isArray(restored.dirtyChunkKeys) ? restored.dirtyChunkKeys.slice() : [];
+      runtimeApi.patchTerrainRuntimeModel(restored, { source: source + ':restore-terrain-runtime' });
+      restoredRuntime = true;
+    } else if (typeof runtimeApi.clearTerrainRuntimeModel === 'function') {
+      runtimeApi.clearTerrainRuntimeModel({ source: source + ':clear-missing-terrain-runtime' });
+    }
+  } catch (err2) {
+    try { pushLog('scene-terrain-restore:runtime-error ' + (err2 && err2.message ? err2.message : err2)); } catch (_) {}
+  }
+  if (restoredGenerator || restoredRuntime) {
+    try {
+      var runtimeSummary = terrainRuntimeSnapshot && terrainRuntimeSnapshot.lastSummary ? terrainRuntimeSnapshot.lastSummary : null;
+      pushLog('scene-terrain-restore:done source=' + source + ' generator=' + restoredGenerator + ' runtime=' + restoredRuntime + ' terrainBatchId=' + String((terrainRuntimeSnapshot && terrainRuntimeSnapshot.activeTerrainBatchId) || (terrainGeneratorSnapshot && terrainGeneratorSnapshot.activeTerrainBatchId) || '') + ' terrainVoxels=' + String((runtimeSummary && runtimeSummary.generatedVoxelCount) || (terrainRuntimeSnapshot && terrainRuntimeSnapshot.terrainExpandedVoxelInstanceCount) || 0));
+    } catch (_) {}
+  }
+  return { generator: restoredGenerator, runtime: restoredRuntime };
+}
+
+function copyScenePersistenceFields(target, source) {
+  if (!target || !source || typeof source !== 'object') return target;
+  var keys = ['generatedBy', 'terrainBatchId', 'terrainCellX', 'terrainCellY', 'semanticTextureMap', 'semanticTextures', 'semanticFaceColors', 'terrainMaterialId', 'materialType', 'terrainMaterialLabel', 'base', 'renderUpdateMode'];
+  for (var i = 0; i < keys.length; i++) {
+    var key = keys[i];
+    if (Object.prototype.hasOwnProperty.call(source, key)) target[key] = cloneSceneSerializable(source[key], source[key]);
+  }
+  return target;
+}
+
 function summarizeCurrentSceneSession(label) {
   var sessionApi = getSceneSessionStateApi();
   try {
@@ -127,6 +212,8 @@ function summarizeSceneSnapshotMeta(snapshot) {
     boxes: Array.isArray(data.boxes) ? data.boxes.length : 0,
     lights: Array.isArray(data.lights) ? data.lights.length : 0,
     habboRefs: Array.isArray(data.habboRefs) ? data.habboRefs.length : 0,
+    hasTerrainRuntime: !!(data.terrainRuntime || data.terrainLogic),
+    hasTerrainGenerator: !!data.terrainGenerator,
   };
 }
 
@@ -143,6 +230,9 @@ function cloneSceneSnapshotShallow(snapshot) {
   if (snapshot.player && typeof snapshot.player === 'object') copy.player = Object.assign({}, snapshot.player);
   if (snapshot.editor && typeof snapshot.editor === 'object') copy.editor = Object.assign({}, snapshot.editor);
   if (snapshot.shadowUi && typeof snapshot.shadowUi === 'object') copy.shadowUi = Object.assign({}, snapshot.shadowUi);
+  if (snapshot.terrainGenerator && typeof snapshot.terrainGenerator === 'object') copy.terrainGenerator = cloneSceneSerializable(snapshot.terrainGenerator, null);
+  if (snapshot.terrainRuntime && typeof snapshot.terrainRuntime === 'object') copy.terrainRuntime = cloneSceneSerializable(snapshot.terrainRuntime, null);
+  if (snapshot.terrainLogic && typeof snapshot.terrainLogic === 'object') copy.terrainLogic = cloneSceneSerializable(snapshot.terrainLogic, null);
   if (Array.isArray(snapshot.instances)) copy.instances = snapshot.instances.map(function (inst) { return inst && typeof inst === 'object' ? Object.assign({}, inst) : inst; });
   if (Array.isArray(snapshot.boxes)) copy.boxes = snapshot.boxes.map(function (box) { return box && typeof box === 'object' ? Object.assign({}, box) : box; });
   if (Array.isArray(snapshot.lights)) copy.lights = snapshot.lights.map(function (light) { return light && typeof light === 'object' ? Object.assign({}, light) : light; });
@@ -407,6 +497,8 @@ function sceneSnapshot() {
     boxes: currentSceneBoxes().map(b => ({ ...b })),
     lights: lights.map(l => ({ ...l })),
     activeLightId,
+    terrainGenerator: getCurrentTerrainGeneratorSnapshot(),
+    terrainRuntime: getCurrentTerrainRuntimeSnapshot(),
   };
 }
 
@@ -450,6 +542,8 @@ function persistentSceneSnapshot() {
     boxes: currentSceneBoxes().map(b => ({ ...b })),
     lights: lights.map(l => ({ ...l })),
     activeLightId,
+    terrainGenerator: getCurrentTerrainGeneratorSnapshot(),
+    terrainRuntime: getCurrentTerrainRuntimeSnapshot(),
   };
 }
 
@@ -515,6 +609,7 @@ function applySceneSnapshot(snapshot, options = {}) {
   clearSelectedInstance();
   const base = createDefaultSceneData();
   const incoming = snapshot && typeof snapshot === 'object' ? snapshot : {};
+  var restoredTerrainState = restoreTerrainStateFromSnapshot(incoming, 'scene-storage:applySceneSnapshot');
   const nextSettings = { ...base.settings, ...(incoming.settings || {}) };
   nextSettings.worldResolution = clamp(parseInt(nextSettings.worldResolution || 1, 10) || 1, 1, 4);
   if (![1, 2, 4].includes(nextSettings.worldResolution)) nextSettings.worldResolution = 1;
@@ -547,9 +642,7 @@ function applySceneSnapshot(snapshot, options = {}) {
       rotation: ((parseInt(inst.rotation || 0, 10) % 4) + 4) % 4,
       name: inst.name || undefined,
     };
-    if (inst && (inst.renderUpdateMode === 'static' || inst.renderUpdateMode === 'dynamic')) {
-      normalized.renderUpdateMode = String(inst.renderUpdateMode);
-    }
+    copyScenePersistenceFields(normalized, inst);
     return normalized;
   });
   if (__sceneGraphApi && typeof __sceneGraphApi.replaceSceneGraph === 'function') {
@@ -633,7 +726,7 @@ function applySceneSnapshot(snapshot, options = {}) {
   }
   var __applyInstances = currentSceneInstances();
   var __applyBoxes = currentSceneBoxes();
-  sceneIoLog('apply-snapshot:done', 'source=' + sourceName + ' reason=' + reasonName + ' instances=' + __applyInstances.length + ' boxes=' + __applyBoxes.length + ' lights=' + lights.length + ' grid=' + settings.gridW + 'x' + settings.gridH);
+  sceneIoLog('apply-snapshot:done', 'source=' + sourceName + ' reason=' + reasonName + ' instances=' + __applyInstances.length + ' boxes=' + __applyBoxes.length + ' lights=' + lights.length + ' grid=' + settings.gridW + 'x' + settings.gridH + ' terrainRuntimeRestored=' + (!!(restoredTerrainState && restoredTerrainState.runtime)));
 }
 
 function saveSceneToLocalStorage() {
