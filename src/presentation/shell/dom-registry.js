@@ -209,6 +209,7 @@ var ui = {
   showDebugBox: document.getElementById('showDebugBox'),
   showFrontLines: document.getElementById('showFrontLines'),
   verboseLog: document.getElementById('verboseLog'),
+  actorSortDiagEnabled: document.getElementById('actorSortDiagEnabled'),
   shadowDebugDetailed: document.getElementById('shadowDebugDetailed'),
   terrainDetailedProfilingEnabled: document.getElementById('terrainDetailedProfilingEnabled'),
   clearLog: document.getElementById('clearLog'),

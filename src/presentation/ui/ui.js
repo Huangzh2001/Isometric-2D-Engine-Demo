@@ -1411,6 +1411,32 @@ safeListen(ui.verboseLog, 'change', () => {
   verboseLog = ui.verboseLog.checked;
   pushLog(`ui: verboseLog=${verboseLog}`);
 });
+function syncActorSortDiagUiFromStorage() {
+  if (!ui.actorSortDiagEnabled) return;
+  var enabled = false;
+  try { enabled = localStorage.getItem('actorSortDiag') === '1'; } catch (_) { enabled = false; }
+  ui.actorSortDiagEnabled.checked = enabled;
+}
+function setActorSortDiagFromUi(enabled) {
+  var next = !!enabled;
+  try {
+    if (next) {
+      localStorage.setItem('actorSortDiag', '1');
+    } else {
+      localStorage.removeItem('actorSortDiag');
+    }
+  } catch (_) {}
+  if (ui.actorSortDiagEnabled) ui.actorSortDiagEnabled.checked = next;
+  try {
+    if (typeof pushLog === 'function') {
+      pushLog('[actor-sort-diag][ui-toggle] enabled=' + next);
+    }
+  } catch (_) {}
+}
+syncActorSortDiagUiFromStorage();
+safeListen(ui.actorSortDiagEnabled, 'change', () => {
+  setActorSortDiagFromUi(!!(ui.actorSortDiagEnabled && ui.actorSortDiagEnabled.checked));
+});
 if (ui.shadowDebugDetailed) ui.shadowDebugDetailed.checked = false;
 if (typeof shadowDebugDetailed !== 'undefined') shadowDebugDetailed = false;
 safeListen(ui.shadowDebugDetailed, 'change', () => {

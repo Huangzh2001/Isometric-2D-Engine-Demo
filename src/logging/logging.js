@@ -77,17 +77,123 @@ function noteStartupIssue(msg) {
 }
 
 function detailLog(msg) {
+  var text = String(msg);
   if (!logSystemReady) {
-    rawBootLog(msg, 'log');
+    rawBootLog(text, 'log');
     return;
   }
-  if (!verboseLog) return;
-  if (typeof pushLog === 'function') pushLog(msg);
+  if (!verboseLog && !isExportDiagnosticLine(text)) return;
+  if (typeof pushLog === 'function') pushLog(text);
 }
 
 function logInfo(msg) {
   if (typeof pushLog === 'function') pushLog(String(msg));
 }
+
+
+var __exportLogChannelVersion = 'export-log-v2-20260428';
+var __consoleExportBridgeInstalled = typeof __consoleExportBridgeInstalled !== 'undefined' ? __consoleExportBridgeInstalled : false;
+var __consoleExportBridgeCapturing = typeof __consoleExportBridgeCapturing !== 'undefined' ? __consoleExportBridgeCapturing : false;
+var __consoleExportBridgeSeq = typeof __consoleExportBridgeSeq !== 'undefined' ? __consoleExportBridgeSeq : 0;
+var __consoleExportBridgeMax = typeof __consoleExportBridgeMax !== 'undefined' ? __consoleExportBridgeMax : 50000;
+
+function isExportDiagnosticLine(line) {
+  var text = String(line == null ? '' : line);
+  return text.indexOf('[actor-sort-diag]') >= 0
+    || text.indexOf('[terrain-player-diag]') >= 0
+    || text.indexOf('[terrain-sort-diag]') >= 0
+    || text.indexOf('[render-order-diag]') >= 0
+    || text.indexOf('[log-channel-diag]') >= 0
+    || text.indexOf('[force-export-log]') >= 0;
+}
+
+function readExportDiagLocalStorageFlag(name) {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      var value = localStorage.getItem(name);
+      return value === '1' || value === 'true';
+    }
+  } catch (_) {}
+  return false;
+}
+
+function isConsoleExportBridgeEnabledForLine(line) {
+  if (isExportDiagnosticLine(line)) return true;
+  try { if (typeof window !== 'undefined' && window.__DEBUG_CONSOLE_TO_EXPORT__ === true) return true; } catch (_) {}
+  return readExportDiagLocalStorageFlag('debugConsoleToExport')
+    || readExportDiagLocalStorageFlag('actorSortDiag')
+    || readExportDiagLocalStorageFlag('terrainPlayerDiag')
+    || readExportDiagLocalStorageFlag('terrainSortDiag');
+}
+
+function stringifyConsoleExportArg(arg) {
+  if (typeof arg === 'string') return arg;
+  if (arg == null) return String(arg);
+  if (arg instanceof Error) return (arg.stack || arg.message || String(arg));
+  try { return JSON.stringify(arg); } catch (_) { return String(arg); }
+}
+
+function installConsoleExportBridge() {
+  if (__consoleExportBridgeInstalled) return;
+  if (typeof console === 'undefined' || !console) return;
+  __consoleExportBridgeInstalled = true;
+  ['log', 'warn', 'error'].forEach(function (level) {
+    var original = console[level];
+    if (typeof original !== 'function') return;
+    console[level] = function () {
+      try { original.apply(console, arguments); } catch (_) {}
+      if (__consoleExportBridgeCapturing) return;
+      if (__consoleExportBridgeSeq >= __consoleExportBridgeMax) return;
+      var args = Array.prototype.slice.call(arguments).map(stringifyConsoleExportArg);
+      var text = args.join(' ');
+      if (!isConsoleExportBridgeEnabledForLine(text)) return;
+      __consoleExportBridgeCapturing = true;
+      try {
+        __consoleExportBridgeSeq += 1;
+        var line = '[console.' + level + '] ' + text;
+        if (line.length > 6000) line = line.slice(0, 6000) + '…[truncated]';
+        if (typeof pushLog === 'function') pushLog(line);
+      } catch (_) {}
+      __consoleExportBridgeCapturing = false;
+    };
+  });
+}
+
+function getExportLogDiagnosticsSnapshot() {
+  var flags = {};
+  try {
+    if (typeof localStorage !== 'undefined') {
+      ['debugConsoleToExport', 'actorSortDiag', 'terrainPlayerDiag', 'terrainSortDiag'].forEach(function (k) {
+        flags[k] = localStorage.getItem(k);
+      });
+    }
+  } catch (err) {
+    flags.error = String(err && err.message || err || 'localStorage-error');
+  }
+  var actorRuntime = null;
+  try { actorRuntime = (typeof window !== 'undefined' && window.__ACTOR_SORT_DIAG_RUNTIME__) ? window.__ACTOR_SORT_DIAG_RUNTIME__ : null; } catch (_) {}
+  return {
+    version: __exportLogChannelVersion,
+    logSeq: logSeq,
+    logCount: logs.length,
+    consoleBridgeInstalled: !!__consoleExportBridgeInstalled,
+    consoleBridgeSeq: __consoleExportBridgeSeq,
+    consoleBridgeMax: __consoleExportBridgeMax,
+    flags: flags,
+    hasPushLog: typeof pushLog === 'function',
+    hasDetailLog: typeof detailLog === 'function',
+    actorSortRuntime: actorRuntime
+  };
+}
+
+function pushLogChannelDiagnostic(reason) {
+  var payload = null;
+  try { payload = JSON.stringify(getExportLogDiagnosticsSnapshot()); } catch (_) { payload = '{"error":"snapshot-unserializable"}'; }
+  try {
+    if (typeof pushLog === 'function') pushLog('[log-channel-diag][' + String(reason || 'event') + '] ' + payload);
+  } catch (_) {}
+}
+
 
 function logWarn(msg) {
   var line = '[warn] ' + String(msg);
@@ -231,6 +337,7 @@ function buildLogExportHeader() {
   if (APP_ENTRY_INFO.build) parts.push('# build=' + APP_ENTRY_INFO.build);
   if (APP_ENTRY_INFO.title) parts.push('# title=' + APP_ENTRY_INFO.title);
   if (APP_ENTRY_INFO.href) parts.push('# href=' + APP_ENTRY_INFO.href);
+  try { parts.push('# exportDiagnostics=' + JSON.stringify(getExportLogDiagnosticsSnapshot())); } catch (_) {}
   if (typeof window !== 'undefined' && window.__FUNCTION_TRACE_INFO) parts.push('# functionTrace=' + JSON.stringify(window.__FUNCTION_TRACE_INFO));
   try {
     var selectedPrefab = (typeof currentProto === 'function' && currentProto()) ? currentProto().id : 'n/a';
@@ -278,6 +385,16 @@ function pushLog(msg) {
   scheduleDebugLogUIFlush();
 }
 
+if (typeof window !== 'undefined') {
+  window.__forceExportLog = function (msg) {
+    try { pushLog('[force-export-log] ' + String(msg || 'manual')); return true; } catch (_) { return false; }
+  };
+  window.__getExportLogDiagnostics = getExportLogDiagnosticsSnapshot;
+}
+
+installConsoleExportBridge();
+pushLogChannelDiagnostic('boot');
+
 function clearLogs() {
   logs.length = 0;
   logSeq = 0;
@@ -289,6 +406,7 @@ function clearLogs() {
 
 function exportLogs() {
   pushLog('log-export:start lines=' + logs.length + ' entry=' + (APP_ENTRY_INFO.kind || 'unknown') + ':' + (APP_ENTRY_INFO.entryFile || 'unknown'));
+  pushLogChannelDiagnostic('export-preflight');
   if (typeof flushPerfSummary === 'function') flushPerfSummary(true);
   flushDebugLogUI(true);
   var payload = buildLogExportHeader() + logs.join('\n');
