@@ -84,12 +84,28 @@
     return out;
   }
 
-  function shouldEmitProfile(signatureKey, signature, minGapMs) {
-    minGapMs = Number(minGapMs || 0);
+  function isDetailedRendererProfilingEnabled() {
+    try {
+      if (typeof window !== 'undefined' && window.__DETAILED_RENDER_PROFILE__ === true) return true;
+      if (typeof localStorage !== 'undefined') {
+        var value = localStorage.getItem('detailedRenderProfile') || localStorage.getItem('rendererProfileVerbose');
+        return value === '1' || value === 'true';
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  function shouldEmitProfile(signatureKey, signature, minGapMs, options) {
+    var opts = options && typeof options === 'object' ? options : {};
+    var detailed = isDetailedRendererProfilingEnabled();
+    minGapMs = detailed ? Number(minGapMs || 0) : Math.max(1000, Number(minGapMs || 0));
     adapterApi.__profileState = adapterApi.__profileState || {};
     var bucket = adapterApi.__profileState[signatureKey] || { at: 0, sig: '' };
     var now = (typeof perfNow === 'function') ? perfNow() : Date.now();
-    if ((now - Number(bucket.at || 0)) < minGapMs && bucket.sig === signature) return false;
+    var slow = opts.slow === true;
+    var effectiveGap = slow ? Math.min(minGapMs, 350) : minGapMs;
+    if ((now - Number(bucket.at || 0)) < effectiveGap) return false;
+    if (!slow && bucket.sig === signature && (now - Number(bucket.at || 0)) < Math.max(effectiveGap, 3000)) return false;
     adapterApi.__profileState[signatureKey] = { at: now, sig: signature };
     return true;
   }
@@ -831,7 +847,8 @@
         debugState.lastRenderable = String(i + 1) + '/' + String(order.length) + ':' + String((r && r.kind) || 'unknown') + ':' + String((r && r.id) || 'no-id');
         var renderableStartAt = (typeof perfNow === 'function') ? perfNow() : Date.now();
         try {
-          if (r) {
+          var shouldMutateDrawMetadata = !isStaticWorldPacket;
+          if (shouldMutateDrawMetadata && r) {
             r.currentViewRotation = r.currentViewRotation != null ? r.currentViewRotation : ((meta && typeof meta.currentViewRotation === 'number') ? meta.currentViewRotation : (r.cacheViewRotation != null ? r.cacheViewRotation : 0));
             r.framePlanId = r.framePlanId || meta.framePlanId || null;
             r.__drawIndex = i;
@@ -1460,9 +1477,10 @@
     adapterApi.__lastPipelineBreakdown = Object.assign({}, pipelineBreakdown, { totalPipelineMs: safeFixed(totalPipelineMs), adapterGlueMs: 0, debugHookMs: 0, knownAccountedMs: 0, unaccountedMs: 0 });
     var shouldEmit = shouldEmitProfile('pipelineBreakdown', [
       Number(pipelineBreakdown.renderableCount || 0),
-      Number(totalPipelineMs || 0).toFixed(1),
-      Number(pipelineBreakdown.drawRenderableOrderMs || 0).toFixed(1)
-    ].join('|'), 250);
+      Number(pipelineBreakdown.baseWorldPassesMs || 0).toFixed(0),
+      Number(pipelineBreakdown.drawRenderableOrderMs || 0).toFixed(0),
+      Number(totalPipelineMs || 0) > 24 ? 'slow' : 'normal'
+    ].join('|'), 1000, { slow: Number(totalPipelineMs || 0) > 24 });
     if (shouldEmit) {
       emitRendererProfile('CANVAS2D-PIPELINE-BREAKDOWN', Object.assign({}, pipelineBreakdown, { totalPipelineMs: safeFixed(totalPipelineMs), adapterGlueMs: 0, debugHookMs: 0, knownAccountedMs: 0, unaccountedMs: 0 }));
       var functionBreakdownPayload = getFunctionBreakdownFrame();

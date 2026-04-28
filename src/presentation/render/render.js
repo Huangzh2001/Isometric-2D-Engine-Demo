@@ -134,6 +134,9 @@ var __lastRenderFrameOccupancyVersion = null;
 var __lastStaticBoxCacheProfileLogAt = 0;
 var __lastStaticBoxCacheProfileSignature = '';
 var __lastStaticBoxCacheProfile = null;
+var __lastStaticCacheInvalidationVerifyLogAt = 0;
+var __lastStaticCacheInvalidationVerifySignature = '';
+var __stableLocalDemergeCache = { key: '', result: null, hitCount: 0, missCount: 0 };
 var __currentRenderFrameStaticCacheState = { rebuilt: false, buildMs: 0, cacheHit: null, invalidationReason: 'none', totalMs: 0, profile: null };
 var __lastObservedTerrainBatchIdForFrames = null;
 var __terrainFirstFrameWindow = { terrainBatchId: null, remaining: 0, nextFrameIndex: 1 };
@@ -2236,11 +2239,11 @@ function maybeLogRenderFrameSummary(payload) {
     Number(safe.occupancyCacheVersion || 0),
     safe.occupancyRebuiltThisFrame === true ? 1 : 0,
     safe.staticCacheRebuiltThisFrame === true ? 1 : 0,
-    Number(safe.staticCacheBuildMs || 0).toFixed(3),
     Number(safe.visibleChunkCount || 0),
     Number(safe.rebuiltChunkCountThisFrame || 0)
   ].join('|');
-  if ((now - __lastRenderFrameSummaryLogAt) < 1000 && signature === __lastRenderFrameSummarySignature) return false;
+  if ((now - __lastRenderFrameSummaryLogAt) < 1000) return false;
+  if (signature === __lastRenderFrameSummarySignature && (now - __lastRenderFrameSummaryLogAt) < 5000) return false;
   __lastRenderFrameSummaryLogAt = now;
   __lastRenderFrameSummarySignature = signature;
   emitRenderFrameSummary(safe);
@@ -2296,10 +2299,12 @@ function maybeLogCameraMoveVerify(payload) {
     Number(safe.visibleChunkCount || 0),
     safe.staticCacheRebuiltThisFrame === true ? 1 : 0,
     Number(safe.rebuiltChunkCountThisFrame || 0),
-    Number(safe.reusedChunkCountThisFrame || 0),
-    Number(safe.frameBuildMs || 0).toFixed(3)
+    Number(safe.reusedChunkCountThisFrame || 0)
   ].join('|');
-  if ((now - (__lastCameraMoveVerifyLogAt || 0)) < 300 && signature === (__lastCameraMoveVerifySignature || '')) return false;
+  var slowFrame = Number(safe.frameBuildMs || 0) > 24 || safe.staticCacheRebuiltThisFrame === true || Number(safe.rebuiltChunkCountThisFrame || 0) > 0;
+  var minGapMs = slowFrame ? 750 : 1500;
+  if ((now - (__lastCameraMoveVerifyLogAt || 0)) < minGapMs) return false;
+  if (!slowFrame && signature === (__lastCameraMoveVerifySignature || '') && (now - (__lastCameraMoveVerifyLogAt || 0)) < 5000) return false;
   __lastCameraMoveVerifyLogAt = now;
   __lastCameraMoveVerifySignature = signature;
   emitCameraMoveVerify(safe);
@@ -2319,23 +2324,21 @@ function emitFrameWorkBreakdown(payload) {
 function maybeLogFrameWorkBreakdown(payload) {
   var safe = payload && typeof payload === 'object' ? payload : {};
   var now = perfNow();
+  var slowFrame = Number(safe.frameBuildMs || 0) > 24 || Number(safe.finalDrawMs || 0) > 12 || Number(safe.rebuiltChunkCountThisFrame || 0) > 0;
+  var minGapMs = slowFrame ? 350 : 1000;
   var signature = [
-    Number(safe.cameraX || 0).toFixed(3),
-    Number(safe.cameraY || 0).toFixed(3),
-    Number(safe.zoom || 0).toFixed(3),
+    Number(safe.cameraX || 0).toFixed(1),
+    Number(safe.cameraY || 0).toFixed(1),
+    Number(safe.zoom || 0).toFixed(2),
     Number(safe.visibleChunkCount || 0),
     Number(safe.visibleStaticChunkCount || 0),
     Number(safe.visibleStaticPacketCount || 0),
-    Number(safe.staticPacketMergeMs || 0).toFixed(3),
-    Number(safe.staticPacketProjectMs || 0).toFixed(3),
-    Number(safe.staticPacketSortMs || 0).toFixed(3),
-    Number(safe.staticPacketDrawPrepMs || 0).toFixed(3),
     Number(safe.dynamicObjectCount || 0),
-    Number(safe.dynamicObjectBuildMs || 0).toFixed(3),
-    Number(safe.finalDrawMs || 0).toFixed(3),
-    Number(safe.frameBuildMs || 0).toFixed(3)
+    Number(safe.rebuiltChunkCountThisFrame || 0),
+    slowFrame ? 'slow' : 'normal'
   ].join('|');
-  if ((now - __lastFrameWorkBreakdownLogAt) < 1000 && signature === __lastFrameWorkBreakdownSignature) return false;
+  if ((now - __lastFrameWorkBreakdownLogAt) < minGapMs) return false;
+  if (!slowFrame && signature === __lastFrameWorkBreakdownSignature && (now - __lastFrameWorkBreakdownLogAt) < 3000) return false;
   __lastFrameWorkBreakdownLogAt = now;
   __lastFrameWorkBreakdownSignature = signature;
   emitFrameWorkBreakdown(safe);
@@ -2416,6 +2419,26 @@ function emitStaticCacheInvalidationVerify(payload) {
   return line;
 }
 
+function maybeLogStaticCacheInvalidationVerify(payload) {
+  var safe = payload && typeof payload === 'object' ? payload : {};
+  var now = perfNow();
+  var shouldInvalidate = safe.shouldInvalidateStaticCache === true || String(safe.invalidationReason || 'none') !== 'none';
+  var signature = [
+    String(safe.invalidationReason || 'none'),
+    String(safe.cacheContentType || ''),
+    safe.cameraIndependent !== false ? 1 : 0,
+    safe.usesScreenSpaceCache === true ? 1 : 0,
+    shouldInvalidate ? 1 : 0
+  ].join('|');
+  var minGapMs = shouldInvalidate ? 250 : 1500;
+  if ((now - __lastStaticCacheInvalidationVerifyLogAt) < minGapMs) return false;
+  if (!shouldInvalidate && signature === __lastStaticCacheInvalidationVerifySignature && (now - __lastStaticCacheInvalidationVerifyLogAt) < 5000) return false;
+  __lastStaticCacheInvalidationVerifyLogAt = now;
+  __lastStaticCacheInvalidationVerifySignature = signature;
+  emitStaticCacheInvalidationVerify(safe);
+  return true;
+}
+
 function emitStaticBoxCacheProfile(payload) {
   var line = '[STATIC-BOX-CACHE-PROFILE] ';
   try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
@@ -2435,9 +2458,12 @@ function maybeLogStaticBoxCacheProfile(payload, forceLog) {
     Number(safe.totalBoxes || 0),
     Number(safe.structuredBoxCount || 0),
     Number(safe.scopedBoxCount || 0),
-    Number(safe.totalMs || 0).toFixed(3)
+    Number(safe.visibleChunkCount || 0),
+    Number(safe.rebuiltChunkCountThisFrame || 0),
+    Number(safe.reusedChunkCountThisFrame || 0)
   ].join('|');
-  if (!forceLog && safe.cacheHit === true && (now - __lastStaticBoxCacheProfileLogAt) < 1000 && signature === __lastStaticBoxCacheProfileSignature) return false;
+  if (!forceLog && safe.cacheHit === true && (now - __lastStaticBoxCacheProfileLogAt) < 1000) return false;
+  if (!forceLog && safe.cacheHit === true && signature === __lastStaticBoxCacheProfileSignature && (now - __lastStaticBoxCacheProfileLogAt) < 5000) return false;
   __lastStaticBoxCacheProfileLogAt = now;
   __lastStaticBoxCacheProfileSignature = signature;
   emitStaticBoxCacheProfile(safe);
@@ -3090,25 +3116,43 @@ function getVisibleInstanceSummaryForRender(scope, visibleDynamicInstances, dyna
   var dynamicVisibleCount = Array.isArray(visibleDynamicInstances) ? visibleDynamicInstances.length : 0;
   var signature = buildVisibleInstanceSummaryCacheKey(scope, dynamicVisibleCount, split.staticInstances.length);
   var now = perfNow();
+  var surfaceStats = typeof __lastSurfaceCacheStats !== 'undefined' && __lastSurfaceCacheStats ? __lastSurfaceCacheStats : null;
+  var estimatedStaticVisibleCount = 0;
+  if (surfaceStats) {
+    estimatedStaticVisibleCount = Math.max(
+      0,
+      Math.round(Number(surfaceStats.renderSourceCountAfterVisibility || surfaceStats.totalStaticBoxes || 0) || 0)
+    );
+  }
+  if (!estimatedStaticVisibleCount && split && Array.isArray(split.staticInstances)) {
+    estimatedStaticVisibleCount = Math.max(0, split.staticInstances.length || 0);
+  }
   if (!forceExact) {
     var cachedStaticVisibleCount = Number(__visibleInstanceSummaryCache && __visibleInstanceSummaryCache.summary && __visibleInstanceSummaryCache.summary.staticSkippedByDynamicLoop || 0);
+    if (!cachedStaticVisibleCount) cachedStaticVisibleCount = estimatedStaticVisibleCount;
     return {
       visibleInstances: Number(dynamicVisibleCount + cachedStaticVisibleCount || 0),
       visibleDynamicInstances: Number(dynamicVisibleCount || 0),
-      staticSkippedByDynamicLoop: Number(cachedStaticVisibleCount || 0)
+      staticSkippedByDynamicLoop: Number(cachedStaticVisibleCount || 0),
+      approximate: true
     };
   }
   if (__visibleInstanceSummaryCache.signature === signature && (now - Number(__visibleInstanceSummaryCache.at || 0)) < 1000) {
     return __visibleInstanceSummaryCache.summary;
   }
-  var visibleStaticCount = 0;
-  if (split.staticInstances.length) {
+  var allowExpensiveExactSummary = false;
+  try {
+    allowExpensiveExactSummary = !!(typeof window !== 'undefined' && (window.__EXACT_VISIBLE_INSTANCE_SUMMARY__ === true || (typeof localStorage !== 'undefined' && localStorage.getItem('exactVisibleInstanceSummary') === '1')));
+  } catch (_) { allowExpensiveExactSummary = false; }
+  var visibleStaticCount = estimatedStaticVisibleCount;
+  if (allowExpensiveExactSummary && split.staticInstances.length) {
     visibleStaticCount = filterInstancesForMainCameraScope(split.staticInstances, scope).length;
   }
   var summary = {
     visibleInstances: Number(dynamicVisibleCount + visibleStaticCount || 0),
     visibleDynamicInstances: Number(dynamicVisibleCount || 0),
-    staticSkippedByDynamicLoop: Number(visibleStaticCount || 0)
+    staticSkippedByDynamicLoop: Number(visibleStaticCount || 0),
+    approximate: allowExpensiveExactSummary !== true
   };
   __visibleInstanceSummaryCache = {
     signature: signature,
@@ -3889,7 +3933,7 @@ function rebuildStaticBoxRenderCacheIfNeeded(force = false) {
             ? 'dirty-chunk-queue-drain'
             : 'none'))));
   var invalidationSignatureFields = ['lightingSignature','xrayFaces','showDebug','surfaceOnlyRenderingEnabled','packetViewRotation','cacheContentType','cameraIndependent','usesScreenSpaceCache'];
-  emitStaticCacheInvalidationVerify({
+  maybeLogStaticCacheInvalidationVerify({
     invalidationReason: invalidationReason,
     cacheContentType: 'world-face-packets',
     cameraIndependent: true,
@@ -6092,7 +6136,34 @@ function logRenderOracleChecks(order, currentViewRotation) {
   logItemRotationPrototype('main-render-oracle-check', payload);
 }
 
+function isRenderOrderHeavyDiagnosticsEnabled() {
+  try {
+    if (typeof window !== 'undefined' && window.__RENDER_ORDER_HEAVY_DIAGNOSTICS__ === true) return true;
+  } catch (_) {}
+  try {
+    if (typeof localStorage !== 'undefined') {
+      var stored = localStorage.getItem('renderOrderHeavyDiagnostics');
+      if (stored === '1' || stored === 'true') return true;
+    }
+  } catch (_) {}
+  return false;
+}
+
+function isFramePlanDiagnosticsEnabled() {
+  try {
+    if (typeof window !== 'undefined' && window.__FRAME_PLAN_DIAGNOSTICS__ === true) return true;
+  } catch (_) {}
+  try {
+    if (typeof localStorage !== 'undefined') {
+      var stored = localStorage.getItem('framePlanDiagnostics');
+      if (stored === '1' || stored === 'true') return true;
+    }
+  } catch (_) {}
+  return isRenderOrderHeavyDiagnosticsEnabled();
+}
+
 function logRenderOrderDiagnostics(framePlanId, framePlanSignature, currentViewRotation, order) {
+  if (!isRenderOrderHeavyDiagnosticsEnabled()) return;
 
   var ordered = [];
   var objectLevelCount = 0;
@@ -8074,7 +8145,212 @@ function doesTopPacketActAsPlayerSupportFloor(packet, playerRef, groupSummaryMap
   }
   return false;
 }
-function applyStableActorSortDemergeToStaticRenderables(staticRenderables, viewRotation) {
+function getActorInteractionPacketMemberDescriptors(packet) {
+  if (!packet || typeof packet !== 'object') return [];
+  if (Array.isArray(packet.actorInteractionMemberDescriptors) && packet.actorInteractionMemberDescriptors.length) {
+    return packet.actorInteractionMemberDescriptors.filter(Boolean);
+  }
+  if (Array.isArray(packet.members) && packet.members.length) return packet.members.filter(Boolean);
+  var fallback = packet.box || packet.cell || null;
+  return fallback ? [Object.assign({}, packet, { cell: fallback, box: fallback })] : [];
+}
+
+function hashStableLocalDemergeString(seed, value) {
+  var hash = Number(seed || 2166136261) >>> 0;
+  var str = String(value == null ? '' : value);
+  for (var i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return hash >>> 0;
+}
+
+function getStableLocalDemergePacketIdentity(packet) {
+  if (!packet || typeof packet !== 'object') return 'null';
+  return [
+    packet.id || '',
+    packet.faceKey || '',
+    packet.semanticFace || '',
+    packet.screenFace || '',
+    Number(packet.sortKey || 0).toFixed(3),
+    Number(packet.tie || 0).toFixed(3),
+    Number(packet.mergedFaceCount || packet.memberCount || 1),
+    packet.terrainMaterialMergeKey || '',
+    packet.cacheViewRotation != null ? Number(packet.cacheViewRotation || 0) : ''
+  ].join('~');
+}
+
+function buildStableLocalDemergeListHash(staticRenderables) {
+  var list = Array.isArray(staticRenderables) ? staticRenderables : [];
+  var hash = 2166136261 >>> 0;
+  hash = hashStableLocalDemergeString(hash, list.length);
+  for (var i = 0; i < list.length; i++) {
+    hash = hashStableLocalDemergeString(hash, getStableLocalDemergePacketIdentity(list[i]));
+  }
+  return String(hash >>> 0);
+}
+
+function quantizeStableLocalDemergeCoord(value) {
+  var n = Number(value || 0);
+  if (!Number.isFinite(n)) n = 0;
+  return Math.round(n * 8) / 8;
+}
+
+function buildStableLocalDemergeCacheKey(staticRenderables, viewRotation, playerRef, radius) {
+  var list = Array.isArray(staticRenderables) ? staticRenderables : [];
+  var surfaceStats = typeof __lastSurfaceCacheStats !== 'undefined' && __lastSurfaceCacheStats ? __lastSurfaceCacheStats : {};
+  var staticCache = typeof staticBoxRenderCache !== 'undefined' && staticBoxRenderCache ? staticBoxRenderCache : {};
+  var px = playerRef ? quantizeStableLocalDemergeCoord(playerRef.x) : 'none';
+  var py = playerRef ? quantizeStableLocalDemergeCoord(playerRef.y) : 'none';
+  var pz = playerRef ? quantizeStableLocalDemergeCoord(playerRef.z) : 'none';
+  return [
+    'v2',
+    normalizeMainEditorViewRotationValue(viewRotation),
+    Number(radius || 0).toFixed(2),
+    px, py, pz,
+    String(staticCache.geometrySignature || ''),
+    String(staticCache.cacheSignature || ''),
+    Number(surfaceStats.visibleChunkCount || 0),
+    Number(surfaceStats.visibleStaticPacketCount || list.length || 0),
+    Number(surfaceStats.rebuiltChunkCountThisFrame || 0),
+    Number(surfaceStats.reusedChunkCountThisFrame || 0),
+    buildStableLocalDemergeListHash(list)
+  ].join('|');
+}
+
+function isActorInteractionDescriptorNearPlayerForLocalDemerge(descriptor, playerRef, radius) {
+  var cell = descriptor && (descriptor.cell || descriptor.box) ? (descriptor.cell || descriptor.box) : null;
+  if (!cell || !playerRef) return false;
+  var px = Number(playerRef.x || 0);
+  var py = Number(playerRef.y || 0);
+  var pz = Number(playerRef.z || 0);
+  if (!Number.isFinite(px) || !Number.isFinite(py) || !Number.isFinite(pz)) return false;
+  var bx = Math.floor(Number(cell.x || 0));
+  var by = Math.floor(Number(cell.y || 0));
+  var bz = Number(cell.z || 0);
+  var bw = Math.max(1, Number(cell.w != null ? cell.w : 1));
+  var bd = Math.max(1, Number(cell.d != null ? cell.d : 1));
+  var bh = Math.max(1, Number(cell.h != null ? cell.h : 1));
+  var r = Math.max(0.25, Number(radius || getActorInteractionSortRadiusForRender() || 2));
+  var nearestX = Math.max(bx, Math.min(px, bx + bw));
+  var nearestY = Math.max(by, Math.min(py, by + bd));
+  var distXY = Math.hypot(nearestX - px, nearestY - py);
+  if (distXY > r + 0.75) return false;
+
+  // Keep local demerge around the actor's usable vertical interaction band only.
+  // This includes the support floor under the feet and nearby side/top faces, but
+  // avoids splitting distant merged terrain on other height levels.
+  var playerHeight = Math.max(0.2, Number((typeof settings !== 'undefined' && settings && settings.playerHeightCells != null) ? settings.playerHeightCells : 1.7));
+  var bottomZ = bz;
+  var topZ = bz + bh;
+  return topZ >= pz - 0.75 && bottomZ <= pz + playerHeight + 0.75;
+}
+
+function buildStaticWorldFacePacketFromDescriptorForActorDemerge(descriptor, sourcePacket, viewRotation, mode, localIndex) {
+  if (!descriptor || !sourcePacket) return null;
+  var sf = String(descriptor.semanticFace || sourcePacket.semanticFace || '');
+  if (!sf) return null;
+  var cell = descriptor.cell || descriptor.box || sourcePacket.box || null;
+  if (!cell) return null;
+  var normal = descriptor.normal || sourcePacket.packetNormal || getSemanticFaceNormal(sf);
+  var worldGeometry = buildMergedVoxelFaceWorldGeometry(descriptor);
+  var worldPts = Array.isArray(worldGeometry && worldGeometry.worldPts) ? worldGeometry.worldPts : [];
+  var worldLoops = Array.isArray(worldGeometry && worldGeometry.worldLoops) ? worldGeometry.worldLoops : null;
+  var worldOutlineSegments = Array.isArray(worldGeometry && worldGeometry.worldOutlineSegments) ? worldGeometry.worldOutlineSegments : null;
+  if (!worldPts.length) return null;
+  var screenFace = descriptor.screenFace || sourcePacket.screenFace || getScreenFaceForSemanticFace(sf, viewRotation);
+  var terrainPatternDescriptor = getTerrainMaterialPatternDescriptorForRenderCell(cell, sf);
+  var terrainFc = getTerrainMaterialBaseFaceColorsForRenderCell(cell);
+  var fc = terrainFc || getCachedBaseFaceColorsForRenderable((cell && cell.base) || '#7aa2f7');
+  var stroke = terrainPatternDescriptor && terrainPatternDescriptor.lineColor ? terrainPatternDescriptor.lineColor : (sourcePacket.stroke || fc.line);
+  var fill = getCachedStaticRenderableFill(cell, sf, worldPts, normal, viewRotation, null).fill;
+  var terrainSettings = getTerrainRenderSettingsForRender();
+  var lightingActive = isStaticRenderableLightingActiveForBuild(terrainSettings);
+  var suppressMergedTerrainTopShadows = !!(descriptor && descriptor.isTerrainFaceMergeCandidate === true && sf === 'top' && Array.isArray(worldLoops) && worldLoops.length > 0);
+  var shadowOverlaysWorld = lightingActive && !suppressMergedTerrainTopShadows
+    ? buildVoxelFaceShadowWorldOverlays(worldPts, normal, cell.instanceId || null, null)
+    : [];
+  var terrainLoopSignature = buildTerrainPolygonLoopSignature(descriptor);
+  var merged = descriptor.merged === true;
+  var faceKey = merged
+    ? [cell.instanceId || 'unknown', [Number(descriptor.mergePlane || 0), Number(descriptor.mergeU || 0), Number(descriptor.mergeV || 0), Number(descriptor.mergeWidth || 1), Number(descriptor.mergeHeight || 1), Number(descriptor.memberCount || 1)].join(','), terrainLoopSignature || '', sf, screenFace].join('|')
+    : buildActorInteractionCellFaceKey(cell, sf, viewRotation);
+  if (!faceKey) return null;
+  var modeLabel = String(mode || (merged ? 'residual-merged' : 'near-single'));
+  return {
+    id: 'stable-local-demerge-' + modeLabel + '-' + String(sourcePacket.id || 'packet') + '-' + String(localIndex || 0) + '-' + String(faceKey || 'face'),
+    kind: 'static-world-face-packet',
+    sortKey: Number(descriptor.sortKey != null ? descriptor.sortKey : sourcePacket.sortKey || 0),
+    tie: Number(descriptor.tie != null ? descriptor.tie : sourcePacket.tie || 0),
+    instanceId: cell.instanceId || sourcePacket.instanceId || null,
+    prefabId: cell.prefabId || sourcePacket.prefabId || null,
+    renderPath: 'stable-actor-sort-local-demerge-' + modeLabel,
+    cacheViewRotation: viewRotation,
+    cacheContentType: 'world-face-packets',
+    cameraIndependent: true,
+    usesScreenSpaceCache: false,
+    semanticFace: sf,
+    screenFace: screenFace,
+    depthKey: descriptor.depthKey != null ? descriptor.depthKey : sourcePacket.depthKey || 0,
+    fill: fill,
+    stroke: stroke,
+    texture: sourcePacket.texture || null,
+    textureColor: sourcePacket.textureColor || null,
+    semanticTextureSlot: sourcePacket.semanticTextureSlot || null,
+    semanticTextureSlotColor: sourcePacket.semanticTextureSlotColor || null,
+    width: sourcePacket.width || 1,
+    worldPts: worldPts,
+    worldLoops: worldLoops,
+    worldOutlineSegments: worldOutlineSegments,
+    shadowOverlaysWorld: shadowOverlaysWorld,
+    box: cell,
+    cellX: Number(cell.x || 0),
+    cellY: Number(cell.y || 0),
+    cellZ: Number(cell.z || 0),
+    faceKey: faceKey,
+    actorInteractionMemberFaceKeys: buildActorInteractionMemberFaceKeysFromFaceDescriptor(descriptor, viewRotation),
+    actorInteractionMemberDescriptors: getActorInteractionMemberDescriptorsFromFaceDescriptor(descriptor),
+    packetNormal: normal,
+    mergedFace: merged,
+    mergedFaceCount: Number(descriptor.memberCount || 1),
+    mergeWidth: Number(descriptor.mergeWidth || 1),
+    mergeHeight: Number(descriptor.mergeHeight || 1),
+    terrainMaterialMergeKey: descriptor.terrainMaterialMergeKey || sourcePacket.terrainMaterialMergeKey || null,
+    terrainMaterialId: getTerrainMaterialIdForRenderCell(cell),
+    terrainMaterialLabel: terrainPatternDescriptor && terrainPatternDescriptor.label ? terrainPatternDescriptor.label : sourcePacket.terrainMaterialLabel || null,
+    materialType: cell && (cell.materialType || cell.terrainBand) ? String(cell.materialType || cell.terrainBand) : (sourcePacket.materialType || null),
+    terrainPatternDescriptor: terrainPatternDescriptor || sourcePacket.terrainPatternDescriptor || null,
+    terrainPatternOpacity: terrainPatternDescriptor && Number.isFinite(Number(terrainPatternDescriptor.opacity)) ? Number(terrainPatternDescriptor.opacity) : sourcePacket.terrainPatternOpacity || null,
+    actorInteractionReplacement: false,
+    actorInteractionStableDemergedFace: modeLabel === 'near-single',
+    actorInteractionStableLocalDemerge: true,
+    actorInteractionStableDemergeSourcePacketId: sourcePacket.id || null,
+    actorInteractionStableDemergeMode: modeLabel,
+    actorInteractionGroupFootprintMode: modeLabel === 'near-single' ? 'stable-local-demerge-near-player' : 'stable-local-demerge-residual-merged'
+  };
+}
+
+function mergeActorInteractionResidualDescriptorsForPacket(sourcePacket, residualMembers) {
+  var list = Array.isArray(residualMembers) ? residualMembers.filter(Boolean) : [];
+  if (list.length <= 1) return list.slice();
+  var cells = getActorInteractionPacketMemberCells(sourcePacket);
+  var terrainLike = isActorInteractionTerrainSupportTopPacket(sourcePacket, cells);
+  if (terrainLike) {
+    var terrainCore = getTerrainFaceMergeCoreApi();
+    if (terrainCore && typeof terrainCore.mergeTerrainFaceDescriptors === 'function') {
+      var terrainResult = terrainCore.mergeTerrainFaceDescriptors(list, { enabled: true });
+      if (terrainResult && Array.isArray(terrainResult.descriptors)) return terrainResult.descriptors;
+    }
+  }
+  var faceMergeCore = getStaticWorldFaceMergeCoreApi();
+  if (faceMergeCore && typeof faceMergeCore.mergeFaceDescriptors === 'function') {
+    var result = faceMergeCore.mergeFaceDescriptors(list, { enabled: true });
+    if (result && Array.isArray(result.descriptors)) return result.descriptors;
+  }
+  return list.slice();
+}
+
+function applyStableActorSortDemergeToStaticRenderables(staticRenderables, viewRotation, playerRef, options) {
   var list = Array.isArray(staticRenderables) ? staticRenderables : [];
   var api = getStableActorSortApiForRender();
   if (!api || typeof api.shouldDemergeStaticPacket !== 'function' || !isStableActorSortModeEnabledForRender()) {
@@ -8084,80 +8360,145 @@ function applyStableActorSortDemergeToStaticRenderables(staticRenderables, viewR
       outputCount: list.length,
       splitPacketCount: 0,
       createdFaceCount: 0,
+      residualMergedPacketCount: 0,
+      cacheHit: false,
       mode: isStableActorSortModeEnabledForRender() ? 'stable-no-demerge-api' : 'legacy-disabled'
     };
   }
 
+  var opts = options && typeof options === 'object' ? options : {};
+  var radius = Math.max(1, Number(opts.radius || getActorInteractionSortRadiusForRender() || 2));
+  var playerObj = playerRef && typeof playerRef === 'object' ? playerRef : null;
+  if (!playerObj) {
+    return {
+      staticRenderables: list,
+      inputCount: list.length,
+      outputCount: list.length,
+      splitPacketCount: 0,
+      createdFaceCount: 0,
+      residualMergedPacketCount: 0,
+      cacheHit: false,
+      mode: 'stable-local-demerge-no-player'
+    };
+  }
+
+  var normalizedViewRotation = normalizeMainEditorViewRotationValue(viewRotation);
+  var cacheKey = buildStableLocalDemergeCacheKey(list, normalizedViewRotation, playerObj, radius);
+  if (__stableLocalDemergeCache && __stableLocalDemergeCache.key === cacheKey && __stableLocalDemergeCache.result) {
+    __stableLocalDemergeCache.hitCount += 1;
+    return Object.assign({}, __stableLocalDemergeCache.result, {
+      cacheHit: true,
+      cacheHitCount: __stableLocalDemergeCache.hitCount,
+      cacheMissCount: __stableLocalDemergeCache.missCount
+    });
+  }
+  if (__stableLocalDemergeCache) __stableLocalDemergeCache.missCount += 1;
+
   var out = [];
   var splitPacketCount = 0;
   var createdFaceCount = 0;
+  var residualMergedPacketCount = 0;
+  var nearMemberCount = 0;
+  var farMemberCount = 0;
+  var checkedPacketCount = 0;
+  var skippedFarPacketCount = 0;
   var samples = [];
-  var normalizedViewRotation = normalizeMainEditorViewRotationValue(viewRotation);
+  var residualSamples = [];
 
   for (var i = 0; i < list.length; i++) {
     var packet = list[i];
+    var members = getActorInteractionPacketMemberDescriptors(packet);
+    if (!members.length || members.length <= 1) {
+      out.push(packet);
+      continue;
+    }
+
+    var nearMembers = [];
+    var farMembers = [];
+    for (var mi = 0; mi < members.length; mi++) {
+      var member = members[mi];
+      if (isActorInteractionDescriptorNearPlayerForLocalDemerge(member, playerObj, radius)) nearMembers.push(member);
+      else farMembers.push(member);
+    }
+    if (!nearMembers.length) {
+      out.push(packet);
+      skippedFarPacketCount += 1;
+      continue;
+    }
+
     var shouldSplit = false;
+    checkedPacketCount += 1;
     try { shouldSplit = api.shouldDemergeStaticPacket(packet) === true; } catch (_) { shouldSplit = false; }
-    var members = shouldSplit && packet && Array.isArray(packet.actorInteractionMemberDescriptors)
-      ? packet.actorInteractionMemberDescriptors
-      : [];
-    if (!shouldSplit || members.length <= 1) {
+    if (!shouldSplit) {
       out.push(packet);
       continue;
     }
 
     var createdForPacket = 0;
-    for (var mi = 0; mi < members.length; mi++) {
-      var replacement = buildActorInteractionReplacementRenderableFromDescriptor(members[mi], packet, normalizedViewRotation);
+    for (var ni = 0; ni < nearMembers.length; ni++) {
+      var replacement = buildStaticWorldFacePacketFromDescriptorForActorDemerge(nearMembers[ni], packet, normalizedViewRotation, 'near-single', ni);
       if (!replacement) continue;
-      var stableFaceId = 'stable-actor-sort-demerge-' + String(packet.id || i) + '-' + String(replacement.faceKey || mi);
-      replacement = Object.assign({}, replacement, {
-        id: stableFaceId,
-        renderPath: 'stable-actor-sort-demerged-static-packet',
-        actorInteractionReplacement: false,
-        actorInteractionStableDemergedFace: true,
-        actorInteractionStableDemergeSourcePacketId: packet.id || null,
-        actorInteractionStableDemergeMode: 'static-identity-demerge',
-        actorInteractionGroupFootprintMode: replacement.actorInteractionGroupFootprintMode || 'stable-demerge-no-dynamic-suppress',
-        mergedFace: false,
-        mergedFaceCount: 1,
-        mergeWidth: 1,
-        mergeHeight: 1
-      });
       out.push(replacement);
       createdForPacket += 1;
       createdFaceCount += 1;
+      nearMemberCount += 1;
       if (samples.length < 16) samples.push(summarizeActorDiagRenderable(replacement));
     }
 
-    if (createdForPacket > 0) {
-      splitPacketCount += 1;
-    } else {
-      out.push(packet);
+    var residualDescriptors = farMembers.length ? mergeActorInteractionResidualDescriptorsForPacket(packet, farMembers) : [];
+    for (var ri = 0; ri < residualDescriptors.length; ri++) {
+      var residual = buildStaticWorldFacePacketFromDescriptorForActorDemerge(residualDescriptors[ri], packet, normalizedViewRotation, 'residual-merged', ri);
+      if (!residual) continue;
+      out.push(residual);
+      if (residual.mergedFace === true) residualMergedPacketCount += 1;
+      farMemberCount += Math.max(1, Number(residual.mergedFaceCount || 1));
+      if (residualSamples.length < 12) residualSamples.push(summarizeActorDiagRenderable(residual));
     }
+
+    if (createdForPacket > 0) splitPacketCount += 1;
+    else out.push(packet);
   }
 
   if (splitPacketCount > 0) out.sort(compareRenderablesByDomain);
   if (splitPacketCount > 0 && isActorInteractionOrderDiagEnabled()) {
-    emitActorInteractionOrderDiag('stable-demerge-static-packets', {
-      mode: 'stable-renderable-identity-demerge',
+    emitActorInteractionOrderDiag('stable-local-demerge-static-packets', {
+      mode: 'stable-local-player-radius-demerge',
       viewRotation: normalizedViewRotation,
+      radius: radius,
+      player: summarizeActorDiagPlayer(playerObj),
       inputStaticRenderableCount: Number(list.length || 0),
       outputStaticRenderableCount: Number(out.length || 0),
       splitPacketCount: Number(splitPacketCount || 0),
       createdFaceCount: Number(createdFaceCount || 0),
-      samples: samples
+      nearMemberCount: Number(nearMemberCount || 0),
+      farMemberCount: Number(farMemberCount || 0),
+      checkedPacketCount: Number(checkedPacketCount || 0),
+      skippedFarPacketCount: Number(skippedFarPacketCount || 0),
+      residualMergedPacketCount: Number(residualMergedPacketCount || 0),
+      samples: samples,
+      residualSamples: residualSamples
     }, { maxCount: 6000 });
   }
 
-  return {
+  var result = {
     staticRenderables: out,
     inputCount: list.length,
     outputCount: out.length,
     splitPacketCount: splitPacketCount,
     createdFaceCount: createdFaceCount,
-    mode: 'stable-renderable-identity-demerge'
+    residualMergedPacketCount: residualMergedPacketCount,
+    checkedPacketCount: checkedPacketCount,
+    skippedFarPacketCount: skippedFarPacketCount,
+    cacheHit: false,
+    cacheHitCount: __stableLocalDemergeCache ? __stableLocalDemergeCache.hitCount : 0,
+    cacheMissCount: __stableLocalDemergeCache ? __stableLocalDemergeCache.missCount : 0,
+    mode: 'stable-local-player-radius-demerge'
   };
+  if (__stableLocalDemergeCache) {
+    __stableLocalDemergeCache.key = cacheKey;
+    __stableLocalDemergeCache.result = result;
+  }
+  return result;
 }
 
 
@@ -8517,7 +8858,7 @@ function buildRenderables() {
   const dynamicObjectBuildMs = Math.max(0, perfNow() - dynamicBuildStartAt);
   const mergeStartAt = perfNow();
   const staticRenderablesBase = actorInteractionResult && Array.isArray(actorInteractionResult.staticRenderables) ? actorInteractionResult.staticRenderables : staticRenderablesAll;
-  const stableDemergeResult = applyStableActorSortDemergeToStaticRenderables(staticRenderablesBase, normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation));
+  const stableDemergeResult = applyStableActorSortDemergeToStaticRenderables(staticRenderablesBase, normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation), SHOW_PLAYER ? player : null, { radius: getActorInteractionSortRadiusForRender() });
   const staticRenderablesForSupportTop = stableDemergeResult && Array.isArray(stableDemergeResult.staticRenderables) ? stableDemergeResult.staticRenderables : staticRenderablesBase;
   const supportTopSortResult = SHOW_PLAYER && pointWithinWorldBoundsXY(player.x, player.y, cameraScope.cullingWorldBounds)
     ? applyPlayerSupportTopSortOverrideToRenderables(staticRenderablesForSupportTop, player, normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation))
@@ -8555,7 +8896,10 @@ function buildRenderables() {
     mergedRenderableCount: Number(renderables.length || 0),
     stableDemergeMode: String(stableDemergeResult && stableDemergeResult.mode || 'none'),
     stableDemergeSplitPacketCount: Number(stableDemergeResult && stableDemergeResult.splitPacketCount || 0),
-    stableDemergeCreatedFaceCount: Number(stableDemergeResult && stableDemergeResult.createdFaceCount || 0)
+    stableDemergeCreatedFaceCount: Number(stableDemergeResult && stableDemergeResult.createdFaceCount || 0),
+    stableDemergeCacheHit: stableDemergeResult && stableDemergeResult.cacheHit === true,
+    stableDemergeCacheHitCount: Number(stableDemergeResult && stableDemergeResult.cacheHitCount || 0),
+    stableDemergeCacheMissCount: Number(stableDemergeResult && stableDemergeResult.cacheMissCount || 0)
   });
   const staticPacketDrawPrepMs = 0;
   const mergeMs = Math.max(0, perfNow() - mergeStartAt);
@@ -9317,35 +9661,41 @@ function buildRendererFramePlan() {
   var currentViewRotation = normalizeMainEditorViewRotationValue(getSafeMainEditorViewRotation(null).viewRotation);
   var framePlanId = 'frameplan-' + String(++__mainFramePlanSeq);
   var framePlanSignature = [currentViewRotation, order.length, __lastMainRenderableBuildStats.staticRenderableCount, __lastMainRenderableBuildStats.dynamicRenderableCount].join('|');
+  var framePlanDiagnosticsEnabled = isFramePlanDiagnosticsEnabled();
+  var renderOrderHeavyDiagnosticsEnabled = isRenderOrderHeavyDiagnosticsEnabled();
   logActorInteractionFinalOrderDiagnostics(framePlanId, currentViewRotation, order);
   if (!interactionFastPath) {
-    for (var i = 0; i < order.length; i++) {
-      if (!order[i] || typeof order[i] !== 'object') continue;
-      order[i].framePlanId = framePlanId;
-      order[i].framePlanSignature = framePlanSignature;
+    if (framePlanDiagnosticsEnabled || renderOrderHeavyDiagnosticsEnabled) {
+      for (var i = 0; i < order.length; i++) {
+        if (!order[i] || typeof order[i] !== 'object') continue;
+        order[i].framePlanId = framePlanId;
+        order[i].framePlanSignature = framePlanSignature;
+      }
     }
-    logItemRotationPrototype('main-render-frameplan-rebuilt', {
-      currentViewRotation: currentViewRotation,
-      framePlanId: framePlanId,
-      framePlanSignature: framePlanSignature,
-      renderableCount: order.length,
-      staticRenderableCount: __lastMainRenderableBuildStats.staticRenderableCount,
-      dynamicRenderableCount: __lastMainRenderableBuildStats.dynamicRenderableCount,
-      reason: 'buildFramePlan'
-    });
-    logItemRotationPrototype('main-view-rotation-source-check', buildMainViewRotationSourceCheckPayload(currentViewRotation, staticBoxRenderCache && typeof staticBoxRenderCache.viewRotation === 'number' ? staticBoxRenderCache.viewRotation : currentViewRotation, typeof staticBoxGeometrySignature === 'function' ? staticBoxGeometrySignature() : null));
+    if (framePlanDiagnosticsEnabled) {
+      logItemRotationPrototype('main-render-frameplan-rebuilt', {
+        currentViewRotation: currentViewRotation,
+        framePlanId: framePlanId,
+        framePlanSignature: framePlanSignature,
+        renderableCount: order.length,
+        staticRenderableCount: __lastMainRenderableBuildStats.staticRenderableCount,
+        dynamicRenderableCount: __lastMainRenderableBuildStats.dynamicRenderableCount,
+        reason: 'buildFramePlan'
+      });
+      logItemRotationPrototype('main-view-rotation-source-check', buildMainViewRotationSourceCheckPayload(currentViewRotation, staticBoxRenderCache && typeof staticBoxRenderCache.viewRotation === 'number' ? staticBoxRenderCache.viewRotation : currentViewRotation, typeof staticBoxGeometrySignature === 'function' ? staticBoxGeometrySignature() : null));
+      logMainViewRotationVisualConsumerCheck(currentViewRotation);
+      logMainViewRotationRenderConsumerMode(currentViewRotation);
+      logItemRotationPrototype('main-camera-render-scope-check', {
+        framePlanId: framePlanId,
+        zoom: __lastMainRenderableBuildStats.zoom != null ? Number(__lastMainRenderableBuildStats.zoom) : getMainEditorZoomValueForRender(),
+        cameraCullingEnabled: __lastMainRenderableBuildStats.cameraCullingEnabled !== false,
+        renderablesBeforeCulling: Number(__lastMainRenderableBuildStats.renderablesBeforeCulling || order.length),
+        renderablesAfterCulling: Number(__lastMainRenderableBuildStats.renderablesAfterCulling || order.length),
+        cullingApplied: (__lastMainRenderableBuildStats.cameraCullingEnabled !== false) && Number(__lastMainRenderableBuildStats.renderablesAfterCulling || order.length) <= Number(__lastMainRenderableBuildStats.renderablesBeforeCulling || order.length)
+      });
+    }
     logRenderOrderDiagnostics(framePlanId, framePlanSignature, currentViewRotation, order);
-    logMainViewRotationVisualConsumerCheck(currentViewRotation);
-    logMainViewRotationRenderConsumerMode(currentViewRotation);
-    logItemRotationPrototype('main-camera-render-scope-check', {
-      framePlanId: framePlanId,
-      zoom: __lastMainRenderableBuildStats.zoom != null ? Number(__lastMainRenderableBuildStats.zoom) : getMainEditorZoomValueForRender(),
-      cameraCullingEnabled: __lastMainRenderableBuildStats.cameraCullingEnabled !== false,
-      renderablesBeforeCulling: Number(__lastMainRenderableBuildStats.renderablesBeforeCulling || order.length),
-      renderablesAfterCulling: Number(__lastMainRenderableBuildStats.renderablesAfterCulling || order.length),
-      cullingApplied: (__lastMainRenderableBuildStats.cameraCullingEnabled !== false) && Number(__lastMainRenderableBuildStats.renderablesAfterCulling || order.length) <= Number(__lastMainRenderableBuildStats.renderablesBeforeCulling || order.length)
-    });
-    if (isMainEditorViewAnimatingForRender()) {
+    if (framePlanDiagnosticsEnabled && isMainEditorViewAnimatingForRender()) {
       logItemRotationPrototype('main-view-rotation-visible-frame-check', {
         visualRotation: normalizeMainEditorViewRotationValue(currentViewRotation),
         discreteViewRotation: normalizeMainEditorViewRotationValue(readLegacyMainEditorViewRotation() != null ? readLegacyMainEditorViewRotation() : currentViewRotation),
@@ -9358,22 +9708,24 @@ function buildRendererFramePlan() {
     }
     if (__lastRenderVisibilityStats) {
       var framePlanBuildMs = Math.max(0, perfNow() - buildStartAtFramePlan);
-      logItemRotationPrototype('render-build-cost-summary', {
-        terrainBuildMs: Number(__lastRenderVisibilityStats.terrainBuildMs || 0),
-        staticBuildMs: Number(__lastRenderVisibilityStats.staticBuildMs || 0),
-        dynamicBuildMs: Number(__lastRenderVisibilityStats.dynamicBuildMs || 0),
-        framePlanBuildMs: framePlanBuildMs,
-        renderablesBeforeCulling: Number(__lastMainRenderableBuildStats.renderablesBeforeCulling || 0),
-        renderablesAfterCulling: Number(__lastMainRenderableBuildStats.renderablesAfterCulling || order.length)
-      });
-      logItemRotationPrototype('render-performance-summary', {
-        framePlanBuildMs: framePlanBuildMs,
-        renderSourceBuildMs: Number(__lastRenderVisibilityStats.renderSourceBuildMs || 0),
-        visibilityFilterMs: Number(__lastRenderVisibilityStats.visibilityFilterMs || 0),
-        finalRenderableCount: Number(__lastMainRenderableBuildStats.renderablesAfterCulling || order.length),
-        cameraZoom: Number(__lastMainRenderableBuildStats.zoom || getMainEditorZoomValueForRender()),
-        currentViewRotation: normalizeMainEditorViewRotationValue(currentViewRotation)
-      });
+      if (framePlanDiagnosticsEnabled) {
+        logItemRotationPrototype('render-build-cost-summary', {
+          terrainBuildMs: Number(__lastRenderVisibilityStats.terrainBuildMs || 0),
+          staticBuildMs: Number(__lastRenderVisibilityStats.staticBuildMs || 0),
+          dynamicBuildMs: Number(__lastRenderVisibilityStats.dynamicBuildMs || 0),
+          framePlanBuildMs: framePlanBuildMs,
+          renderablesBeforeCulling: Number(__lastMainRenderableBuildStats.renderablesBeforeCulling || 0),
+          renderablesAfterCulling: Number(__lastMainRenderableBuildStats.renderablesAfterCulling || order.length)
+        });
+        logItemRotationPrototype('render-performance-summary', {
+          framePlanBuildMs: framePlanBuildMs,
+          renderSourceBuildMs: Number(__lastRenderVisibilityStats.renderSourceBuildMs || 0),
+          visibilityFilterMs: Number(__lastRenderVisibilityStats.visibilityFilterMs || 0),
+          finalRenderableCount: Number(__lastMainRenderableBuildStats.renderablesAfterCulling || order.length),
+          cameraZoom: Number(__lastMainRenderableBuildStats.zoom || getMainEditorZoomValueForRender()),
+          currentViewRotation: normalizeMainEditorViewRotationValue(currentViewRotation)
+        });
+      }
       __lastRenderResourceSummary = Object.assign({}, __lastRenderResourceSummary || {}, {
         framePlanBuildMs: framePlanBuildMs,
         finalRenderableCount: Number(__lastMainRenderableBuildStats.renderablesAfterCulling || order.length),
@@ -9381,7 +9733,7 @@ function buildRendererFramePlan() {
         terrainVisibleFaceCount: Number(__lastRenderVisibilityStats.terrainVisibleFaceCount || 0),
         terrainVisibleChunkCount: Number(__lastRenderVisibilityStats.terrainVisibleChunkCount || 0)
       });
-      logItemRotationPrototype('render-resource-summary', __lastRenderResourceSummary);
+      if (framePlanDiagnosticsEnabled) logItemRotationPrototype('render-resource-summary', __lastRenderResourceSummary);
     }
   }
   recordRenderFunctionTiming('render.buildRendererFramePlan.total', perfNow() - buildStartAtFramePlan, {

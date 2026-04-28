@@ -315,15 +315,17 @@ function maybeEmitFullFrameWalltime(payload) {
   var safe = payload && typeof payload === 'object' ? payload : {};
   loop.__fullFrameProfileState = loop.__fullFrameProfileState || { at: 0, sig: '' };
   var nowMs = perfNow();
+  var slowFrame = Number(safe.totalFrameWallMs || 0) > 24 || Number(safe.renderMs || 0) > 24 || safe.staticCacheRebuiltThisFrame === true || Number(safe.rebuiltChunkCountThisFrame || 0) > 0;
+  var minGapMs = slowFrame ? 350 : 1000;
   var sig = [
-    Number(safe.totalFrameWallMs || 0).toFixed(1),
-    Number(safe.renderMs || 0).toFixed(1),
     Number(safe.visibleChunkCount || 0),
     Number(safe.visibleStaticPacketCount || 0),
     Number(safe.rebuiltChunkCountThisFrame || 0),
-    Number(safe.reusedChunkCountThisFrame || 0)
+    Number(safe.reusedChunkCountThisFrame || 0),
+    slowFrame ? 'slow' : 'normal'
   ].join('|');
-  if ((nowMs - loop.__fullFrameProfileState.at) < 250 && loop.__fullFrameProfileState.sig === sig) return false;
+  if ((nowMs - loop.__fullFrameProfileState.at) < minGapMs) return false;
+  if (!slowFrame && loop.__fullFrameProfileState.sig === sig && (nowMs - loop.__fullFrameProfileState.at) < 3000) return false;
   loop.__fullFrameProfileState = { at: nowMs, sig: sig };
   emitFullFrameWalltime(safe);
   return true;
