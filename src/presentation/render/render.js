@@ -5662,6 +5662,169 @@ var __lastMainRenderableBuildStats = {
   reason: 'startup'
 };
 
+
+var __playerMoveFastPathDiagState = {
+  frameCount: 0,
+  emittedCount: 0,
+  lastSignature: '',
+  lastPlayerInteractionCellKey: '',
+  lastViewRotation: null,
+  lastStaticOrderSignature: '',
+  lastStaticRenderableCount: 0,
+  lastDynamicRenderableCount: 0,
+  warmStaticOrderAvailable: false
+};
+
+function getMainEditorModeForPlayerMoveFastPathDiag() {
+  try {
+    var selectors = (typeof App !== 'undefined' && App && App.state && App.state.selectors) ? App.state.selectors : null;
+    if (selectors && typeof selectors.getEditorMode === 'function') return String(selectors.getEditorMode() || 'view');
+  } catch (_) {}
+  try {
+    if (typeof editor !== 'undefined' && editor && editor.mode != null) return String(editor.mode || 'view');
+  } catch (_) {}
+  return 'view';
+}
+
+function getPlayerMoveFastPathStaticOrderSignature(order, currentViewRotation) {
+  var list = Array.isArray(order) ? order : [];
+  var staticCount = 0;
+  var dynamicCount = 0;
+  var firstStaticId = '';
+  var lastStaticId = '';
+  for (var i = 0; i < list.length; i++) {
+    var r = list[i];
+    if (!r) continue;
+    var isPlayer = r.id === 'player-avatar' || r.kind === 'player-avatar' || r.actorKind === 'player';
+    var isDynamic = isPlayer || r.dynamic === true || r.kind === 'sprite' || r.kind === 'player-sprite';
+    if (isDynamic) {
+      dynamicCount += 1;
+      continue;
+    }
+    staticCount += 1;
+    var id = String(r.id || r.faceKey || r.kind || 'static');
+    if (!firstStaticId) firstStaticId = id;
+    lastStaticId = id;
+  }
+  return [
+    normalizeMainEditorViewRotationValue(currentViewRotation),
+    staticCount,
+    dynamicCount,
+    firstStaticId,
+    lastStaticId
+  ].join('|');
+}
+
+function shouldEmitPlayerMoveFastPathDiag(signature, candidateEligible, rejectReasons) {
+  __playerMoveFastPathDiagState.frameCount += 1;
+  if (__playerMoveFastPathDiagState.emittedCount < 12) return true;
+  if (__playerMoveFastPathDiagState.lastSignature !== signature) return true;
+  if (candidateEligible === true && (__playerMoveFastPathDiagState.frameCount % 30) === 0) return true;
+  if (rejectReasons && rejectReasons.length && (__playerMoveFastPathDiagState.frameCount % 90) === 0) return true;
+  return false;
+}
+
+function emitPlayerMoveFastPathEligibilityDiagnostic(payload) {
+  try {
+    if (typeof detailLog === 'function') detailLog('[PLAYER-MOVE-FASTPATH-ELIGIBILITY] ' + JSON.stringify(payload || {}));
+    else if (typeof pushLog === 'function') pushLog('[PLAYER-MOVE-FASTPATH-ELIGIBILITY] ' + JSON.stringify(payload || {}));
+    else if (typeof console !== 'undefined' && console.log) console.log('[PLAYER-MOVE-FASTPATH-ELIGIBILITY]', payload || {});
+  } catch (_) {}
+}
+
+function evaluatePlayerMoveFastPathEligibilityForRender(framePlanId, order, currentViewRotation, interactionState) {
+  var stats = __lastMainRenderableBuildStats || {};
+  var rejectReasons = [];
+  var warnings = [];
+  var editorModeValue = getMainEditorModeForPlayerMoveFastPathDiag();
+  var playerObj = (typeof player !== 'undefined' && player && typeof player === 'object') ? player : null;
+  var playerInteractionCellKey = playerObj ? buildStableLocalDemergeInteractionCellKey(playerObj) : 'none';
+  var currentStaticOrderSignature = getPlayerMoveFastPathStaticOrderSignature(order, currentViewRotation);
+  var staticOrderChanged = __playerMoveFastPathDiagState.lastStaticOrderSignature !== '' && __playerMoveFastPathDiagState.lastStaticOrderSignature !== currentStaticOrderSignature;
+  var playerInteractionCellChanged = __playerMoveFastPathDiagState.lastPlayerInteractionCellKey !== '' && __playerMoveFastPathDiagState.lastPlayerInteractionCellKey !== playerInteractionCellKey;
+  var viewRotationChanged = __playerMoveFastPathDiagState.lastViewRotation != null && Number(__playerMoveFastPathDiagState.lastViewRotation) !== Number(currentViewRotation);
+  var dynamicRenderableCount = Number(stats.dynamicRenderableCount || 0);
+  var staticRenderableCount = Number(stats.staticRenderableCount || 0);
+  var orderLength = Array.isArray(order) ? order.length : 0;
+
+  if (editorModeValue !== 'view') rejectReasons.push('editorModeNotView');
+  if (typeof SHOW_PLAYER !== 'undefined' && SHOW_PLAYER !== true) rejectReasons.push('playerHidden');
+  if (!playerObj) rejectReasons.push('playerMissing');
+  if (dynamicRenderableCount !== 1) rejectReasons.push('dynamicRenderableCountNotOne');
+  if (staticRenderableCount <= 0) rejectReasons.push('staticOrderEmpty');
+  if (stats.staticCacheRebuiltThisFrame === true) rejectReasons.push('staticCacheRebuiltThisFrame');
+  if (stats.occupancyRebuiltThisFrame === true) rejectReasons.push('occupancyRebuiltThisFrame');
+  if (typeof isMainEditorViewAnimatingForRender === 'function' && isMainEditorViewAnimatingForRender()) rejectReasons.push('viewRotationAnimating');
+  if (viewRotationChanged) rejectReasons.push('viewRotationChanged');
+  if (playerInteractionCellChanged) rejectReasons.push('playerInteractionCellChanged');
+  if (staticOrderChanged) warnings.push('staticOrderSignatureChanged');
+  if (__playerMoveFastPathDiagState.warmStaticOrderAvailable !== true) rejectReasons.push('staticOrderCacheMissing');
+  if (stats.staticCacheBuildMs != null && Number(stats.staticCacheBuildMs || 0) > 4) warnings.push('staticCacheBuildMsHigh');
+  if (stats.staticPacketSortMs != null && Number(stats.staticPacketSortMs || 0) > 4) warnings.push('mergeSortedRenderablesHigh');
+
+  var candidateEligible = rejectReasons.length === 0;
+  var signature = [
+    candidateEligible ? 'eligible' : 'blocked',
+    rejectReasons.join(','),
+    warnings.join(','),
+    editorModeValue,
+    playerInteractionCellKey,
+    Number(currentViewRotation || 0),
+    staticRenderableCount,
+    dynamicRenderableCount,
+    Number(stats.staticCacheRebuiltThisFrame === true ? 1 : 0),
+    Number(stats.occupancyRebuiltThisFrame === true ? 1 : 0)
+  ].join('|');
+
+  var payload = {
+    phase: 'step2-diagnostic-only',
+    framePlanId: String(framePlanId || ''),
+    implementedActive: false,
+    candidateEligible: candidateEligible,
+    wouldUseFastPathIfImplemented: candidateEligible,
+    rejectReasons: rejectReasons,
+    warnings: warnings,
+    editorMode: editorModeValue,
+    currentViewRotation: normalizeMainEditorViewRotationValue(currentViewRotation),
+    viewRotationChanged: viewRotationChanged,
+    playerInteractionCellKey: playerInteractionCellKey,
+    playerInteractionCellChanged: playerInteractionCellChanged,
+    staticOrderCacheWarm: __playerMoveFastPathDiagState.warmStaticOrderAvailable === true,
+    staticOrderSignatureChanged: staticOrderChanged,
+    staticRenderableCount: staticRenderableCount,
+    dynamicRenderableCount: dynamicRenderableCount,
+    renderableCount: Number(orderLength || 0),
+    visibleStaticPacketCount: Number(stats.visibleStaticPacketCount || 0),
+    visibleChunkCount: Number(stats.visibleChunkCount || 0),
+    staticCacheRebuiltThisFrame: stats.staticCacheRebuiltThisFrame === true,
+    occupancyRebuiltThisFrame: stats.occupancyRebuiltThisFrame === true,
+    staticCacheBuildMs: Number(stats.staticCacheBuildMs || 0),
+    frameBuildMs: Number(stats.frameBuildMs || 0),
+    mergeSortedRenderablesMs: Number(stats.staticPacketSortMs || 0),
+    stableDemergePlayerInteractionCellKey: String(stats.stableDemergePlayerInteractionCellKey || playerInteractionCellKey),
+    stableDemergeCacheHit: stats.stableDemergeCacheHit === true,
+    stableDemergeCacheHitCount: Number(stats.stableDemergeCacheHitCount || 0),
+    stableDemergeCacheMissCount: Number(stats.stableDemergeCacheMissCount || 0),
+    stableDemergeSplitPacketCount: Number(stats.stableDemergeSplitPacketCount || 0),
+    stableDemergeCreatedFaceCount: Number(stats.stableDemergeCreatedFaceCount || 0),
+    interactionStateActive: !!interactionState
+  };
+
+  if (shouldEmitPlayerMoveFastPathDiag(signature, candidateEligible, rejectReasons)) {
+    __playerMoveFastPathDiagState.emittedCount += 1;
+    __playerMoveFastPathDiagState.lastSignature = signature;
+    emitPlayerMoveFastPathEligibilityDiagnostic(payload);
+  }
+
+  __playerMoveFastPathDiagState.lastPlayerInteractionCellKey = playerInteractionCellKey;
+  __playerMoveFastPathDiagState.lastViewRotation = normalizeMainEditorViewRotationValue(currentViewRotation);
+  __playerMoveFastPathDiagState.lastStaticOrderSignature = currentStaticOrderSignature;
+  __playerMoveFastPathDiagState.lastStaticRenderableCount = staticRenderableCount;
+  __playerMoveFastPathDiagState.lastDynamicRenderableCount = dynamicRenderableCount;
+  __playerMoveFastPathDiagState.warmStaticOrderAvailable = staticRenderableCount > 0 && dynamicRenderableCount === 1 && stats.staticCacheRebuiltThisFrame !== true && stats.occupancyRebuiltThisFrame !== true;
+  return payload;
+}
+
 function deriveRenderableDrawPosition(renderable) {
   if (!renderable) return { x: 0, y: 0 };
   if (renderable.drawScreenPosition && typeof renderable.drawScreenPosition.x === 'number' && typeof renderable.drawScreenPosition.y === 'number') {
@@ -8190,24 +8353,37 @@ function buildStableLocalDemergeListHash(staticRenderables) {
   return String(hash >>> 0);
 }
 
-function quantizeStableLocalDemergeCoord(value) {
+function floorStableLocalDemergeCoord(value) {
   var n = Number(value || 0);
   if (!Number.isFinite(n)) n = 0;
-  return Math.round(n * 8) / 8;
+  return Math.floor(n);
+}
+
+function getStableLocalDemergeInteractionCell(playerRef) {
+  if (!playerRef || typeof playerRef !== 'object') return null;
+  return {
+    x: floorStableLocalDemergeCoord(playerRef.x),
+    y: floorStableLocalDemergeCoord(playerRef.y),
+    z: floorStableLocalDemergeCoord(playerRef.z)
+  };
+}
+
+function buildStableLocalDemergeInteractionCellKey(playerRef) {
+  var cell = getStableLocalDemergeInteractionCell(playerRef);
+  if (!cell) return 'none';
+  return [cell.x, cell.y, cell.z].join(',');
 }
 
 function buildStableLocalDemergeCacheKey(staticRenderables, viewRotation, playerRef, radius) {
   var list = Array.isArray(staticRenderables) ? staticRenderables : [];
   var surfaceStats = typeof __lastSurfaceCacheStats !== 'undefined' && __lastSurfaceCacheStats ? __lastSurfaceCacheStats : {};
   var staticCache = typeof staticBoxRenderCache !== 'undefined' && staticBoxRenderCache ? staticBoxRenderCache : {};
-  var px = playerRef ? quantizeStableLocalDemergeCoord(playerRef.x) : 'none';
-  var py = playerRef ? quantizeStableLocalDemergeCoord(playerRef.y) : 'none';
-  var pz = playerRef ? quantizeStableLocalDemergeCoord(playerRef.z) : 'none';
+  var interactionCellKey = buildStableLocalDemergeInteractionCellKey(playerRef);
   return [
-    'v2',
+    'v3-interaction-cell',
     normalizeMainEditorViewRotationValue(viewRotation),
     Number(radius || 0).toFixed(2),
-    px, py, pz,
+    interactionCellKey,
     String(staticCache.geometrySignature || ''),
     String(staticCache.cacheSignature || ''),
     Number(surfaceStats.visibleChunkCount || 0),
@@ -8221,10 +8397,17 @@ function buildStableLocalDemergeCacheKey(staticRenderables, viewRotation, player
 function isActorInteractionDescriptorNearPlayerForLocalDemerge(descriptor, playerRef, radius) {
   var cell = descriptor && (descriptor.cell || descriptor.box) ? (descriptor.cell || descriptor.box) : null;
   if (!cell || !playerRef) return false;
-  var px = Number(playerRef.x || 0);
-  var py = Number(playerRef.y || 0);
-  var pz = Number(playerRef.z || 0);
-  if (!Number.isFinite(px) || !Number.isFinite(py) || !Number.isFinite(pz)) return false;
+  var interactionCell = getStableLocalDemergeInteractionCell(playerRef);
+  if (!interactionCell) return false;
+  // The local demerge set is intentionally keyed by the actor interaction tile,
+  // not by sub-tile coordinates. Test against the whole tile AABB so walking
+  // inside one tile updates only the player sprite position, not static splits.
+  var px0 = Number(interactionCell.x || 0);
+  var py0 = Number(interactionCell.y || 0);
+  var px1 = px0 + 1;
+  var py1 = py0 + 1;
+  var pz = Number(interactionCell.z || 0);
+  if (!Number.isFinite(px0) || !Number.isFinite(py0) || !Number.isFinite(pz)) return false;
   var bx = Math.floor(Number(cell.x || 0));
   var by = Math.floor(Number(cell.y || 0));
   var bz = Number(cell.z || 0);
@@ -8232,9 +8415,13 @@ function isActorInteractionDescriptorNearPlayerForLocalDemerge(descriptor, playe
   var bd = Math.max(1, Number(cell.d != null ? cell.d : 1));
   var bh = Math.max(1, Number(cell.h != null ? cell.h : 1));
   var r = Math.max(0.25, Number(radius || getActorInteractionSortRadiusForRender() || 2));
-  var nearestX = Math.max(bx, Math.min(px, bx + bw));
-  var nearestY = Math.max(by, Math.min(py, by + bd));
-  var distXY = Math.hypot(nearestX - px, nearestY - py);
+  var cellMinX = bx;
+  var cellMaxX = bx + bw;
+  var cellMinY = by;
+  var cellMaxY = by + bd;
+  var dx = Math.max(0, Math.max(cellMinX - px1, px0 - cellMaxX));
+  var dy = Math.max(0, Math.max(cellMinY - py1, py0 - cellMaxY));
+  var distXY = Math.hypot(dx, dy);
   if (distXY > r + 0.75) return false;
 
   // Keep local demerge around the actor's usable vertical interaction band only.
@@ -8465,6 +8652,7 @@ function applyStableActorSortDemergeToStaticRenderables(staticRenderables, viewR
       mode: 'stable-local-player-radius-demerge',
       viewRotation: normalizedViewRotation,
       radius: radius,
+      playerInteractionCellKey: buildStableLocalDemergeInteractionCellKey(playerObj),
       player: summarizeActorDiagPlayer(playerObj),
       inputStaticRenderableCount: Number(list.length || 0),
       outputStaticRenderableCount: Number(out.length || 0),
@@ -8487,6 +8675,7 @@ function applyStableActorSortDemergeToStaticRenderables(staticRenderables, viewR
     splitPacketCount: splitPacketCount,
     createdFaceCount: createdFaceCount,
     residualMergedPacketCount: residualMergedPacketCount,
+    playerInteractionCellKey: buildStableLocalDemergeInteractionCellKey(playerObj),
     checkedPacketCount: checkedPacketCount,
     skippedFarPacketCount: skippedFarPacketCount,
     cacheHit: false,
@@ -8897,6 +9086,7 @@ function buildRenderables() {
     stableDemergeMode: String(stableDemergeResult && stableDemergeResult.mode || 'none'),
     stableDemergeSplitPacketCount: Number(stableDemergeResult && stableDemergeResult.splitPacketCount || 0),
     stableDemergeCreatedFaceCount: Number(stableDemergeResult && stableDemergeResult.createdFaceCount || 0),
+    stableDemergePlayerInteractionCellKey: String(stableDemergeResult && stableDemergeResult.playerInteractionCellKey || ''),
     stableDemergeCacheHit: stableDemergeResult && stableDemergeResult.cacheHit === true,
     stableDemergeCacheHitCount: Number(stableDemergeResult && stableDemergeResult.cacheHitCount || 0),
     stableDemergeCacheMissCount: Number(stableDemergeResult && stableDemergeResult.cacheMissCount || 0)
@@ -8967,7 +9157,14 @@ function buildRenderables() {
     effectiveFaceMergeMode: String(faceMergeControlState.effectiveFaceMergeMode || 'merge'),
     pendingFaceMergeMode: String(faceMergeControlState.pendingFaceMergeMode || faceMergeControlState.effectiveFaceMergeMode || 'merge'),
     faceMergeModeSwitchCount: Number(faceMergeControlState.faceMergeModeSwitchCount || 0),
-    hysteresisHitCount: Number(faceMergeControlState.hysteresisHitCount || 0)
+    hysteresisHitCount: Number(faceMergeControlState.hysteresisHitCount || 0),
+    stableDemergeMode: String(stableDemergeResult && stableDemergeResult.mode || 'none'),
+    stableDemergeSplitPacketCount: Number(stableDemergeResult && stableDemergeResult.splitPacketCount || 0),
+    stableDemergeCreatedFaceCount: Number(stableDemergeResult && stableDemergeResult.createdFaceCount || 0),
+    stableDemergePlayerInteractionCellKey: String(stableDemergeResult && stableDemergeResult.playerInteractionCellKey || ''),
+    stableDemergeCacheHit: stableDemergeResult && stableDemergeResult.cacheHit === true,
+    stableDemergeCacheHitCount: Number(stableDemergeResult && stableDemergeResult.cacheHitCount || 0),
+    stableDemergeCacheMissCount: Number(stableDemergeResult && stableDemergeResult.cacheMissCount || 0)
   };
   __lastRenderFrameOccupancyVersion = occupancyCacheVersion;
   var frameBuildMs = Number(Math.max(0, perfNow() - buildStartAt).toFixed(3));
@@ -9661,6 +9858,7 @@ function buildRendererFramePlan() {
   var currentViewRotation = normalizeMainEditorViewRotationValue(getSafeMainEditorViewRotation(null).viewRotation);
   var framePlanId = 'frameplan-' + String(++__mainFramePlanSeq);
   var framePlanSignature = [currentViewRotation, order.length, __lastMainRenderableBuildStats.staticRenderableCount, __lastMainRenderableBuildStats.dynamicRenderableCount].join('|');
+  var playerMoveFastPathEligibility = evaluatePlayerMoveFastPathEligibilityForRender(framePlanId, order, currentViewRotation, interactionState);
   var framePlanDiagnosticsEnabled = isFramePlanDiagnosticsEnabled();
   var renderOrderHeavyDiagnosticsEnabled = isRenderOrderHeavyDiagnosticsEnabled();
   logActorInteractionFinalOrderDiagnostics(framePlanId, currentViewRotation, order);
@@ -9739,7 +9937,10 @@ function buildRendererFramePlan() {
   recordRenderFunctionTiming('render.buildRendererFramePlan.total', perfNow() - buildStartAtFramePlan, {
     framePlanId: framePlanId,
     renderableCount: Number(order && order.length || 0),
-    interactionFastPath: interactionFastPath === true
+    interactionFastPath: interactionFastPath === true,
+    playerMoveFastPathCandidateEligible: playerMoveFastPathEligibility && playerMoveFastPathEligibility.candidateEligible === true,
+    playerMoveFastPathRejectReasons: playerMoveFastPathEligibility && Array.isArray(playerMoveFastPathEligibility.rejectReasons) ? playerMoveFastPathEligibility.rejectReasons.slice(0, 8) : [],
+    playerMoveFastPathCellKey: playerMoveFastPathEligibility ? String(playerMoveFastPathEligibility.playerInteractionCellKey || '') : ''
   });
   return {
     id: framePlanId,
