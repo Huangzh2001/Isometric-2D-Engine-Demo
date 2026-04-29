@@ -105,6 +105,109 @@ function getPlayerGroundBounds() {
   return polyBounds(poly);
 }
 
+function normalizePlayerInputRotationValue(rotation) {
+  var turns = Number(rotation) || 0;
+  turns %= 4;
+  if (turns < 0) turns += 4;
+  return turns;
+}
+
+function getPlayerInputViewRotationCoreApi() {
+  try {
+    if (typeof window !== 'undefined' && window.App && window.App.domain && window.App.domain.viewRotationCore) return window.App.domain.viewRotationCore;
+  } catch (_) {}
+  try {
+    if (typeof __VIEW_ROTATION_CORE__ !== 'undefined' && __VIEW_ROTATION_CORE__) return __VIEW_ROTATION_CORE__;
+  } catch (_) {}
+  try {
+    if (typeof window !== 'undefined' && window.__VIEW_ROTATION_CORE__) return window.__VIEW_ROTATION_CORE__;
+  } catch (_) {}
+  return null;
+}
+
+function getPlayerInputViewRotation() {
+  try {
+    var mainController = typeof window !== 'undefined' && window.App && window.App.controllers ? window.App.controllers.main || null : null;
+    if (mainController && typeof mainController.getMainEditorVisualRotation === 'function') {
+      return normalizePlayerInputRotationValue(mainController.getMainEditorVisualRotation('player-input:view-rotation'));
+    }
+    if (mainController && typeof mainController.getMainEditorViewRotation === 'function') {
+      return normalizePlayerInputRotationValue(mainController.getMainEditorViewRotation('player-input:view-rotation'));
+    }
+  } catch (_) {}
+
+  var runtimeEditor = null;
+  try {
+    var runtimeState = typeof window !== 'undefined' && window.App && window.App.state ? window.App.state.runtimeState || null : null;
+    runtimeEditor = runtimeState && runtimeState.editor ? runtimeState.editor : null;
+  } catch (_) {
+    runtimeEditor = null;
+  }
+  try {
+    if (!runtimeEditor && typeof editor !== 'undefined' && editor) runtimeEditor = editor;
+  } catch (_) {}
+
+  var rawRotation = runtimeEditor && typeof runtimeEditor.visualRotation === 'number'
+    ? runtimeEditor.visualRotation
+    : (runtimeEditor && typeof runtimeEditor.rotation === 'number' ? runtimeEditor.rotation : 0);
+  return normalizePlayerInputRotationValue(rawRotation);
+}
+
+function getPlayerInputProjectionConfig() {
+  return {
+    tileW: settings && Number(settings.tileW) || 80,
+    tileH: settings && Number(settings.tileH) || 40,
+    originX: settings && Number(settings.originX) || 0,
+    originY: settings && Number(settings.originY) || 0,
+    cameraX: camera && Number(camera.x) || 0,
+    cameraY: camera && Number(camera.y) || 0,
+    worldBoundsOrOrigin: {
+      cols: settings && Number(settings.gridW || settings.worldCols) || 0,
+      rows: settings && Number(settings.gridH || settings.worldRows) || 0
+    }
+  };
+}
+
+function normalizePlayerInputWorldVector(wx, wy) {
+  wx = Number(wx) || 0;
+  wy = Number(wy) || 0;
+  var len = Math.hypot(wx, wy);
+  if (!Number.isFinite(len) || len <= 1e-9) return null;
+  wx /= len;
+  wy /= len;
+  if (Math.abs(wx) < 1e-9) wx = 0;
+  if (Math.abs(wy) < 1e-9) wy = 0;
+  return { wx: wx, wy: wy };
+}
+
+function rotatePlayerInputAgainstView(wx, wy, viewRotation) {
+  var angle = -normalizePlayerInputRotationValue(viewRotation) * (Math.PI / 2);
+  var cos = Math.cos(angle);
+  var sin = Math.sin(angle);
+  return normalizePlayerInputWorldVector(wx * cos + wy * sin, -wx * sin + wy * cos) || { wx: 0, wy: 0 };
+}
+
+function screenVectorToPlayerWorldInput(sx, sy, viewRotation) {
+  var api = getPlayerInputViewRotationCoreApi();
+  if (api && typeof api.worldToScreenWithViewRotation === 'function' && typeof api.screenToWorldWithViewRotation === 'function') {
+    try {
+      var z = Number(player && player.z) || 0;
+      var cfg = getPlayerInputProjectionConfig();
+      var baseScreen = api.worldToScreenWithViewRotation({ x: Number(player && player.x) || 0, y: Number(player && player.y) || 0, z: z }, viewRotation, cfg);
+      var pixelStep = Math.max(32, Math.min(160, Number(cfg.tileW) || 80));
+      var baseWorld = api.screenToWorldWithViewRotation({ x: baseScreen.x, y: baseScreen.y, z: z }, viewRotation, cfg);
+      var targetWorld = api.screenToWorldWithViewRotation({ x: baseScreen.x + sx * pixelStep, y: baseScreen.y + sy * pixelStep, z: z }, viewRotation, cfg);
+      var exact = normalizePlayerInputWorldVector(targetWorld.x - baseWorld.x, targetWorld.y - baseWorld.y);
+      if (exact) return exact;
+    } catch (_) {}
+  }
+
+  var wx = sx + sy;
+  var wy = sy - sx;
+  var normalized = normalizePlayerInputWorldVector(wx, wy) || { wx: 0, wy: 0 };
+  return rotatePlayerInputAgainstView(normalized.wx, normalized.wy, viewRotation);
+}
+
 function getPlayerInput() {
   let sx = 0, sy = 0;
   if (keys.has('arrowup') || keys.has('w')) sy -= 1;
@@ -112,11 +215,16 @@ function getPlayerInput() {
   if (keys.has('arrowleft') || keys.has('a')) sx -= 1;
   if (keys.has('arrowright') || keys.has('d')) sx += 1;
   if (sx === 0 && sy === 0) return null;
-  const sl = Math.hypot(sx, sy); sx /= sl; sy /= sl;
-  let wx = sx + sy, wy = sy - sx; const wl = Math.hypot(wx, wy) || 1; wx /= wl; wy /= wl;
+  const sl = Math.hypot(sx, sy) || 1;
+  sx /= sl;
+  sy /= sl;
+  const viewRotation = getPlayerInputViewRotation();
+  const worldInput = screenVectorToPlayerWorldInput(sx, sy, viewRotation);
+  let wx = worldInput.wx;
+  let wy = worldInput.wy;
   let dir = player.dir;
   if (Math.abs(sx) > Math.abs(sy)) dir = sx > 0 ? 'right' : 'left'; else dir = sy > 0 ? 'down' : 'up';
-  return { wx, wy, dir };
+  return { wx, wy, dir, viewRotation };
 }
 
 function fallbackBoxOverlap3D(a, b) {
