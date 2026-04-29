@@ -433,6 +433,8 @@
           <h2>调试显示 / Debug</h2>
           <label><input id="terrainDebugFaceColorsEnabled" type="checkbox"> Terrain Semantic Edge Colors</label>
           <div class="hintBox">开启后，terrain 使用原方块语义面的调试颜色；关闭后恢复自然地形颜色。</div>
+          <label><input id="terrainBoundaryDebugRedEnabled" type="checkbox"> Terrain Boundary Red Debug Lines</label>
+          <div class="hintBox">开启后，只把地形高低差/外边界线强制显示为更粗红线，用于检查边缘线是否完整；关闭后恢复正常颜色。</div>
           <label>Terrain Build Color Mode
             <select id="terrainBuildColorMode">
               <option value="natural">natural</option>
@@ -700,7 +702,7 @@
   <script src="src/presentation/lighting/lighting-editor.js"></script>
   <script src="src/presentation/lighting/lighting-render.js"></script>
   <script src="src/presentation/lighting/lighting.js"></script>
-  <script src="src/presentation/shell/dom-registry.js"></script>
+  <script src="src/presentation/shell/dom-registry.js?v=20260429-terrain-edge-outline-debug-v3"></script>
   <script src="src/core/state/runtime-state.js"></script>
   <script src="src/core/state/prefab-registry.js"></script>
   <script src="src/core/state/scene-session-state.js"></script>
@@ -736,12 +738,12 @@
   <script src="src/presentation/ui/ui-tabs.js"></script>
   <script src="src/presentation/ui/ui-inspectors.js"></script>
   <script src="src/presentation/ui/ui-habbo-library.js"></script>
-  <script src="src/presentation/ui/ui.js"></script>
+  <script src="src/presentation/ui/ui.js?v=20260429-terrain-edge-outline-debug-v3"></script>
   <script src="src/presentation/render/logic.js"></script>
   <script src="src/presentation/render/static-world-cache.js"></script>
   <script src="src/presentation/render/actor-sort-stable.js"></script>
-  <script src="src/presentation/render/render.js"></script>
-  <script src="src/presentation/render/renderer/canvas2d-renderer.js"></script>
+  <script src="src/presentation/render/render.js?v=20260429-terrain-edge-outline-debug-v3"></script>
+  <script src="src/presentation/render/renderer/canvas2d-renderer.js?v=20260429-terrain-edge-outline-debug-v3"></script>
   <script src="src/presentation/shell/app-shell.js"></script>
   <script src="src/presentation/shell/app.js"></script>
   <script src="src/infrastructure/self-check/scenario-runner.js"></script>

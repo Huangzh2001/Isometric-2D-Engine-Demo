@@ -901,6 +901,103 @@ function buildTerrainPolygonLoopSignature(descriptor) {
 }
 
 
+function isTerrainTopBoundaryDebugRedEnabled() {
+  try {
+    if (typeof window !== 'undefined' && window.__TERRAIN_BOUNDARY_DEBUG_RED__ === true) return true;
+    if (typeof localStorage !== 'undefined') {
+      var value = localStorage.getItem('terrainBoundaryDebugRed');
+      return value === '1' || value === 'true';
+    }
+  } catch (_) {}
+  return false;
+}
+
+function getTerrainTopBoundaryRenderDebugSignature() {
+  return isTerrainTopBoundaryDebugRedEnabled() ? 'boundary-debug-red:1' : 'boundary-debug-red:0';
+}
+
+function getGlobalTerrainBoundaryOccupancyReaderForRender(reason) {
+  try {
+    var snapshot = getSceneOccupancySnapshotForRender(reason || 'terrain-boundary:global-reader');
+    var occ = snapshot && snapshot.map ? snapshot.map : snapshot;
+    var occupancyReaderCore = getOccupancyReaderCoreApi();
+    if (occupancyReaderCore && typeof occupancyReaderCore.createOccupancyReader === 'function') {
+      var result = occupancyReaderCore.createOccupancyReader({
+        occupancy: occ,
+        localBoxes: [],
+        sourceLabel: 'terrain-boundary-global',
+        validateLocalBoxes: false
+      });
+      if (result && result.reader) return result.reader;
+    }
+    if (occ && typeof occ.has === 'function') return occ;
+  } catch (_) {}
+  return null;
+}
+
+function buildTerrainTopBoundarySegmentsWorldFromDescriptor(descriptor, occupancyReader) {
+  var face = descriptor && typeof descriptor === 'object' ? descriptor : null;
+  if (!face || face.isTerrainFaceMergeCandidate !== true || String(face.semanticFace || '') !== 'top') return [];
+  var reader = occupancyReader || getGlobalTerrainBoundaryOccupancyReaderForRender('terrain-boundary:descriptor-fallback');
+  var members = Array.isArray(face.members) && face.members.length ? face.members : [face];
+  var segments = [];
+  var seen = Object.create(null);
+
+  function pointKey(pt) {
+    return [
+      Number(pt && pt.x || 0).toFixed(4),
+      Number(pt && pt.y || 0).toFixed(4),
+      Number(pt && pt.z || 0).toFixed(4)
+    ].join(',');
+  }
+
+  function addSegment(a, b) {
+    if (!a || !b) return;
+    var ak = pointKey(a);
+    var bk = pointKey(b);
+    var key = ak < bk ? ak + '|' + bk : bk + '|' + ak;
+    if (seen[key]) return;
+    seen[key] = true;
+    segments.push([a, b]);
+  }
+
+  function hasSameHeightTopSurface(nx, ny, plane) {
+    // A neighbouring column is part of the same continuous top plane only when it
+    // contains the voxel immediately below the plane and does not continue above it.
+    return occupancyReaderHasSolid(reader, nx, ny, plane - 1) && !occupancyReaderHasSolid(reader, nx, ny, plane);
+  }
+
+  for (var i = 0; i < members.length; i++) {
+    var member = members[i] && typeof members[i] === 'object' ? members[i] : null;
+    var cell = member && (member.cell || member.box) ? (member.cell || member.box) : null;
+    if (!cell || cell.generatedBy !== 'terrain-generator') continue;
+    var x = Math.round(Number(cell.x || 0));
+    var y = Math.round(Number(cell.y || 0));
+    var z = Math.round(Number(cell.z || 0));
+    var plane = z + 1;
+
+    if (!hasSameHeightTopSurface(x, y - 1, plane)) addSegment({ x: x, y: y, z: plane }, { x: x + 1, y: y, z: plane });
+    if (!hasSameHeightTopSurface(x + 1, y, plane)) addSegment({ x: x + 1, y: y, z: plane }, { x: x + 1, y: y + 1, z: plane });
+    if (!hasSameHeightTopSurface(x, y + 1, plane)) addSegment({ x: x + 1, y: y + 1, z: plane }, { x: x, y: y + 1, z: plane });
+    if (!hasSameHeightTopSurface(x - 1, y, plane)) addSegment({ x: x, y: y + 1, z: plane }, { x: x, y: y, z: plane });
+  }
+  return segments;
+}
+
+function getTerrainTopBoundaryStrokeWidthForPacket(packet) {
+  if (!packet || !Array.isArray(packet.terrainBoundarySegmentsWorld) || !packet.terrainBoundarySegmentsWorld.length) return 0;
+  if (isTerrainTopBoundaryDebugRedEnabled()) return 4.5;
+  var explicit = Number(packet.terrainBoundaryStrokeWidth);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  return 2.6;
+}
+
+function getTerrainTopBoundaryStrokeStyleForPacket(packet) {
+  if (!packet) return null;
+  if (isTerrainTopBoundaryDebugRedEnabled()) return 'rgba(255,0,0,0.98)';
+  return packet.terrainBoundaryStroke || packet.stroke || 'rgba(17,24,39,0.78)';
+}
+
 function buildMergedVoxelFaceWorldGeometry(descriptor) {
   var face = descriptor && typeof descriptor === 'object' ? descriptor : null;
   if (!face) return { worldPts: [], worldLoops: null, worldOutlineSegments: null };
@@ -1610,6 +1707,7 @@ function buildStaticWorldChunkRenderables(chunk, options) {
     var worldPts = Array.isArray(worldGeometry && worldGeometry.worldPts) ? worldGeometry.worldPts : [];
     var worldLoops = Array.isArray(worldGeometry && worldGeometry.worldLoops) ? worldGeometry.worldLoops : null;
     var worldOutlineSegments = Array.isArray(worldGeometry && worldGeometry.worldOutlineSegments) ? worldGeometry.worldOutlineSegments : null;
+    var terrainBoundarySegmentsWorld = buildTerrainTopBoundarySegmentsWorldFromDescriptor(descriptor, chunkOcc);
     if (!worldPts.length) {
       step1PrepareFaceInputsMs += Math.max(0, perfNow() - prepareFaceInputsStartAt);
       continue;
@@ -1677,6 +1775,9 @@ function buildStaticWorldChunkRenderables(chunk, options) {
       worldPts: worldPts,
       worldLoops: worldLoops,
       worldOutlineSegments: worldOutlineSegments,
+      terrainBoundarySegmentsWorld: terrainBoundarySegmentsWorld,
+      terrainBoundaryStroke: stroke,
+      terrainBoundaryStrokeWidth: terrainBoundarySegmentsWorld.length ? 2.6 : 0,
       shadowOverlaysWorld: shadowOverlaysWorld,
       box: cell || null,
       cellX: Number(cell.x || 0),
@@ -8779,6 +8880,10 @@ function buildStaticWorldFacePacketFromDescriptorForActorDemerge(descriptor, sou
   var shadowOverlaysWorld = lightingActive && !suppressMergedTerrainTopShadows
     ? buildVoxelFaceShadowWorldOverlays(worldPts, normal, cell.instanceId || null, null)
     : [];
+  var terrainBoundarySegmentsWorld = buildTerrainTopBoundarySegmentsWorldFromDescriptor(
+    descriptor,
+    sourcePacket.terrainBoundaryOccupancyReader || getGlobalTerrainBoundaryOccupancyReaderForRender('stable-local-demerge:terrain-boundary')
+  );
   var terrainLoopSignature = buildTerrainPolygonLoopSignature(descriptor);
   var merged = descriptor.merged === true;
   var faceKey = merged
@@ -8811,6 +8916,9 @@ function buildStaticWorldFacePacketFromDescriptorForActorDemerge(descriptor, sou
     worldPts: worldPts,
     worldLoops: worldLoops,
     worldOutlineSegments: worldOutlineSegments,
+    terrainBoundarySegmentsWorld: terrainBoundarySegmentsWorld,
+    terrainBoundaryStroke: sourcePacket.terrainBoundaryStroke || stroke,
+    terrainBoundaryStrokeWidth: terrainBoundarySegmentsWorld.length ? (sourcePacket.terrainBoundaryStrokeWidth || 2.6) : 0,
     shadowOverlaysWorld: shadowOverlaysWorld,
     box: cell,
     cellX: Number(cell.x || 0),
@@ -11443,6 +11551,10 @@ function buildStaticWorldPacketProjectionCacheKey(packet, viewRotation) {
     worldLoops.length,
     worldLoops.map(function (loop) { return Array.isArray(loop) ? loop.length : 0; }).join(','),
     worldOutlineSegments.length,
+    Array.isArray(packet && packet.terrainBoundarySegmentsWorld) ? packet.terrainBoundarySegmentsWorld.length : 0,
+    Number(packet && packet.terrainBoundaryStrokeWidth || 0),
+    String(packet && packet.terrainBoundaryStroke || ''),
+    getTerrainTopBoundaryRenderDebugSignature(),
     Array.isArray(packet && packet.shadowOverlaysWorld) ? packet.shadowOverlaysWorld.length : 0,
     packet && packet.id ? String(packet.id) : ''
   ].join('|');
@@ -11472,6 +11584,14 @@ function getStaticWorldPacketProjectedGeometry(packet, viewRotation) {
         ];
       }).filter(function (seg) { return Array.isArray(seg) && seg[0] && seg[1]; })
     : [];
+  var terrainBoundarySegmentsNoCamera = Array.isArray(packet.terrainBoundarySegmentsWorld) && packet.terrainBoundarySegmentsWorld.length
+    ? packet.terrainBoundarySegmentsWorld.map(function (seg) {
+        return [
+          screenPointsFromWorldFaceNoCamera([seg[0] || {}], viewRotation)[0] || null,
+          screenPointsFromWorldFaceNoCamera([seg[1] || {}], viewRotation)[0] || null
+        ];
+      }).filter(function (seg) { return Array.isArray(seg) && seg[0] && seg[1]; })
+    : [];
   var overlaysNoCamera = Array.isArray(packet.shadowOverlaysWorld) && packet.shadowOverlaysWorld.length
     ? worldShadowOverlaysToNoCamera(packet.shadowOverlaysWorld || [], viewRotation)
     : [];
@@ -11480,9 +11600,11 @@ function getStaticWorldPacketProjectedGeometry(packet, viewRotation) {
     pointsNoCamera: pointsNoCamera,
     loopsNoCamera: loopsNoCamera,
     outlineSegmentsNoCamera: outlineSegmentsNoCamera,
+    terrainBoundarySegmentsNoCamera: terrainBoundarySegmentsNoCamera,
     overlaysNoCamera: overlaysNoCamera,
     path2d: loopsNoCamera.length ? buildPath2DFromLoops(loopsNoCamera) : buildPath2DFromPoints(pointsNoCamera),
-    strokePath2d: outlineSegmentsNoCamera.length ? buildPath2DFromSegments(outlineSegmentsNoCamera) : null
+    strokePath2d: outlineSegmentsNoCamera.length ? buildPath2DFromSegments(outlineSegmentsNoCamera) : null,
+    terrainBoundaryPath2d: terrainBoundarySegmentsNoCamera.length ? buildPath2DFromSegments(terrainBoundarySegmentsNoCamera) : null
   };
   packet.__projectedDrawCache = cached;
   packet.__lastStaticPacketCacheState = {
@@ -11491,6 +11613,34 @@ function getStaticWorldPacketProjectedGeometry(packet, viewRotation) {
     overlayCount: overlaysNoCamera.length
   };
   return cached;
+}
+
+function drawTerrainTopBoundarySegmentsForPacket(targetCtx, packet, projected) {
+  if (!targetCtx || !packet || !projected) return;
+  var width = getTerrainTopBoundaryStrokeWidthForPacket(packet);
+  var stroke = getTerrainTopBoundaryStrokeStyleForPacket(packet);
+  if (!width || !stroke) return;
+  var path = projected.terrainBoundaryPath2d || null;
+  var segments = Array.isArray(projected.terrainBoundarySegmentsNoCamera) ? projected.terrainBoundarySegmentsNoCamera : [];
+  if (!path && !segments.length) return;
+  targetCtx.save();
+  targetCtx.strokeStyle = stroke;
+  targetCtx.lineWidth = width;
+  targetCtx.lineJoin = 'round';
+  targetCtx.lineCap = 'round';
+  if (path) {
+    targetCtx.stroke(path);
+  } else {
+    targetCtx.beginPath();
+    for (var i = 0; i < segments.length; i++) {
+      var seg = segments[i];
+      if (!Array.isArray(seg) || !seg[0] || !seg[1]) continue;
+      targetCtx.moveTo(Number(seg[0].x || 0), Number(seg[0].y || 0));
+      targetCtx.lineTo(Number(seg[1].x || 0), Number(seg[1].y || 0));
+    }
+    targetCtx.stroke();
+  }
+  targetCtx.restore();
 }
 
 function drawStaticWorldFacePacket(packet) {
@@ -11520,12 +11670,19 @@ function drawStaticWorldFacePacket(packet) {
     if (Array.isArray(projected.overlaysNoCamera) && projected.overlaysNoCamera.length) {
       drawFaceShadowOverlaysNoCamera(ctx, pointsNoCamera, projected.overlaysNoCamera, 0, 0);
     }
+    drawTerrainTopBoundarySegmentsForPacket(ctx, packet, projected);
     ctx.restore();
     return;
   }
   drawPolyWithOffset(pointsNoCamera, offsetX, offsetY, packet.fill, packet.stroke, packet.width || 1);
   applyTerrainMaterialPatternOverlay(ctx, pointsNoCamera, null, offsetX, offsetY, packet);
   drawFaceShadowOverlaysNoCamera(ctx, pointsNoCamera, projected && projected.overlaysNoCamera ? projected.overlaysNoCamera : worldShadowOverlaysToNoCamera(packet.shadowOverlaysWorld || [], currentViewRotation), offsetX, offsetY);
+  if (projected && Array.isArray(projected.terrainBoundarySegmentsNoCamera) && projected.terrainBoundarySegmentsNoCamera.length) {
+    ctx.save();
+    if (offsetX || offsetY) ctx.translate(offsetX, offsetY);
+    drawTerrainTopBoundarySegmentsForPacket(ctx, packet, projected);
+    ctx.restore();
+  }
 }
 
 function buildStaticVoxelFaceRenderable(baseRenderable, face, faceIndex, viewRotation) {

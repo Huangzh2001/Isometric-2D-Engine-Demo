@@ -201,12 +201,25 @@
     return state;
   }
 
+  function getTerrainBoundaryDebugSignatureForRenderer() {
+    try {
+      if (typeof getTerrainTopBoundaryRenderDebugSignature === 'function') return getTerrainTopBoundaryRenderDebugSignature();
+      if (typeof window !== 'undefined' && window.__TERRAIN_BOUNDARY_DEBUG_RED__ === true) return 'boundary-debug-red:1';
+      if (typeof localStorage !== 'undefined') {
+        var value = localStorage.getItem('terrainBoundaryDebugRed');
+        return (value === '1' || value === 'true') ? 'boundary-debug-red:1' : 'boundary-debug-red:0';
+      }
+    } catch (_) {}
+    return 'boundary-debug-red:0';
+  }
+
   function buildStaticPacketRunInteractionSlotKey(meta) {
     meta = meta || {};
     return [
       'runslot',
       String(meta.currentViewRotation || 0),
-      String(meta.runStartIndex || 0)
+      String(meta.runStartIndex || 0),
+      getTerrainBoundaryDebugSignatureForRenderer()
     ].join('|');
   }
 
@@ -410,6 +423,10 @@
       hash = mixHashString(hash, Array.isArray(packet && packet.worldPts) ? packet.worldPts.length : 0);
       hash = mixHashString(hash, Array.isArray(packet && packet.worldLoops) ? packet.worldLoops.length : 0);
       hash = mixHashString(hash, Array.isArray(packet && packet.worldOutlineSegments) ? packet.worldOutlineSegments.length : 0);
+      hash = mixHashString(hash, Array.isArray(packet && packet.terrainBoundarySegmentsWorld) ? packet.terrainBoundarySegmentsWorld.length : 0);
+      hash = mixHashString(hash, Number(packet && packet.terrainBoundaryStrokeWidth || 0));
+      hash = mixHashString(hash, String(packet && packet.terrainBoundaryStroke || ''));
+      hash = mixHashString(hash, getTerrainBoundaryDebugSignatureForRenderer());
       hash = mixHashString(hash, Array.isArray(packet && packet.shadowOverlaysWorld) ? packet.shadowOverlaysWorld.length : 0);
     }
     return [
@@ -489,6 +506,12 @@
         else stats.staticPacketOverlayCacheMissCount += 1;
       }
       for (var p = 0; p < projected.pointsNoCamera.length; p++) expandBoundsByPoint(bounds, projected.pointsNoCamera[p]);
+      var boundarySegments = Array.isArray(projected.terrainBoundarySegmentsNoCamera) ? projected.terrainBoundarySegmentsNoCamera : [];
+      for (var bi = 0; bi < boundarySegments.length; bi++) {
+        var boundarySeg = Array.isArray(boundarySegments[bi]) ? boundarySegments[bi] : [];
+        if (boundarySeg[0]) expandBoundsByPoint(bounds, boundarySeg[0]);
+        if (boundarySeg[1]) expandBoundsByPoint(bounds, boundarySeg[1]);
+      }
       var overlays = Array.isArray(projected.overlaysNoCamera) ? projected.overlaysNoCamera : [];
       for (var oi = 0; oi < overlays.length; oi++) {
         var overlay = overlays[oi] || null;
@@ -544,6 +567,9 @@
       }
       if (Array.isArray(projected.overlaysNoCamera) && projected.overlaysNoCamera.length && typeof drawFaceShadowOverlaysNoCamera === 'function') {
         drawFaceShadowOverlaysNoCamera(surfaceCtx, projected.pointsNoCamera, projected.overlaysNoCamera, 0, 0);
+      }
+      if (typeof drawTerrainTopBoundarySegmentsForPacket === 'function') {
+        drawTerrainTopBoundarySegmentsForPacket(surfaceCtx, packet, projected);
       }
     }
     surfaceCtx.restore();

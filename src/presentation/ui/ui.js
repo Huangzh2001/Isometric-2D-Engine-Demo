@@ -1155,6 +1155,35 @@ function uiRefreshMainTerrainPanel(source) {
 }
 
 
+function uiSyncTerrainBoundaryDebugRedToggleFromStorage() {
+  var enabled = false;
+  try {
+    if (typeof localStorage !== 'undefined') {
+      var value = localStorage.getItem('terrainBoundaryDebugRed');
+      enabled = value === '1' || value === 'true';
+    }
+  } catch (_) {}
+  try {
+    if (typeof window !== 'undefined') window.__TERRAIN_BOUNDARY_DEBUG_RED__ = enabled;
+  } catch (_) {}
+  if (ui.terrainBoundaryDebugRedEnabled) ui.terrainBoundaryDebugRedEnabled.checked = enabled;
+  return enabled;
+}
+
+function uiHandleTerrainBoundaryDebugRedToggle(source) {
+  var enabled = !!(ui.terrainBoundaryDebugRedEnabled && ui.terrainBoundaryDebugRedEnabled.checked);
+  try { if (typeof window !== 'undefined') window.__TERRAIN_BOUNDARY_DEBUG_RED__ = enabled; } catch (_) {}
+  try { if (typeof localStorage !== 'undefined') localStorage.setItem('terrainBoundaryDebugRed', enabled ? '1' : '0'); } catch (_) {}
+  try {
+    if (typeof pushLog === 'function') pushLog('terrain-boundary-debug-red=' + String(enabled) + ' source=' + String(source || 'terrain-panel'));
+  } catch (_) {}
+  try { if (typeof refreshInspectorPanels === 'function') refreshInspectorPanels(); } catch (_) {}
+  try { if (typeof updatePreview === 'function') updatePreview(); } catch (_) {}
+  return enabled;
+}
+
+uiSyncTerrainBoundaryDebugRedToggleFromStorage();
+
 function uiHandleTerrainDebugFaceColorsToggle(source) {
 
   var controller = getUiMainController();
@@ -1273,6 +1302,7 @@ safeListen(ui.terrainBuildColorMode, 'change', () => uiHandleTerrainBuildColorMo
 safeListen(ui.terrainBuildLightingBypass, 'change', () => uiHandleTerrainBuildLightingBypassToggle('terrain-panel:build-lighting-bypass'));
 safeListen(ui.terrainDetailedProfilingEnabled, 'change', () => uiHandleTerrainDetailedProfilingToggle('terrain-panel:detailed-terrain-profiling'));
 safeListen(ui.terrainDebugFaceColorsEnabled, 'change', () => { uiHandleTerrainDebugFaceColorsToggle('terrain-panel:debug-face-colors-toggle'); });
+safeListen(ui.terrainBoundaryDebugRedEnabled, 'change', () => { uiHandleTerrainBoundaryDebugRedToggle('terrain-panel:boundary-red-debug-toggle'); });
 
 safeListen(ui.previewRotateLeft, 'click', () => uiHandlePreviewFacingRotate(-1, 'ui.previewRotateLeft.click'));
 safeListen(ui.previewRotateRight, 'click', () => uiHandlePreviewFacingRotate(1, 'ui.previewRotateRight.click'));

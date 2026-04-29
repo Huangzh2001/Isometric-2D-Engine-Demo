@@ -166,6 +166,7 @@ var ui = {
   terrainDetailOffsetZ: document.getElementById('terrainDetailOffsetZ'),
 
   terrainDebugFaceColorsEnabled: document.getElementById('terrainDebugFaceColorsEnabled'),
+  terrainBoundaryDebugRedEnabled: document.getElementById('terrainBoundaryDebugRedEnabled'),
   terrainBuildColorMode: document.getElementById('terrainBuildColorMode'),
   terrainBuildLightingBypass: document.getElementById('terrainBuildLightingBypass'),
   terrainGenerate: document.getElementById('terrainGenerate'),
