@@ -19,18 +19,24 @@
     window.__APP_NAMESPACE.bind('editor.unifiedV18', { owner: 'src/presentation/editor/editor-unified-v18.js', build: BUILD_VERSION, entryFile: 'START_V18_ONLY.html' }, { owner: 'src/presentation/editor/editor-unified-v18.js', legacy: [], phase: 'P2-A' });
   }
 
-  const __editorHealthCheck = (typeof window !== 'undefined' && window.__EDITOR_HEALTH_CHECK__ && window.__EDITOR_HEALTH_CHECK__.active) ? window.__EDITOR_HEALTH_CHECK__ : null;
+  const __editorHealthReporter = (window.__EDITOR_V18_DIAGNOSTICS__ && typeof window.__EDITOR_V18_DIAGNOSTICS__.createHealthReporter === 'function')
+    ? window.__EDITOR_V18_DIAGNOSTICS__.createHealthReporter(window, { owner: 'src/presentation/editor/editor-unified-v18.js', build: BUILD_VERSION })
+    : null;
   function postEditorHealth(tag, ok, details) {
     try {
-      if (!__editorHealthCheck || typeof __editorHealthCheck.post !== 'function') return;
-      __editorHealthCheck.post(String(tag || 'unknown'), !!ok, details || {});
+      if (__editorHealthReporter && typeof __editorHealthReporter.post === 'function') return __editorHealthReporter.post(tag, ok, details);
+      var health = (typeof window !== 'undefined' && window.__EDITOR_HEALTH_CHECK__ && window.__EDITOR_HEALTH_CHECK__.active) ? window.__EDITOR_HEALTH_CHECK__ : null;
+      if (!health || typeof health.post !== 'function') return;
+      health.post(String(tag || 'unknown'), !!ok, details || {});
     } catch (_) {}
   }
   function finishEditorHealth(ok, tag, details) {
     try {
-      if (!__editorHealthCheck || typeof __editorHealthCheck.finish !== 'function') return;
-      __editorHealthCheck.__finished = true;
-      __editorHealthCheck.finish(!!ok, String(tag || (ok ? 'ready' : 'failed')), details || {});
+      if (__editorHealthReporter && typeof __editorHealthReporter.finish === 'function') return __editorHealthReporter.finish(ok, tag, details);
+      var health = (typeof window !== 'undefined' && window.__EDITOR_HEALTH_CHECK__ && window.__EDITOR_HEALTH_CHECK__.active) ? window.__EDITOR_HEALTH_CHECK__ : null;
+      if (!health || typeof health.finish !== 'function') return;
+      health.__finished = true;
+      health.finish(!!ok, String(tag || (ok ? 'ready' : 'failed')), details || {});
     } catch (_) {}
   }
   postEditorHealth('script-begin', true, { build: BUILD_VERSION });

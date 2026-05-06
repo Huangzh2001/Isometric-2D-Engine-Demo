@@ -1,118 +1,59 @@
 (function () {
   if (typeof window === 'undefined') return;
 
+  function getControllerBoundaryApiForAppControllers() {
+    try { return window.__APP_CONTROLLER_BOUNDARY__ || null; } catch (_) { return null; }
+  }
+
   function emitP7(kind, message, extra) {
+    var api = getControllerBoundaryApiForAppControllers();
+    if (api && typeof api.emitP7 === 'function') return api.emitP7(kind, message, extra);
     var line = '[P7][' + String(kind || 'BOOT') + '] ' + String(message || '');
-    if (typeof extra !== 'undefined') {
-      try { line += ' ' + JSON.stringify(extra); } catch (_) { line += ' "[unserializable]"'; }
-    }
-    try {
-      if (typeof pushLog === 'function') pushLog(line);
-      else if (typeof console !== 'undefined' && console.log) console.log(line);
-    } catch (err) {
-      try { console.log(line); } catch (_) {}
-    }
+    try { if (typeof pushLog === 'function') pushLog(line); else if (typeof console !== 'undefined' && console.log) console.log(line); } catch (_) {}
     return line;
   }
 
   function getNs() {
+    var api = getControllerBoundaryApiForAppControllers();
+    if (api && typeof api.getNs === 'function') return api.getNs();
     return (window.__APP_NAMESPACE && typeof window.__APP_NAMESPACE.bind === 'function') ? window.__APP_NAMESPACE : null;
   }
 
   function appPath(path) {
+    var api = getControllerBoundaryApiForAppControllers();
+    if (api && typeof api.appPath === 'function') return api.appPath(path);
     var ns = getNs();
     if (!ns || typeof ns.getPath !== 'function') return null;
     try { return ns.getPath(String(path || '')) || null; } catch (_) { return null; }
   }
 
-  var APP_BOUNDARY_OWNER = 'src/application/controllers/app-controllers.js';
-  var APP_BOUNDARY_PHASE = 'P15-APP';
-  var APP_BOUNDARY_MAX = 80;
-  var appBoundaryAudit = {
-    owner: APP_BOUNDARY_OWNER,
-    phase: APP_BOUNDARY_PHASE,
-    counters: {
-      stateActionHits: 0,
-      prefabRegistryHits: 0,
-      runtimeStateHits: 0,
-      serviceWorkflowHits: 0,
-      selectorHits: 0,
-      legacyGlobalHits: 0,
-      fallbackCount: 0
-    },
-    lastEvent: null,
-    lastFallback: null,
-    recentEvents: [],
-    recentFallbacks: []
-  };
-
   function safeClone(value) {
+    var api = getControllerBoundaryApiForAppControllers();
+    if (api && typeof api.safeClone === 'function') return api.safeClone(value);
     try { return JSON.parse(JSON.stringify(value)); } catch (_) { return value; }
   }
 
-  function pushAudit(bucket, entry) {
-    bucket.push(entry);
-    if (bucket.length > APP_BOUNDARY_MAX) bucket.splice(0, bucket.length - APP_BOUNDARY_MAX);
-    return entry;
-  }
-
   function recordAppBoundaryEvent(kind, route, detail) {
-    var entry = {
-      at: (function(){ try { return new Date().toISOString(); } catch (_) { return ''; } })(),
-      kind: String(kind || ''),
-      route: String(route || ''),
-      detail: safeClone(detail || null)
-    };
-    if (kind === 'state-action') appBoundaryAudit.counters.stateActionHits += 1;
-    else if (kind === 'prefab-registry') appBoundaryAudit.counters.prefabRegistryHits += 1;
-    else if (kind === 'runtime-state') appBoundaryAudit.counters.runtimeStateHits += 1;
-    else if (kind === 'service-workflow') appBoundaryAudit.counters.serviceWorkflowHits += 1;
-    else if (kind === 'selector') appBoundaryAudit.counters.selectorHits += 1;
-    else if (kind === 'legacy-global') appBoundaryAudit.counters.legacyGlobalHits += 1;
-    appBoundaryAudit.lastEvent = entry;
-    pushAudit(appBoundaryAudit.recentEvents, entry);
-    return entry;
+    var api = getControllerBoundaryApiForAppControllers();
+    if (api && typeof api.recordAppBoundaryEvent === 'function') return api.recordAppBoundaryEvent(kind, route, detail);
+    return { kind: String(kind || ''), route: String(route || ''), detail: safeClone(detail || null) };
   }
 
   function recordAppBoundaryFallback(route, detail) {
-    var entry = {
-      at: (function(){ try { return new Date().toISOString(); } catch (_) { return ''; } })(),
-      route: String(route || ''),
-      detail: safeClone(detail || null)
-    };
-    appBoundaryAudit.counters.fallbackCount += 1;
-    appBoundaryAudit.lastFallback = entry;
-    pushAudit(appBoundaryAudit.recentFallbacks, entry);
-    return entry;
+    var api = getControllerBoundaryApiForAppControllers();
+    if (api && typeof api.recordAppBoundaryFallback === 'function') return api.recordAppBoundaryFallback(route, detail);
+    return { route: String(route || ''), detail: safeClone(detail || null) };
   }
 
   function summarizeAppBoundary(label) {
-    return {
-      owner: APP_BOUNDARY_OWNER,
-      phase: APP_BOUNDARY_PHASE,
-      label: String(label || ''),
-      available: true,
-      counters: safeClone(appBoundaryAudit.counters),
-      lastEvent: safeClone(appBoundaryAudit.lastEvent),
-      lastFallback: safeClone(appBoundaryAudit.lastFallback),
-      recentEvents: appBoundaryAudit.recentEvents.slice(-8).map(safeClone),
-      recentFallbacks: appBoundaryAudit.recentFallbacks.slice(-5).map(safeClone)
-    };
+    var api = getControllerBoundaryApiForAppControllers();
+    if (api && typeof api.summarizeAppBoundary === 'function') return api.summarizeAppBoundary(label);
+    return { owner: 'src/application/controllers/app-controllers.js', phase: 'P9c-CONTROLLER-SHELL:fallback', label: String(label || ''), available: false };
   }
 
   function resetAppBoundary(meta) {
-    appBoundaryAudit.counters.stateActionHits = 0;
-    appBoundaryAudit.counters.prefabRegistryHits = 0;
-    appBoundaryAudit.counters.runtimeStateHits = 0;
-    appBoundaryAudit.counters.serviceWorkflowHits = 0;
-    appBoundaryAudit.counters.selectorHits = 0;
-    appBoundaryAudit.counters.legacyGlobalHits = 0;
-    appBoundaryAudit.counters.fallbackCount = 0;
-    appBoundaryAudit.lastEvent = null;
-    appBoundaryAudit.lastFallback = null;
-    appBoundaryAudit.recentEvents = [];
-    appBoundaryAudit.recentFallbacks = [];
-    recordAppBoundaryEvent('reset', 'application-boundary.reset', meta || { source: 'app-controllers:reset' });
+    var api = getControllerBoundaryApiForAppControllers();
+    if (api && typeof api.resetAppBoundary === 'function') return api.resetAppBoundary(meta);
     return summarizeAppBoundary(meta && meta.label ? String(meta.label) : 'reset');
   }
 
@@ -199,54 +140,266 @@
     return state && state.sceneGraph ? state.sceneGraph : (appPath('state.sceneGraph') || (typeof window !== 'undefined' ? window.__SCENE_GRAPH_STATE__ || null : null));
   }
 
+  function getControllerDiagnosticsApiForAppControllers() {
+    try { return window.__APP_CONTROLLER_DIAGNOSTICS__ || null; } catch (_) { return null; }
+  }
+
+  function requireControllerDiagnosticsApiForAppControllers() {
+    var api = getControllerDiagnosticsApiForAppControllers();
+    if (!api) throw new Error('Missing controller diagnostics owner: src/application/controllers/controller-diagnostics.js must load before app-controllers.js');
+    return api;
+  }
+
   function isDetailedTerrainProfilingEnabledForController() {
-    var settings = getMainEditorTerrainSettings('app-controllers:detailed-terrain-profiling');
-    return !!(settings && settings.terrainDetailedProfilingEnabled === true);
+    return requireControllerDiagnosticsApiForAppControllers().isDetailedTerrainProfilingEnabled({ getMainEditorTerrainSettings: getMainEditorTerrainSettings });
   }
 
   function recordTerrainDiagnostic(event, payload) {
-    var entry = Object.assign({ event: String(event || '') }, safeClone(payload || {}));
-    try {
-      var line = '[TERRAIN] ' + JSON.stringify(entry);
-      if (typeof pushLog === 'function') pushLog(line);
-      else if (typeof console !== 'undefined' && console.log) console.log(line);
-    } catch (_) {}
-    return entry;
+    return requireControllerDiagnosticsApiForAppControllers().recordTerrainDiagnostic(event, payload);
   }
 
   function controllerPerfNowMs() {
-    try {
-      if (typeof performance !== 'undefined' && performance && typeof performance.now === 'function') return performance.now();
-    } catch (_) {}
-    return Date.now();
+    return requireControllerDiagnosticsApiForAppControllers().controllerPerfNowMs();
   }
 
   function emitStructuredControllerLog(tag, payload) {
-    var line = '[' + String(tag || 'APP-CONTROLLER') + '] ';
-    try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
-    try {
-      if (typeof pushLog === 'function') pushLog(line);
-      else if (typeof console !== 'undefined' && console.log) console.log(line);
-    } catch (_) {}
-    return line;
+    return requireControllerDiagnosticsApiForAppControllers().emitStructuredControllerLog(tag, payload);
   }
 
   function emitTerrainGenerateProfile(payload) {
-    return emitStructuredControllerLog('TERRAIN-GENERATE-PROFILE', payload || {});
+    return requireControllerDiagnosticsApiForAppControllers().emitTerrainGenerateProfile(payload || {});
   }
 
   function emitSceneCommitProfile(payload) {
-    return emitStructuredControllerLog('SCENE-COMMIT-PROFILE', payload || {});
+    return requireControllerDiagnosticsApiForAppControllers().emitSceneCommitProfile(payload || {});
   }
 
 
-  var __pendingTerrainApplyJob = null;
-  var TERRAIN_APPLY_BATCH_INSTANCE_COUNT = 512;
+  function getTerrainGenerationDiagnosticsModuleForAppControllers() {
+    try { return window.__APP_TERRAIN_GENERATION_DIAGNOSTICS__ || null; } catch (_) { return null; }
+  }
+
+  function requireTerrainGenerationDiagnosticsModuleForAppControllers() {
+    var api = getTerrainGenerationDiagnosticsModuleForAppControllers();
+    if (!api || typeof api.createTerrainGenerationDiagnostics !== 'function') {
+      throw new Error('Missing terrain generation diagnostics owner: src/application/controllers/terrain-generation-diagnostics.js must load before app-controllers.js');
+    }
+    return api;
+  }
+
+  var __terrainGenerationDiagnosticsForAppControllers = null;
+
+  function createTerrainGenerationDiagnosticsDepsForAppControllers() {
+    return {
+      recordTerrainDiagnostic: recordTerrainDiagnostic
+    };
+  }
+
+  function getTerrainGenerationDiagnosticsForAppControllers() {
+    if (!__terrainGenerationDiagnosticsForAppControllers) {
+      __terrainGenerationDiagnosticsForAppControllers = requireTerrainGenerationDiagnosticsModuleForAppControllers()
+        .createTerrainGenerationDiagnostics(createTerrainGenerationDiagnosticsDepsForAppControllers());
+    }
+    return __terrainGenerationDiagnosticsForAppControllers;
+  }
+
+  function emitTerrainGeneratorParamsDiagnostic(normalizedParams) {
+    return getTerrainGenerationDiagnosticsForAppControllers().emitTerrainGeneratorParams(normalizedParams);
+  }
+
+  function emitTerrainWorldIntegrationSummaryDiagnostic(batchId, worldIntegration, occupancySummary) {
+    return getTerrainGenerationDiagnosticsForAppControllers().emitTerrainWorldIntegrationSummary(batchId, worldIntegration, occupancySummary);
+  }
+
+  function emitTerrainLogicSummaryDiagnostic(normalizedParams, stacks, terrainPlacementPlan) {
+    return getTerrainGenerationDiagnosticsForAppControllers().emitTerrainLogicSummary(normalizedParams, stacks, terrainPlacementPlan);
+  }
+
+  function emitTerrainPlacementUnificationCheckDiagnostic(batchId, terrainPlacementPlan) {
+    return getTerrainGenerationDiagnosticsForAppControllers().emitTerrainPlacementUnificationCheck(batchId, terrainPlacementPlan);
+  }
+
+  function emitTerrainDebugFaceUnificationCheckDiagnostic(batchId, normalizedParams) {
+    return getTerrainGenerationDiagnosticsForAppControllers().emitTerrainDebugFaceUnificationCheck(batchId, normalizedParams);
+  }
+
+  function emitTerrainCameraUnificationCheckDiagnostic(batchId) {
+    return getTerrainGenerationDiagnosticsForAppControllers().emitTerrainCameraUnificationCheck(batchId);
+  }
+
+  function emitSharedRenderOptimizationCheckDiagnostic(batchId) {
+    return getTerrainGenerationDiagnosticsForAppControllers().emitSharedRenderOptimizationCheck(batchId);
+  }
+
+  function emitTerrainGeneratorSummaryDiagnostic(summary) {
+    return getTerrainGenerationDiagnosticsForAppControllers().emitTerrainGeneratorSummary(summary);
+  }
+
+  function emitTerrainGeneratorApplyDiagnostic(batchId, terrainPlacementPlan) {
+    return getTerrainGenerationDiagnosticsForAppControllers().emitTerrainGeneratorApply(batchId, terrainPlacementPlan);
+  }
+
+
+  function getTerrainApplyJobControllerModuleForAppControllers() {
+    try { return window.__APP_TERRAIN_APPLY_JOB_CONTROLLER__ || null; } catch (_) { return null; }
+  }
+
+  function requireTerrainApplyJobControllerModuleForAppControllers() {
+    var api = getTerrainApplyJobControllerModuleForAppControllers();
+    if (!api || typeof api.createTerrainApplyJobController !== 'function') {
+      throw new Error('Missing terrain apply job owner: src/application/controllers/terrain-apply-job-controller.js must load before app-controllers.js');
+    }
+    return api;
+  }
+
+  var __terrainApplyJobControllerForAppControllers = null;
+
+  function createTerrainApplyJobControllerDepsForAppControllers() {
+    return {
+      getSceneSessionApi: getSceneSessionApi,
+      applyTerrainRuntimeModel: applyTerrainRuntimeModel,
+      applyTerrainBatchState: applyTerrainBatchState,
+      getTerrainRuntimeModel: getTerrainRuntimeModel,
+      readCurrentSceneInstances: readCurrentSceneInstances,
+      readCurrentSceneBoxes: readCurrentSceneBoxes,
+      buildTerrainInstancesAndBoxesFromPlacementPlanRange: buildTerrainInstancesAndBoxesFromPlacementPlanRange,
+      replaceCurrentSceneGraph: replaceCurrentSceneGraph,
+      controllerPerfNowMs: controllerPerfNowMs,
+      emitTerrainGenerateProfile: emitTerrainGenerateProfile,
+      recordTerrainDiagnostic: recordTerrainDiagnostic,
+      isDetailedTerrainProfilingEnabledForController: isDetailedTerrainProfilingEnabledForController,
+      notifyTerrainSceneChanged: function notifyTerrainSceneChangedForAppControllers() {
+        if (typeof refreshInspectorPanels === 'function') { try { refreshInspectorPanels(); } catch (_) {} }
+        if (typeof updatePreview === 'function') { try { updatePreview(); } catch (_) {} }
+      }
+    };
+  }
+
+  function getTerrainApplyJobControllerForAppControllers() {
+    if (!__terrainApplyJobControllerForAppControllers) {
+      __terrainApplyJobControllerForAppControllers = requireTerrainApplyJobControllerModuleForAppControllers()
+        .createTerrainApplyJobController(createTerrainApplyJobControllerDepsForAppControllers());
+    }
+    return __terrainApplyJobControllerForAppControllers;
+  }
+
+  function getTerrainApplyBatchInstanceCountForAppControllers() {
+    var controller = getTerrainApplyJobControllerForAppControllers();
+    return controller && typeof controller.getBatchInstanceCount === 'function'
+      ? controller.getBatchInstanceCount()
+      : 512;
+  }
 
   function cancelPendingTerrainApplyJob(reason) {
-    if (!__pendingTerrainApplyJob) return false;
-    __pendingTerrainApplyJob = null;
-    return true;
+    return getTerrainApplyJobControllerForAppControllers().cancelPendingTerrainApplyJob(reason);
+  }
+
+
+  function getTerrainClearControllerModuleForAppControllers() {
+    try { return window.__APP_TERRAIN_CLEAR_CONTROLLER__ || null; } catch (_) { return null; }
+  }
+
+  function requireTerrainClearControllerModuleForAppControllers() {
+    var api = getTerrainClearControllerModuleForAppControllers();
+    if (!api || typeof api.createTerrainClearController !== 'function') {
+      throw new Error('Missing terrain clear owner: src/application/controllers/terrain-clear-controller.js must load before app-controllers.js');
+    }
+    return api;
+  }
+
+  var __terrainClearControllerForAppControllers = null;
+
+  function createTerrainClearControllerDepsForAppControllers() {
+    return {
+      cancelPendingTerrainApplyJob: cancelPendingTerrainApplyJob,
+      readCurrentSceneInstances: readCurrentSceneInstances,
+      isTerrainGeneratedInstance: isTerrainGeneratedInstance,
+      replaceCurrentSceneInstances: replaceCurrentSceneInstances,
+      getTerrainRuntimeModel: getTerrainRuntimeModel,
+      getMainEditorTerrainSettings: getMainEditorTerrainSettings,
+      clearTerrainRuntimeModelState: clearTerrainRuntimeModelState,
+      applyTerrainBatchState: applyTerrainBatchState,
+      invalidateMainEditorTerrainRenderCaches: invalidateMainEditorTerrainRenderCaches,
+      recordTerrainDiagnostic: recordTerrainDiagnostic,
+      notifyTerrainSceneChanged: function notifyTerrainSceneChangedForAppControllers() {
+        if (typeof refreshInspectorPanels === 'function') { try { refreshInspectorPanels(); } catch (_) {} }
+        if (typeof updatePreview === 'function') { try { updatePreview(); } catch (_) {} }
+      }
+    };
+  }
+
+  function getTerrainClearControllerForAppControllers() {
+    if (!__terrainClearControllerForAppControllers) {
+      __terrainClearControllerForAppControllers = requireTerrainClearControllerModuleForAppControllers()
+        .createTerrainClearController(createTerrainClearControllerDepsForAppControllers());
+    }
+    return __terrainClearControllerForAppControllers;
+  }
+
+
+  function getTerrainGenerationControllerModuleForAppControllers() {
+    try { return window.__APP_TERRAIN_GENERATION_CONTROLLER__ || null; } catch (_) { return null; }
+  }
+
+  function requireTerrainGenerationControllerModuleForAppControllers() {
+    var api = getTerrainGenerationControllerModuleForAppControllers();
+    if (!api || typeof api.createTerrainGenerationController !== 'function') {
+      throw new Error('Missing terrain generation owner: src/application/controllers/terrain-generation-controller.js must load before app-controllers.js');
+    }
+    return api;
+  }
+
+  var __terrainGenerationControllerForAppControllers = null;
+
+  function createTerrainGenerationControllerDepsForAppControllers() {
+    return {
+      cancelPendingTerrainApplyJob: cancelPendingTerrainApplyJob,
+      getTerrainGeneratorCoreApi: getTerrainGeneratorCoreApi,
+      controllerPerfNowMs: controllerPerfNowMs,
+      getMainEditorTerrainSettings: getMainEditorTerrainSettings,
+      getRuntimeStateApi: getRuntimeStateApi,
+      getSceneSessionApi: getSceneSessionApi,
+      emitTerrainGeneratorParamsDiagnostic: emitTerrainGeneratorParamsDiagnostic,
+      readCurrentSceneInstances: readCurrentSceneInstances,
+      readCurrentSceneBoxes: readCurrentSceneBoxes,
+      isTerrainGeneratedInstance: isTerrainGeneratedInstance,
+      replaceCurrentSceneInstances: replaceCurrentSceneInstances,
+      buildTerrainMaterialMapForApply: buildTerrainMaterialMapForApply,
+      getManualTerrainGenerationBoxes: function getManualTerrainGenerationBoxesForAppControllers() {
+        return (typeof boxes !== 'undefined' && Array.isArray(boxes)) ? boxes.filter(function (box) { return !(box && box.generatedBy === 'terrain-generator'); }) : [];
+      },
+      buildManualColumnHeightMapFromBoxes: buildManualColumnHeightMapFromBoxes,
+      summarizeTerrainWorldIntegration: summarizeTerrainWorldIntegration,
+      allocateTerrainBatchId: allocateTerrainBatchId,
+      getTerrainRuntimeModel: getTerrainRuntimeModel,
+      buildTerrainPlacementPlan: buildTerrainPlacementPlan,
+      applyTerrainRuntimeModel: applyTerrainRuntimeModel,
+      applyTerrainBatchState: applyTerrainBatchState,
+      beginTerrainApplyJob: beginTerrainApplyJob,
+      getTerrainApplyBatchInstanceCountForAppControllers: getTerrainApplyBatchInstanceCountForAppControllers,
+      buildTerrainInstanceSemanticMetadata: buildTerrainInstanceSemanticMetadata,
+      emitTerrainWorldIntegrationSummaryDiagnostic: emitTerrainWorldIntegrationSummaryDiagnostic,
+      emitTerrainLogicSummaryDiagnostic: emitTerrainLogicSummaryDiagnostic,
+      emitTerrainPlacementUnificationCheckDiagnostic: emitTerrainPlacementUnificationCheckDiagnostic,
+      emitTerrainDebugFaceUnificationCheckDiagnostic: emitTerrainDebugFaceUnificationCheckDiagnostic,
+      emitTerrainCameraUnificationCheckDiagnostic: emitTerrainCameraUnificationCheckDiagnostic,
+      emitSharedRenderOptimizationCheckDiagnostic: emitSharedRenderOptimizationCheckDiagnostic,
+      emitTerrainGeneratorSummaryDiagnostic: emitTerrainGeneratorSummaryDiagnostic,
+      emitTerrainGeneratorApplyDiagnostic: emitTerrainGeneratorApplyDiagnostic,
+      emitTerrainGenerateProfile: emitTerrainGenerateProfile,
+      notifyTerrainSceneChanged: function notifyTerrainSceneChangedForAppControllers() {
+        if (typeof refreshInspectorPanels === 'function') { try { refreshInspectorPanels(); } catch (_) {} }
+        if (typeof updatePreview === 'function') { try { updatePreview(); } catch (_) {} }
+      }
+    };
+  }
+
+  function getTerrainGenerationControllerForAppControllers() {
+    if (!__terrainGenerationControllerForAppControllers) {
+      __terrainGenerationControllerForAppControllers = requireTerrainGenerationControllerModuleForAppControllers()
+        .createTerrainGenerationController(createTerrainGenerationControllerDepsForAppControllers());
+    }
+    return __terrainGenerationControllerForAppControllers;
   }
 
   var __itemFacingCoreBindCheckLogged = false;
@@ -2307,411 +2460,29 @@
   }
 
   function beginTerrainApplyJob(job) {
-    __pendingTerrainApplyJob = job || null;
-    return __pendingTerrainApplyJob;
+    return getTerrainApplyJobControllerForAppControllers().beginTerrainApplyJob(job);
   }
 
   function finalizePendingTerrainApplyJob(job, source) {
-    var sceneSessionApi = getSceneSessionApi();
-    var summary = job && job.summary ? Object.assign({}, job.summary, { appliedVoxelCount: job.appliedInstances.length, applyInProgress: false }) : null;
-    if (job) {
-      applyTerrainRuntimeModel({
-        activeTerrainBatchId: job.batchId,
-        width: job.normalizedParams.width,
-        height: job.normalizedParams.height,
-        heightMap: job.generated.heightMap,
-        existingHeightMap: job.occupancySummary.existingHeightMap,
-        materialMap: terrainMaterialMap,
-        editDiff: {},
-        params: job.normalizedParams,
-        lastSummary: summary,
-        terrainUsesColumnModel: false,
-        terrainExpandedVoxelInstanceCount: job.appliedInstances.length,
-        terrainOwnedDeltaBlockCount: job.worldIntegration.terrainOwnedDeltaBlockCount,
-        existingManualBlockCount: job.occupancySummary.manualBlockCount,
-        overlappingColumnCount: job.worldIntegration.overlappingColumnCount,
-        mergedWithExistingOccupancy: true,
-        stackedOnExistingBlocks: job.worldIntegration.stackedOnExistingBlocks,
-        chunkSize: 16,
-        dirtyChunkKeys: [],
-        terrainChunkCacheVersion: Number((getTerrainRuntimeModel() && getTerrainRuntimeModel().terrainChunkCacheVersion) || 0) + 1
-      }, String(source || job.source || 'terrain:apply-complete') + ':runtime-model');
-      applyTerrainBatchState({ activeTerrainBatchId: job.batchId, lastSummary: summary }, String(source || job.source || 'terrain:apply-complete') + ':runtime');
-      job.profile.terrainGeneratedInstanceCount = Number(job.appliedInstances.length || 0);
-      job.profile.finalInstanceCountAfter = Number(readCurrentSceneInstances().length || 0);
-      job.profile.finalBoxCountAfter = Number(sceneSessionApi && typeof sceneSessionApi.getBoxes === 'function' ? ((sceneSessionApi.getBoxes() || []).length) : readCurrentSceneBoxes().length);
-      job.profile.timings.sceneCommitMs = Number(job.sceneCommitMsTotal.toFixed(3));
-      job.profile.timings.totalMs = Number(Math.max(0, controllerPerfNowMs() - job.startedAt).toFixed(3));
-      emitTerrainGenerateProfile(job.profile);
-      recordTerrainDiagnostic('terrain-generator-apply-complete', {
-        terrainBatchId: job.batchId,
-        appliedTerrainInstanceCount: job.appliedInstances.length,
-        plannedTerrainInstanceCount: job.terrainPlacementPlan.length,
-        source: source || job.source || 'terrain:apply-complete'
-      });
-      if (typeof refreshInspectorPanels === 'function') { try { refreshInspectorPanels(); } catch (_) {} }
-      if (typeof updatePreview === 'function') { try { updatePreview(); } catch (_) {} }
-    }
-    __pendingTerrainApplyJob = null;
-    return summary;
+    return getTerrainApplyJobControllerForAppControllers().finalizePendingTerrainApplyJob(job, source);
   }
 
   function tickMainEditorTerrainApply(now, source) {
-    var job = __pendingTerrainApplyJob;
-    if (!job) return null;
-    var sceneSessionApi = getSceneSessionApi();
-    var requestSource = String(source || 'terrain:apply-batch');
-    var remaining = Math.max(0, job.terrainPlacementPlan.length - job.nextPlanIndex);
-    if (remaining <= 0) return finalizePendingTerrainApplyJob(job, requestSource + ':complete');
-    var batchCount = Math.min(job.batchSize, remaining);
-    var range = sceneSessionApi && typeof sceneSessionApi.allocateBoxIdRange === 'function'
-      ? sceneSessionApi.allocateBoxIdRange(batchCount, { source: requestSource + ':allocate-box-range' })
-      : { start: job.nextBoxId, count: batchCount };
-    var startingBoxId = range && Number.isFinite(Number(range.start)) ? Number(range.start) : job.nextBoxId;
-    var materializeStartAt = controllerPerfNowMs();
-    var built = buildTerrainInstancesAndBoxesFromPlacementPlanRange(job.terrainPlacementPlan, job.nextPlanIndex, batchCount, job.batchId, job.normalizedParams, job.generated.heightMap, job.generated && job.generated.materialMap ? job.generated.materialMap : null, job.semanticMeta, startingBoxId);
-    var materializeMs = Math.max(0, controllerPerfNowMs() - materializeStartAt);
-    var nextInstances = job.survivors.concat(job.appliedInstances, built.instances);
-    var nextBoxes = job.survivorsBoxes.concat(job.appliedBoxes, built.boxes);
-    var commitStartAt = controllerPerfNowMs();
-    replaceCurrentSceneGraph(nextInstances, nextBoxes, requestSource + ':scene-graph');
-    var commitMs = Math.max(0, controllerPerfNowMs() - commitStartAt);
-    Array.prototype.push.apply(job.appliedInstances, built.instances);
-    Array.prototype.push.apply(job.appliedBoxes, built.boxes);
-    job.nextPlanIndex += built.instances.length;
-    job.nextBoxId = startingBoxId + built.boxes.length;
-    job.materializeMsTotal += materializeMs;
-    job.sceneCommitMsTotal += commitMs;
-    var appliedCount = job.appliedInstances.length;
-    var summary = Object.assign({}, job.summary, { appliedVoxelCount: appliedCount, applyInProgress: appliedCount < job.terrainPlacementPlan.length });
-    job.summary = summary;
-    applyTerrainRuntimeModel({
-      activeTerrainBatchId: job.batchId,
-      width: job.normalizedParams.width,
-      height: job.normalizedParams.height,
-      heightMap: job.generated.heightMap,
-      existingHeightMap: job.occupancySummary.existingHeightMap,
-      materialMap: job.generated && job.generated.materialMap ? job.generated.materialMap : null,
-      editDiff: {},
-      params: job.normalizedParams,
-      lastSummary: summary,
-      terrainUsesColumnModel: false,
-      terrainExpandedVoxelInstanceCount: appliedCount,
-      terrainOwnedDeltaBlockCount: job.worldIntegration.terrainOwnedDeltaBlockCount,
-      existingManualBlockCount: job.occupancySummary.manualBlockCount,
-      overlappingColumnCount: job.worldIntegration.overlappingColumnCount,
-      mergedWithExistingOccupancy: true,
-      stackedOnExistingBlocks: job.worldIntegration.stackedOnExistingBlocks,
-      chunkSize: 16,
-      dirtyChunkKeys: []
-    }, requestSource + ':runtime-model');
-    applyTerrainBatchState({ activeTerrainBatchId: job.batchId, lastSummary: summary }, requestSource + ':runtime');
-    if (isDetailedTerrainProfilingEnabledForController()) {
-      recordTerrainDiagnostic('terrain-generator-apply-batch', {
-        terrainBatchId: job.batchId,
-        appliedTerrainInstanceCount: appliedCount,
-        batchCount: built.instances.length,
-        batchIndexStart: job.nextPlanIndex - built.instances.length,
-        batchIndexEndExclusive: job.nextPlanIndex,
-        remainingTerrainInstanceCount: Math.max(0, job.terrainPlacementPlan.length - job.nextPlanIndex),
-        materializeMs: Number(materializeMs.toFixed(3)),
-        sceneCommitMs: Number(commitMs.toFixed(3))
-      });
-    }
-    if (job.nextPlanIndex >= job.terrainPlacementPlan.length) return finalizePendingTerrainApplyJob(job, requestSource + ':complete');
-    return summary;
+    return getTerrainApplyJobControllerForAppControllers().tickMainEditorTerrainApply(now, source);
   }
 
   function clearMainEditorTerrain(source) {
-    var requestSource = String(source || 'terrain:clear');
-    cancelPendingTerrainApplyJob(requestSource + ':cancel-pending');
-    var current = readCurrentSceneInstances();
-    var removedLegacy = current.filter(isTerrainGeneratedInstance);
-    var survivors = current.filter(function (inst) { return !isTerrainGeneratedInstance(inst); });
-    replaceCurrentSceneInstances(survivors, requestSource);
-    var terrainRuntime = getTerrainRuntimeModel();
-    var lastSettings = getMainEditorTerrainSettings(requestSource);
-    var removedTerrainVoxelCount = terrainRuntime && terrainRuntime.lastSummary && Number.isFinite(Number(terrainRuntime.lastSummary.generatedVoxelCount))
-      ? Math.round(Number(terrainRuntime.lastSummary.generatedVoxelCount))
-      : removedLegacy.length;
-    clearTerrainRuntimeModelState(requestSource + ':runtime-model');
-    applyTerrainBatchState({ activeTerrainBatchId: null, lastSummary: null }, requestSource + ':runtime');
-    invalidateMainEditorTerrainRenderCaches(requestSource + ':invalidate');
-    var payload = {
-      terrainBatchId: (terrainRuntime && terrainRuntime.activeTerrainBatchId) || (lastSettings && lastSettings.activeTerrainBatchId) || 'all-terrain-generated',
-      removedTerrainInstanceCount: removedLegacy.length,
-      removedTerrainVoxelCount: removedTerrainVoxelCount
-    };
-    recordTerrainDiagnostic('terrain-generator-clear', payload);
-    if (typeof refreshInspectorPanels === 'function') { try { refreshInspectorPanels(); } catch (_) {} }
-    if (typeof updatePreview === 'function') { try { updatePreview(); } catch (_) {} }
-    return Object.assign({ ok: true }, payload);
+    return getTerrainClearControllerForAppControllers().clearMainEditorTerrain(source);
   }
 
   function generateMainEditorTerrain(source) {
-    var requestSource = String(source || 'terrain:generate');
-    cancelPendingTerrainApplyJob(requestSource + ':cancel-pending');
-    var terrainCore = getTerrainGeneratorCoreApi();
-    if (!terrainCore || typeof terrainCore.generateHeightMap !== 'function' || typeof terrainCore.heightMapToVoxelStacks !== 'function') {
-      return { ok: false, reason: 'missing-terrain-generator-core' };
-    }
-    var terrainProfileStartAt = controllerPerfNowMs();
-    var terrainProfile = {
-      terrainBatchId: null,
-      width: 0,
-      height: 0,
-      heightMapCellCount: 0,
-      terrainPlacementPlanLength: 0,
-      terrainGeneratedInstanceCount: 0,
-      survivorsCount: 0,
-      existingInstanceCountBefore: 0,
-      existingBoxCountBefore: 0,
-      finalInstanceCountAfter: 0,
-      finalBoxCountAfter: 0,
-      timings: {
-        buildHeightMapMs: 0,
-        buildOccupancySummaryMs: 0,
-        buildPlacementPlanMs: 0,
-        buildTerrainInstancesMs: 0,
-        clearLegacyCommitMs: 0,
-        sceneCommitMs: 0,
-        totalMs: 0
-      }
-    };
-    var currentSettings = getMainEditorTerrainSettings(requestSource);
-    var runtimeApi = getRuntimeStateApi();
-    var sceneSessionApi = getSceneSessionApi();
-    var gridW = runtimeApi && runtimeApi.settings ? Number(runtimeApi.settings.gridW || runtimeApi.settings.worldCols || currentSettings.width || 1) : Number(currentSettings.width || 1);
-    var gridH = runtimeApi && runtimeApi.settings ? Number(runtimeApi.settings.gridH || runtimeApi.settings.worldRows || currentSettings.height || 1) : Number(currentSettings.height || 1);
-    var requestedParams = Object.assign({}, currentSettings, {
-      width: Math.max(1, Math.min(Math.round(Number(currentSettings.width) || 1), Math.max(1, Math.round(gridW) || 1))),
-      height: Math.max(1, Math.min(Math.round(Number(currentSettings.height) || 1), Math.max(1, Math.round(gridH) || 1)))
-    });
-    var normalizedParams = terrainCore.normalizeTerrainParams ? terrainCore.normalizeTerrainParams(requestedParams) : requestedParams;
-    terrainProfile.width = Number(normalizedParams.width || 0);
-    terrainProfile.height = Number(normalizedParams.height || 0);
-    recordTerrainDiagnostic('terrain-generator-params', {
-      seed: normalizedParams.seed,
-      width: normalizedParams.width,
-      height: normalizedParams.height,
-      terrainAlgorithm: normalizedParams.terrainAlgorithm || 'profile_fbm',
-
-      sinScaleX: normalizedParams.sinScaleX,
-      sinScaleZ: normalizedParams.sinScaleZ,
-      sinPhaseX: normalizedParams.sinPhaseX,
-      sinPhaseZ: normalizedParams.sinPhaseZ,
-      sinMixMode: normalizedParams.sinMixMode,
-
-      perlinScale: normalizedParams.perlinScale,
-      perlinOffsetX: normalizedParams.perlinOffsetX,
-      perlinOffsetZ: normalizedParams.perlinOffsetZ,
-
-      octaveScale: normalizedParams.octaveScale,
-      octaves: normalizedParams.octaves,
-      persistence: normalizedParams.persistence,
-      lacunarity: normalizedParams.lacunarity,
-      octaveOffsetX: normalizedParams.octaveOffsetX,
-      octaveOffsetZ: normalizedParams.octaveOffsetZ,
-
-      detailScale: normalizedParams.detailScale,
-      detailOctaves: normalizedParams.detailOctaves,
-      detailPersistence: normalizedParams.detailPersistence,
-      detailLacunarity: normalizedParams.detailLacunarity,
-      detailStrength: normalizedParams.detailStrength,
-      detailOffsetX: normalizedParams.detailOffsetX,
-      detailOffsetZ: normalizedParams.detailOffsetZ,
-
-      multiScale1: normalizedParams.multiScale1,
-      multiWeight1: normalizedParams.multiWeight1,
-      multiOffsetX1: normalizedParams.multiOffsetX1,
-      multiOffsetZ1: normalizedParams.multiOffsetZ1,
-      multiSeedOffset1: normalizedParams.multiSeedOffset1,
-      multiScale2: normalizedParams.multiScale2,
-      multiWeight2: normalizedParams.multiWeight2,
-      multiOffsetX2: normalizedParams.multiOffsetX2,
-      multiOffsetZ2: normalizedParams.multiOffsetZ2,
-      multiSeedOffset2: normalizedParams.multiSeedOffset2,
-      multiScale3: normalizedParams.multiScale3,
-      multiWeight3: normalizedParams.multiWeight3,
-      multiOffsetX3: normalizedParams.multiOffsetX3,
-      multiOffsetZ3: normalizedParams.multiOffsetZ3,
-      multiSeedOffset3: normalizedParams.multiSeedOffset3,
-
-      macroScale: normalizedParams.macroScale,
-      macroOctaves: normalizedParams.macroOctaves,
-      macroPersistence: normalizedParams.macroPersistence,
-      macroLacunarity: normalizedParams.macroLacunarity,
-      macroOffsetX: normalizedParams.macroOffsetX,
-      macroOffsetZ: normalizedParams.macroOffsetZ,
-
-      minHeight: normalizedParams.minHeight,
-      maxHeight: normalizedParams.maxHeight,
-      waterLevel: normalizedParams.waterLevel,
-      baseHeightOffset: normalizedParams.baseHeightOffset,
-      heightProfileConfig: normalizedParams.heightProfileConfig
-    });
-    var current = readCurrentSceneInstances();
-    terrainProfile.existingInstanceCountBefore = Number(current.length || 0);
-    terrainProfile.existingBoxCountBefore = Number(sceneSessionApi && typeof sceneSessionApi.getBoxes === 'function'
-      ? ((sceneSessionApi.getBoxes() || []).length)
-      : ((typeof boxes !== 'undefined' && Array.isArray(boxes)) ? boxes.length : 0));
-    var buildHeightMapStartAt = controllerPerfNowMs();
-    var generated = terrainCore.generateHeightMap(normalizedParams);
-    var terrainMaterialMap = buildTerrainMaterialMapForApply(generated && generated.heightMap, normalizedParams);
-    if (generated && typeof generated === 'object') generated.materialMap = terrainMaterialMap;
-    var stacks = terrainCore.heightMapToVoxelStacks(generated);
-    terrainProfile.timings.buildHeightMapMs = Number(Math.max(0, controllerPerfNowMs() - buildHeightMapStartAt).toFixed(3));
-    terrainProfile.heightMapCellCount = Number((Array.isArray(generated && generated.heightMap) ? generated.heightMap.length : 0) && Array.isArray(generated && generated.heightMap && generated.heightMap[0])
-      ? (generated.heightMap.length * generated.heightMap[0].length)
-      : (normalizedParams.width * normalizedParams.height));
-    var survivors = current.filter(function (inst) { return !isTerrainGeneratedInstance(inst); });
-    terrainProfile.survivorsCount = Number(survivors.length || 0);
-    var clearLegacyCommitStartAt = controllerPerfNowMs();
-    replaceCurrentSceneInstances(survivors, requestSource + ':clear-legacy');
-    terrainProfile.timings.clearLegacyCommitMs = Number(Math.max(0, controllerPerfNowMs() - clearLegacyCommitStartAt).toFixed(3));
-    var manualBoxes = (typeof boxes !== 'undefined' && Array.isArray(boxes)) ? boxes.filter(function (box) { return !(box && box.generatedBy === 'terrain-generator'); }) : [];
-    var occupancySummaryStartAt = controllerPerfNowMs();
-    var occupancySummary = buildManualColumnHeightMapFromBoxes(manualBoxes, normalizedParams.width, normalizedParams.height);
-    var worldIntegration = summarizeTerrainWorldIntegration(generated.heightMap, occupancySummary.existingHeightMap);
-    terrainProfile.timings.buildOccupancySummaryMs = Number(Math.max(0, controllerPerfNowMs() - occupancySummaryStartAt).toFixed(3));
-    var batchId = allocateTerrainBatchId(requestSource);
-    terrainProfile.terrainBatchId = batchId;
-    var terrainRuntime = getTerrainRuntimeModel();
-    var buildPlacementPlanStartAt = controllerPerfNowMs();
-    var terrainPlacementPlan = buildTerrainPlacementPlan(generated.heightMap, occupancySummary.existingHeightMap);
-    terrainProfile.timings.buildPlacementPlanMs = Number(Math.max(0, controllerPerfNowMs() - buildPlacementPlanStartAt).toFixed(3));
-    terrainProfile.terrainPlacementPlanLength = Number(terrainPlacementPlan.length || 0);
-    terrainProfile.terrainGeneratedInstanceCount = Number(terrainPlacementPlan.length || 0);
-    var summary = {
-      generatedCellCount: stacks.generatedCellCount,
-      generatedVoxelCount: terrainPlacementPlan.length,
-      appliedVoxelCount: 0,
-      applyInProgress: terrainPlacementPlan.length > 0,
-      minHeightObserved: generated.minHeightObserved,
-      maxHeightObserved: generated.maxHeightObserved,
-      avgHeightObserved: generated.avgHeightObserved,
-      terrainBatchId: batchId,
-      terrainOwnedDeltaBlockCount: worldIntegration.terrainOwnedDeltaBlockCount,
-      existingManualBlockCount: occupancySummary.manualBlockCount,
-      overlappingColumnCount: worldIntegration.overlappingColumnCount
-    };
-    var survivorsBoxes = readCurrentSceneBoxes();
-    applyTerrainRuntimeModel({
-      activeTerrainBatchId: batchId,
-      width: normalizedParams.width,
-      height: normalizedParams.height,
-      heightMap: generated.heightMap,
-      existingHeightMap: occupancySummary.existingHeightMap,
-      materialMap: terrainMaterialMap,
-      editDiff: {},
-      params: normalizedParams,
-      lastSummary: summary,
-      terrainUsesColumnModel: false,
-      terrainExpandedVoxelInstanceCount: 0,
-      terrainOwnedDeltaBlockCount: worldIntegration.terrainOwnedDeltaBlockCount,
-      existingManualBlockCount: occupancySummary.manualBlockCount,
-      overlappingColumnCount: worldIntegration.overlappingColumnCount,
-      mergedWithExistingOccupancy: true,
-      stackedOnExistingBlocks: worldIntegration.stackedOnExistingBlocks,
-      chunkSize: 16,
-      dirtyChunkKeys: [],
-      terrainChunkCacheVersion: Number((terrainRuntime && terrainRuntime.terrainChunkCacheVersion) || 0) + 1
-    }, requestSource + ':runtime-model');
-    applyTerrainBatchState({ activeTerrainBatchId: batchId, lastSummary: summary }, requestSource + ':runtime');
-    beginTerrainApplyJob({
-      batchId: batchId,
-      source: requestSource,
-      normalizedParams: normalizedParams,
-      generated: generated,
-      occupancySummary: occupancySummary,
-      worldIntegration: worldIntegration,
-      terrainPlacementPlan: terrainPlacementPlan,
-      survivors: survivors,
-      survivorsBoxes: survivorsBoxes,
-      appliedInstances: [],
-      appliedBoxes: [],
-      nextPlanIndex: 0,
-      nextBoxId: 1,
-      semanticMeta: buildTerrainInstanceSemanticMetadata(normalizedParams),
-      batchSize: TERRAIN_APPLY_BATCH_INSTANCE_COUNT,
-      summary: summary,
-      startedAt: terrainProfileStartAt,
-      materializeMsTotal: 0,
-      sceneCommitMsTotal: terrainProfile.timings.clearLegacyCommitMs,
-      profile: terrainProfile
-    });
-    recordTerrainDiagnostic('terrain-world-integration-summary', {
-      terrainBatchId: batchId,
-      terrainTargetColumnCount: worldIntegration.terrainTargetColumnCount,
-      terrainOwnedDeltaBlockCount: worldIntegration.terrainOwnedDeltaBlockCount,
-      mergedWithExistingOccupancy: true,
-      existingManualBlockCount: occupancySummary.manualBlockCount,
-      overlappingColumnCount: worldIntegration.overlappingColumnCount,
-      stackedOnExistingBlocks: worldIntegration.stackedOnExistingBlocks
-    });
-    recordTerrainDiagnostic('terrain-logic-summary', {
-      terrainCellCount: normalizedParams.width * normalizedParams.height,
-      terrainColumnCount: stacks.generatedCellCount,
-      terrainExpandedVoxelInstanceCount: terrainPlacementPlan.length,
-      terrainUsesColumnModel: false
-    });
-    recordTerrainDiagnostic('terrain-placement-unification-check', {
-      terrainGeneratedAsPlacementPlan: true,
-      terrainAppliedThroughSharedBlockPipeline: true,
-      terrainUsesDedicatedRenderPath: false,
-      terrainUsesDedicatedGeometryPath: false,
-      terrainUsesDedicatedCameraPath: false,
-      terrainPlacementPlanLength: terrainPlacementPlan.length,
-      terrainGeneratedInstanceCount: terrainPlacementPlan.length,
-      terrainBatchId: batchId
-    });
-    recordTerrainDiagnostic('terrain-debug-face-unification-check', {
-      terrainDebugFaceColorsEnabled: normalizedParams.terrainDebugFaceColorsEnabled === true,
-      usesOriginalBlockSemanticFaces: true,
-      usesOriginalBlockFaceGeometry: true,
-      hasMergedContinuousTerrainSideFaces: false,
-      hasSlopedAppearanceRisk: false,
-      terrainBatchId: batchId
-    });
-    recordTerrainDiagnostic('terrain-camera-unification-check', {
-      floorUsesUnifiedCameraTransform: true,
-      blocksUseUnifiedCameraTransform: true,
-      terrainUsesUnifiedCameraTransform: true,
-      usesSingleUnifiedZoomPath: true,
-      zoomSource: 'runtime-state.editor.zoom',
-      cullingSource: 'presentation.render.render.getMainCameraRenderScope',
-      terrainBatchId: batchId
-    });
-    recordTerrainDiagnostic('shared-render-optimization-check', {
-      optimizationAppliesToManualBlocks: true,
-      optimizationAppliesToGeneratedTerrainBlocks: true,
-      optimizationAppliesToPlacedVoxelFurniture: true,
-      surfaceOnlyRenderingEnabled: true,
-      cameraCullingEnabled: true,
-      chunkBatchingEnabled: false,
-      terrainBatchId: batchId
-    });
-    recordTerrainDiagnostic('terrain-generator-summary', summary);
-    recordTerrainDiagnostic('terrain-generator-apply', {
-      terrainBatchId: batchId,
-      terrainInstanceCount: terrainPlacementPlan.length,
-      terrainVoxelCount: terrainPlacementPlan.length,
-      appliedToMainEditor: true,
-      appliedAsPlacementPlan: true,
-      appliedThroughSharedBlockPipeline: true,
-      applyMode: 'batched'
-    });
-    terrainProfile.timings.totalMs = Number(Math.max(0, controllerPerfNowMs() - terrainProfileStartAt).toFixed(3));
-    emitTerrainGenerateProfile(Object.assign({}, terrainProfile, {
-      finalInstanceCountAfter: Number(readCurrentSceneInstances().length || 0),
-      finalBoxCountAfter: Number(readCurrentSceneBoxes().length || 0),
-      generateQueued: true
-    }));
-    if (typeof refreshInspectorPanels === 'function') { try { refreshInspectorPanels(); } catch (_) {} }
-    if (typeof updatePreview === 'function') { try { updatePreview(); } catch (_) {} }
-    return Object.assign({ ok: true }, summary, { terrainInstanceCount: terrainPlacementPlan.length, terrainVoxelCount: terrainPlacementPlan.length, terrainUsesColumnModel: false, applyMode: 'batched' });
+    return getTerrainGenerationControllerForAppControllers().generateMainEditorTerrain(source);
   }
 
+
+  function getControllerRegistryApiForAppControllers() {
+    try { return window.__APP_CONTROLLER_REGISTRY__ || null; } catch (_) { return null; }
+  }
 
   var mainActions = {
     summarizeBoundary: summarizeAppBoundary,
@@ -2800,60 +2571,21 @@
     runAssetScan: runAssetScan
   };
 
-  var controllerRoot = {
-    main: Object.assign({}, mainActions, {
-      dispatch: function (action, payload) { return invokeControllerAction(mainActions, action, payload); }
-    }),
-    scene: Object.assign({}, sceneActions, {
-      dispatch: function (action, payload) { return invokeControllerAction(sceneActions, action, payload); }
-    }),
-    assetLibrary: Object.assign({}, assetLibraryActions, {
-      dispatch: function (action, payload) { return invokeControllerAction(assetLibraryActions, action, payload); }
-    }),
-    placement: Object.assign({}, placementActions, {
-      dispatch: function (action, payload) { return invokeControllerAction(placementActions, action, payload); }
-    }),
-    editorHandoff: Object.assign({}, editorHandoffActions, {
-      dispatch: function (action, payload) { return invokeControllerAction(editorHandoffActions, action, payload); }
-    }),
-    dispatch: dispatchControllerCommand
-  };
-
-  var ns = getNs();
-  if (ns) {
-    ns.bind('controllers.main', controllerRoot.main, { owner: 'src/application/controllers/app-controllers.js', legacy: [], phase: 'P7-C' });
-    ns.bind('controllers.scene', controllerRoot.scene, { owner: 'src/application/controllers/app-controllers.js', legacy: [], phase: 'P7-C' });
-    ns.bind('controllers.assetLibrary', controllerRoot.assetLibrary, { owner: 'src/application/controllers/app-controllers.js', legacy: [], phase: 'P7-C' });
-    ns.bind('controllers.placement', controllerRoot.placement, { owner: 'src/application/controllers/app-controllers.js', legacy: [], phase: 'P7-C' });
-    ns.bind('controllers.editorHandoff', controllerRoot.editorHandoff, { owner: 'src/application/controllers/app-controllers.js', legacy: [], phase: 'P7-C' });
-    ns.bind('controllers.dispatch', controllerRoot.dispatch, { owner: 'src/application/controllers/app-controllers.js', legacy: [], phase: 'P7-C' });
+  var controllerRegistry = getControllerRegistryApiForAppControllers();
+  if (!controllerRegistry || typeof controllerRegistry.registerControllers !== 'function') {
+    throw new Error('Missing controller registry owner: src/application/controllers/controller-registry.js must load before app-controllers.js');
   }
-
-  emitP7('BOOT', 'controller-entrypoints-ready', {
-    phase: 'P7-C',
-    owner: 'src/application/controllers/app-controllers.js',
-    roots: ['controllers.main', 'controllers.scene', 'controllers.assetLibrary', 'controllers.placement', 'controllers.editorHandoff', 'controllers.dispatch'],
-    functions: {
-      main: ['summarizeBoundary','resetBoundaryAudit','openEditorFromMain', 'handleOpenEditorButton', 'requestModeChange', 'runAssetScan', 'handleRescanAssetsButton', 'saveSceneTarget', 'loadSceneTarget', 'getMainEditorViewRotation', 'getMainEditorCameraSettings', 'getMainEditorVisualRotation', 'isMainEditorViewRotating', 'tickMainEditorViewRotationAnimation', 'completeMainEditorViewRotationAnimation', 'setMainEditorRotationAnimationEnabled', 'setMainEditorRotationAnimationMs', 'setMainEditorRotationInterpolationEnabled', 'setMainEditorRotationInterpolationMode', 'setMainEditorZoom', 'setMainEditorZoomBounds', 'setMainEditorCameraCullingEnabled', 'setMainEditorCullingMargin', 'setMainEditorShowCameraBounds', 'setMainEditorShowCullingBounds', 'setMainEditorStaticWorldFaceMergeEnabled', 'setMainEditorDisableFaceMergeAtOrAboveZoomEnabled', 'setMainEditorDisableFaceMergeAtOrAboveZoomThreshold', 'getMainEditorTerrainSettings', 'setMainEditorTerrainSettings', 'resetMainEditorTerrainSettings', 'generateMainEditorTerrain', 'clearMainEditorTerrain', 'tickMainEditorTerrainApply', 'resetMainEditorViewRotation', 'setMainEditorViewRotation', 'rotateMainEditorView', 'exportMainViewRotationDiagnostic', 'dispatch'],
-      scene: ['saveSceneTarget', 'loadSceneTarget', 'saveLocalScene', 'loadLocalScene', 'saveSceneFile', 'openDefaultScene', 'importSceneFile', 'dispatch'],
-      assetLibrary: ['openHabboLibrary', 'handleOpenBrowserClick', 'handleRefreshBrowserClick', 'handleTypeSwitch', 'handleCategorySelect', 'handleSearchInput', 'handlePageAction', 'handlePlaceSelectedItem', 'runAssetScan', 'dispatch'],
-      placement: ['requestModeChange', 'handleModeButton', 'selectPrefabByIndex', 'selectPrefabById', 'handlePrefabSelectChange', 'applyPlacementIntent', 'getPreviewFacing', 'setPreviewFacing', 'rotatePreviewFacing', 'rotatePreviewFacingByWheel', 'startDragging', 'commitPreview', 'cancelDrag', 'completeDragInteraction', 'syncPlacementUi', 'summarizeRoutes', 'resetRouteAudit', 'dispatch'],
-      editorHandoff: ['processEditorReturn', 'runAssetScan', 'dispatch'],
-      root: ['dispatch']
+  controllerRegistry.registerControllers({
+    ns: getNs(),
+    emitP7: emitP7,
+    invokeControllerAction: invokeControllerAction,
+    dispatchControllerCommand: dispatchControllerCommand,
+    actionGroups: {
+      main: mainActions,
+      scene: sceneActions,
+      assetLibrary: assetLibraryActions,
+      placement: placementActions,
+      editorHandoff: editorHandoffActions
     }
-  });
-  emitP7('SUMMARY', 'controller-entrypoint-coverage', {
-    phase: 'P7-C',
-    owner: 'src/application/controllers/app-controllers.js',
-    wiredInto: [
-      'src/presentation/ui/ui.js:mode/prefab/scene/editor/rescan buttons',
-      'src/presentation/shell/app.js:editor-return startup/focus/visibility',
-      'src/presentation/ui/ui-habbo-library.js:open/refresh/type/category/search/page/place actions'
-    ],
-    notes: [
-      'P7-C keeps controller entrypoints as the orchestration shell and adds controller-local dispatch so UI/app glue stop branching on individual action methods.',
-      'P8-S3 adds placement.routeAudit plus placement.applyPlacementIntent so placement state intent and UI synchronization stop being logged through ad-hoc controller-local globals.',
-      'UI handlers and editor-return hooks now prefer App.controllers.*.dispatch(...) before falling back to lower-level services or globals.'
-    ]
   });
 })();

@@ -48,6 +48,8 @@ const evidence = {
   },
   prefabs: [summary('debug_cube_5faces'), summary('debug_rect_2x1_5faces')]
 };
-const out = path.join(__dirname, '..', 'v45_five_face_evidence.json');
+const outDir = path.join(__dirname, '..', 'docs', 'evidence');
+fs.mkdirSync(outDir, { recursive: true });
+const out = path.join(outDir, 'v45_five_face_evidence.json');
 fs.writeFileSync(out, JSON.stringify(evidence, null, 2));
 console.log('wrote', out);

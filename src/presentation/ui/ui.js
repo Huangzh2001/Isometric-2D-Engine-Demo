@@ -4,89 +4,7 @@
 // v1 split file generated from original monolithic app.js
 // 注意：此文件为保持行为稳定的第一刀拆分，允许存在少量跨层函数。
 
-function emitP1bUi(kind, message, extra) {
-  var line = '[P1b][' + String(kind || 'BOOT') + '] ' + String(message || '');
-  if (typeof extra !== 'undefined') {
-    try { line += ' ' + JSON.stringify(extra); } catch (err) { line += ' "[unserializable]"'; }
-  }
-  try { if (typeof pushLog === 'function') pushLog(line); else if (typeof console !== 'undefined' && console.log) console.log(line); } catch (err) { try { console.log(line); } catch (_) {} }
-  return line;
-}
-
-function readEditorHandoff() {
-  var service = getUiEditorHandoffService();
-  if (!service || typeof service.readHandoff !== 'function') return null;
-  return service.readHandoff({ source: 'presentation:ui-read-editor-handoff' });
-}
-
-function clearEditorHandoff() {
-  var service = getUiEditorHandoffService();
-  if (!service || typeof service.clearHandoff !== 'function') return false;
-  return service.clearHandoff({ source: 'presentation:ui-clear-editor-handoff' });
-}
-
-
-function getUiAssetWorkflow() {
-  try { return window.App && window.App.services ? window.App.services.assetWorkflow || null : null; } catch (_) { return null; }
-}
-
-function getUiSceneWorkflow() {
-  try { return window.App && window.App.services ? window.App.services.sceneWorkflow || null : null; } catch (_) { return null; }
-}
-
-function getUiEditorHandoffService() {
-  try { return window.App && window.App.services ? window.App.services.editorHandoff || null : null; } catch (_) { return null; }
-}
-
-function getUiMainController() {
-  try { return window.App && window.App.controllers ? window.App.controllers.main || null : null; } catch (_) { return null; }
-}
-
-function getUiSceneController() {
-  try { return window.App && window.App.controllers ? window.App.controllers.scene || null : null; } catch (_) { return null; }
-}
-
-function getUiPlacementController() {
-  try { return window.App && window.App.controllers ? window.App.controllers.placement || null : null; } catch (_) { return null; }
-}
-
-function getUiAssetLibraryController() {
-  try { return window.App && window.App.controllers ? window.App.controllers.assetLibrary || null : null; } catch (_) { return null; }
-}
-
-function uiDispatchController(controller, action, payload) {
-  try {
-    if (controller && typeof controller.dispatch === 'function') return controller.dispatch(action, payload);
-  } catch (_) {}
-  return null;
-}
-
-function uiDispatchControllerCommand(controllerName, action, payload) {
-  try {
-    if (window.App && window.App.controllers && typeof window.App.controllers.dispatch === 'function') {
-      var dispatched = window.App.controllers.dispatch(controllerName, action, payload);
-      if (dispatched && dispatched.ok !== false) return dispatched;
-    }
-  } catch (_) {}
-  var controller = null;
-  if (controllerName === 'main') controller = getUiMainController();
-  else if (controllerName === 'scene') controller = getUiSceneController();
-  else if (controllerName === 'placement') controller = getUiPlacementController();
-  else if (controllerName === 'assetLibrary') controller = getUiAssetLibraryController();
-  return uiDispatchController(controller, action, payload);
-}
-
-function uiDirectPatchRenderSettings(patch, source) {
-  try {
-    var runtimeApi = window.App && window.App.state ? window.App.state.runtimeStateApi || null : null;
-    if (!runtimeApi && window.__RUNTIME_STATE_API__) runtimeApi = window.__RUNTIME_STATE_API__;
-    if (runtimeApi && typeof runtimeApi.patchEditorCameraSettings === 'function') {
-      return runtimeApi.patchEditorCameraSettings(patch || {}, { source: String(source || 'ui-direct-render-patch') });
-    }
-  } catch (_) {}
-  return null;
-}
-
+// P9e: UI boundary/service/controller accessors moved to src/presentation/ui/ui-boundary.js.
 
 async function uiRunAssetScan(force, source) {
   var controller = getUiMainController();
@@ -294,109 +212,76 @@ function uiHandleMainViewRotationDiagnosticExport(source) {
   return null;
 }
 
-function uiGetMainCameraSettings(source) {
-  var controller = getUiMainController();
-  var dispatched = uiDispatchControllerCommand('main', 'getMainEditorCameraSettings', [source || 'camera-panel:read']);
-  if (dispatched) return dispatched;
-  if (controller && typeof controller.getMainEditorCameraSettings === 'function') return controller.getMainEditorCameraSettings(source || 'camera-panel:read');
+function getUiCameraRenderPanelService() {
+  try {
+    if (typeof window !== 'undefined' && window.__UI_CAMERA_RENDER_PANEL__) return window.__UI_CAMERA_RENDER_PANEL__;
+  } catch (_) {}
   return null;
 }
 
-function uiRefreshMainCameraPanel(source) {
-  var settings = uiGetMainCameraSettings(source || 'camera-panel:refresh') || null;
-  if (!settings) return null;
-  if (ui.mainCameraAnimationEnabled) ui.mainCameraAnimationEnabled.checked = settings.rotationAnimationEnabled !== false;
-  if (ui.mainCameraAnimationMs) ui.mainCameraAnimationMs.value = String(Math.max(0, Number(settings.rotationAnimationMs) || 0));
-  if (ui.mainCameraInterpolationEnabled) ui.mainCameraInterpolationEnabled.checked = settings.rotationInterpolationEnabled !== false;
-  if (ui.mainCameraInterpolationMode) ui.mainCameraInterpolationMode.value = String(settings.rotationInterpolationMode || 'easeInOut');
-  if (ui.mainCameraZoom) ui.mainCameraZoom.value = String(Number(settings.zoom || 1).toFixed(2));
-  if (ui.mainCameraMinZoom) ui.mainCameraMinZoom.value = String(Number(settings.minZoom || 0.5).toFixed(2));
-  if (ui.mainCameraMaxZoom) ui.mainCameraMaxZoom.value = String(Number(settings.maxZoom || 2).toFixed(2));
-  if (ui.mainCameraCullingEnabled) ui.mainCameraCullingEnabled.checked = settings.cameraCullingEnabled !== false;
-  if (ui.mainCameraCullingMargin) ui.mainCameraCullingMargin.value = String(Number(settings.cullingMargin || 0));
-  if (ui.mainCameraShowBounds) ui.mainCameraShowBounds.checked = !!settings.showCameraBounds;
-  if (ui.mainCameraShowCullingBounds) ui.mainCameraShowCullingBounds.checked = !!settings.showCullingBounds;
-  if (ui.mainCameraSurfaceOnlyRenderingEnabled) ui.mainCameraSurfaceOnlyRenderingEnabled.checked = settings.surfaceOnlyRenderingEnabled !== false;
-  if (ui.mainCameraDebugVisibleSurfaces) ui.mainCameraDebugVisibleSurfaces.checked = !!settings.debugVisibleSurfaces;
-  if (ui.mainCameraSettingsSummary) {
-    ui.mainCameraSettingsSummary.textContent = '动画：' + ((settings.rotationAnimationEnabled !== false) ? '开启' : '关闭') +
-      '，' + String(Math.max(0, Number(settings.rotationAnimationMs) || 0)) + 'ms，插值：' + ((settings.rotationInterpolationEnabled !== false) ? '开启' : '关闭') +
-      ' / ' + String(settings.rotationInterpolationMode || 'easeInOut') +
-      '，缩放：' + Number(settings.zoom || 1).toFixed(2) + 'x [' + Number(settings.minZoom || 0.5).toFixed(2) + ',' + Number(settings.maxZoom || 2).toFixed(2) + ']'+
-      '，裁剪：' + ((settings.cameraCullingEnabled !== false) ? '开启' : '关闭') + ' margin=' + String(Number(settings.cullingMargin || 0)) +
-      '，表面渲染：' + ((settings.surfaceOnlyRenderingEnabled !== false) ? '开启' : '关闭') +
-      (settings.debugVisibleSurfaces ? '，可见面调试：开' : '') +
-      (settings.isViewRotating ? ' · 视角过渡中' : '');
-  }
-  return settings;
+function createUiCameraRenderPanelDeps() {
+  return {
+    getUi: function () { return ui; },
+    getGlobal: function () { return (typeof window !== 'undefined') ? window : globalThis; },
+    getInspectorState: function () { return inspectorState; },
+    getUiMainController: getUiMainController,
+    uiDispatchControllerCommand: uiDispatchControllerCommand,
+  };
+}
+function uiGetMainCameraSettings(source) {
+  var service = getUiCameraRenderPanelService();
+  if (service && typeof service.uiGetMainCameraSettings === 'function') return service.uiGetMainCameraSettings(source, createUiCameraRenderPanelDeps());
+  return null;
 }
 
-var __uiRenderControlInteractionLockUntil = 0;
+
+function uiRefreshMainCameraPanel(source) {
+  var service = getUiCameraRenderPanelService();
+  if (service && typeof service.uiRefreshMainCameraPanel === 'function') return service.uiRefreshMainCameraPanel(source, createUiCameraRenderPanelDeps());
+  return null;
+}
+
 
 function uiLockRenderControlsInteraction(ms) {
-  try { __uiRenderControlInteractionLockUntil = Date.now() + Math.max(0, Number(ms) || 0); } catch (_) { __uiRenderControlInteractionLockUntil = 0; }
+  var service = getUiCameraRenderPanelService();
+  if (service && typeof service.uiLockRenderControlsInteraction === 'function') return service.uiLockRenderControlsInteraction(ms, createUiCameraRenderPanelDeps());
 }
+
 
 function uiIsRenderControlsInteractionLocked() {
-  try { return Date.now() < __uiRenderControlInteractionLockUntil; } catch (_) { return false; }
+  var service = getUiCameraRenderPanelService();
+  if (service && typeof service.uiIsRenderControlsInteractionLocked === 'function') return service.uiIsRenderControlsInteractionLocked(createUiCameraRenderPanelDeps());
+  return false;
 }
+
 
 function uiGetRenderControlOverrides() {
-  try {
-    if (typeof window === 'undefined') return null;
-    var overrides = window.__RENDER_CONTROL_OVERRIDES__;
-    return overrides && typeof overrides === 'object' ? overrides : null;
-  } catch (_) {
-    return null;
-  }
+  var service = getUiCameraRenderPanelService();
+  if (service && typeof service.uiGetRenderControlOverrides === 'function') return service.uiGetRenderControlOverrides(createUiCameraRenderPanelDeps());
+  return null;
 }
+
 
 function uiSetRenderControlOverrides(patch) {
-  try {
-    if (typeof window === 'undefined') return null;
-    if (!window.__RENDER_CONTROL_OVERRIDES__ || typeof window.__RENDER_CONTROL_OVERRIDES__ !== 'object') window.__RENDER_CONTROL_OVERRIDES__ = {};
-    var target = window.__RENDER_CONTROL_OVERRIDES__;
-    if (patch && typeof patch === 'object') {
-      if (Object.prototype.hasOwnProperty.call(patch, 'staticWorldFaceMergeEnabled')) target.staticWorldFaceMergeEnabled = patch.staticWorldFaceMergeEnabled !== false;
-      if (Object.prototype.hasOwnProperty.call(patch, 'disableFaceMergeAtOrAboveZoomEnabled')) target.disableFaceMergeAtOrAboveZoomEnabled = !!patch.disableFaceMergeAtOrAboveZoomEnabled;
-      if (Object.prototype.hasOwnProperty.call(patch, 'disableFaceMergeAtOrAboveZoomThreshold')) target.disableFaceMergeAtOrAboveZoomThreshold = Math.max(0.05, Number(patch.disableFaceMergeAtOrAboveZoomThreshold) || 1.6);
-      target.updatedAt = Date.now();
-    }
-    return target;
-  } catch (_) {
-    return null;
-  }
+  var service = getUiCameraRenderPanelService();
+  if (service && typeof service.uiSetRenderControlOverrides === 'function') return service.uiSetRenderControlOverrides(patch, createUiCameraRenderPanelDeps());
+  return null;
 }
+
 
 function uiBuildEffectiveRenderSettings(settings) {
-  var base = settings && typeof settings === 'object' ? settings : {};
-  var effective = Object.assign({}, base);
-  var overrides = uiGetRenderControlOverrides();
-  if (overrides) {
-    if (Object.prototype.hasOwnProperty.call(overrides, 'staticWorldFaceMergeEnabled')) effective.staticWorldFaceMergeEnabled = overrides.staticWorldFaceMergeEnabled !== false;
-    if (Object.prototype.hasOwnProperty.call(overrides, 'disableFaceMergeAtOrAboveZoomEnabled')) effective.disableFaceMergeAtOrAboveZoomEnabled = !!overrides.disableFaceMergeAtOrAboveZoomEnabled;
-    if (Object.prototype.hasOwnProperty.call(overrides, 'disableFaceMergeAtOrAboveZoomThreshold')) effective.disableFaceMergeAtOrAboveZoomThreshold = Math.max(0.05, Number(overrides.disableFaceMergeAtOrAboveZoomThreshold) || 1.6);
-  }
-  return effective;
+  var service = getUiCameraRenderPanelService();
+  if (service && typeof service.uiBuildEffectiveRenderSettings === 'function') return service.uiBuildEffectiveRenderSettings(settings, createUiCameraRenderPanelDeps());
+  return Object.assign({}, settings && typeof settings === 'object' ? settings : {});
 }
 
+
 function uiRefreshRenderPanel(source) {
-  var settings = uiGetMainCameraSettings(source || 'render-panel:refresh') || null;
-  if (!settings) return null;
-  var effectiveSettings = uiBuildEffectiveRenderSettings(settings);
-  var skipControlWrite = uiIsRenderControlsInteractionLocked() || !!(inspectorState && inspectorState.activeTab === 'render');
-  if (!skipControlWrite && ui.renderFaceMergeEnabled) ui.renderFaceMergeEnabled.checked = effectiveSettings.staticWorldFaceMergeEnabled !== false;
-  if (!skipControlWrite && ui.renderDisableFaceMergeAtZoomEnabled) ui.renderDisableFaceMergeAtZoomEnabled.checked = !!effectiveSettings.disableFaceMergeAtOrAboveZoomEnabled;
-  if (!skipControlWrite && ui.renderDisableFaceMergeAtZoomThreshold) ui.renderDisableFaceMergeAtZoomThreshold.value = String(Number(effectiveSettings.disableFaceMergeAtOrAboveZoomThreshold || 1.6).toFixed(2));
-  if (ui.renderSettingsSummary) {
-    var mergeSummary = effectiveSettings.staticWorldFaceMergeEnabled === false ? '关闭' : '开启';
-    var zoomRuleSummary = effectiveSettings.disableFaceMergeAtOrAboveZoomEnabled === true
-      ? ('开启（zoom ≥ ' + Number(effectiveSettings.disableFaceMergeAtOrAboveZoomThreshold || 1.6).toFixed(2) + ' 时禁用）')
-      : '关闭';
-    ui.renderSettingsSummary.textContent = 'Face Merge：' + mergeSummary + '；Zoom 条件禁用：' + zoomRuleSummary + '；当前 Zoom：' + Number(effectiveSettings.zoom || 1).toFixed(2) + 'x';
-  }
-  return effectiveSettings;
+  var service = getUiCameraRenderPanelService();
+  if (service && typeof service.uiRefreshRenderPanel === 'function') return service.uiRefreshRenderPanel(source, createUiCameraRenderPanelDeps());
+  return null;
 }
+
 
 function uiHandleRenderSetFaceMergeEnabled(enabled, source) {
   uiLockRenderControlsInteraction(1200);
@@ -628,277 +513,109 @@ function uiHandleMainCameraSetDebugVisibleSurfaces(enabled, source) {
 }
 
 
-function uiNormalizeTerrainAlgorithmValue(value) {
-  var raw = String(value == null ? '' : value).trim();
-  if (!raw) return 'profile_fbm';
-  if (raw === 'random' || raw === 'rand') return 'random_height';
-  if (raw === 'sin') return 'sin_wave';
-  if (raw === 'fbm' || raw === 'simple_fbm' || raw === 'simple-fbm' || raw === 'noise') return 'perlin_octaves';
-  if (raw === 'profile_perlin' || raw === 'profile-fbm' || raw === 'profile_fbm' || raw === 'profile' || raw === 'height_profile') return 'profile_fbm';
-  if (raw === 'multiple_perlin') return 'multi_perlin';
-  if (raw === 'single_perlin') return 'perlin';
-  if (['random_height', 'sin_wave', 'perlin', 'perlin_octaves', 'multi_perlin', 'profile_fbm'].indexOf(raw) >= 0) return raw;
-  return 'profile_fbm';
+function getUiTerrainPanelRefreshService() {
+  try {
+    if (typeof window !== 'undefined' && window.__UI_TERRAIN_PANEL_REFRESH__) return window.__UI_TERRAIN_PANEL_REFRESH__;
+  } catch (_) {}
+  return null;
 }
 
+function createUiTerrainPanelRefreshDeps() {
+  return {
+    getUi: function () { return ui; },
+    getUiMainController: getUiMainController,
+    uiDispatchControllerCommand: uiDispatchControllerCommand,
+    uiSyncTerrainMapColorMode: uiSyncTerrainMapColorMode,
+    uiRenderTerrainMapWindow: uiRenderTerrainMapWindow,
+  };
+}
+function uiNormalizeTerrainAlgorithmValue(value) {
+  var service = getUiTerrainPanelRefreshService();
+  if (service && typeof service.uiNormalizeTerrainAlgorithmValue === 'function') return service.uiNormalizeTerrainAlgorithmValue(value, createUiTerrainPanelRefreshDeps());
+  var raw = String(value == null ? '' : value).trim();
+  return raw || 'profile_fbm';
+}
+
+
 function uiTerrainNumberSetting(settings, key, fallback) {
+  var service = getUiTerrainPanelRefreshService();
+  if (service && typeof service.uiTerrainNumberSetting === 'function') return service.uiTerrainNumberSetting(settings, key, fallback, createUiTerrainPanelRefreshDeps());
   if (!settings || !Object.prototype.hasOwnProperty.call(settings, key)) return fallback;
   var value = Number(settings[key]);
   return Number.isFinite(value) ? value : fallback;
 }
 
+
 function uiSetTerrainInputValue(el, value) {
-  if (!el) return;
-  el.value = String(value);
+  var service = getUiTerrainPanelRefreshService();
+  if (service && typeof service.uiSetTerrainInputValue === 'function') return service.uiSetTerrainInputValue(el, value, createUiTerrainPanelRefreshDeps());
+  if (el) el.value = String(value);
 }
+
 
 function uiSetTerrainSelectValue(el, value) {
-  if (!el) return;
-  el.value = String(value);
+  var service = getUiTerrainPanelRefreshService();
+  if (service && typeof service.uiSetTerrainSelectValue === 'function') return service.uiSetTerrainSelectValue(el, value, createUiTerrainPanelRefreshDeps());
+  if (el) el.value = String(value);
 }
 
+
 function uiSetTerrainAlgorithmPanelVisible(el, visible) {
+  var service = getUiTerrainPanelRefreshService();
+  if (service && typeof service.uiSetTerrainAlgorithmPanelVisible === 'function') return service.uiSetTerrainAlgorithmPanelVisible(el, visible, createUiTerrainPanelRefreshDeps());
   if (!el) return;
   try { el.hidden = !visible; } catch (_) {}
   el.style.display = visible ? '' : 'none';
 }
 
+
 function uiUpdateTerrainAlgorithmPanel(source) {
-  var algorithm = uiNormalizeTerrainAlgorithmValue(ui.terrainAlgorithm && ui.terrainAlgorithm.value || 'profile_fbm');
-
-  uiSetTerrainAlgorithmPanelVisible(ui.terrainRandomParamsPanel, algorithm === 'random_height');
-  uiSetTerrainAlgorithmPanelVisible(ui.terrainSinParamsPanel, algorithm === 'sin_wave');
-  uiSetTerrainAlgorithmPanelVisible(ui.terrainPerlinParamsPanel, algorithm === 'perlin');
-  uiSetTerrainAlgorithmPanelVisible(ui.terrainOctaveParamsPanel, algorithm === 'perlin_octaves');
-  uiSetTerrainAlgorithmPanelVisible(ui.terrainMultiPerlinParamsPanel, algorithm === 'multi_perlin');
-  uiSetTerrainAlgorithmPanelVisible(ui.terrainProfileParamsPanel, algorithm === 'profile_fbm');
-
-  if (ui.terrainAlgorithmHint) {
-    if (algorithm === 'random_height') {
-      ui.terrainAlgorithmHint.textContent = 'Random：每个格子独立随机取高度，变化最突兀，主要用于对照测试。';
-    } else if (algorithm === 'sin_wave') {
-      ui.terrainAlgorithmHint.textContent = 'Sin：用正弦函数生成平滑且周期性的高低起伏，参数控制波长、相位和混合方式。';
-    } else if (algorithm === 'perlin') {
-      ui.terrainAlgorithmHint.textContent = 'Perlin(x,z)：单层平滑噪声，Scale 控制起伏尺度，Offset 控制采样平移。';
-    } else if (algorithm === 'perlin_octaves') {
-      ui.terrainAlgorithmHint.textContent = 'Perlin + Octaves：多八度 fBm 噪声，Octaves / Persistence / Lacunarity 控制细节层级。';
-    } else if (algorithm === 'multi_perlin') {
-      ui.terrainAlgorithmHint.textContent = 'Multiple Perlin：多个不同尺度、权重、偏移和 seedOffset 的 Perlin 函数叠加。';
-    } else {
-      ui.terrainAlgorithmHint.textContent = 'Perlin + Height Profile：macro noise 选择基础海拔档位，detail noise 叠加局部起伏，可生成突兀山体、悬崖和台地。';
-    }
-  }
-  return { algorithm: algorithm, source: String(source || 'terrain-panel:algorithm-panel') };
+  var service = getUiTerrainPanelRefreshService();
+  if (service && typeof service.uiUpdateTerrainAlgorithmPanel === 'function') return service.uiUpdateTerrainAlgorithmPanel(source, createUiTerrainPanelRefreshDeps());
+  return { algorithm: uiNormalizeTerrainAlgorithmValue(ui.terrainAlgorithm && ui.terrainAlgorithm.value || 'profile_fbm'), source: String(source || 'terrain-panel:algorithm-panel') };
 }
+
 
 function uiHandleTerrainAlgorithmChange(source) {
-  var panelState = uiUpdateTerrainAlgorithmPanel(source || 'terrain-panel:algorithm-change');
-  var controller = getUiMainController();
-  var payload = { terrainAlgorithm: panelState.algorithm };
-  var dispatched = uiDispatchControllerCommand('main', 'setMainEditorTerrainSettings', [payload, source || 'terrain-panel:algorithm-change']);
-  return dispatched || (controller && typeof controller.setMainEditorTerrainSettings === 'function' ? controller.setMainEditorTerrainSettings(payload, source || 'terrain-panel:algorithm-change') : panelState);
+  var service = getUiTerrainPanelRefreshService();
+  if (service && typeof service.uiHandleTerrainAlgorithmChange === 'function') return service.uiHandleTerrainAlgorithmChange(source, createUiTerrainPanelRefreshDeps());
+  return uiUpdateTerrainAlgorithmPanel(source || 'terrain-panel:algorithm-change');
 }
+
 
 function uiHandleTerrainParamGroupToggle(button, source) {
-  if (!button) return { ok: false, reason: 'missing-button' };
-  var group = button.closest ? button.closest('.terrainParamGroup') : null;
-  if (!group) return { ok: false, reason: 'missing-param-group' };
-  var nextCollapsed = !group.classList.contains('collapsed');
-  group.classList.toggle('collapsed', nextCollapsed);
-  try { button.setAttribute('aria-expanded', nextCollapsed ? 'false' : 'true'); } catch (_) {}
-  return {
-    ok: true,
-    collapsed: nextCollapsed,
-    source: String(source || 'terrain-panel:param-group-toggle')
-  };
+  var service = getUiTerrainPanelRefreshService();
+  if (service && typeof service.uiHandleTerrainParamGroupToggle === 'function') return service.uiHandleTerrainParamGroupToggle(button, source, createUiTerrainPanelRefreshDeps());
+  return { ok: false, reason: 'missing-terrain-panel-refresh-service' };
 }
+
 
 function uiReadTerrainProfileRows() {
-  return [0, 1, 2, 3].map(function (idx) {
-    var startEl = ui['terrainProfile' + idx + 'Start'];
-    var endEl = ui['terrainProfile' + idx + 'End'];
-    var baseEl = ui['terrainProfile' + idx + 'Base'];
-    return {
-      start: Number(startEl && startEl.value || 0),
-      end: Number(endEl && endEl.value || 0),
-      baseHeight: Number(baseEl && baseEl.value || 0)
-    };
-  });
+  var service = getUiTerrainPanelRefreshService();
+  if (service && typeof service.uiReadTerrainProfileRows === 'function') return service.uiReadTerrainProfileRows(createUiTerrainPanelRefreshDeps());
+  return [];
 }
+
 
 function uiReadMainTerrainFormValues() {
-  var octaveScale = Number(ui.terrainOctaveScale && ui.terrainOctaveScale.value || 0);
-  var octaveCount = Number(ui.terrainOctaves && ui.terrainOctaves.value || 0);
-  var octavePersistence = Number(ui.terrainPersistence && ui.terrainPersistence.value || 0);
-  var octaveLacunarity = Number(ui.terrainLacunarity && ui.terrainLacunarity.value || 0);
-  var detailScale = Number(ui.terrainDetailScale && ui.terrainDetailScale.value || 0);
-  var detailOctaves = Number(ui.terrainDetailOctaves && ui.terrainDetailOctaves.value || 0);
-  var detailPersistence = Number(ui.terrainDetailPersistence && ui.terrainDetailPersistence.value || 0);
-  var detailLacunarity = Number(ui.terrainDetailLacunarity && ui.terrainDetailLacunarity.value || 0);
-
-  return {
-    seed: ui.terrainSeed ? String(ui.terrainSeed.value || '').trim() : '1337',
-    width: Number(ui.terrainWidth && ui.terrainWidth.value || 0),
-    height: Number(ui.terrainHeight && ui.terrainHeight.value || 0),
-    minHeight: Number(ui.terrainMinHeight && ui.terrainMinHeight.value || 0),
-    maxHeight: Number(ui.terrainMaxHeight && ui.terrainMaxHeight.value || 0),
-    waterLevel: Number(ui.terrainWaterLevel && ui.terrainWaterLevel.value || 0),
-    baseHeightOffset: Number(ui.terrainBaseHeightOffset && ui.terrainBaseHeightOffset.value || 0),
-
-    terrainAlgorithm: uiNormalizeTerrainAlgorithmValue(ui.terrainAlgorithm && ui.terrainAlgorithm.value || 'profile_fbm'),
-
-    sinScaleX: Number(ui.terrainSinScaleX && ui.terrainSinScaleX.value || 0),
-    sinScaleZ: Number(ui.terrainSinScaleZ && ui.terrainSinScaleZ.value || 0),
-    sinScaleY: Number(ui.terrainSinScaleZ && ui.terrainSinScaleZ.value || 0),
-    sinPhaseX: Number(ui.terrainSinPhaseX && ui.terrainSinPhaseX.value || 0),
-    sinPhaseZ: Number(ui.terrainSinPhaseZ && ui.terrainSinPhaseZ.value || 0),
-    sinPhaseY: Number(ui.terrainSinPhaseZ && ui.terrainSinPhaseZ.value || 0),
-    sinMixMode: String(ui.terrainSinMixMode && ui.terrainSinMixMode.value || 'add'),
-
-    perlinScale: Number(ui.terrainPerlinScale && ui.terrainPerlinScale.value || 0),
-    perlinOffsetX: Number(ui.terrainPerlinOffsetX && ui.terrainPerlinOffsetX.value || 0),
-    perlinOffsetZ: Number(ui.terrainPerlinOffsetZ && ui.terrainPerlinOffsetZ.value || 0),
-
-    octaveScale: octaveScale,
-    octaves: octaveCount,
-    persistence: octavePersistence,
-    lacunarity: octaveLacunarity,
-    octaveOffsetX: Number(ui.terrainOctaveOffsetX && ui.terrainOctaveOffsetX.value || 0),
-    octaveOffsetZ: Number(ui.terrainOctaveOffsetZ && ui.terrainOctaveOffsetZ.value || 0),
-
-    multiScale1: Number(ui.terrainMultiScale1 && ui.terrainMultiScale1.value || 0),
-    multiWeight1: Number(ui.terrainMultiWeight1 && ui.terrainMultiWeight1.value || 0),
-    multiOffsetX1: Number(ui.terrainMultiOffsetX1 && ui.terrainMultiOffsetX1.value || 0),
-    multiOffsetZ1: Number(ui.terrainMultiOffsetZ1 && ui.terrainMultiOffsetZ1.value || 0),
-    multiSeedOffset1: Number(ui.terrainMultiSeedOffset1 && ui.terrainMultiSeedOffset1.value || 0),
-    multiScale2: Number(ui.terrainMultiScale2 && ui.terrainMultiScale2.value || 0),
-    multiWeight2: Number(ui.terrainMultiWeight2 && ui.terrainMultiWeight2.value || 0),
-    multiOffsetX2: Number(ui.terrainMultiOffsetX2 && ui.terrainMultiOffsetX2.value || 0),
-    multiOffsetZ2: Number(ui.terrainMultiOffsetZ2 && ui.terrainMultiOffsetZ2.value || 0),
-    multiSeedOffset2: Number(ui.terrainMultiSeedOffset2 && ui.terrainMultiSeedOffset2.value || 0),
-    multiScale3: Number(ui.terrainMultiScale3 && ui.terrainMultiScale3.value || 0),
-    multiWeight3: Number(ui.terrainMultiWeight3 && ui.terrainMultiWeight3.value || 0),
-    multiOffsetX3: Number(ui.terrainMultiOffsetX3 && ui.terrainMultiOffsetX3.value || 0),
-    multiOffsetZ3: Number(ui.terrainMultiOffsetZ3 && ui.terrainMultiOffsetZ3.value || 0),
-    multiSeedOffset3: Number(ui.terrainMultiSeedOffset3 && ui.terrainMultiSeedOffset3.value || 0),
-
-    macroScale: Number(ui.terrainMacroScale && ui.terrainMacroScale.value || 0),
-    macroOctaves: Number(ui.terrainMacroOctaves && ui.terrainMacroOctaves.value || 0),
-    macroPersistence: Number(ui.terrainMacroPersistence && ui.terrainMacroPersistence.value || 0),
-    macroLacunarity: Number(ui.terrainMacroLacunarity && ui.terrainMacroLacunarity.value || 0),
-    macroOffsetX: Number(ui.terrainMacroOffsetX && ui.terrainMacroOffsetX.value || 0),
-    macroOffsetZ: Number(ui.terrainMacroOffsetZ && ui.terrainMacroOffsetZ.value || 0),
-
-    detailScale: detailScale,
-    detailOctaves: detailOctaves,
-    detailPersistence: detailPersistence,
-    detailLacunarity: detailLacunarity,
-    detailStrength: Number(ui.terrainDetailStrength && ui.terrainDetailStrength.value || 0),
-    detailOffsetX: Number(ui.terrainDetailOffsetX && ui.terrainDetailOffsetX.value || 0),
-    detailOffsetZ: Number(ui.terrainDetailOffsetZ && ui.terrainDetailOffsetZ.value || 0),
-
-    // Legacy mirror fields kept so older terrain paths/tests reading detail* for octave mode do not break.
-    legacyOctaveScale: octaveScale,
-    legacyOctaves: octaveCount,
-
-    terrainDebugFaceColorsEnabled: !!(ui.terrainDebugFaceColorsEnabled && ui.terrainDebugFaceColorsEnabled.checked),
-    terrainColorMode: (ui.terrainDebugFaceColorsEnabled && ui.terrainDebugFaceColorsEnabled.checked) ? 'debug-semantic' : 'natural',
-    terrainBuildColorMode: String(ui.terrainBuildColorMode && ui.terrainBuildColorMode.value || 'natural'),
-    terrainBuildLightingBypass: !!(ui.terrainBuildLightingBypass && ui.terrainBuildLightingBypass.checked),
-    terrainDetailedProfilingEnabled: !!(ui.terrainDetailedProfilingEnabled && ui.terrainDetailedProfilingEnabled.checked),
-    heightProfileConfig: uiReadTerrainProfileRows()
-  };
+  var service = getUiTerrainPanelRefreshService();
+  if (service && typeof service.uiReadMainTerrainFormValues === 'function') return service.uiReadMainTerrainFormValues(createUiTerrainPanelRefreshDeps());
+  return {};
 }
 
+
 function uiGetMainTerrainSettings(source) {
-  var controller = getUiMainController();
-  var dispatched = uiDispatchControllerCommand('main', 'getMainEditorTerrainSettings', [source || 'terrain-panel:read']);
-  if (dispatched) return dispatched;
-  if (controller && typeof controller.getMainEditorTerrainSettings === 'function') return controller.getMainEditorTerrainSettings(source || 'terrain-panel:read');
+  var service = getUiTerrainPanelRefreshService();
+  if (service && typeof service.uiGetMainTerrainSettings === 'function') return service.uiGetMainTerrainSettings(source, createUiTerrainPanelRefreshDeps());
   return null;
 }
 
+
 function uiApplyMainTerrainSettingsToForm(settings) {
-  if (!settings) return;
-
-  uiSetTerrainInputValue(ui.terrainSeed, settings.seed != null ? settings.seed : '1337');
-  uiSetTerrainInputValue(ui.terrainWidth, Math.max(1, Number(settings.width) || 1));
-  uiSetTerrainInputValue(ui.terrainHeight, Math.max(1, Number(settings.height) || 1));
-  uiSetTerrainInputValue(ui.terrainMinHeight, uiTerrainNumberSetting(settings, 'minHeight', -10));
-  uiSetTerrainInputValue(ui.terrainMaxHeight, uiTerrainNumberSetting(settings, 'maxHeight', 25));
-  uiSetTerrainInputValue(ui.terrainWaterLevel, uiTerrainNumberSetting(settings, 'waterLevel', 0));
-  uiSetTerrainInputValue(ui.terrainBaseHeightOffset, uiTerrainNumberSetting(settings, 'baseHeightOffset', 0));
-
-  uiSetTerrainSelectValue(ui.terrainAlgorithm, uiNormalizeTerrainAlgorithmValue(settings.terrainAlgorithm || 'profile_fbm'));
-  uiUpdateTerrainAlgorithmPanel('terrain-panel:apply-settings');
-
-  uiSetTerrainInputValue(ui.terrainSinScaleX, uiTerrainNumberSetting(settings, 'sinScaleX', 8));
-  uiSetTerrainInputValue(ui.terrainSinScaleZ, uiTerrainNumberSetting(settings, 'sinScaleZ', uiTerrainNumberSetting(settings, 'sinScaleY', 8)));
-  uiSetTerrainInputValue(ui.terrainSinPhaseX, uiTerrainNumberSetting(settings, 'sinPhaseX', 0));
-  uiSetTerrainInputValue(ui.terrainSinPhaseZ, uiTerrainNumberSetting(settings, 'sinPhaseZ', uiTerrainNumberSetting(settings, 'sinPhaseY', 0)));
-  uiSetTerrainSelectValue(ui.terrainSinMixMode, String(settings.sinMixMode || 'add'));
-
-  uiSetTerrainInputValue(ui.terrainPerlinScale, uiTerrainNumberSetting(settings, 'perlinScale', 16));
-  uiSetTerrainInputValue(ui.terrainPerlinOffsetX, uiTerrainNumberSetting(settings, 'perlinOffsetX', 0));
-  uiSetTerrainInputValue(ui.terrainPerlinOffsetZ, uiTerrainNumberSetting(settings, 'perlinOffsetZ', 0));
-
-  uiSetTerrainInputValue(ui.terrainOctaveScale, uiTerrainNumberSetting(settings, 'octaveScale', uiTerrainNumberSetting(settings, 'detailScale', 8)));
-  uiSetTerrainInputValue(ui.terrainOctaves, uiTerrainNumberSetting(settings, 'octaves', uiTerrainNumberSetting(settings, 'detailOctaves', 4)));
-  uiSetTerrainInputValue(ui.terrainPersistence, uiTerrainNumberSetting(settings, 'persistence', uiTerrainNumberSetting(settings, 'detailPersistence', 0.5)));
-  uiSetTerrainInputValue(ui.terrainLacunarity, uiTerrainNumberSetting(settings, 'lacunarity', uiTerrainNumberSetting(settings, 'detailLacunarity', 2)));
-  uiSetTerrainInputValue(ui.terrainOctaveOffsetX, uiTerrainNumberSetting(settings, 'octaveOffsetX', 0));
-  uiSetTerrainInputValue(ui.terrainOctaveOffsetZ, uiTerrainNumberSetting(settings, 'octaveOffsetZ', 0));
-
-  uiSetTerrainInputValue(ui.terrainMultiScale1, uiTerrainNumberSetting(settings, 'multiScale1', 10));
-  uiSetTerrainInputValue(ui.terrainMultiWeight1, uiTerrainNumberSetting(settings, 'multiWeight1', 1));
-  uiSetTerrainInputValue(ui.terrainMultiOffsetX1, uiTerrainNumberSetting(settings, 'multiOffsetX1', 0));
-  uiSetTerrainInputValue(ui.terrainMultiOffsetZ1, uiTerrainNumberSetting(settings, 'multiOffsetZ1', 0));
-  uiSetTerrainInputValue(ui.terrainMultiSeedOffset1, uiTerrainNumberSetting(settings, 'multiSeedOffset1', 101));
-  uiSetTerrainInputValue(ui.terrainMultiScale2, uiTerrainNumberSetting(settings, 'multiScale2', 22));
-  uiSetTerrainInputValue(ui.terrainMultiWeight2, uiTerrainNumberSetting(settings, 'multiWeight2', 0.65));
-  uiSetTerrainInputValue(ui.terrainMultiOffsetX2, uiTerrainNumberSetting(settings, 'multiOffsetX2', 0));
-  uiSetTerrainInputValue(ui.terrainMultiOffsetZ2, uiTerrainNumberSetting(settings, 'multiOffsetZ2', 0));
-  uiSetTerrainInputValue(ui.terrainMultiSeedOffset2, uiTerrainNumberSetting(settings, 'multiSeedOffset2', 202));
-  uiSetTerrainInputValue(ui.terrainMultiScale3, uiTerrainNumberSetting(settings, 'multiScale3', 48));
-  uiSetTerrainInputValue(ui.terrainMultiWeight3, uiTerrainNumberSetting(settings, 'multiWeight3', 0.35));
-  uiSetTerrainInputValue(ui.terrainMultiOffsetX3, uiTerrainNumberSetting(settings, 'multiOffsetX3', 0));
-  uiSetTerrainInputValue(ui.terrainMultiOffsetZ3, uiTerrainNumberSetting(settings, 'multiOffsetZ3', 0));
-  uiSetTerrainInputValue(ui.terrainMultiSeedOffset3, uiTerrainNumberSetting(settings, 'multiSeedOffset3', 303));
-
-  uiSetTerrainInputValue(ui.terrainMacroScale, uiTerrainNumberSetting(settings, 'macroScale', 28));
-  uiSetTerrainInputValue(ui.terrainMacroOctaves, uiTerrainNumberSetting(settings, 'macroOctaves', 3));
-  uiSetTerrainInputValue(ui.terrainMacroPersistence, uiTerrainNumberSetting(settings, 'macroPersistence', 0.55));
-  uiSetTerrainInputValue(ui.terrainMacroLacunarity, uiTerrainNumberSetting(settings, 'macroLacunarity', 2));
-  uiSetTerrainInputValue(ui.terrainMacroOffsetX, uiTerrainNumberSetting(settings, 'macroOffsetX', 0));
-  uiSetTerrainInputValue(ui.terrainMacroOffsetZ, uiTerrainNumberSetting(settings, 'macroOffsetZ', 0));
-
-  uiSetTerrainInputValue(ui.terrainDetailScale, uiTerrainNumberSetting(settings, 'detailScale', 8));
-  uiSetTerrainInputValue(ui.terrainDetailOctaves, uiTerrainNumberSetting(settings, 'detailOctaves', 4));
-  uiSetTerrainInputValue(ui.terrainDetailPersistence, uiTerrainNumberSetting(settings, 'detailPersistence', 0.5));
-  uiSetTerrainInputValue(ui.terrainDetailLacunarity, uiTerrainNumberSetting(settings, 'detailLacunarity', 2));
-  uiSetTerrainInputValue(ui.terrainDetailStrength, uiTerrainNumberSetting(settings, 'detailStrength', 4));
-  uiSetTerrainInputValue(ui.terrainDetailOffsetX, uiTerrainNumberSetting(settings, 'detailOffsetX', 0));
-  uiSetTerrainInputValue(ui.terrainDetailOffsetZ, uiTerrainNumberSetting(settings, 'detailOffsetZ', 0));
-
-  if (ui.terrainDebugFaceColorsEnabled) ui.terrainDebugFaceColorsEnabled.checked = settings.terrainDebugFaceColorsEnabled === true;
-  if (ui.terrainBuildColorMode) ui.terrainBuildColorMode.value = String(settings.terrainBuildColorMode || 'natural');
-  if (ui.terrainBuildLightingBypass) ui.terrainBuildLightingBypass.checked = settings.terrainBuildLightingBypass === true;
-  if (ui.terrainDetailedProfilingEnabled) ui.terrainDetailedProfilingEnabled.checked = settings.terrainDetailedProfilingEnabled === true;
-
-  var profile = Array.isArray(settings.heightProfileConfig) ? settings.heightProfileConfig : [];
-  [0, 1, 2, 3].forEach(function (idx) {
-    var defaults = [
-      { start: 0, end: 0.25, baseHeight: -10 },
-      { start: 0.25, end: 0.58, baseHeight: 5 },
-      { start: 0.58, end: 0.60, baseHeight: 25 },
-      { start: 0.60, end: 1.01, baseHeight: 25 }
-    ];
-    var segment = profile[idx] || defaults[idx];
-    uiSetTerrainInputValue(ui['terrainProfile' + idx + 'Start'], Number(segment.start) || 0);
-    uiSetTerrainInputValue(ui['terrainProfile' + idx + 'End'], Number(segment.end) || 0);
-    uiSetTerrainInputValue(ui['terrainProfile' + idx + 'Base'], Number(segment.baseHeight) || 0);
-  });
+  var service = getUiTerrainPanelRefreshService();
+  if (service && typeof service.uiApplyMainTerrainSettingsToForm === 'function') return service.uiApplyMainTerrainSettingsToForm(settings, createUiTerrainPanelRefreshDeps());
 }
+
 
 function uiGetRuntimeStateApiForTerrainMap() {
   try {
@@ -1137,22 +854,11 @@ function uiRenderTerrainMapWindow(source) {
 }
 
 function uiRefreshMainTerrainPanel(source) {
-  var settings = uiGetMainTerrainSettings(source || 'terrain-panel:refresh') || null;
-  if (!settings) return null;
-  uiApplyMainTerrainSettingsToForm(settings);
-  if (ui.terrainSummary) {
-    var summary = settings.lastSummary || null;
-    ui.terrainSummary.textContent = summary
-      ? ('Terrain：algorithm=' + String(settings.terrainAlgorithm || 'profile_fbm') + ' · batch=' + String(summary.terrainBatchId || '-') + ' · cells=' + String(summary.generatedCellCount || 0) + ' · voxels=' + String(summary.generatedVoxelCount || 0) + (summary.appliedVoxelCount != null ? (' · applied=' + String(summary.appliedVoxelCount || 0)) : '') + ' · min/max=' + String(summary.minHeightObserved || 0) + '/' + String(summary.maxHeightObserved || 0) + ((settings.terrainDebugFaceColorsEnabled === true) ? ' · debug-colors=on' : '') + ' · buildColor=' + String(settings.terrainBuildColorMode || 'natural') + ' · lightingBypass=' + String(settings.terrainBuildLightingBypass === true) + ' · detailedLog=' + String(settings.terrainDetailedProfilingEnabled === true))
-      : 'Terrain：尚未生成。';
-  }
-  if (ui.terrainDetails) {
-    try { ui.terrainDetails.textContent = JSON.stringify(settings, null, 2); } catch (_) { ui.terrainDetails.textContent = String(settings); }
-  }
-  uiSyncTerrainMapColorMode(source || 'terrain-panel:refresh');
-  if (ui.terrainMapWindow && ui.terrainMapWindow.hidden === false) uiRenderTerrainMapWindow((source || 'terrain-panel:refresh') + ':terrain-map');
-  return settings;
+  var service = getUiTerrainPanelRefreshService();
+  if (service && typeof service.uiRefreshMainTerrainPanel === 'function') return service.uiRefreshMainTerrainPanel(source, createUiTerrainPanelRefreshDeps());
+  return null;
 }
+
 
 
 function uiSyncTerrainBoundaryDebugRedToggleFromStorage() {

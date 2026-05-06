@@ -5,159 +5,42 @@
 /* moved */
 if (typeof bindLoggingUi === 'function') bindLoggingUi(ui);
 
+
+function getLegacyStateBridgeApiForLegacyState() {
+  if (typeof window === 'undefined') return null;
+  return window.__LEGACY_STATE_BRIDGE__ || null;
+}
 function getStateNamespacePath(path) {
+  var bridge = getLegacyStateBridgeApiForLegacyState();
+  if (bridge && typeof bridge.getStateNamespacePath === 'function') return bridge.getStateNamespacePath(path);
   if (typeof window === 'undefined' || !window.__APP_NAMESPACE || typeof window.__APP_NAMESPACE.getPath !== 'function') return null;
   return window.__APP_NAMESPACE.getPath(path);
 }
-
-var __lightingStateApi = getStateNamespacePath('state.lightingState');
-var __prefabRegistryApi = getStateNamespacePath('state.prefabRegistry');
-var __domRegistryApi = getStateNamespacePath('shell.domRegistry');
-var __runtimeStateApi = getStateNamespacePath('state.runtimeState');
-var __sceneGraphApi = getStateNamespacePath('state.sceneGraph');
-var __sceneSessionApi = getStateNamespacePath('state.sceneSession');
+var __legacyStateBridgeApi = getLegacyStateBridgeApiForLegacyState();
+var __legacyStateApis = __legacyStateBridgeApi && typeof __legacyStateBridgeApi.getStateApis === 'function' ? __legacyStateBridgeApi.getStateApis() : null;
+var __lightingStateApi = __legacyStateApis ? __legacyStateApis.lightingState : getStateNamespacePath('state.lightingState');
+var __prefabRegistryApi = __legacyStateApis ? __legacyStateApis.prefabRegistry : getStateNamespacePath('state.prefabRegistry');
+var __domRegistryApi = __legacyStateApis ? __legacyStateApis.domRegistry : getStateNamespacePath('shell.domRegistry');
+var __runtimeStateApi = __legacyStateApis ? __legacyStateApis.runtimeState : getStateNamespacePath('state.runtimeState');
+var __sceneGraphApi = __legacyStateApis ? __legacyStateApis.sceneGraph : getStateNamespacePath('state.sceneGraph');
+var __sceneSessionApi = __legacyStateApis ? __legacyStateApis.sceneSession : getStateNamespacePath('state.sceneSession');
 function getPlacementLegacyBridgeState() {
+  var bridge = getLegacyStateBridgeApiForLegacyState();
+  if (bridge && typeof bridge.getPlacementLegacyBridgeState === 'function') return bridge.getPlacementLegacyBridgeState();
   return getStateNamespacePath('legacy.placement') || (typeof window !== 'undefined' ? window.__PLACEMENT_LEGACY_BRIDGE__ || null : null);
 }
 function callLegacyPlacement(action, args, meta) {
+  var bridge = getLegacyStateBridgeApiForLegacyState();
+  if (bridge && typeof bridge.callLegacyPlacement === 'function') return bridge.callLegacyPlacement(action, args, meta);
   args = Array.isArray(args) ? args : [];
   meta = meta || {};
-  var bridge = getPlacementLegacyBridgeState();
-  if (bridge && typeof bridge[action] === 'function') return bridge[action].apply(bridge, args.concat(meta));
+  var placementBridge = getPlacementLegacyBridgeState();
+  if (placementBridge && typeof placementBridge[action] === 'function') return placementBridge[action].apply(placementBridge, args.concat(meta));
   if (typeof window !== 'undefined' && typeof window[action] === 'function') return window[action].apply(window, args);
   return null;
 }
-
-if (typeof setRefactorStep === 'function') {
-  setRefactorStep('Phase-A-02', {
-    entry: (typeof window !== 'undefined' && (window.__APP_ENTRY_INFO_RESOLVED || window.__APP_ENTRY_INFO)) ? (window.__APP_ENTRY_INFO_RESOLVED || window.__APP_ENTRY_INFO) : null,
-    note: 'tighten frontend service boundaries, reduce duplicate request orchestration logs, and partially dedupe repeated asset scan imports without changing backend behavior'
-  });
-}
-if (typeof markRefactorCheckpoint === 'function') {
-  markRefactorCheckpoint('Bootstrap', 'ui-bound', {
-    entryFile: (typeof APP_ENTRY_INFO !== 'undefined' && APP_ENTRY_INFO && APP_ENTRY_INFO.entryFile) ? APP_ENTRY_INFO.entryFile : 'unknown',
-    hasCanvas: !!canvas,
-    hasDebugLog: !!(ui && ui.debugLog)
-  });
-  markRefactorCheckpoint('Bootstrap', 'logging-ready', {
-    loggerBound: typeof bindLoggingUi === 'function',
-    uiKeys: Object.keys(ui || {}).length
-  });
-  markRefactorCheckpoint('SceneKeys', 'shared-keys-ready', {
-    owner: window.__SCENE_STORAGE_KEYS && window.__SCENE_STORAGE_KEYS.owner,
-    sceneKey: typeof LOCAL_SCENE_STORAGE_KEY !== 'undefined' ? LOCAL_SCENE_STORAGE_KEY : null,
-    prefabKey: typeof LOCAL_PREFAB_STORAGE_KEY !== 'undefined' ? LOCAL_PREFAB_STORAGE_KEY : null,
-    sceneApiSave: typeof SCENE_API_SAVE_URL !== 'undefined' ? SCENE_API_SAVE_URL : null,
-  });
-  markRefactorCheckpoint('LightingState', 'shared-state-ready', {
-    owner: __lightingStateApi && __lightingStateApi.owner,
-    lightCount: Array.isArray(lights) ? lights.length : null,
-    activeLightId: typeof activeLightId !== 'undefined' ? activeLightId : null,
-  });
-  markRefactorCheckpoint('LightingEditor', 'editor-api-ready', {
-    owner: window.__LIGHTING_EDITOR_API && window.__LIGHTING_EDITOR_API.owner,
-    hasLightList: !!(ui && ui.lightList),
-    hasLightingEnabledToggle: !!(ui && ui.lightingEnabled),
-  });
-  markRefactorCheckpoint('LightingRender', 'render-api-ready', {
-    owner: window.__LIGHTING_RENDER_API && window.__LIGHTING_RENDER_API.owner,
-    hasGlow: !!(window.__LIGHTING_RENDER_API && window.__LIGHTING_RENDER_API.renderLightingGlow),
-    hasShadowPass: !!(window.__LIGHTING_RENDER_API && window.__LIGHTING_RENDER_API.renderLightingShadows),
-  });
-  markRefactorCheckpoint('PrefabRegistry', 'registry-api-ready', {
-    owner: __prefabRegistryApi && __prefabRegistryApi.owner,
-    prototypeCount: __prefabRegistryApi && __prefabRegistryApi.getPrototypeCount ? __prefabRegistryApi.getPrototypeCount() : null,
-    builtInCount: __prefabRegistryApi && __prefabRegistryApi.getBuiltInCount ? __prefabRegistryApi.getBuiltInCount() : null,
-  });
-  markRefactorCheckpoint('DomRegistry', 'dom-api-ready', {
-    owner: __domRegistryApi && __domRegistryApi.owner,
-    keyCount: __domRegistryApi && __domRegistryApi.getKeyCount ? __domRegistryApi.getKeyCount() : null,
-    missingKeyCount: __domRegistryApi && __domRegistryApi.getMissingKeys ? __domRegistryApi.getMissingKeys().length : null,
-    hasCanvas: !!canvas,
-  });
-  markRefactorCheckpoint('RuntimeState', 'runtime-state-ready', Object.assign({
-    owner: __runtimeStateApi && __runtimeStateApi.owner
-  }, (__runtimeStateApi && __runtimeStateApi.summarize ? __runtimeStateApi.summarize() : {})));
-  markRefactorCheckpoint('SceneSession', 'scene-session-ready', Object.assign({
-    owner: __sceneSessionApi && __sceneSessionApi.owner
-  }, (__sceneSessionApi && typeof __sceneSessionApi.summarizeSession === 'function' ? __sceneSessionApi.summarizeSession() : {})));
-  if (typeof logCompatMapping === 'function') {
-    logCompatMapping('LOCAL_SCENE_STORAGE_KEY', 'src/core/scene/scene-keys.js');
-    logCompatMapping('saveScene', 'src/infrastructure/storage/scene-storage.js');
-    logCompatMapping('loadScene', 'src/infrastructure/storage/scene-storage.js');
-    logCompatMapping('buildSceneSnapshot', 'src/infrastructure/storage/scene-storage.js');
-    logCompatMapping('applySceneSnapshot', 'src/infrastructure/storage/scene-storage.js');
-    logCompatMapping('repairSceneSnapshot', 'src/infrastructure/storage/scene-storage.js');
-    logCompatMapping('repairLegacySceneSnapshot', 'src/infrastructure/storage/scene-storage.js');
-    logCompatMapping('restoreScenePrefabRefs', 'src/infrastructure/storage/scene-storage.js');
-    logCompatMapping('restoreSceneHabboRefs', 'src/infrastructure/storage/scene-storage.js');
-    logCompatMapping('applyLightingPreset', 'src/core/lighting/lighting-state.js');
-    logCompatMapping('normalizeLight', 'src/core/lighting/lighting-state.js');
-    logCompatMapping('bindLightingUi', 'src/presentation/lighting/lighting-editor.js');
-    logCompatMapping('syncLightUI', 'src/presentation/lighting/lighting-editor.js');
-    logCompatMapping('renderLightList', 'src/presentation/lighting/lighting-editor.js');
-    logCompatMapping('hitLightAxis', 'src/presentation/lighting/lighting-editor.js');
-    logCompatMapping('renderLightingShadows', 'src/presentation/lighting/lighting-render.js');
-    logCompatMapping('renderLightingGlow', 'src/presentation/lighting/lighting-render.js');
-    logCompatMapping('drawLightingBulb', 'src/presentation/lighting/lighting-render.js');
-    logCompatMapping('drawLightingAxes', 'src/presentation/lighting/lighting-render.js');
-    logCompatMapping('normalizePrefab', 'src/core/state/prefab-registry.js');
-    logCompatMapping('ensurePrefabRegistered', 'src/core/state/prefab-registry.js');
-    logCompatMapping('getPrefabById', 'src/core/state/prefab-registry.js');
-    logCompatMapping('prefabVariant', 'src/core/state/prefab-registry.js');
-    logCompatMapping('prototypes', 'src/core/state/prefab-registry.js');
-    logCompatMapping('setActivePanelTab', 'src/presentation/ui/ui-tabs.js');
-    logCompatMapping('refreshAssetScanStatus', 'src/presentation/ui/ui-inspectors.js');
-    logCompatMapping('refreshItemInspector', 'src/presentation/ui/ui-inspectors.js');
-    logCompatMapping('refreshPlayerInspector', 'src/presentation/ui/ui-inspectors.js');
-    logCompatMapping('refreshWorldInspector', 'src/presentation/ui/ui-inspectors.js');
-    logCompatMapping('refreshInspectorPanels', 'src/presentation/ui/ui-inspectors.js');
-    logCompatMapping('setHabboLibraryVisibility', 'src/presentation/ui/ui-habbo-library.js');
-    logCompatMapping('renderHabboLibraryBrowser', 'src/presentation/ui/ui-habbo-library.js');
-    logCompatMapping('openHabboLibraryBrowser', 'src/presentation/ui/ui-habbo-library.js');
-    logCompatMapping('bindHabboLibraryUi', 'src/presentation/ui/ui-habbo-library.js');
-    logCompatMapping('canvas', 'src/presentation/shell/dom-registry.js');
-    logCompatMapping('ui', 'src/presentation/shell/dom-registry.js');
-    logCompatMapping('mouse', 'src/core/state/runtime-state.js');
-    logCompatMapping('camera', 'src/core/state/runtime-state.js');
-    logCompatMapping('settings', 'src/core/state/runtime-state.js');
-    logCompatMapping('editor', 'src/core/state/runtime-state.js');
-    logCompatMapping('player', 'src/core/state/runtime-state.js');
-    logCompatMapping('inspectorState', 'src/core/state/runtime-state.js');
-  }
-  markRefactorCheckpoint('Cleanup', 'cleanup-ready', {
-    owner: 'src/infrastructure/legacy/state.js',
-    removedLegacyEntries: 6,
-    removedCompatMappings: 6,
-    removedFallbackRoutes: 1,
-    keptCompatMappings: 43,
-    keptFallbackRoutes: 2
-  });
-  if (typeof refactorLogCurrent === 'function') {
-    refactorLogCurrent('Cleanup', 'cleanup-legacy-entry removed -> requestPrefabSelectRefresh', { owner: 'src/infrastructure/assets/asset-management.js', reason: 'unused-global-alias' });
-    refactorLogCurrent('Cleanup', 'cleanup-legacy-entry removed -> window.initializeMainApp', { owner: 'src/presentation/shell/app-shell.js', reason: 'use-app-shell-api-object' });
-    refactorLogCurrent('Cleanup', 'cleanup-legacy-entry removed -> window.bootstrapApplication', { owner: 'src/presentation/shell/app-shell.js', reason: 'api-object-only' });
-    refactorLogCurrent('Cleanup', 'cleanup-legacy-entry removed -> window.bindApplicationModules', { owner: 'src/presentation/shell/app-shell.js', reason: 'api-object-only' });
-    refactorLogCurrent('Cleanup', 'cleanup-legacy-entry removed -> window.runStartupRestorePipeline', { owner: 'src/presentation/shell/app-shell.js', reason: 'api-object-only' });
-    refactorLogCurrent('Cleanup', 'cleanup-legacy-entry removed -> window.runStartupAssetPipeline', { owner: 'src/presentation/shell/app-shell.js', reason: 'api-object-only' });
-
-    refactorLogCurrent('Cleanup', 'cleanup-compat-mapping removed -> importPrefabDefinition', { owner: 'src/infrastructure/legacy/state.js', reason: 'asset-import-self-reported' });
-    refactorLogCurrent('Cleanup', 'cleanup-compat-mapping removed -> registerImportedPrefab', { owner: 'src/infrastructure/legacy/state.js', reason: 'asset-import-self-reported' });
-    refactorLogCurrent('Cleanup', 'cleanup-compat-mapping removed -> prepareImportedPrefabForPlacement', { owner: 'src/infrastructure/legacy/state.js', reason: 'asset-import-self-reported' });
-    refactorLogCurrent('Cleanup', 'cleanup-compat-mapping removed -> selectImportedPrefabForEditor', { owner: 'src/infrastructure/legacy/state.js', reason: 'asset-import-self-reported' });
-    refactorLogCurrent('Cleanup', 'cleanup-compat-mapping removed -> enterPlacementModeForImportedPrefab', { owner: 'src/infrastructure/legacy/state.js', reason: 'asset-import-self-reported' });
-    refactorLogCurrent('Cleanup', 'cleanup-compat-mapping removed -> dedupeImportedPrefab', { owner: 'src/infrastructure/legacy/state.js', reason: 'asset-import-self-reported' });
-
-    refactorLogCurrent('Cleanup', 'cleanup-compat-mapping kept -> saveScene', { reason: 'still-needed-across-ui-and-app-shell' });
-    refactorLogCurrent('Cleanup', 'cleanup-compat-mapping kept -> loadScene', { reason: 'still-needed-across-ui-and-app-shell' });
-    refactorLogCurrent('Cleanup', 'cleanup-compat-mapping kept -> refreshInspectorPanels', { reason: 'still-needed-across-import-placement-and-selection' });
-    refactorLogCurrent('Cleanup', 'cleanup-compat-mapping kept -> editor/runtime globals', { reason: 'unsafe-to-remove-before-final-render-pass' });
-
-    refactorLogCurrent('Cleanup', 'cleanup-fallback-route removed -> src/presentation/shell/app.js:initializeMainApp-missing', { owner: 'src/presentation/shell/app.js', reason: 'app-shell-api-required' });
-    refactorLogCurrent('Cleanup', 'cleanup-fallback-route kept -> asset-management-ownership-check', { owner: 'src/infrastructure/assets/asset-management.js', reason: 'unsafe-to-remove' });
-    refactorLogCurrent('Cleanup', 'cleanup-fallback-route kept -> legacy-habbo-prefab-repair', { owner: 'src/infrastructure/legacy/state.js', reason: 'still-needed-for-flat-habbo-recovery' });
-  }
+if (__legacyStateBridgeApi && typeof __legacyStateBridgeApi.reportLegacyStateBootOwnership === 'function') {
+  __legacyStateBridgeApi.reportLegacyStateBootOwnership();
 }
 
 

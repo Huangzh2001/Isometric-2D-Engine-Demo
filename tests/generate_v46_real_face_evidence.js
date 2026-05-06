@@ -54,5 +54,8 @@ const evidence = {
     }
   }
 };
-fs.writeFileSync(path.join(__dirname, '..', 'v46_real_face_evidence.json'), JSON.stringify(evidence, null, 2));
-console.log('v46_real_face_evidence.json written');
+const outDir = path.join(__dirname, '..', 'docs', 'evidence');
+fs.mkdirSync(outDir, { recursive: true });
+const out = path.join(outDir, 'v46_real_face_evidence.json');
+fs.writeFileSync(out, JSON.stringify(evidence, null, 2));
+console.log('wrote', out);

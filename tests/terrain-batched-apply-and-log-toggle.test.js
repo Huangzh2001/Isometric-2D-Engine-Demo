@@ -11,6 +11,7 @@ const uiJs = read('src/presentation/ui/ui.js');
 const runtimeState = read('src/core/state/runtime-state.js');
 const terrainCore = read('src/core/domain/terrain-generator-core.js');
 const appControllers = read('src/application/controllers/app-controllers.js');
+const terrainGenerationController = read('src/application/controllers/terrain-generation-controller.js');
 const appShell = read('src/presentation/shell/app.js');
 const renderJs = read('src/presentation/render/render.js');
 const staticWorldCache = read('src/presentation/render/static-world-cache.js');
@@ -21,7 +22,7 @@ assert(runtimeState.includes('terrainDetailedProfilingEnabled: false'), 'runtime
 assert(terrainCore.includes('terrainDetailedProfilingEnabled: false'), 'terrain core defaults should include detailed terrain profiling flag');
 assert(appControllers.includes('tickMainEditorTerrainApply'), 'main controller should expose terrain apply tick');
 assert(appControllers.includes('replaceCurrentSceneGraph'), 'terrain batching should use replaceCurrentSceneGraph for staged scene updates');
-assert(appControllers.includes("applyMode: 'batched'"), 'terrain generate should report batched apply mode');
+assert(terrainGenerationController.includes("applyMode: 'batched'"), 'terrain generate should report batched apply mode');
 assert(appShell.includes('tickMainEditorTerrainApply'), 'main app loop should advance terrain apply batches');
 assert(renderJs.includes('terrainDetailedProfilingEnabled'), 'render terrain settings should include detailed terrain profiling flag');
 assert(staticWorldCache.includes('terrainDetailedProfilingEnabled'), 'static world cache should consult terrain detailed profiling flag');

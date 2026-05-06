@@ -1,0 +1,693 @@
+{
+  "schema": "main-editor-placed-semantic-face-evidence/v50",
+  "cubeFacing0": {
+    "prefabId": "debug_cube_5faces",
+    "facing": 0,
+    "visibleSemanticFaces": [
+      "top",
+      "south",
+      "east"
+    ],
+    "renderedFaces": [
+      {
+        "faceId": "instance:debug_cube_5faces:4,4,0:lowerRight:east",
+        "semanticFace": "east",
+        "screenFace": "lowerRight",
+        "textureId": "debug.semantic.east.solid-green",
+        "color": "#27AE60",
+        "depthKey": 8001,
+        "polygon": [
+          {
+            "x": 5,
+            "y": 4,
+            "z": 0
+          },
+          {
+            "x": 5,
+            "y": 5,
+            "z": 0
+          },
+          {
+            "x": 5,
+            "y": 5,
+            "z": 1
+          },
+          {
+            "x": 5,
+            "y": 4,
+            "z": 1
+          }
+        ]
+      },
+      {
+        "faceId": "instance:debug_cube_5faces:4,4,0:lowerLeft:south",
+        "semanticFace": "south",
+        "screenFace": "lowerLeft",
+        "textureId": "debug.semantic.south.solid-yellow",
+        "color": "#F2C94C",
+        "depthKey": 8002,
+        "polygon": [
+          {
+            "x": 4,
+            "y": 5,
+            "z": 0
+          },
+          {
+            "x": 5,
+            "y": 5,
+            "z": 0
+          },
+          {
+            "x": 5,
+            "y": 5,
+            "z": 1
+          },
+          {
+            "x": 4,
+            "y": 5,
+            "z": 1
+          }
+        ]
+      },
+      {
+        "faceId": "instance:debug_cube_5faces:4,4,0:top:top",
+        "semanticFace": "top",
+        "screenFace": "top",
+        "textureId": "debug.semantic.top.solid-blue",
+        "color": "#2F80ED",
+        "depthKey": 8003,
+        "polygon": [
+          {
+            "x": 4,
+            "y": 4,
+            "z": 1
+          },
+          {
+            "x": 5,
+            "y": 4,
+            "z": 1
+          },
+          {
+            "x": 5,
+            "y": 5,
+            "z": 1
+          },
+          {
+            "x": 4,
+            "y": 5,
+            "z": 1
+          }
+        ]
+      }
+    ],
+    "faceDrawOrder": [
+      "instance:debug_cube_5faces:4,4,0:lowerRight:east",
+      "instance:debug_cube_5faces:4,4,0:lowerLeft:south",
+      "instance:debug_cube_5faces:4,4,0:top:top"
+    ],
+    "topTexture": {
+      "textureId": "debug.semantic.top.solid-blue",
+      "kind": "solid-color",
+      "color": "#2F80ED",
+      "semanticFace": "top"
+    },
+    "northTexture": {
+      "textureId": "debug.semantic.north.solid-red",
+      "kind": "solid-color",
+      "color": "#E74C3C",
+      "semanticFace": "north"
+    },
+    "eastTexture": {
+      "textureId": "debug.semantic.east.solid-green",
+      "kind": "solid-color",
+      "color": "#27AE60",
+      "semanticFace": "east"
+    },
+    "southTexture": {
+      "textureId": "debug.semantic.south.solid-yellow",
+      "kind": "solid-color",
+      "color": "#F2C94C",
+      "semanticFace": "south"
+    },
+    "westTexture": {
+      "textureId": "debug.semantic.west.solid-purple",
+      "kind": "solid-color",
+      "color": "#9B51E0",
+      "semanticFace": "west"
+    },
+    "renderedAsRealFaces": true,
+    "renderedAsOverlay": false,
+    "helperLayerUsed": false,
+    "boxBaseUsedForDebugFaces": false
+  },
+  "cubeFacing1": {
+    "prefabId": "debug_cube_5faces",
+    "facing": 1,
+    "visibleSemanticFaces": [
+      "top",
+      "east",
+      "north"
+    ],
+    "renderedFaces": [
+      {
+        "faceId": "instance:debug_cube_5faces:4,4,0:lowerRight:north",
+        "semanticFace": "north",
+        "screenFace": "lowerRight",
+        "textureId": "debug.semantic.north.solid-red",
+        "color": "#E74C3C",
+        "depthKey": 8001,
+        "polygon": [
+          {
+            "x": 4,
+            "y": 4,
+            "z": 1
+          },
+          {
+            "x": 5,
+            "y": 4,
+            "z": 1
+          },
+          {
+            "x": 5,
+            "y": 4,
+            "z": 0
+          },
+          {
+            "x": 4,
+            "y": 4,
+            "z": 0
+          }
+        ]
+      },
+      {
+        "faceId": "instance:debug_cube_5faces:4,4,0:lowerLeft:east",
+        "semanticFace": "east",
+        "screenFace": "lowerLeft",
+        "textureId": "debug.semantic.east.solid-green",
+        "color": "#27AE60",
+        "depthKey": 8002,
+        "polygon": [
+          {
+            "x": 5,
+            "y": 4,
+            "z": 0
+          },
+          {
+            "x": 5,
+            "y": 5,
+            "z": 0
+          },
+          {
+            "x": 5,
+            "y": 5,
+            "z": 1
+          },
+          {
+            "x": 5,
+            "y": 4,
+            "z": 1
+          }
+        ]
+      },
+      {
+        "faceId": "instance:debug_cube_5faces:4,4,0:top:top",
+        "semanticFace": "top",
+        "screenFace": "top",
+        "textureId": "debug.semantic.top.solid-blue",
+        "color": "#2F80ED",
+        "depthKey": 8003,
+        "polygon": [
+          {
+            "x": 4,
+            "y": 4,
+            "z": 1
+          },
+          {
+            "x": 5,
+            "y": 4,
+            "z": 1
+          },
+          {
+            "x": 5,
+            "y": 5,
+            "z": 1
+          },
+          {
+            "x": 4,
+            "y": 5,
+            "z": 1
+          }
+        ]
+      }
+    ],
+    "faceDrawOrder": [
+      "instance:debug_cube_5faces:4,4,0:lowerRight:north",
+      "instance:debug_cube_5faces:4,4,0:lowerLeft:east",
+      "instance:debug_cube_5faces:4,4,0:top:top"
+    ],
+    "topTexture": {
+      "textureId": "debug.semantic.top.solid-blue",
+      "kind": "solid-color",
+      "color": "#2F80ED",
+      "semanticFace": "top"
+    },
+    "northTexture": {
+      "textureId": "debug.semantic.north.solid-red",
+      "kind": "solid-color",
+      "color": "#E74C3C",
+      "semanticFace": "north"
+    },
+    "eastTexture": {
+      "textureId": "debug.semantic.east.solid-green",
+      "kind": "solid-color",
+      "color": "#27AE60",
+      "semanticFace": "east"
+    },
+    "southTexture": {
+      "textureId": "debug.semantic.south.solid-yellow",
+      "kind": "solid-color",
+      "color": "#F2C94C",
+      "semanticFace": "south"
+    },
+    "westTexture": {
+      "textureId": "debug.semantic.west.solid-purple",
+      "kind": "solid-color",
+      "color": "#9B51E0",
+      "semanticFace": "west"
+    },
+    "renderedAsRealFaces": true,
+    "renderedAsOverlay": false,
+    "helperLayerUsed": false,
+    "boxBaseUsedForDebugFaces": false
+  },
+  "rectFacing0": {
+    "prefabId": "debug_rect_2x1_5faces",
+    "facing": 0,
+    "visibleSemanticFaces": [
+      "top",
+      "south",
+      "east"
+    ],
+    "renderedFaces": [
+      {
+        "faceId": "instance:debug_rect_2x1_5faces:1,1,0:lowerLeft:south",
+        "semanticFace": "south",
+        "screenFace": "lowerLeft",
+        "textureId": "debug.semantic.south.solid-yellow",
+        "color": "#F2C94C",
+        "depthKey": 2002,
+        "polygon": [
+          {
+            "x": 1,
+            "y": 2,
+            "z": 0
+          },
+          {
+            "x": 2,
+            "y": 2,
+            "z": 0
+          },
+          {
+            "x": 2,
+            "y": 2,
+            "z": 1
+          },
+          {
+            "x": 1,
+            "y": 2,
+            "z": 1
+          }
+        ]
+      },
+      {
+        "faceId": "instance:debug_rect_2x1_5faces:1,1,0:top:top",
+        "semanticFace": "top",
+        "screenFace": "top",
+        "textureId": "debug.semantic.top.solid-blue",
+        "color": "#2F80ED",
+        "depthKey": 2003,
+        "polygon": [
+          {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          {
+            "x": 2,
+            "y": 1,
+            "z": 1
+          },
+          {
+            "x": 2,
+            "y": 2,
+            "z": 1
+          },
+          {
+            "x": 1,
+            "y": 2,
+            "z": 1
+          }
+        ]
+      },
+      {
+        "faceId": "instance:debug_rect_2x1_5faces:2,1,0:lowerRight:east",
+        "semanticFace": "east",
+        "screenFace": "lowerRight",
+        "textureId": "debug.semantic.east.solid-green",
+        "color": "#27AE60",
+        "depthKey": 3001.001,
+        "polygon": [
+          {
+            "x": 3,
+            "y": 1,
+            "z": 0
+          },
+          {
+            "x": 3,
+            "y": 2,
+            "z": 0
+          },
+          {
+            "x": 3,
+            "y": 2,
+            "z": 1
+          },
+          {
+            "x": 3,
+            "y": 1,
+            "z": 1
+          }
+        ]
+      },
+      {
+        "faceId": "instance:debug_rect_2x1_5faces:2,1,0:lowerLeft:south",
+        "semanticFace": "south",
+        "screenFace": "lowerLeft",
+        "textureId": "debug.semantic.south.solid-yellow",
+        "color": "#F2C94C",
+        "depthKey": 3002.001,
+        "polygon": [
+          {
+            "x": 2,
+            "y": 2,
+            "z": 0
+          },
+          {
+            "x": 3,
+            "y": 2,
+            "z": 0
+          },
+          {
+            "x": 3,
+            "y": 2,
+            "z": 1
+          },
+          {
+            "x": 2,
+            "y": 2,
+            "z": 1
+          }
+        ]
+      },
+      {
+        "faceId": "instance:debug_rect_2x1_5faces:2,1,0:top:top",
+        "semanticFace": "top",
+        "screenFace": "top",
+        "textureId": "debug.semantic.top.solid-blue",
+        "color": "#2F80ED",
+        "depthKey": 3003.001,
+        "polygon": [
+          {
+            "x": 2,
+            "y": 1,
+            "z": 1
+          },
+          {
+            "x": 3,
+            "y": 1,
+            "z": 1
+          },
+          {
+            "x": 3,
+            "y": 2,
+            "z": 1
+          },
+          {
+            "x": 2,
+            "y": 2,
+            "z": 1
+          }
+        ]
+      }
+    ],
+    "faceDrawOrder": [
+      "instance:debug_rect_2x1_5faces:1,1,0:lowerLeft:south",
+      "instance:debug_rect_2x1_5faces:1,1,0:top:top",
+      "instance:debug_rect_2x1_5faces:2,1,0:lowerRight:east",
+      "instance:debug_rect_2x1_5faces:2,1,0:lowerLeft:south",
+      "instance:debug_rect_2x1_5faces:2,1,0:top:top"
+    ],
+    "topTexture": {
+      "textureId": "debug.semantic.top.solid-blue",
+      "kind": "solid-color",
+      "color": "#2F80ED",
+      "semanticFace": "top"
+    },
+    "northTexture": {
+      "textureId": "debug.semantic.north.solid-red",
+      "kind": "solid-color",
+      "color": "#E74C3C",
+      "semanticFace": "north"
+    },
+    "eastTexture": {
+      "textureId": "debug.semantic.east.solid-green",
+      "kind": "solid-color",
+      "color": "#27AE60",
+      "semanticFace": "east"
+    },
+    "southTexture": {
+      "textureId": "debug.semantic.south.solid-yellow",
+      "kind": "solid-color",
+      "color": "#F2C94C",
+      "semanticFace": "south"
+    },
+    "westTexture": {
+      "textureId": "debug.semantic.west.solid-purple",
+      "kind": "solid-color",
+      "color": "#9B51E0",
+      "semanticFace": "west"
+    },
+    "renderedAsRealFaces": true,
+    "renderedAsOverlay": false,
+    "helperLayerUsed": false,
+    "boxBaseUsedForDebugFaces": false
+  },
+  "rectFacing1": {
+    "prefabId": "debug_rect_2x1_5faces",
+    "facing": 1,
+    "visibleSemanticFaces": [
+      "top",
+      "east",
+      "north"
+    ],
+    "renderedFaces": [
+      {
+        "faceId": "instance:debug_rect_2x1_5faces:1,1,0:lowerRight:north",
+        "semanticFace": "north",
+        "screenFace": "lowerRight",
+        "textureId": "debug.semantic.north.solid-red",
+        "color": "#E74C3C",
+        "depthKey": 2001,
+        "polygon": [
+          {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          {
+            "x": 2,
+            "y": 1,
+            "z": 1
+          },
+          {
+            "x": 2,
+            "y": 1,
+            "z": 0
+          },
+          {
+            "x": 1,
+            "y": 1,
+            "z": 0
+          }
+        ]
+      },
+      {
+        "faceId": "instance:debug_rect_2x1_5faces:1,1,0:lowerLeft:east",
+        "semanticFace": "east",
+        "screenFace": "lowerLeft",
+        "textureId": "debug.semantic.east.solid-green",
+        "color": "#27AE60",
+        "depthKey": 2002,
+        "polygon": [
+          {
+            "x": 2,
+            "y": 1,
+            "z": 0
+          },
+          {
+            "x": 2,
+            "y": 2,
+            "z": 0
+          },
+          {
+            "x": 2,
+            "y": 2,
+            "z": 1
+          },
+          {
+            "x": 2,
+            "y": 1,
+            "z": 1
+          }
+        ]
+      },
+      {
+        "faceId": "instance:debug_rect_2x1_5faces:1,1,0:top:top",
+        "semanticFace": "top",
+        "screenFace": "top",
+        "textureId": "debug.semantic.top.solid-blue",
+        "color": "#2F80ED",
+        "depthKey": 2003,
+        "polygon": [
+          {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          {
+            "x": 2,
+            "y": 1,
+            "z": 1
+          },
+          {
+            "x": 2,
+            "y": 2,
+            "z": 1
+          },
+          {
+            "x": 1,
+            "y": 2,
+            "z": 1
+          }
+        ]
+      },
+      {
+        "faceId": "instance:debug_rect_2x1_5faces:1,2,0:lowerLeft:east",
+        "semanticFace": "east",
+        "screenFace": "lowerLeft",
+        "textureId": "debug.semantic.east.solid-green",
+        "color": "#27AE60",
+        "depthKey": 3002.001,
+        "polygon": [
+          {
+            "x": 2,
+            "y": 2,
+            "z": 0
+          },
+          {
+            "x": 2,
+            "y": 3,
+            "z": 0
+          },
+          {
+            "x": 2,
+            "y": 3,
+            "z": 1
+          },
+          {
+            "x": 2,
+            "y": 2,
+            "z": 1
+          }
+        ]
+      },
+      {
+        "faceId": "instance:debug_rect_2x1_5faces:1,2,0:top:top",
+        "semanticFace": "top",
+        "screenFace": "top",
+        "textureId": "debug.semantic.top.solid-blue",
+        "color": "#2F80ED",
+        "depthKey": 3003.001,
+        "polygon": [
+          {
+            "x": 1,
+            "y": 2,
+            "z": 1
+          },
+          {
+            "x": 2,
+            "y": 2,
+            "z": 1
+          },
+          {
+            "x": 2,
+            "y": 3,
+            "z": 1
+          },
+          {
+            "x": 1,
+            "y": 3,
+            "z": 1
+          }
+        ]
+      }
+    ],
+    "faceDrawOrder": [
+      "instance:debug_rect_2x1_5faces:1,1,0:lowerRight:north",
+      "instance:debug_rect_2x1_5faces:1,1,0:lowerLeft:east",
+      "instance:debug_rect_2x1_5faces:1,1,0:top:top",
+      "instance:debug_rect_2x1_5faces:1,2,0:lowerLeft:east",
+      "instance:debug_rect_2x1_5faces:1,2,0:top:top"
+    ],
+    "topTexture": {
+      "textureId": "debug.semantic.top.solid-blue",
+      "kind": "solid-color",
+      "color": "#2F80ED",
+      "semanticFace": "top"
+    },
+    "northTexture": {
+      "textureId": "debug.semantic.north.solid-red",
+      "kind": "solid-color",
+      "color": "#E74C3C",
+      "semanticFace": "north"
+    },
+    "eastTexture": {
+      "textureId": "debug.semantic.east.solid-green",
+      "kind": "solid-color",
+      "color": "#27AE60",
+      "semanticFace": "east"
+    },
+    "southTexture": {
+      "textureId": "debug.semantic.south.solid-yellow",
+      "kind": "solid-color",
+      "color": "#F2C94C",
+      "semanticFace": "south"
+    },
+    "westTexture": {
+      "textureId": "debug.semantic.west.solid-purple",
+      "kind": "solid-color",
+      "color": "#9B51E0",
+      "semanticFace": "west"
+    },
+    "renderedAsRealFaces": true,
+    "renderedAsOverlay": false,
+    "helperLayerUsed": false,
+    "boxBaseUsedForDebugFaces": false
+  },
+  "sourceContracts": {
+    "placedFaceBuilderExists": true,
+    "staticCacheExcludesDebugPrefabs": false,
+    "placedModeLogExists": true,
+    "overlayDisabled": true
+  }
+}

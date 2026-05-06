@@ -1,4 +1,6 @@
 // v1 split file generated from original monolithic app.js
+// P11a-3 note: preview update and screen picking are delegated to
+// src/presentation/render/interaction/render-preview-interaction-controller.js.
 // 注意：此文件为保持行为稳定的第一刀拆分，允许存在少量跨层函数。
 
 function faceColors(base) {
@@ -11,49 +13,229 @@ function faceColors(base) {
   };
 }
 
+function getCanvas2dDrawPrimitivesApiForRender() {
+  try {
+    if (typeof window !== 'undefined') {
+      return window.__APP_PRESENTATION_CANVAS2D_DRAW_PRIMITIVES__ || window.__CANVAS2D_DRAW_PRIMITIVES__ || window.IsometricCanvas2dDrawPrimitives || null;
+    }
+    if (typeof globalThis !== 'undefined') {
+      return globalThis.__APP_PRESENTATION_CANVAS2D_DRAW_PRIMITIVES__ || globalThis.__CANVAS2D_DRAW_PRIMITIVES__ || globalThis.IsometricCanvas2dDrawPrimitives || null;
+    }
+  } catch (_) {}
+  return null;
+}
+
+function requireCanvas2dDrawPrimitivesForRender() {
+  var api = getCanvas2dDrawPrimitivesApiForRender();
+  if (!api) throw new Error('canvas2d-draw-primitives.js must load before presentation/render/render.js');
+  return api;
+}
+
+function getCanvas2dShadowOverlaysApiForRender() {
+  try {
+    if (typeof window !== 'undefined') {
+      return window.__APP_PRESENTATION_CANVAS2D_SHADOW_OVERLAYS__ || window.__CANVAS2D_SHADOW_OVERLAYS__ || window.IsometricCanvas2dShadowOverlays || null;
+    }
+    if (typeof globalThis !== 'undefined') {
+      return globalThis.__APP_PRESENTATION_CANVAS2D_SHADOW_OVERLAYS__ || globalThis.__CANVAS2D_SHADOW_OVERLAYS__ || globalThis.IsometricCanvas2dShadowOverlays || null;
+    }
+  } catch (_) {}
+  return null;
+}
+
+function requireCanvas2dShadowOverlaysForRender() {
+  var api = getCanvas2dShadowOverlaysApiForRender();
+  if (!api) throw new Error('canvas2d-shadow-overlays.js must load before presentation/render/render.js');
+  return api;
+}
+
+function getCanvas2dShadowOverlayCacheApiForRender() {
+  try {
+    if (typeof window !== 'undefined') {
+      return window.__APP_PRESENTATION_CANVAS2D_SHADOW_OVERLAY_CACHE__ || window.__CANVAS2D_SHADOW_OVERLAY_CACHE__ || window.IsometricCanvas2dShadowOverlayCache || null;
+    }
+    if (typeof globalThis !== 'undefined') {
+      return globalThis.__APP_PRESENTATION_CANVAS2D_SHADOW_OVERLAY_CACHE__ || globalThis.__CANVAS2D_SHADOW_OVERLAY_CACHE__ || globalThis.IsometricCanvas2dShadowOverlayCache || null;
+    }
+  } catch (_) {}
+  return null;
+}
+
+function requireCanvas2dShadowOverlayCacheForRender() {
+  var api = getCanvas2dShadowOverlayCacheApiForRender();
+  if (!api) throw new Error('canvas2d-shadow-overlay-cache.js must load before presentation/render/render.js');
+  return api;
+}
+
+function createCanvas2dShadowOverlayCacheDepsForRender() {
+  return {
+    iso: typeof iso === 'function' ? iso : null,
+    screenPointsFromWorldFaceNoCamera: typeof screenPointsFromWorldFaceNoCamera === 'function' ? screenPointsFromWorldFaceNoCamera : null,
+    perfNow: typeof perfNow === 'function' ? perfNow : null,
+    boxesShadowSignature: typeof boxesShadowSignature === 'function' ? boxesShadowSignature : null,
+    boxes: typeof boxes !== 'undefined' ? boxes : [],
+    lightState: typeof lightState !== 'undefined' ? lightState : null,
+    isLightingSystemEnabled: typeof isLightingSystemEnabled === 'function' ? isLightingSystemEnabled : null,
+    getShadowDebugRenderLights: typeof getShadowDebugRenderLights === 'function' ? getShadowDebugRenderLights : null,
+    getLightingRenderLights: typeof getLightingRenderLights === 'function' ? getLightingRenderLights : null,
+    lights: typeof lights !== 'undefined' ? lights : [],
+    noteShadowOverlayCache: typeof noteShadowOverlayCache === 'function' ? noteShadowOverlayCache : null,
+    dbgSimpleHash: typeof dbgSimpleHash === 'function' ? dbgSimpleHash : null,
+    cameraSignatureForDebug: typeof cameraSignatureForDebug === 'function' ? cameraSignatureForDebug : null,
+    collectProjectedShadowPolysForReceiver: typeof collectProjectedShadowPolysForReceiver === 'function' ? collectProjectedShadowPolysForReceiver : null
+  };
+}
+
+function createCanvas2dShadowOverlayDepsForRender() {
+  return {
+    viewW: typeof VIEW_W !== 'undefined' ? VIEW_W : 0,
+    viewH: typeof VIEW_H !== 'undefined' ? VIEW_H : 0,
+    ensureShadowPolyUnionCanvas: typeof ensureShadowPolyUnionCanvas === 'function' ? ensureShadowPolyUnionCanvas : null,
+    fillShadowUnionWithDistanceFade: typeof fillShadowUnionWithDistanceFade === 'function' ? fillShadowUnionWithDistanceFade : null,
+    drawUnionShadowCanvasToTarget: typeof drawUnionShadowCanvasToTarget === 'function' ? drawUnionShadowCanvasToTarget : null,
+    clamp: typeof clamp === 'function' ? clamp : null,
+    shadowDebugLog: typeof shadowDebugLog === 'function' ? shadowDebugLog : null,
+    shadowDebugDetailed: typeof shadowDebugDetailed !== 'undefined' ? !!shadowDebugDetailed : false,
+    logScreenOverlayDebug: typeof logScreenOverlayDebug === 'function' ? logScreenOverlayDebug : null,
+    shadowProbeMatchReceiver: typeof shadowProbeMatchReceiver === 'function' ? shadowProbeMatchReceiver : null,
+    lightState: typeof lightState !== 'undefined' ? lightState : null,
+    shadowStrokeCss: typeof shadowStrokeCss === 'function' ? shadowStrokeCss : null
+  };
+}
+
+
+function getCanvas2dStaticWorldFaceDrawPassApiForRender() {
+  try {
+    if (typeof window !== 'undefined') {
+      return window.__APP_PRESENTATION_CANVAS2D_STATIC_WORLD_FACE_DRAW_PASS__ || window.__CANVAS2D_STATIC_WORLD_FACE_DRAW_PASS__ || window.IsometricCanvas2dStaticWorldFaceDrawPass || null;
+    }
+    if (typeof globalThis !== 'undefined') {
+      return globalThis.__APP_PRESENTATION_CANVAS2D_STATIC_WORLD_FACE_DRAW_PASS__ || globalThis.__CANVAS2D_STATIC_WORLD_FACE_DRAW_PASS__ || globalThis.IsometricCanvas2dStaticWorldFaceDrawPass || null;
+    }
+  } catch (_) {}
+  return null;
+}
+
+function requireCanvas2dStaticWorldFaceDrawPassForRender() {
+  var api = getCanvas2dStaticWorldFaceDrawPassApiForRender();
+  if (!api) throw new Error('canvas2d-static-world-face-draw-pass.js must load before presentation/render/render.js');
+  return api;
+}
+
+function createCanvas2dStaticWorldFaceDrawPassDepsForRender() {
+  return {
+    ctx: typeof ctx !== 'undefined' ? ctx : null,
+    camera: typeof camera !== 'undefined' ? camera : null,
+    settings: typeof settings !== 'undefined' ? settings : null,
+    screenPointsFromWorldFaceNoCamera: typeof screenPointsFromWorldFaceNoCamera === 'function' ? screenPointsFromWorldFaceNoCamera : null,
+    worldShadowOverlaysToNoCamera: typeof worldShadowOverlaysToNoCamera === 'function' ? worldShadowOverlaysToNoCamera : null,
+    buildPath2DFromPoints: typeof buildPath2DFromPoints === 'function' ? buildPath2DFromPoints : null,
+    buildPath2DFromLoops: typeof buildPath2DFromLoops === 'function' ? buildPath2DFromLoops : null,
+    buildPath2DFromSegments: typeof buildPath2DFromSegments === 'function' ? buildPath2DFromSegments : null,
+    drawPoly: typeof drawPoly === 'function' ? drawPoly : null,
+    drawPolyWithOffset: typeof drawPolyWithOffset === 'function' ? drawPolyWithOffset : null,
+    drawFaceShadowOverlays: typeof drawFaceShadowOverlays === 'function' ? drawFaceShadowOverlays : null,
+    drawFaceShadowOverlaysNoCamera: typeof drawFaceShadowOverlaysNoCamera === 'function' ? drawFaceShadowOverlaysNoCamera : null,
+    applyTerrainMaterialPatternOverlay: typeof applyTerrainMaterialPatternOverlay === 'function' ? applyTerrainMaterialPatternOverlay : null,
+    getTerrainTopBoundaryRenderDebugSignature: typeof getTerrainTopBoundaryRenderDebugSignature === 'function' ? getTerrainTopBoundaryRenderDebugSignature : null,
+    getTerrainTopBoundaryStrokeWidthForPacket: typeof getTerrainTopBoundaryStrokeWidthForPacket === 'function' ? getTerrainTopBoundaryStrokeWidthForPacket : null,
+    getTerrainTopBoundaryStrokeStyleForPacket: typeof getTerrainTopBoundaryStrokeStyleForPacket === 'function' ? getTerrainTopBoundaryStrokeStyleForPacket : null,
+    normalizeMainEditorViewRotationValue: typeof normalizeMainEditorViewRotationValue === 'function' ? normalizeMainEditorViewRotationValue : null,
+    getSafeMainEditorViewRotation: typeof getSafeMainEditorViewRotation === 'function' ? getSafeMainEditorViewRotation : null
+  };
+}
+
+
+function getStaticWorldFrameMaterializerApiForRender() {
+  try {
+    if (typeof window !== 'undefined' && window.__APP_PRESENTATION_STATIC_WORLD_FRAME_MATERIALIZER__) return window.__APP_PRESENTATION_STATIC_WORLD_FRAME_MATERIALIZER__;
+    if (typeof window !== 'undefined' && window.__STATIC_WORLD_FRAME_MATERIALIZER__) return window.__STATIC_WORLD_FRAME_MATERIALIZER__;
+    if (typeof window !== 'undefined' && window.IsometricStaticWorldFrameMaterializer) return window.IsometricStaticWorldFrameMaterializer;
+  } catch (_) {}
+  try {
+    if (typeof globalThis !== 'undefined' && globalThis.__APP_PRESENTATION_STATIC_WORLD_FRAME_MATERIALIZER__) return globalThis.__APP_PRESENTATION_STATIC_WORLD_FRAME_MATERIALIZER__;
+    if (typeof globalThis !== 'undefined' && globalThis.__STATIC_WORLD_FRAME_MATERIALIZER__) return globalThis.__STATIC_WORLD_FRAME_MATERIALIZER__;
+    if (typeof globalThis !== 'undefined' && globalThis.IsometricStaticWorldFrameMaterializer) return globalThis.IsometricStaticWorldFrameMaterializer;
+  } catch (_) {}
+  return null;
+}
+
+function requireStaticWorldFrameMaterializerForRender() {
+  var api = getStaticWorldFrameMaterializerApiForRender();
+  if (!api) throw new Error('static-world-frame-materializer.js must load before presentation/render/render.js');
+  return api;
+}
+
+function createStaticWorldFrameMaterializerDepsForRender() {
+  return {
+    averageScreenPoint: averageScreenPoint,
+    drawCachedVoxelFaceRenderable: drawCachedVoxelFaceRenderable,
+    getDomainSceneCoreApi: getDomainSceneCoreApi,
+    computeViewAwareSortMeta: computeViewAwareSortMeta,
+    screenPointsFromWorldFace: screenPointsFromWorldFace,
+    worldShadowOverlaysToScreen: worldShadowOverlaysToScreen,
+    compareRenderablesByDomain: compareRenderablesByDomain
+  };
+}
+
+// P11a-5 note: static world frame materialization helpers are delegated to
+// presentation/render/renderables/static-world-frame-materializer.js; render.js
+// keeps compatibility wrappers only.
+
+function getStaticRenderableColorCacheApiForRender() {
+  try {
+    if (typeof window !== 'undefined' && window.__APP_PRESENTATION_STATIC_RENDERABLE_COLOR_CACHE__) return window.__APP_PRESENTATION_STATIC_RENDERABLE_COLOR_CACHE__;
+    if (typeof window !== 'undefined' && window.__STATIC_RENDERABLE_COLOR_CACHE__) return window.__STATIC_RENDERABLE_COLOR_CACHE__;
+    if (typeof window !== 'undefined' && window.IsometricStaticRenderableColorCache) return window.IsometricStaticRenderableColorCache;
+  } catch (_) {}
+  try {
+    if (typeof globalThis !== 'undefined' && globalThis.__APP_PRESENTATION_STATIC_RENDERABLE_COLOR_CACHE__) return globalThis.__APP_PRESENTATION_STATIC_RENDERABLE_COLOR_CACHE__;
+    if (typeof globalThis !== 'undefined' && globalThis.__STATIC_RENDERABLE_COLOR_CACHE__) return globalThis.__STATIC_RENDERABLE_COLOR_CACHE__;
+    if (typeof globalThis !== 'undefined' && globalThis.IsometricStaticRenderableColorCache) return globalThis.IsometricStaticRenderableColorCache;
+  } catch (_) {}
+  return null;
+}
+
+function requireStaticRenderableColorCacheForRender() {
+  var api = getStaticRenderableColorCacheApiForRender();
+  if (!api) throw new Error('static-renderable-color-cache.js must load before presentation/render/render.js');
+  return api;
+}
+
+function createStaticRenderableColorCacheDepsForRender() {
+  return {
+    perfNow: perfNow,
+    baseFaceColors: baseFaceColors,
+    rgbToCss: rgbToCss,
+    getTerrainRenderSettingsForRender: getTerrainRenderSettingsForRender,
+    getLightStateForRender: function () { return (typeof lightState !== 'undefined' ? lightState : null); },
+    staticBoxLightingSignature: (typeof staticBoxLightingSignature === 'function' ? staticBoxLightingSignature : null),
+    getTerrainMaterialIdForRenderCell: getTerrainMaterialIdForRenderCell,
+    getTerrainMaterialBaseFaceColorsForRenderCell: getTerrainMaterialBaseFaceColorsForRenderCell,
+    getBaseFaceFillRgbForSemanticFace: getBaseFaceFillRgbForSemanticFace,
+    litFaceColor: litFaceColor
+  };
+}
+
+// P11a-6 note: static renderable color mode, lighting signature, and fill
+// cache helpers are delegated to
+// presentation/render/renderables/static-renderable-color-cache.js; render.js
+// keeps compatibility wrappers only.
+
 function drawPoly(points, fill, stroke = 'rgba(0,0,0,.22)', width = 1) {
-  ctx.beginPath();
-  ctx.moveTo(points[0].x, points[0].y);
-  for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
-  ctx.closePath();
-  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
-  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = width; ctx.stroke(); }
+  return requireCanvas2dDrawPrimitivesForRender().drawPolyOn(ctx, points, fill, stroke, width);
 }
 
 function drawPolyWithOffset(points, offsetX, offsetY, fill, stroke = 'rgba(0,0,0,.22)', width = 1) {
-  if (!Array.isArray(points) || !points.length) return;
-  var dx = Number(offsetX || 0);
-  var dy = Number(offsetY || 0);
-  ctx.beginPath();
-  ctx.moveTo(Number(points[0].x || 0) + dx, Number(points[0].y || 0) + dy);
-  for (let i = 1; i < points.length; i++) ctx.lineTo(Number(points[i].x || 0) + dx, Number(points[i].y || 0) + dy);
-  ctx.closePath();
-  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
-  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = width; ctx.stroke(); }
+  return requireCanvas2dDrawPrimitivesForRender().drawPolyWithOffsetOn(ctx, points, offsetX, offsetY, fill, stroke, width);
 }
 
 function averagePointWithOffset(points, offsetX, offsetY) {
-  var pts = Array.isArray(points) ? points : [];
-  if (!pts.length) return { x: Number(offsetX || 0), y: Number(offsetY || 0) };
-  var sx = 0;
-  var sy = 0;
-  for (let i = 0; i < pts.length; i++) {
-    sx += Number(pts[i].x || 0);
-    sy += Number(pts[i].y || 0);
-  }
-  return { x: sx / pts.length + Number(offsetX || 0), y: sy / pts.length + Number(offsetY || 0) };
+  return requireCanvas2dDrawPrimitivesForRender().averagePointWithOffset(points, offsetX, offsetY);
 }
 
-function pointInPoly(p, poly) {
-  let inside = false;
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const xi = poly[i].x, yi = poly[i].y, xj = poly[j].x, yj = poly[j].y;
-    const intersect = ((yi > p.y) !== (yj > p.y)) && (p.x < (xj - xi) * (p.y - yi) / ((yj - yi) || 1e-9) + xi);
-    if (intersect) inside = !inside;
-  }
-  return inside;
-}
 
+// pointInPoly is owned by src/core/domain/spatial-geometry-core.js
 function cubePoints(x, y, z, w = 1, d = 1, h = 1) {
   return {
     p000: iso(x,     y,     z),
@@ -77,86 +259,36 @@ function projectedBounds(box) {
   return { minX, minY, maxX, maxY };
 }
 
-function polyBounds(poly) {
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const p of poly) {
-    minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
-  }
-  return { minX, minY, maxX, maxY };
-}
 
+// polyBounds is owned by src/core/domain/spatial-geometry-core.js
 function buildBoxFaces(box, alpha = 1) {
   // 保留兼容接口：单个 box 的可见外表面（不是内部面）
   return buildSurfaceFaces([box], alpha, false);
 }
 
-function overlap2D(a, b) {
-  return !(a.maxX <= b.minX || a.minX >= b.maxX || a.maxY <= b.minY || a.minY >= b.maxY);
-}
 
-function isBehind(a, b) {
-  return a.maxX <= b.minX + EPS || a.maxY <= b.minY + EPS || a.maxZ <= b.minZ + EPS;
-}
+// overlap2D is owned by src/core/domain/spatial-geometry-core.js
 
-function makeAABB(x, y, z, w, d, h) {
-  return { minX: x, maxX: x + w, minY: y, maxY: y + d, minZ: z, maxZ: z + h };
-}
+// isBehind is owned by src/core/domain/spatial-geometry-core.js
 
-function rectCircleCollide(cx, cy, cr, rx, ry, rw, rh) {
-  const nx = Math.max(rx, Math.min(cx, rx + rw));
-  const ny = Math.max(ry, Math.min(cy, ry + rh));
-  const dx = cx - nx, dy = cy - ny;
-  return dx * dx + dy * dy < cr * cr;
-}
+// makeAABB is owned by src/core/domain/spatial-geometry-core.js
 
-function boxRectOverlap3D(a, b) {
-  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.d && a.y + a.d > b.y && a.z < b.z + b.h && a.z + a.h > b.z;
-}
+// rectCircleCollide is owned by src/core/domain/spatial-geometry-core.js
 
+// boxRectOverlap3D is owned by src/core/domain/spatial-geometry-core.js
 
-function buildOccupancy(boxList) {
-  const occ = new Map();
-  for (const b of boxList) {
-    for (let x = b.x; x < b.x + b.w; x++) {
-      for (let y = b.y; y < b.y + b.d; y++) {
-        for (let z = b.z; z < b.z + b.h; z++) {
-          occ.set(`${x},${y},${z}`, { box: b, x, y, z });
-        }
-      }
-    }
-  }
-  return occ;
-}
-
-var __lastRenderFrameSummaryLogAt = 0;
-var __lastRenderFrameSummarySignature = '';
+// buildOccupancy is owned by src/core/domain/spatial-geometry-core.js
 var __lastRenderFrameOccupancyVersion = null;
-var __lastStaticBoxCacheProfileLogAt = 0;
-var __lastStaticBoxCacheProfileSignature = '';
-var __lastStaticBoxCacheProfile = null;
-var __lastStaticCacheInvalidationVerifyLogAt = 0;
-var __lastStaticCacheInvalidationVerifySignature = '';
 var __stableLocalDemergeCache = { key: '', result: null, hitCount: 0, missCount: 0 };
-var __currentRenderFrameStaticCacheState = { rebuilt: false, buildMs: 0, cacheHit: null, invalidationReason: 'none', totalMs: 0, profile: null };
 var __lastObservedTerrainBatchIdForFrames = null;
 var __terrainFirstFrameWindow = { terrainBatchId: null, remaining: 0, nextFrameIndex: 1 };
 
-var __lastStaticWorldChunkLogAt = 0;
-var __lastStaticWorldChunkLogSignature = '';
-var __lastCameraStaticWorldVerifySignature = '';
-var __lastCameraMoveVerifyLogAt = 0;
-var __lastCameraMoveVerifySignature = '';
-var __lastFrameWorkBreakdownLogAt = 0;
-var __lastFrameWorkBreakdownSignature = '';
-var __lastZoomStateVerifyLogAt = 0;
-var __lastZoomStateVerifySignature = '';
 var __lastFrameDrawMs = 0;
 var __lastFrameDrawStats = null;
 var __renderDynamicInstanceCache = { source: null, length: 0, dynamicInstances: [], staticInstances: [] };
 var __visibleInstanceSummaryCache = { signature: '', at: 0, summary: { visibleInstances: 0, visibleDynamicInstances: 0, staticSkippedByDynamicLoop: 0 } };
-var __staticRenderableBaseFaceColorCache = new Map();
-var __staticRenderableCssCache = new Map();
-var __staticRenderableColorCacheState = { scopeSignature: '', map: new Map() };
+// P11a-6 note: static renderable color/lighting caches live in
+// presentation/render/renderables/static-renderable-color-cache.js.
 
 function getSceneOccupancyCacheApiForRender() {
   try {
@@ -226,6 +358,48 @@ function getTerrainFaceMergeCoreApi() {
   return null;
 }
 
+
+function getTerrainRenderCoreApi() {
+  try {
+    if (typeof window !== 'undefined' && window.__TERRAIN_RENDER_CORE__) return window.__TERRAIN_RENDER_CORE__;
+  } catch (_) {}
+  try {
+    if (typeof window !== 'undefined' && window.App && window.App.domain && window.App.domain.terrainRenderCore) return window.App.domain.terrainRenderCore;
+  } catch (_) {}
+  return null;
+}
+
+function requireTerrainRenderCoreForRender() {
+  var core = getTerrainRenderCoreApi();
+  if (!core) throw new Error('Missing terrain render core: src/core/domain/terrain-render-core.js must load before render.js');
+  return core;
+}
+
+function getRenderOrderCoreApi() {
+  try {
+    if (typeof window !== 'undefined' && window.__RENDER_ORDER_CORE__) return window.__RENDER_ORDER_CORE__;
+  } catch (_) {}
+  try {
+    if (typeof window !== 'undefined' && window.App && window.App.domain && window.App.domain.renderOrderCore) return window.App.domain.renderOrderCore;
+  } catch (_) {}
+  return null;
+}
+
+function requireRenderOrderCoreForRender() {
+  var core = getRenderOrderCoreApi();
+  if (!core) throw new Error('Missing render order core: src/core/domain/render-order-core.js must load before render.js');
+  return core;
+}
+function getIsometricFaceCoreApi() {
+  try {
+    if (typeof window !== 'undefined' && window.__ISOMETRIC_FACE_CORE__) return window.__ISOMETRIC_FACE_CORE__;
+  } catch (_) {}
+  try {
+    if (typeof window !== 'undefined' && window.App && window.App.domain && window.App.domain.isometricFaceCore) return window.App.domain.isometricFaceCore;
+  } catch (_) {}
+  return null;
+}
+
 function isTerrainMaterialVisualsEnabledForRender() {
   try {
     if (typeof window !== 'undefined' && window.__TERRAIN_MATERIAL_VISUALS_ENABLED__ === true) return true;
@@ -234,97 +408,31 @@ function isTerrainMaterialVisualsEnabledForRender() {
 }
 
 function getTerrainMaterialMergeKeyForRenderCell(cell) {
-  var safeCell = cell && typeof cell === 'object' ? cell : null;
-  if (!safeCell || safeCell.generatedBy !== 'terrain-generator') return null;
-  if (safeCell.terrainMaterialMergeKey != null && String(safeCell.terrainMaterialMergeKey)) {
-    return String(safeCell.terrainMaterialMergeKey);
-  }
-  return '__terrain_default__';
+  return requireTerrainRenderCoreForRender().getTerrainMaterialMergeKeyForRenderCell(cell);
 }
 
 function getTerrainFaceMergeSignature(cell, semanticFace, screenFace, currentViewRotation) {
-  var safeCell = cell && typeof cell === 'object' ? cell : {};
-  var semanticTextureSignature = [
-    safeCell.semanticTextureMap ? JSON.stringify(safeCell.semanticTextureMap) : '',
-    safeCell.semanticTextures ? JSON.stringify(safeCell.semanticTextures) : '',
-    safeCell.semanticFaceColors ? JSON.stringify(safeCell.semanticFaceColors) : ''
-  ].join('|');
-  return [
-    'terrain-face',
-    String(semanticFace || 'top'),
-    String(screenFace || ''),
-    Number(currentViewRotation || 0),
-    String(getTerrainMaterialMergeKeyForRenderCell(safeCell) || '__terrain_default__'),
-    semanticTextureSignature
-  ].join('|');
+  return requireTerrainRenderCoreForRender().getTerrainFaceMergeSignature(cell, semanticFace, screenFace, currentViewRotation);
 }
 
 function getTerrainSortBandKeyForRenderFace(cell, semanticFace, mergeCoords, orderMeta) {
-  var safeCell = cell && typeof cell === 'object' ? cell : null;
-  if (!safeCell || safeCell.generatedBy !== 'terrain-generator') return null;
-  var face = String(semanticFace || 'top');
-  var coords = mergeCoords && typeof mergeCoords === 'object' ? mergeCoords : null;
-  if (!coords) return null;
-  var rotatedPoint = orderMeta && orderMeta.rotatedPoint ? orderMeta.rotatedPoint : null;
-  if (face === 'top') {
-    return 'ry:' + String(Number(rotatedPoint && rotatedPoint.y != null ? rotatedPoint.y : 0));
-  }
-  if (face === 'east' || face === 'south') {
-    return face + '|u:' + String(Number(coords.u || 0));
-  }
-  return null;
+  return requireTerrainRenderCoreForRender().getTerrainSortBandKeyForRenderFace(cell, semanticFace, mergeCoords, orderMeta);
 }
 
 function getTerrainSideEdgeVisibilitySignature(visibleFaces, semanticFace) {
-  var list = Array.isArray(visibleFaces) ? visibleFaces.filter(Boolean).map(String) : [];
-  list.sort();
-  return [String(semanticFace || ''), list.join(',')].join('|');
+  return requireTerrainRenderCoreForRender().getTerrainSideEdgeVisibilitySignature(visibleFaces, semanticFace);
 }
 
 function occupancyReaderHasSolid(reader, x, y, z) {
-  if (!reader || typeof reader !== 'object') return false;
-  try {
-    if (typeof reader.isOccupied === 'function') return reader.isOccupied(x, y, z) === true;
-    if (typeof reader.has === 'function') return reader.has(x, y, z) === true;
-  } catch (_) {}
-  return false;
+  return requireTerrainRenderCoreForRender().occupancyReaderHasSolid(reader, x, y, z);
 }
 
 function getTerrainSideTangentNeighbor(cell, semanticFace, direction) {
-  var safeCell = cell && typeof cell === 'object' ? cell : null;
-  if (!safeCell) return null;
-  var dir = direction === 'neg' ? -1 : 1;
-  var x = Number(safeCell.x || 0);
-  var y = Number(safeCell.y || 0);
-  var z = Number(safeCell.z || 0);
-  if (semanticFace === 'east') return { x: x, y: y + dir, z: z };
-  if (semanticFace === 'south') return { x: x + dir, y: y, z: z };
-  return null;
+  return requireTerrainRenderCoreForRender().getTerrainSideTangentNeighbor(cell, semanticFace, direction);
 }
 
 function getTerrainSideStepBreakSignature(cell, semanticFace, occupancyReader) {
-  var safeCell = cell && typeof cell === 'object' ? cell : null;
-  if (!safeCell) return null;
-  var face = String(semanticFace || '');
-  if (face !== 'east' && face !== 'south') return null;
-  var x = Number(safeCell.x || 0);
-  var y = Number(safeCell.y || 0);
-  var z = Number(safeCell.z || 0);
-  var selfTopOpen = !occupancyReaderHasSolid(occupancyReader, x, y, z + 1);
-  function classify(direction) {
-    var neighbor = getTerrainSideTangentNeighbor(safeCell, face, direction);
-    if (!neighbor) return 'none';
-    var solid = occupancyReaderHasSolid(occupancyReader, neighbor.x, neighbor.y, neighbor.z);
-    if (!solid) return 'void';
-    var topOpen = !occupancyReaderHasSolid(occupancyReader, neighbor.x, neighbor.y, neighbor.z + 1);
-    return topOpen ? 'open' : 'closed';
-  }
-  return [
-    String(face),
-    'selfTop:' + String(selfTopOpen ? 1 : 0),
-    'neg:' + classify('neg'),
-    'pos:' + classify('pos')
-  ].join('|');
+  return requireTerrainRenderCoreForRender().getTerrainSideStepBreakSignature(cell, semanticFace, occupancyReader);
 }
 
 function readStaticWorldFaceMergeDomOverrides() {
@@ -578,37 +686,66 @@ function getSharedStaticWorldChunkCacheApiForRender() {
   return null;
 }
 
-function emitStaticWorldChunkSummary(payload) {
-  var line = '[STATIC-WORLD-CHUNK] ';
-  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
+function getRenderDiagnosticsApiForRender() {
   try {
-    if (typeof pushLog === 'function') pushLog(line);
-    else if (typeof console !== 'undefined' && console.log) console.log(line);
+    if (typeof window !== 'undefined' && window.App && window.App.renderer && window.App.renderer.renderDiagnostics) {
+      return window.App.renderer.renderDiagnostics;
+    }
   } catch (_) {}
-  return line;
+  try { if (typeof window !== 'undefined' && window.__RENDER_DIAGNOSTICS__) return window.__RENDER_DIAGNOSTICS__; } catch (_) {}
+  try { if (typeof window !== 'undefined' && window.IsometricRenderDiagnostics) return window.IsometricRenderDiagnostics; } catch (_) {}
+  return null;
+}
+
+function requireRenderDiagnosticsForRender() {
+  var api = getRenderDiagnosticsApiForRender();
+  if (!api) throw new Error('Render diagnostics API is not loaded before render.js');
+  return api;
+}
+
+function getRenderBuildDiagnosticsGateApiForRender() {
+  try {
+    if (typeof window !== 'undefined' && window.__APP_PRESENTATION_RENDER_BUILD_DIAGNOSTICS_GATE__) return window.__APP_PRESENTATION_RENDER_BUILD_DIAGNOSTICS_GATE__;
+    if (typeof window !== 'undefined' && window.__RENDER_BUILD_DIAGNOSTICS_GATE__) return window.__RENDER_BUILD_DIAGNOSTICS_GATE__;
+    if (typeof window !== 'undefined' && window.IsometricRenderBuildDiagnosticsGate) return window.IsometricRenderBuildDiagnosticsGate;
+  } catch (_) {}
+  try {
+    if (typeof globalThis !== 'undefined' && globalThis.__APP_PRESENTATION_RENDER_BUILD_DIAGNOSTICS_GATE__) return globalThis.__APP_PRESENTATION_RENDER_BUILD_DIAGNOSTICS_GATE__;
+    if (typeof globalThis !== 'undefined' && globalThis.__RENDER_BUILD_DIAGNOSTICS_GATE__) return globalThis.__RENDER_BUILD_DIAGNOSTICS_GATE__;
+    if (typeof globalThis !== 'undefined' && globalThis.IsometricRenderBuildDiagnosticsGate) return globalThis.IsometricRenderBuildDiagnosticsGate;
+  } catch (_) {}
+  return null;
+}
+
+function requireRenderBuildDiagnosticsGateForRender() {
+  var api = getRenderBuildDiagnosticsGateApiForRender();
+  if (!api) throw new Error('render-build-diagnostics-gate.js must load before presentation/render/render.js');
+  return api;
+}
+
+function createRenderBuildDiagnosticsGateDepsForRender() {
+  return {
+    requireRenderDiagnosticsForRender: requireRenderDiagnosticsForRender,
+    isDetailedTerrainProfilingEnabledForRender: typeof isDetailedTerrainProfilingEnabledForRender === 'function' ? isDetailedTerrainProfilingEnabledForRender : null
+  };
+}
+
+// P11a-7 note: detailed static/chunk/color build diagnostic emitter gating
+// lives in src/presentation/render/diagnostics/render-build-diagnostics-gate.js.
+
+function emitRenderBuildDiagnostic(name, payload) {
+  var gate = requireRenderBuildDiagnosticsGateForRender();
+  var fn = gate && gate[name];
+  if (typeof fn !== 'function') throw new Error('render build diagnostics gate missing ' + name);
+  return fn(payload, createRenderBuildDiagnosticsGateDepsForRender());
+}
+
+function emitStaticWorldChunkSummary(payload) {
+  return requireRenderDiagnosticsForRender().emitStaticWorldChunkSummary(payload);
 }
 
 function maybeLogStaticWorldChunkSummary(payload, forceLog) {
-  var safe = payload && typeof payload === 'object' ? payload : {};
-  var now = perfNow();
-  var signature = [
-    String(safe.cacheContentType || 'world-face-packets'),
-    safe.cameraIndependent === false ? 0 : 1,
-    safe.usesScreenSpaceCache === true ? 1 : 0,
-    Number(safe.totalChunkCount || 0),
-    Number(safe.dirtyChunkCount || 0),
-    Number(safe.visibleChunkCount || 0),
-    Number(safe.rebuiltChunkCountThisFrame || 0),
-    Number(safe.reusedChunkCountThisFrame || 0),
-    Number(safe.chunkSize || 0),
-    Number(safe.totalStaticBoxes || 0),
-    Number(safe.totalStaticRenderables || 0)
-  ].join('|');
-  if (!forceLog && (now - __lastStaticWorldChunkLogAt) < 1000 && signature === __lastStaticWorldChunkLogSignature) return false;
-  __lastStaticWorldChunkLogAt = now;
-  __lastStaticWorldChunkLogSignature = signature;
-  emitStaticWorldChunkSummary(safe);
-  return true;
+  return requireRenderDiagnosticsForRender().maybeLogStaticWorldChunkSummary(payload, forceLog);
 }
 
 function isStaticWorldBoxForRender(box, instanceRenderUpdateModes) {
@@ -661,77 +798,30 @@ function buildChunkLocalOccupancyMap(localBoxes, neighborBoxes) {
   return map;
 }
 
+function requireIsometricFaceCoreForRender() {
+  var api = getIsometricFaceCoreApi();
+  if (!api) throw new Error('Missing isometric face core: src/core/domain/isometric-face-core.js must load before render.js');
+  return api;
+}
+
 function getScreenFaceForSemanticFace(semanticFace, viewRotation) {
-  if (semanticFace === 'top') return 'top';
-  var mapping = getVisibleSemanticMappingForRender(0, viewRotation);
-  var visibleByScreen = mapping && mapping.visibleFacesByScreenPosition ? mapping.visibleFacesByScreenPosition : null;
-  if (visibleByScreen) {
-    if (visibleByScreen.lowerLeft === semanticFace) return 'lowerLeft';
-    if (visibleByScreen.lowerRight === semanticFace) return 'lowerRight';
-  }
-  return semanticFace;
+  return requireIsometricFaceCoreForRender().getScreenFaceForSemanticFace(semanticFace, viewRotation, 0);
 }
 
 function getBaseFaceFillRgbForSemanticFace(fc, semanticFace) {
-  if (semanticFace === 'top') return fc.top;
-  if (semanticFace === 'east') return fc.east;
-  if (semanticFace === 'south') return fc.south;
-  if (semanticFace === 'west') return fc.east;
-  if (semanticFace === 'north') return fc.south;
-  return fc.top;
+  return requireIsometricFaceCoreForRender().getBaseFaceFillRgbForSemanticFace(fc, semanticFace);
 }
 
 function buildVoxelFaceWorldPolygon(x, y, z, semanticFace) {
-  var cellX = Number(x || 0);
-  var cellY = Number(y || 0);
-  var cellZ = Number(z || 0);
-  if (semanticFace === 'top') return [{ x: cellX, y: cellY, z: cellZ + 1 }, { x: cellX + 1, y: cellY, z: cellZ + 1 }, { x: cellX + 1, y: cellY + 1, z: cellZ + 1 }, { x: cellX, y: cellY + 1, z: cellZ + 1 }];
-  if (semanticFace === 'east') return [{ x: cellX + 1, y: cellY, z: cellZ }, { x: cellX + 1, y: cellY + 1, z: cellZ }, { x: cellX + 1, y: cellY + 1, z: cellZ + 1 }, { x: cellX + 1, y: cellY, z: cellZ + 1 }];
-  if (semanticFace === 'south') return [{ x: cellX, y: cellY + 1, z: cellZ }, { x: cellX + 1, y: cellY + 1, z: cellZ }, { x: cellX + 1, y: cellY + 1, z: cellZ + 1 }, { x: cellX, y: cellY + 1, z: cellZ + 1 }];
-  if (semanticFace === 'west') return [{ x: cellX, y: cellY, z: cellZ + 1 }, { x: cellX, y: cellY + 1, z: cellZ + 1 }, { x: cellX, y: cellY + 1, z: cellZ }, { x: cellX, y: cellY, z: cellZ }];
-  if (semanticFace === 'north') return [{ x: cellX, y: cellY, z: cellZ + 1 }, { x: cellX + 1, y: cellY, z: cellZ + 1 }, { x: cellX + 1, y: cellY, z: cellZ }, { x: cellX, y: cellY, z: cellZ }];
-  return [];
+  return requireIsometricFaceCoreForRender().buildVoxelFaceWorldPolygon(x, y, z, semanticFace);
 }
 
 function getStaticWorldFaceMergeCoords(cell, semanticFace) {
-  var safeCell = cell && typeof cell === 'object' ? cell : null;
-  if (!safeCell) return null;
-  var x = Number(safeCell.x || 0);
-  var y = Number(safeCell.y || 0);
-  var z = Number(safeCell.z || 0);
-  if (semanticFace === 'top') return { plane: z + 1, u: x, v: y };
-  if (semanticFace === 'east') return { plane: x + 1, u: y, v: z };
-  if (semanticFace === 'south') return { plane: y + 1, u: x, v: z };
-  if (semanticFace === 'west') return { plane: x, u: y, v: z };
-  if (semanticFace === 'north') return { plane: y, u: x, v: z };
-  return null;
+  return requireIsometricFaceCoreForRender().getStaticWorldFaceMergeCoords(cell, semanticFace);
 }
 
 function getStaticWorldFaceMergeSignature(cell, semanticFace, screenFace, currentViewRotation) {
-  var safeCell = cell && typeof cell === 'object' ? cell : {};
-  var ownerKey = safeCell.instanceId != null
-    ? 'instance:' + String(safeCell.instanceId)
-    : (safeCell.terrainBatchId != null
-      ? 'terrain:' + String(safeCell.terrainBatchId)
-      : 'prefab:' + String(safeCell.prefabId || '') + '|generated:' + String(safeCell.generatedBy || '') + '|base:' + String(safeCell.base || ''));
-  var semanticTextureSignature = [
-    safeCell.semanticTextureMap ? JSON.stringify(safeCell.semanticTextureMap) : '',
-    safeCell.semanticTextures ? JSON.stringify(safeCell.semanticTextures) : '',
-    safeCell.semanticFaceColors ? JSON.stringify(safeCell.semanticFaceColors) : ''
-  ].join('|');
-  return [
-    ownerKey,
-    String(safeCell.prefabId || ''),
-    String(safeCell.generatedBy || ''),
-    String(safeCell.base || ''),
-    String(safeCell.terrainMaterialId || ''),
-    String(safeCell.materialType || safeCell.terrainBand || ''),
-    String(safeCell.rotation != null ? safeCell.rotation : ''),
-    String(semanticFace || 'top'),
-    String(screenFace || ''),
-    Number(currentViewRotation || 0),
-    semanticTextureSignature
-  ].join('|');
+  return requireIsometricFaceCoreForRender().getStaticWorldFaceMergeSignature(cell, semanticFace, screenFace, currentViewRotation);
 }
 
 
@@ -878,28 +968,12 @@ function applyTerrainMaterialPatternOverlay(ctxRef, points, path2d, offsetX, off
 
 
 function worldPointFromMergeUV(semanticFace, plane, u, v) {
-  var face = String(semanticFace || 'top');
-  var p = Number(plane || 0);
-  var uu = Number(u || 0);
-  var vv = Number(v || 0);
-  if (face === 'top') return { x: uu, y: vv, z: p };
-  if (face === 'east') return { x: p, y: uu, z: vv };
-  if (face === 'south') return { x: uu, y: p, z: vv };
-  if (face === 'west') return { x: p, y: uu, z: vv };
-  if (face === 'north') return { x: uu, y: p, z: vv };
-  return { x: uu, y: vv, z: p };
+  return requireTerrainRenderCoreForRender().worldPointFromMergeUV(semanticFace, plane, u, v);
 }
 
 function buildTerrainPolygonLoopSignature(descriptor) {
-  var loops = Array.isArray(descriptor && descriptor.polygonLoopsUV) ? descriptor.polygonLoopsUV : [];
-  if (!loops.length) return '';
-  return loops.map(function (loop) {
-    return (Array.isArray(loop) ? loop : []).map(function (pt) {
-      return String(Number(pt && pt.u || 0)) + ',' + String(Number(pt && pt.v || 0));
-    }).join(';');
-  }).join('||');
+  return requireTerrainRenderCoreForRender().buildTerrainPolygonLoopSignature(descriptor);
 }
-
 
 function isTerrainTopBoundaryDebugRedEnabled() {
   try {
@@ -936,52 +1010,8 @@ function getGlobalTerrainBoundaryOccupancyReaderForRender(reason) {
 }
 
 function buildTerrainTopBoundarySegmentsWorldFromDescriptor(descriptor, occupancyReader) {
-  var face = descriptor && typeof descriptor === 'object' ? descriptor : null;
-  if (!face || face.isTerrainFaceMergeCandidate !== true || String(face.semanticFace || '') !== 'top') return [];
   var reader = occupancyReader || getGlobalTerrainBoundaryOccupancyReaderForRender('terrain-boundary:descriptor-fallback');
-  var members = Array.isArray(face.members) && face.members.length ? face.members : [face];
-  var segments = [];
-  var seen = Object.create(null);
-
-  function pointKey(pt) {
-    return [
-      Number(pt && pt.x || 0).toFixed(4),
-      Number(pt && pt.y || 0).toFixed(4),
-      Number(pt && pt.z || 0).toFixed(4)
-    ].join(',');
-  }
-
-  function addSegment(a, b) {
-    if (!a || !b) return;
-    var ak = pointKey(a);
-    var bk = pointKey(b);
-    var key = ak < bk ? ak + '|' + bk : bk + '|' + ak;
-    if (seen[key]) return;
-    seen[key] = true;
-    segments.push([a, b]);
-  }
-
-  function hasSameHeightTopSurface(nx, ny, plane) {
-    // A neighbouring column is part of the same continuous top plane only when it
-    // contains the voxel immediately below the plane and does not continue above it.
-    return occupancyReaderHasSolid(reader, nx, ny, plane - 1) && !occupancyReaderHasSolid(reader, nx, ny, plane);
-  }
-
-  for (var i = 0; i < members.length; i++) {
-    var member = members[i] && typeof members[i] === 'object' ? members[i] : null;
-    var cell = member && (member.cell || member.box) ? (member.cell || member.box) : null;
-    if (!cell || cell.generatedBy !== 'terrain-generator') continue;
-    var x = Math.round(Number(cell.x || 0));
-    var y = Math.round(Number(cell.y || 0));
-    var z = Math.round(Number(cell.z || 0));
-    var plane = z + 1;
-
-    if (!hasSameHeightTopSurface(x, y - 1, plane)) addSegment({ x: x, y: y, z: plane }, { x: x + 1, y: y, z: plane });
-    if (!hasSameHeightTopSurface(x + 1, y, plane)) addSegment({ x: x + 1, y: y, z: plane }, { x: x + 1, y: y + 1, z: plane });
-    if (!hasSameHeightTopSurface(x, y + 1, plane)) addSegment({ x: x + 1, y: y + 1, z: plane }, { x: x, y: y + 1, z: plane });
-    if (!hasSameHeightTopSurface(x - 1, y, plane)) addSegment({ x: x, y: y + 1, z: plane }, { x: x, y: y, z: plane });
-  }
-  return segments;
+  return requireTerrainRenderCoreForRender().buildTerrainTopBoundarySegmentsWorldFromDescriptor(descriptor, reader);
 }
 
 function getTerrainTopBoundaryStrokeWidthForPacket(packet) {
@@ -999,1609 +1029,343 @@ function getTerrainTopBoundaryStrokeStyleForPacket(packet) {
 }
 
 function buildMergedVoxelFaceWorldGeometry(descriptor) {
-  var face = descriptor && typeof descriptor === 'object' ? descriptor : null;
-  if (!face) return { worldPts: [], worldLoops: null, worldOutlineSegments: null };
-  var semanticFace = String(face.semanticFace || 'top');
-  var plane = Number(face.mergePlane != null ? face.mergePlane : 0);
-  if (semanticFace === 'top' && Array.isArray(face.polygonLoopsUV) && face.polygonLoopsUV.length) {
-    var worldLoops = [];
-    for (var li = 0; li < face.polygonLoopsUV.length; li++) {
-      var loop = Array.isArray(face.polygonLoopsUV[li]) ? face.polygonLoopsUV[li] : [];
-      if (loop.length < 3) continue;
-      worldLoops.push(loop.map(function (pt) { return worldPointFromMergeUV('top', plane, pt.u, pt.v); }));
-    }
-    var primaryLoop = worldLoops.length ? worldLoops[0] : [];
-    var worldOutlineSegments = [];
-    if (worldLoops.length) {
-      for (var lsi = 0; lsi < worldLoops.length; lsi++) {
-        var wLoop = worldLoops[lsi];
-        for (var wi = 0; wi < wLoop.length; wi++) {
-          worldOutlineSegments.push([wLoop[wi], wLoop[(wi + 1) % wLoop.length]]);
-        }
-      }
-    }
-    return {
-      worldPts: primaryLoop,
-      worldLoops: worldLoops,
-      worldOutlineSegments: worldOutlineSegments
-    };
-  }
-  var u = Number(face.mergeU || 0);
-  var v = Number(face.mergeV || 0);
-  var width = Math.max(1, Number(face.mergeWidth || 1));
-  var height = Math.max(1, Number(face.mergeHeight || 1));
-  if (!(width > 1 || height > 1)) {
-    var cell = face.cell || face.box || null;
-    var cellPts = buildVoxelFaceWorldPolygon(cell && cell.x, cell && cell.y, cell && cell.z, semanticFace);
-    return { worldPts: cellPts, worldLoops: null, worldOutlineSegments: null };
-  }
-  var rect = [];
-  if (semanticFace === 'top') rect = [{ x: u, y: v, z: plane }, { x: u + width, y: v, z: plane }, { x: u + width, y: v + height, z: plane }, { x: u, y: v + height, z: plane }];
-  else if (semanticFace === 'east') rect = [{ x: plane, y: u, z: v }, { x: plane, y: u + width, z: v }, { x: plane, y: u + width, z: v + height }, { x: plane, y: u, z: v + height }];
-  else if (semanticFace === 'south') rect = [{ x: u, y: plane, z: v }, { x: u + width, y: plane, z: v }, { x: u + width, y: plane, z: v + height }, { x: u, y: plane, z: v + height }];
-  else if (semanticFace === 'west') rect = [{ x: plane, y: u, z: v + height }, { x: plane, y: u + width, z: v + height }, { x: plane, y: u + width, z: v }, { x: plane, y: u, z: v }];
-  else if (semanticFace === 'north') rect = [{ x: u, y: plane, z: v + height }, { x: u + width, y: plane, z: v + height }, { x: u + width, y: plane, z: v }, { x: u, y: plane, z: v }];
-  return { worldPts: rect, worldLoops: null, worldOutlineSegments: null };
+  return requireTerrainRenderCoreForRender().buildMergedVoxelFaceWorldGeometry(descriptor);
 }
 
 function buildMergedVoxelFaceWorldPolygon(descriptor) {
-  return buildMergedVoxelFaceWorldGeometry(descriptor).worldPts || [];
+  return requireTerrainRenderCoreForRender().buildMergedVoxelFaceWorldPolygon(descriptor);
 }
 
 function emitChunkRebuildBreakdown(payload) {
-  var line = '[CHUNK-REBUILD-BREAKDOWN] ';
-  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
-  try {
-    if (typeof pushLog === 'function') pushLog(line);
-    else if (typeof console !== 'undefined' && console.log) console.log(line);
-  } catch (_) {}
-  return line;
+  return emitRenderBuildDiagnostic('emitChunkRebuildBreakdown', payload);
 }
 
 function emitChunkRebuildDetail(payload) {
-  if (!isDetailedTerrainProfilingEnabledForRender()) return null;
-  var line = '[CHUNK-REBUILD-DETAIL] ';
-  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
-  try {
-    if (typeof pushLog === 'function') pushLog(line);
-    else if (typeof console !== 'undefined' && console.log) console.log(line);
-  } catch (_) {}
-  return line;
+  return emitRenderBuildDiagnostic('emitChunkRebuildDetail', payload);
 }
 
 function emitChunkRebuildScopeVerify(payload) {
-  if (!isDetailedTerrainProfilingEnabledForRender()) return null;
-  var line = '[CHUNK-REBUILD-SCOPE-VERIFY] ';
-  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
-  try {
-    if (typeof pushLog === 'function') pushLog(line);
-    else if (typeof console !== 'undefined' && console.log) console.log(line);
-  } catch (_) {}
-  return line;
+  return emitRenderBuildDiagnostic('emitChunkRebuildScopeVerify', payload);
 }
 
 function emitChunkRebuildHotspot(payload) {
-  if (!isDetailedTerrainProfilingEnabledForRender()) return null;
-  var line = '[CHUNK-REBUILD-HOTSPOT] ';
-  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
-  try {
-    if (typeof pushLog === 'function') pushLog(line);
-    else if (typeof console !== 'undefined' && console.log) console.log(line);
-  } catch (_) {}
-  return line;
+  return emitRenderBuildDiagnostic('emitChunkRebuildHotspot', payload);
 }
 
 function emitStaticRenderableBuildDetail(payload) {
-  if (!isDetailedTerrainProfilingEnabledForRender()) return null;
-  var line = '[STATIC-RENDERABLE-BUILD-DETAIL] ';
-  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
-  try {
-    if (typeof pushLog === 'function') pushLog(line);
-    else if (typeof console !== 'undefined' && console.log) console.log(line);
-  } catch (_) {}
-  return line;
+  return emitRenderBuildDiagnostic('emitStaticRenderableBuildDetail', payload);
 }
 
 function emitStaticRenderableBuildHotspot(payload) {
-  if (!isDetailedTerrainProfilingEnabledForRender()) return null;
-  var line = '[STATIC-RENDERABLE-BUILD-HOTSPOT] ';
-  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
-  try {
-    if (typeof pushLog === 'function') pushLog(line);
-    else if (typeof console !== 'undefined' && console.log) console.log(line);
-  } catch (_) {}
-  return line;
+  return emitRenderBuildDiagnostic('emitStaticRenderableBuildHotspot', payload);
 }
 
 function emitStaticRenderableBuildScopeVerify(payload) {
-  if (!isDetailedTerrainProfilingEnabledForRender()) return null;
-  var line = '[STATIC-RENDERABLE-BUILD-SCOPE-VERIFY] ';
-  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
-  try {
-    if (typeof pushLog === 'function') pushLog(line);
-    else if (typeof console !== 'undefined' && console.log) console.log(line);
-  } catch (_) {}
-  return line;
+  return emitRenderBuildDiagnostic('emitStaticRenderableBuildScopeVerify', payload);
 }
 
 function emitColorBuildDetail(payload) {
-  if (!isDetailedTerrainProfilingEnabledForRender()) return null;
-  var line = '[COLOR-BUILD-DETAIL] ';
-  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
-  try {
-    if (typeof pushLog === 'function') pushLog(line);
-    else if (typeof console !== 'undefined' && console.log) console.log(line);
-  } catch (_) {}
-  return line;
+  return emitRenderBuildDiagnostic('emitColorBuildDetail', payload);
 }
 
 function emitColorBuildHotspot(payload) {
-  if (!isDetailedTerrainProfilingEnabledForRender()) return null;
-  var line = '[COLOR-BUILD-HOTSPOT] ';
-  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
-  try {
-    if (typeof pushLog === 'function') pushLog(line);
-    else if (typeof console !== 'undefined' && console.log) console.log(line);
-  } catch (_) {}
-  return line;
+  return emitRenderBuildDiagnostic('emitColorBuildHotspot', payload);
 }
 
 function emitBuildColorPathVerify(payload) {
-  if (!isDetailedTerrainProfilingEnabledForRender()) return null;
-  var line = '[BUILD-COLOR-PATH-VERIFY] ';
-  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
-  try {
-    if (typeof pushLog === 'function') pushLog(line);
-    else if (typeof console !== 'undefined' && console.log) console.log(line);
-  } catch (_) {}
-  return line;
+  return emitRenderBuildDiagnostic('emitBuildColorPathVerify', payload);
 }
 
 function emitColorBuildMissBreakdown(payload) {
-  if (!isDetailedTerrainProfilingEnabledForRender()) return null;
-  var line = '[COLOR-BUILD-MISS-BREAKDOWN] ';
-  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
-  try {
-    if (typeof pushLog === 'function') pushLog(line);
-    else if (typeof console !== 'undefined' && console.log) console.log(line);
-  } catch (_) {}
-  return line;
+  return emitRenderBuildDiagnostic('emitColorBuildMissBreakdown', payload);
 }
 
 function emitStep4ColorBuildDetail(payload) {
-  if (!isDetailedTerrainProfilingEnabledForRender()) return null;
-  var line = '[STEP4-COLOR-BUILD-DETAIL] ';
-  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
-  try {
-    if (typeof pushLog === 'function') pushLog(line);
-    else if (typeof console !== 'undefined' && console.log) console.log(line);
-  } catch (_) {}
-  return line;
+  return emitRenderBuildDiagnostic('emitStep4ColorBuildDetail', payload);
 }
 
 function emitStep4ColorBuildHotspot(payload) {
-  if (!isDetailedTerrainProfilingEnabledForRender()) return null;
-  var line = '[STEP4-COLOR-BUILD-HOTSPOT] ';
-  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
-  try {
-    if (typeof pushLog === 'function') pushLog(line);
-    else if (typeof console !== 'undefined' && console.log) console.log(line);
-  } catch (_) {}
-  return line;
+  return emitRenderBuildDiagnostic('emitStep4ColorBuildHotspot', payload);
 }
 
 function emitStep4ColorBuildScopeVerify(payload) {
-  var line = '[STEP4-COLOR-BUILD-SCOPE-VERIFY] ';
-  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
-  try {
-    if (typeof pushLog === 'function') pushLog(line);
-    else if (typeof console !== 'undefined' && console.log) console.log(line);
-  } catch (_) {}
-  return line;
+  return emitRenderBuildDiagnostic('emitStep4ColorBuildScopeVerify', payload);
 }
 
 function emitLightingShadowBypassVerify(payload) {
-  var line = '[LIGHTING-SHADOW-BYPASS-VERIFY] ';
-  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
-  try {
-    if (typeof pushLog === 'function') pushLog(line);
-    else if (typeof console !== 'undefined' && console.log) console.log(line);
-  } catch (_) {}
-  return line;
+  return emitRenderBuildDiagnostic('emitLightingShadowBypassVerify', payload);
 }
 
 function emitStep4ShadowPathSummary(payload) {
-  var line = '[STEP4-SHADOW-PATH-SUMMARY] ';
-  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
-  try {
-    if (typeof pushLog === 'function') pushLog(line);
-    else if (typeof console !== 'undefined' && console.log) console.log(line);
-  } catch (_) {}
-  return line;
+  return emitRenderBuildDiagnostic('emitStep4ShadowPathSummary', payload);
 }
 
 function getCachedBaseFaceColorsForRenderable(base) {
-  var key = String(base || '#7aa2f7');
-  if (__staticRenderableBaseFaceColorCache.has(key)) return __staticRenderableBaseFaceColorCache.get(key);
-  var fc = baseFaceColors(key);
-  __staticRenderableBaseFaceColorCache.set(key, fc);
-  return fc;
+  return requireStaticRenderableColorCacheForRender().getCachedBaseFaceColorsForRenderable(
+    base,
+    createStaticRenderableColorCacheDepsForRender()
+  );
 }
 
 function rgbToCssCachedForRenderable(rgb, a) {
-  var alpha = a == null ? 1 : Number(a);
-  var rr = Math.round(Number(rgb && rgb.r || 0));
-  var gg = Math.round(Number(rgb && rgb.g || 0));
-  var bb = Math.round(Number(rgb && rgb.b || 0));
-  var aa = Math.max(0, Math.min(1, alpha));
-  var key = rr + ',' + gg + ',' + bb + ',' + aa.toFixed(3);
-  if (__staticRenderableCssCache.has(key)) return __staticRenderableCssCache.get(key);
-  var css = rgbToCss({ r: rr, g: gg, b: bb }, aa);
-  __staticRenderableCssCache.set(key, css);
-  return css;
+  return requireStaticRenderableColorCacheForRender().rgbToCssCachedForRenderable(
+    rgb,
+    a,
+    createStaticRenderableColorCacheDepsForRender()
+  );
 }
 
 function getStaticRenderableBuildColorModeForRender(terrainSettings) {
-  var settings = terrainSettings && typeof terrainSettings === 'object' ? terrainSettings : getTerrainRenderSettingsForRender();
-  if (settings && settings.terrainDebugFaceColorsEnabled === true) return 'debug-semantic';
-  return String((settings && settings.terrainBuildColorMode) || (settings && settings.terrainColorMode) || 'natural');
+  return requireStaticRenderableColorCacheForRender().getStaticRenderableBuildColorModeForRender(
+    terrainSettings,
+    createStaticRenderableColorCacheDepsForRender()
+  );
 }
 
 function isStaticRenderableBuildLightingBypassEnabled(terrainSettings) {
-  var settings = terrainSettings && typeof terrainSettings === 'object' ? terrainSettings : getTerrainRenderSettingsForRender();
-  return !!(settings && settings.terrainBuildLightingBypass === true);
+  return requireStaticRenderableColorCacheForRender().isStaticRenderableBuildLightingBypassEnabled(
+    terrainSettings,
+    createStaticRenderableColorCacheDepsForRender()
+  );
 }
 
 function isStaticRenderableLightingUiEnabledForBuild() {
-  return !!(typeof lightState !== 'undefined' && lightState && lightState.enabled !== false);
+  return requireStaticRenderableColorCacheForRender().isStaticRenderableLightingUiEnabledForBuild(
+    createStaticRenderableColorCacheDepsForRender()
+  );
 }
 
 function isStaticRenderableLightingActiveForBuild(terrainSettings) {
-  if (isStaticRenderableBuildLightingBypassEnabled(terrainSettings)) return false;
-  return isStaticRenderableLightingUiEnabledForBuild();
+  return requireStaticRenderableColorCacheForRender().isStaticRenderableLightingActiveForBuild(
+    terrainSettings,
+    createStaticRenderableColorCacheDepsForRender()
+  );
 }
 
 function getStaticRenderableBuildLightingSignature(terrainSettings) {
-  if (isStaticRenderableBuildLightingBypassEnabled(terrainSettings)) return 'lighting:bypass';
-  if (!isStaticRenderableLightingUiEnabledForBuild()) return 'lighting:off';
-  return String(typeof staticBoxLightingSignature === 'function' ? staticBoxLightingSignature() : 'lighting:none');
+  return requireStaticRenderableColorCacheForRender().getStaticRenderableBuildLightingSignature(
+    terrainSettings,
+    createStaticRenderableColorCacheDepsForRender()
+  );
 }
 
 function getStaticRenderableActualColorPathUsed(terrainSettings) {
-  var mode = getStaticRenderableBuildColorModeForRender(terrainSettings);
-  if (isStaticRenderableBuildLightingBypassEnabled(terrainSettings)) return String(mode || 'natural') + '+lightingBypass';
-  if (!isStaticRenderableLightingUiEnabledForBuild()) return String(mode || 'natural') + '+lightingOff';
-  return String(mode || 'natural') + '+lighting';
+  return requireStaticRenderableColorCacheForRender().getStaticRenderableActualColorPathUsed(
+    terrainSettings,
+    createStaticRenderableColorCacheDepsForRender()
+  );
 }
 
 function getStaticRenderableFlatDebugFillRgb(semanticFace) {
-  var face = String(semanticFace || 'top');
-  if (face === 'top') return { r: 110, g: 203, b: 255 };
-  if (face === 'east') return { r: 70, g: 150, b: 245 };
-  if (face === 'south') return { r: 44, g: 114, b: 208 };
-  if (face === 'west') return { r: 70, g: 150, b: 245 };
-  if (face === 'north') return { r: 44, g: 114, b: 208 };
-  return { r: 110, g: 203, b: 255 };
+  return requireStaticRenderableColorCacheForRender().getStaticRenderableFlatDebugFillRgb(
+    semanticFace,
+    createStaticRenderableColorCacheDepsForRender()
+  );
 }
 
 function getStaticRenderableColorScopeSignature(currentViewRotation) {
-  var terrainSettings = getTerrainRenderSettingsForRender();
-  var buildColorMode = getStaticRenderableBuildColorModeForRender(terrainSettings);
-  var lightingSignature = getStaticRenderableBuildLightingSignature(terrainSettings);
-  return [buildColorMode, lightingSignature, Number(currentViewRotation || 0)].join('|');
+  return requireStaticRenderableColorCacheForRender().getStaticRenderableColorScopeSignature(
+    currentViewRotation,
+    createStaticRenderableColorCacheDepsForRender()
+  );
 }
 
 function ensureStaticRenderableColorCacheScope(currentViewRotation) {
-  var scopeSignature = getStaticRenderableColorScopeSignature(currentViewRotation);
-  if (__staticRenderableColorCacheState.scopeSignature !== scopeSignature) {
-    __staticRenderableColorCacheState.scopeSignature = scopeSignature;
-    __staticRenderableColorCacheState.map = new Map();
-  }
-  return {
-    scopeSignature: scopeSignature,
-    map: __staticRenderableColorCacheState.map
-  };
+  return requireStaticRenderableColorCacheForRender().ensureStaticRenderableColorCacheScope(
+    currentViewRotation,
+    createStaticRenderableColorCacheDepsForRender()
+  );
 }
 
 function getStaticRenderableColorCacheMeta(cell, semanticFace, currentViewRotation, terrainSettings) {
-  var settings = terrainSettings && typeof terrainSettings === 'object' ? terrainSettings : getTerrainRenderSettingsForRender();
-  var buildColorMode = getStaticRenderableBuildColorModeForRender(settings);
-  var lightingSignature = getStaticRenderableBuildLightingSignature(settings);
-  var lightingBypass = isStaticRenderableBuildLightingBypassEnabled(settings);
-  var x = Number(cell && cell.x || 0);
-  var y = Number(cell && cell.y || 0);
-  var z = Number(cell && cell.z || 0);
-  var isTerrain = !!(cell && cell.generatedBy === 'terrain-generator');
-  var spatialBucketSize = isTerrain ? 4 : 1;
-  var xBucket = Math.floor(x / spatialBucketSize);
-  var yBucket = Math.floor(y / spatialBucketSize);
-  var faceCenterZ = semanticFace === 'top' ? z + 1 : z + 0.5;
-  var heightBucketIndex = Math.round(faceCenterZ * 2);
-  var heightBucket = heightBucketIndex / 2;
-  var terrainMaterialIdForMeta = getTerrainMaterialIdForRenderCell(cell);
-  var materialType = String(terrainMaterialIdForMeta || (cell && (cell.materialType || cell.terrainBand || cell.base)) || '#7aa2f7');
-  var key = [buildColorMode, semanticFace, materialType, heightBucketIndex, xBucket, yBucket, lightingSignature, Number(currentViewRotation || 0)].join('|');
-  return {
-    key: key,
-    terrainColorMode: buildColorMode,
-    dominantFaceType: String(semanticFace || 'top'),
-    dominantMaterialType: materialType,
-    dominantHeightBucket: heightBucket,
-    lightingSignature: lightingSignature,
-    packetViewRotation: Number(currentViewRotation || 0),
-    debugFaceColorsEnabled: settings && settings.terrainDebugFaceColorsEnabled === true,
-    terrainBuildLightingBypass: lightingBypass,
-    xBucket: xBucket,
-    yBucket: yBucket
-  };
+  return requireStaticRenderableColorCacheForRender().getStaticRenderableColorCacheMeta(
+    cell,
+    semanticFace,
+    currentViewRotation,
+    terrainSettings,
+    createStaticRenderableColorCacheDepsForRender()
+  );
 }
 
 function getCachedStaticRenderableFill(cell, semanticFace, worldPts, normal, currentViewRotation, colorStats) {
-  var terrainSettings = getTerrainRenderSettingsForRender();
-  var scope = ensureStaticRenderableColorCacheScope(currentViewRotation);
-  var cacheLookupStartAt = perfNow();
-  var missHeightBucketStartAt = perfNow();
-  var meta = getStaticRenderableColorCacheMeta(cell, semanticFace, currentViewRotation, terrainSettings);
-  var metaBuildMs = Math.max(0, perfNow() - missHeightBucketStartAt);
-  var cached = scope.map.get(meta.key);
-  var cacheLookupMs = Math.max(0, perfNow() - cacheLookupStartAt);
-  if (colorStats) colorStats.step4a_colorCacheLookupMs += cacheLookupMs;
-  if (cached) {
-    if (colorStats) {
-      var hitFastPathStartAt = perfNow();
-      colorStats.colorCacheHitCount += 1;
-      colorStats.colorKeyUsage.set(meta.key, {
-        count: Number((colorStats.colorKeyUsage.get(meta.key) && colorStats.colorKeyUsage.get(meta.key).count) || 0) + 1,
-        terrainColorMode: meta.terrainColorMode,
-        dominantFaceType: meta.dominantFaceType,
-        dominantMaterialType: meta.dominantMaterialType,
-        dominantHeightBucket: meta.dominantHeightBucket
-      });
-      colorStats.actualColorPathUsedCounts.set(getStaticRenderableActualColorPathUsed(terrainSettings), Number(colorStats.actualColorPathUsedCounts.get(getStaticRenderableActualColorPathUsed(terrainSettings)) || 0) + 1);
-      colorStats.step4b_colorCacheHitFastPathMs += Math.max(0, perfNow() - hitFastPathStartAt);
-      colorStats.touchedColorCachePath = true;
-    }
-    return { fill: cached.fill, meta: meta, cacheHit: true };
-  }
-  var missPathStartAt = perfNow();
-  var paletteLookupStartAt = perfNow();
-  var buildColorMode = getStaticRenderableBuildColorModeForRender(terrainSettings);
-  var baseRgb;
-  if (buildColorMode === 'flat_debug') baseRgb = getStaticRenderableFlatDebugFillRgb(semanticFace);
-  else if (buildColorMode === 'debug-semantic') baseRgb = getStaticRenderableFlatDebugFillRgb(semanticFace);
-  else {
-    var terrainFc = getTerrainMaterialBaseFaceColorsForRenderCell(cell);
-    var fc = terrainFc || getCachedBaseFaceColorsForRenderable((cell && cell.base) || '#7aa2f7');
-    baseRgb = getBaseFaceFillRgbForSemanticFace(fc, semanticFace);
-  }
-  var paletteLookupMs = Math.max(0, perfNow() - paletteLookupStartAt);
-  var materialColorStartAt = perfNow();
-  var fillBaseRgb = { r: Number(baseRgb && baseRgb.r || 0), g: Number(baseRgb && baseRgb.g || 0), b: Number(baseRgb && baseRgb.b || 0) };
-  var materialColorMs = Math.max(0, perfNow() - materialColorStartAt);
-  var lightingMixStartAt = perfNow();
-  var lightingActive = isStaticRenderableLightingActiveForBuild(terrainSettings);
-  var fillRgb = lightingActive
-    ? litFaceColor(fillBaseRgb, worldPts, normal, cell && cell.instanceId || null)
-    : fillBaseRgb;
-  var lightingMixMs = Math.max(0, perfNow() - lightingMixStartAt);
-  var cssBuildStartAt = perfNow();
-  var fill = rgbToCssCachedForRenderable(fillRgb, 1);
-  var cssBuildMs = Math.max(0, perfNow() - cssBuildStartAt);
-  if (colorStats) colorStats.step4c_colorMissPathMs += Math.max(0, perfNow() - missPathStartAt);
-  scope.map.set(meta.key, { fill: fill });
-  if (colorStats) {
-    colorStats.colorCacheMissCount += 1;
-    colorStats.colorKeyUsage.set(meta.key, {
-      count: Number((colorStats.colorKeyUsage.get(meta.key) && colorStats.colorKeyUsage.get(meta.key).count) || 0) + 1,
-      terrainColorMode: meta.terrainColorMode,
-      dominantFaceType: meta.dominantFaceType,
-      dominantMaterialType: meta.dominantMaterialType,
-      dominantHeightBucket: meta.dominantHeightBucket
-    });
-    colorStats.actualColorPathUsedCounts.set(getStaticRenderableActualColorPathUsed(terrainSettings), Number(colorStats.actualColorPathUsedCounts.get(getStaticRenderableActualColorPathUsed(terrainSettings)) || 0) + 1);
-    colorStats.miss_step1_paletteLookupMs += paletteLookupMs;
-    colorStats.miss_step2_heightBucketMs += metaBuildMs;
-    colorStats.miss_step3_materialColorMs += materialColorMs;
-    colorStats.miss_step4_lightingMixMs += lightingMixMs;
-    colorStats.miss_step5_cssOrObjectBuildMs += cssBuildMs;
-    colorStats.touchedNaturalColorPath = buildColorMode === 'natural';
-    colorStats.touchedLightingPath = lightingActive;
-  }
-  return { fill: fill, meta: meta, cacheHit: false };
+  return requireStaticRenderableColorCacheForRender().getCachedStaticRenderableFill(
+    cell,
+    semanticFace,
+    worldPts,
+    normal,
+    currentViewRotation,
+    colorStats,
+    createStaticRenderableColorCacheDepsForRender()
+  );
+}
+
+function requireStaticWorldRenderableBuilderForRender() {
+  try {
+    if (typeof window !== 'undefined' && window.App && window.App.application && window.App.application.render && window.App.application.render.staticWorldRenderableBuilder) return window.App.application.render.staticWorldRenderableBuilder;
+  } catch (_) {}
+  try {
+    if (typeof window !== 'undefined' && window.__STATIC_WORLD_RENDERABLE_BUILDER__) return window.__STATIC_WORLD_RENDERABLE_BUILDER__;
+  } catch (_) {}
+  throw new Error('Missing static world renderable builder: src/application/render/static-world-renderable-builder.js must load before src/presentation/render/render.js');
+}
+
+function resolveRenderFunctionDependency(name) {
+  try {
+    if (typeof window !== 'undefined' && typeof window[name] === 'function') return window[name];
+  } catch (_) {}
+  try {
+    if (typeof globalThis !== 'undefined' && typeof globalThis[name] === 'function') return globalThis[name];
+  } catch (_) {}
+  return null;
+}
+
+function createStaticWorldRenderableBuilderDepsForRender() {
+  return {
+    perfNow: resolveRenderFunctionDependency('perfNow'),
+    getRenderVisibilityCoreApi: resolveRenderFunctionDependency('getRenderVisibilityCoreApi'),
+    getMainCameraRenderScope: resolveRenderFunctionDependency('getMainCameraRenderScope'),
+    resolveChunkOccupancyReaderForRender: resolveRenderFunctionDependency('resolveChunkOccupancyReaderForRender'),
+    buildChunkLocalOccupancyMap: resolveRenderFunctionDependency('buildChunkLocalOccupancyMap'),
+    getDomainSceneCoreApi: resolveRenderFunctionDependency('getDomainSceneCoreApi'),
+    isStaticWorldFaceMergeEnabledForRender: resolveRenderFunctionDependency('isStaticWorldFaceMergeEnabledForRender'),
+    isStaticRenderableLightingUiEnabledForBuild: resolveRenderFunctionDependency('isStaticRenderableLightingUiEnabledForBuild'),
+    getScreenFaceForSemanticFace: resolveRenderFunctionDependency('getScreenFaceForSemanticFace'),
+    getSemanticFaceNormal: resolveRenderFunctionDependency('getSemanticFaceNormal'),
+    getStaticWorldFaceMergeCoords: resolveRenderFunctionDependency('getStaticWorldFaceMergeCoords'),
+    computeViewAwareSortMeta: resolveRenderFunctionDependency('computeViewAwareSortMeta'),
+    getTerrainSortBandKeyForRenderFace: resolveRenderFunctionDependency('getTerrainSortBandKeyForRenderFace'),
+    getTerrainSideEdgeVisibilitySignature: resolveRenderFunctionDependency('getTerrainSideEdgeVisibilitySignature'),
+    getTerrainSideStepBreakSignature: resolveRenderFunctionDependency('getTerrainSideStepBreakSignature'),
+    getTerrainMaterialMergeKeyForRenderCell: resolveRenderFunctionDependency('getTerrainMaterialMergeKeyForRenderCell'),
+    getTerrainFaceMergeSignature: resolveRenderFunctionDependency('getTerrainFaceMergeSignature'),
+    getStaticWorldFaceMergeSignature: resolveRenderFunctionDependency('getStaticWorldFaceMergeSignature'),
+    getStaticWorldFaceMergeCoreApi: resolveRenderFunctionDependency('getStaticWorldFaceMergeCoreApi'),
+    getTerrainFaceMergeCoreApi: resolveRenderFunctionDependency('getTerrainFaceMergeCoreApi'),
+    buildMergedVoxelFaceWorldGeometry: resolveRenderFunctionDependency('buildMergedVoxelFaceWorldGeometry'),
+    buildTerrainTopBoundarySegmentsWorldFromDescriptor: resolveRenderFunctionDependency('buildTerrainTopBoundarySegmentsWorldFromDescriptor'),
+    buildTerrainPolygonLoopSignature: resolveRenderFunctionDependency('buildTerrainPolygonLoopSignature'),
+    getTerrainMaterialPatternDescriptorForRenderCell: resolveRenderFunctionDependency('getTerrainMaterialPatternDescriptorForRenderCell'),
+    getTerrainMaterialBaseFaceColorsForRenderCell: resolveRenderFunctionDependency('getTerrainMaterialBaseFaceColorsForRenderCell'),
+    getCachedBaseFaceColorsForRenderable: resolveRenderFunctionDependency('getCachedBaseFaceColorsForRenderable'),
+    getTerrainRenderSettingsForRender: resolveRenderFunctionDependency('getTerrainRenderSettingsForRender'),
+    isStaticRenderableLightingActiveForBuild: resolveRenderFunctionDependency('isStaticRenderableLightingActiveForBuild'),
+    getCachedStaticRenderableFill: resolveRenderFunctionDependency('getCachedStaticRenderableFill'),
+    buildVoxelFaceShadowWorldOverlays: resolveRenderFunctionDependency('buildVoxelFaceShadowWorldOverlays'),
+    buildActorInteractionMemberFaceKeysFromFaceDescriptor: resolveRenderFunctionDependency('buildActorInteractionMemberFaceKeysFromFaceDescriptor'),
+    getActorInteractionMemberDescriptorsFromFaceDescriptor: resolveRenderFunctionDependency('getActorInteractionMemberDescriptorsFromFaceDescriptor'),
+    getTerrainMaterialIdForRenderCell: resolveRenderFunctionDependency('getTerrainMaterialIdForRenderCell'),
+    compareRenderablesByDomain: resolveRenderFunctionDependency('compareRenderablesByDomain'),
+    emitChunkRebuildScopeVerify: resolveRenderFunctionDependency('emitChunkRebuildScopeVerify'),
+    emitChunkRebuildDetail: resolveRenderFunctionDependency('emitChunkRebuildDetail'),
+    emitChunkRebuildHotspot: resolveRenderFunctionDependency('emitChunkRebuildHotspot'),
+    emitStaticRenderableBuildDetail: resolveRenderFunctionDependency('emitStaticRenderableBuildDetail'),
+    emitStaticRenderableBuildScopeVerify: resolveRenderFunctionDependency('emitStaticRenderableBuildScopeVerify'),
+    emitStaticRenderableBuildHotspot: resolveRenderFunctionDependency('emitStaticRenderableBuildHotspot'),
+    emitColorBuildDetail: resolveRenderFunctionDependency('emitColorBuildDetail'),
+    emitStep4ColorBuildDetail: resolveRenderFunctionDependency('emitStep4ColorBuildDetail'),
+    emitStep4ColorBuildScopeVerify: resolveRenderFunctionDependency('emitStep4ColorBuildScopeVerify'),
+    getStaticRenderableActualColorPathUsed: resolveRenderFunctionDependency('getStaticRenderableActualColorPathUsed'),
+    getStaticRenderableBuildColorModeForRender: resolveRenderFunctionDependency('getStaticRenderableBuildColorModeForRender'),
+    emitBuildColorPathVerify: resolveRenderFunctionDependency('emitBuildColorPathVerify'),
+    emitLightingShadowBypassVerify: resolveRenderFunctionDependency('emitLightingShadowBypassVerify'),
+    emitStep4ShadowPathSummary: resolveRenderFunctionDependency('emitStep4ShadowPathSummary'),
+    emitColorBuildMissBreakdown: resolveRenderFunctionDependency('emitColorBuildMissBreakdown'),
+    emitColorBuildHotspot: resolveRenderFunctionDependency('emitColorBuildHotspot'),
+    emitStep4ColorBuildHotspot: resolveRenderFunctionDependency('emitStep4ColorBuildHotspot'),
+    emitChunkRebuildBreakdown: resolveRenderFunctionDependency('emitChunkRebuildBreakdown')
+  };
 }
 
 function buildStaticWorldChunkRenderables(chunk, options) {
-  var opts = options && typeof options === 'object' ? options : {};
-  var visibilityCore = opts.visibilityCore || getRenderVisibilityCoreApi();
-  var currentViewRotation = Number(opts.currentViewRotation || 0);
-  var cameraScope = opts.cameraScope || getMainCameraRenderScope(currentViewRotation);
-  var semanticLogSeen = opts.semanticLogSeen || Object.create(null);
-  var profileContext = opts.profileContext && typeof opts.profileContext === 'object' ? opts.profileContext : {};
-  var chunkBuildStartAt = perfNow();
-  var chunkBoxesCollectStartAt = perfNow();
-  var chunkBoxes = [];
-  if (chunk && chunk.boxMap && typeof chunk.boxMap.forEach === 'function') {
-    chunk.boxMap.forEach(function (box) { if (box) chunkBoxes.push(box); });
-  }
-  var step1CollectChunkBoxesMs = Math.max(0, perfNow() - chunkBoxesCollectStartAt);
-  var neighborBoxesCollectStartAt = perfNow();
-  var neighborBoxes = [];
-  if (Array.isArray(opts.neighborBoxes) && opts.neighborBoxes.length) {
-    neighborBoxes = opts.neighborBoxes.filter(function (box) { return !!box; });
-  }
-  var step2CollectNeighborBoxesMs = Math.max(0, perfNow() - neighborBoxesCollectStartAt);
-  var occupancyStartAt = perfNow();
-  // Prefer the scene-level occupancy cache so chunk rebuilds can reuse the shared world occupancy index.
-  // Keep the local fallback to preserve behavior and allow fast rollback if validation fails.
-  var occupancyResolution = resolveChunkOccupancyReaderForRender({
-    occupancy: opts.occupancy,
-    localBoxes: chunkBoxes,
-    neighborBoxes: neighborBoxes
-  });
-  var chunkOcc = occupancyResolution && occupancyResolution.reader ? occupancyResolution.reader : buildChunkLocalOccupancyMap(chunkBoxes, neighborBoxes);
-  var occupancyBuildMs = Math.max(0, perfNow() - occupancyStartAt);
-  var usedGlobalOccupancy = occupancyResolution && occupancyResolution.source === 'global';
-  var usedLocalOccupancyFallback = !usedGlobalOccupancy;
-  var occupancyAccessMode = occupancyResolution && occupancyResolution.source ? String(occupancyResolution.source) : 'local-fallback';
-  var occupancyFallbackReason = occupancyResolution && occupancyResolution.fallbackReason ? String(occupancyResolution.fallbackReason) : null;
-  var occupancyValidationSampleCount = Number(occupancyResolution && occupancyResolution.validationSampleCount || 0);
-  var step3ResolveOccupancyMs = occupancyBuildMs;
-  var step3BuildLocalOccupancyMs = usedLocalOccupancyFallback ? occupancyBuildMs : 0;
-  var visibleSurfaceStartAt = perfNow();
-  var surfaceCache = visibilityCore && typeof visibilityCore.buildVisibleSurfaceCache === 'function'
-    ? visibilityCore.buildVisibleSurfaceCache(chunkBoxes, {
-        scope: null,
-        occupancy: chunkOcc,
-        surfaceOnlyRenderingEnabled: cameraScope.surfaceOnlyRenderingEnabled !== false,
-        classifyBox: function (box) {
-          return {
-            isTerrain: !!(box && box.generatedBy === 'terrain-generator'),
-            isStructured: true,
-            isVoxelFurniture: !(box && box.generatedBy === 'terrain-generator')
-          };
-        }
-      })
-    : {
-        surfaceCells: chunkBoxes.map(function (box) { return { box: box, visibleFaces: ['top', 'east', 'south'] }; }),
-        logicalVoxelCountEstimated: chunkBoxes.length,
-        visibleTopFaceCount: 0,
-        visibleSideFaceCount: 0,
-        hiddenInternalSurfaceSkippedCount: 0,
-        voxelFurnitureProcessedCount: chunkBoxes.length,
-        surfaceOnlyRenderingEnabled: true,
-        internalVoxelSkippedCount: 0,
-        cameraCulledCount: 0
-      };
-  var visibleSurfaceBuildMs = Math.max(0, perfNow() - visibleSurfaceStartAt);
-  var step4ComputeVisibleFacesMs = visibleSurfaceBuildMs;
-  var packetBuildStartAt = perfNow();
-  var packets = [];
-  var surfaceCells = Array.isArray(surfaceCache.surfaceCells) ? surfaceCache.surfaceCells : [];
-  var domainCore = getDomainSceneCoreApi();
-  var faceTiePrio = { lowerRight: 1, lowerLeft: 2, top: 3, east: 1, south: 2, north: 0, west: 0 };
-  var staticRenderableBuildProfileStartAt = perfNow();
-  var step1PrepareFaceInputsMs = 0;
-  var step2BuildRenderableBaseMs = 0;
-  var step3BuildStyleOrMaterialMs = 0;
-  var step4BuildColorMs = 0;
-  var step5ComputeSortKeyMs = 0;
-  var step6ObjectAllocationMs = 0;
-  var step7ArrayPushMs = 0;
-  var step8FinalizeRenderableListMs = 0;
-  var mergeFaceDescriptorsMs = 0;
-  var inputFaceDescriptorCount = 0;
-  var mergedFaceDescriptorCount = 0;
-  var mergedStaticFaceCount = 0;
-  var mergeReductionRatio = 0;
-  var terrainPacketCount = 0;
-  var faceMergeMode = 'disabled';
-  var faceMergeFallbackReason = null;
-  var faceMergeEnabled = isStaticWorldFaceMergeEnabledForRender();
-  var colorBuildStats = {
-    colorCacheEnabled: true,
-    colorCacheHitCount: 0,
-    colorCacheMissCount: 0,
-    colorKeyUsage: new Map(),
-    actualColorPathUsedCounts: new Map(),
-    miss_step1_paletteLookupMs: 0,
-    miss_step2_heightBucketMs: 0,
-    miss_step3_materialColorMs: 0,
-    miss_step4_lightingMixMs: 0,
-    miss_step5_cssOrObjectBuildMs: 0,
-    step4a_colorCacheLookupMs: 0,
-    step4b_colorCacheHitFastPathMs: 0,
-    step4c_colorMissPathMs: 0,
-    step4d_shadowOverlayTotalMs: 0,
-    step4e_shadowOverlayCacheLookupMs: 0,
-    step4f_shadowOverlayCollectMs: 0,
-    step4g_shadowOverlayCloneMs: 0,
-    step4h_fillAndOverlayAssignMs: 0,
-    shadowOverlayCacheHitCount: 0,
-    shadowOverlayCacheMissCount: 0,
-    shadowOverlayTotalCount: 0,
-    touchedColorCachePath: false,
-    touchedNaturalColorPath: false,
-    touchedLightingPath: false,
-    touchedShadowOverlayPath: false,
-    touchedProjectedShadowCollector: false,
-    shadowOverlaySkippedByLightingOff: false,
-    lightingEnabledUi: isStaticRenderableLightingUiEnabledForBuild(),
-    usedLightingSignature: false
-  };
-  var scannedFaceCount = 0;
-  var touchedGlobalRenderableTemplates = false;
-  var touchedGlobalStyleCache = false;
-  var touchedGlobalMaterialCache = false;
-  var faceDescriptors = [];
-  for (var i = 0; i < surfaceCells.length; i++) {
-    var entry = surfaceCells[i];
-    var cell = entry && entry.box ? entry.box : entry;
-    if (!cell) continue;
-    var visibleFaces = Array.isArray(entry && entry.visibleFaces) && entry.visibleFaces.length ? entry.visibleFaces.slice() : ['top', 'east', 'south'];
-    for (var vf = 0; vf < visibleFaces.length; vf++) {
-      scannedFaceCount += 1;
-      var prepareFaceInputsStartAt = perfNow();
-      var semanticFace = String(visibleFaces[vf] || 'top');
-      var screenFace = getScreenFaceForSemanticFace(semanticFace, currentViewRotation);
-      var normal = getSemanticFaceNormal(semanticFace || screenFace);
-      var mergeCoords = getStaticWorldFaceMergeCoords(cell, semanticFace);
-      if (!mergeCoords) {
-        step1PrepareFaceInputsMs += Math.max(0, perfNow() - prepareFaceInputsStartAt);
-        continue;
-      }
-      step1PrepareFaceInputsMs += Math.max(0, perfNow() - prepareFaceInputsStartAt);
-      var sortKeyStartAt = perfNow();
-      var orderMeta = domainCore && typeof domainCore.computeVoxelRenderableSort === 'function'
-        ? domainCore.computeVoxelRenderableSort({ cell: { x: Number(cell.x || 0), y: Number(cell.y || 0), z: Number(cell.z || 0) }, box: cell, viewRotation: currentViewRotation })
-        : computeViewAwareSortMeta({ x: Number(cell.x || 0), y: Number(cell.y || 0), z: Number(cell.z || 0) }, 1, currentViewRotation);
-      var sortKey = Number(orderMeta.sortKey || 0);
-      var tie = Number(orderMeta.tie || 0) + ((faceTiePrio[screenFace] || 0) * 0.01);
-      var terrainSortBandKey = getTerrainSortBandKeyForRenderFace(cell, semanticFace, mergeCoords, orderMeta);
-      var edgeVisibilitySignature = (cell && cell.generatedBy === 'terrain-generator' && (semanticFace === 'east' || semanticFace === 'south'))
-        ? getTerrainSideEdgeVisibilitySignature(visibleFaces, semanticFace)
-        : null;
-      var sideStepBreakSignature = (cell && cell.generatedBy === 'terrain-generator' && (semanticFace === 'east' || semanticFace === 'south'))
-        ? getTerrainSideStepBreakSignature(cell, semanticFace, chunkOcc)
-        : null;
-      step5ComputeSortKeyMs += Math.max(0, perfNow() - sortKeyStartAt);
-      inputFaceDescriptorCount += 1;
-      var isTerrainFaceMergeCandidate = !!(cell && cell.generatedBy === 'terrain-generator');
-      var terrainMaterialMergeKey = getTerrainMaterialMergeKeyForRenderCell(cell);
-      var terrainMergeSignature = isTerrainFaceMergeCandidate
-        ? getTerrainFaceMergeSignature(cell, semanticFace, screenFace, currentViewRotation)
-        : null;
-      faceDescriptors.push({
-        cell: cell,
-        box: cell || null,
-        instanceId: cell.instanceId || null,
-        prefabId: cell.prefabId || null,
-        semanticFace: semanticFace,
-        screenFace: screenFace,
-        depthKey: vf,
-        sortKey: sortKey,
-        tie: tie,
-        normal: normal,
-        mergePlane: Number(mergeCoords.plane || 0),
-        mergeU: Number(mergeCoords.u || 0),
-        mergeV: Number(mergeCoords.v || 0),
-        mergeWidth: 1,
-        mergeHeight: 1,
-        mergeSignature: isTerrainFaceMergeCandidate
-          ? terrainMergeSignature
-          : getStaticWorldFaceMergeSignature(cell, semanticFace, screenFace, currentViewRotation),
-        terrainMaterialMergeKey: terrainMaterialMergeKey,
-        terrainMergeSignature: terrainMergeSignature,
-        terrainSortBandKey: terrainSortBandKey,
-        edgeVisibilitySignature: edgeVisibilitySignature,
-        sideStepBreakSignature: sideStepBreakSignature,
-        isTerrainFaceMergeCandidate: isTerrainFaceMergeCandidate,
-        memberCount: 1,
-        merged: false
-      });
-    }
-  }
-  var renderFaceDescriptors = faceDescriptors;
-  var terrainInputFaceDescriptorCount = 0;
-  var terrainMergedFaceDescriptorCount = 0;
-  var terrainMergedStaticFaceCount = 0;
-  var terrainMergeReductionRatio = 0;
-  var terrainMergeFaceDescriptorsMs = 0;
-  var terrainSideInputFaceDescriptorCount = 0;
-  var terrainSideMergedFaceDescriptorCount = 0;
-  var terrainSideMergedStaticFaceCount = 0;
-  var terrainSideMergeReductionRatio = 0;
-  var terrainSideStepBreakCount = 0;
-  var terrainFaceMergeMode = 'not-applicable';
-  var terrainFaceMergeFallbackReason = null;
-  var faceMergeCore = getStaticWorldFaceMergeCoreApi();
-  var terrainFaceMergeCore = getTerrainFaceMergeCoreApi();
-  var nonTerrainDescriptors = [];
-  var terrainDescriptors = [];
-  for (var fdi = 0; fdi < faceDescriptors.length; fdi++) {
-    var faceDesc = faceDescriptors[fdi];
-    if (faceDesc && faceDesc.isTerrainFaceMergeCandidate === true) terrainDescriptors.push(faceDesc);
-    else nonTerrainDescriptors.push(faceDesc);
-  }
-  terrainInputFaceDescriptorCount = terrainDescriptors.length;
-  terrainSideInputFaceDescriptorCount = terrainDescriptors.filter(function (face) {
-    var sf = String(face && face.semanticFace || '');
-    return sf === 'east' || sf === 'south';
-  }).length;
-  var mergedNonTerrainDescriptors = nonTerrainDescriptors;
-  var mergedTerrainDescriptors = terrainDescriptors;
-  var nonTerrainMergedCount = 0;
-  var nonTerrainOutputCount = nonTerrainDescriptors.length;
-  if (faceMergeEnabled && faceMergeCore && typeof faceMergeCore.mergeFaceDescriptors === 'function' && nonTerrainDescriptors.length > 0) {
-    var nonTerrainMergeStartAt = perfNow();
-    var nonTerrainMergeResult = faceMergeCore.mergeFaceDescriptors(nonTerrainDescriptors, { enabled: true });
-    mergeFaceDescriptorsMs += Math.max(0, perfNow() - nonTerrainMergeStartAt);
-    if (nonTerrainMergeResult && Array.isArray(nonTerrainMergeResult.descriptors)) {
-      mergedNonTerrainDescriptors = nonTerrainMergeResult.descriptors;
-      nonTerrainOutputCount = Number(nonTerrainMergeResult.outputCount || mergedNonTerrainDescriptors.length || 0);
-      nonTerrainMergedCount = Number(nonTerrainMergeResult.mergedFaceCount || Math.max(0, nonTerrainDescriptors.length - nonTerrainOutputCount));
-    } else {
-      faceMergeFallbackReason = 'invalid-non-terrain-merge-result';
-      faceMergeMode = 'fallback-no-merge';
-    }
-  } else if (!faceMergeEnabled) {
-    faceMergeMode = 'disabled';
-    faceMergeFallbackReason = 'face-merge-disabled';
-  } else if (nonTerrainDescriptors.length > 0 && !(faceMergeCore && typeof faceMergeCore.mergeFaceDescriptors === 'function')) {
-    faceMergeMode = 'fallback-no-merge';
-    faceMergeFallbackReason = 'missing-face-merge-core';
-  }
-  if (terrainDescriptors.length > 0) {
-    if (faceMergeEnabled && terrainFaceMergeCore && typeof terrainFaceMergeCore.mergeTerrainFaceDescriptors === 'function') {
-      var terrainMergeStartAt = perfNow();
-      var terrainMergeResult = terrainFaceMergeCore.mergeTerrainFaceDescriptors(terrainDescriptors, { enabled: true });
-      terrainMergeFaceDescriptorsMs = Math.max(0, perfNow() - terrainMergeStartAt);
-      mergeFaceDescriptorsMs += terrainMergeFaceDescriptorsMs;
-      if (terrainMergeResult && Array.isArray(terrainMergeResult.descriptors)) {
-        mergedTerrainDescriptors = terrainMergeResult.descriptors;
-        terrainMergedFaceDescriptorCount = Number(terrainMergeResult.outputCount || mergedTerrainDescriptors.length || 0);
-        terrainMergedStaticFaceCount = Number(terrainMergeResult.mergedFaceCount || Math.max(0, terrainDescriptors.length - terrainMergedFaceDescriptorCount));
-        terrainMergeReductionRatio = Number(terrainMergeResult.reductionRatio || (terrainDescriptors.length > 0 ? Math.max(0, (terrainDescriptors.length - terrainMergedFaceDescriptorCount) / terrainDescriptors.length) : 0));
-        terrainSideStepBreakCount = Number(terrainMergeResult.sideStepBreakCount || 0);
-        terrainFaceMergeMode = 'terrain-core-merge';
-      } else {
-        terrainMergedFaceDescriptorCount = terrainDescriptors.length;
-        terrainFaceMergeMode = 'fallback-no-merge';
-        terrainFaceMergeFallbackReason = 'invalid-terrain-merge-result';
-      }
-    } else if (!faceMergeEnabled) {
-      terrainMergedFaceDescriptorCount = terrainDescriptors.length;
-      terrainFaceMergeMode = 'disabled';
-      terrainFaceMergeFallbackReason = 'face-merge-disabled';
-    } else {
-      terrainMergedFaceDescriptorCount = terrainDescriptors.length;
-      terrainFaceMergeMode = 'fallback-no-merge';
-      terrainFaceMergeFallbackReason = 'missing-terrain-face-merge-core';
-    }
-  }
-  if (terrainMergedFaceDescriptorCount <= 0 && terrainInputFaceDescriptorCount > 0) terrainMergedFaceDescriptorCount = terrainInputFaceDescriptorCount;
-  terrainSideMergedFaceDescriptorCount = mergedTerrainDescriptors.filter(function (face) {
-    var sf = String(face && face.semanticFace || '');
-    return sf === 'east' || sf === 'south';
-  }).length;
-  terrainSideMergedStaticFaceCount = Math.max(0, Number(terrainSideInputFaceDescriptorCount || 0) - Number(terrainSideMergedFaceDescriptorCount || 0));
-  terrainSideMergeReductionRatio = terrainSideInputFaceDescriptorCount > 0
-    ? Math.max(0, (terrainSideInputFaceDescriptorCount - terrainSideMergedFaceDescriptorCount) / terrainSideInputFaceDescriptorCount)
-    : 0;
-  renderFaceDescriptors = mergedNonTerrainDescriptors.concat(mergedTerrainDescriptors);
-  mergedFaceDescriptorCount = Number(nonTerrainOutputCount || mergedNonTerrainDescriptors.length || 0) + Number(terrainMergedFaceDescriptorCount || 0);
-  mergedStaticFaceCount = Math.max(0, Number(nonTerrainMergedCount || 0) + Number(terrainMergedStaticFaceCount || 0));
-  mergeReductionRatio = inputFaceDescriptorCount > 0 ? Math.max(0, (inputFaceDescriptorCount - mergedFaceDescriptorCount) / inputFaceDescriptorCount) : 0;
-  if (terrainDescriptors.length > 0 && nonTerrainDescriptors.length > 0) faceMergeMode = 'split-terrain-generic';
-  else if (terrainDescriptors.length > 0) faceMergeMode = terrainFaceMergeMode;
-  else if (nonTerrainDescriptors.length > 0 && faceMergeEnabled && faceMergeCore && typeof faceMergeCore.mergeFaceDescriptors === 'function') faceMergeMode = 'generic-core-merge';
-  if (mergedFaceDescriptorCount <= 0 && inputFaceDescriptorCount > 0) mergedFaceDescriptorCount = inputFaceDescriptorCount;
-  for (var fd = 0; fd < renderFaceDescriptors.length; fd++) {
-    var descriptor = renderFaceDescriptors[fd];
-    var cell = descriptor && (descriptor.cell || descriptor.box) ? (descriptor.cell || descriptor.box) : null;
-    if (!cell) continue;
-    var prepareFaceInputsStartAt = perfNow();
-    var semanticFace = String(descriptor.semanticFace || 'top');
-    var screenFace = descriptor.screenFace || getScreenFaceForSemanticFace(semanticFace, currentViewRotation);
-    var normal = descriptor.normal || getSemanticFaceNormal(semanticFace || screenFace);
-    var worldGeometry = buildMergedVoxelFaceWorldGeometry(descriptor);
-    var worldPts = Array.isArray(worldGeometry && worldGeometry.worldPts) ? worldGeometry.worldPts : [];
-    var worldLoops = Array.isArray(worldGeometry && worldGeometry.worldLoops) ? worldGeometry.worldLoops : null;
-    var worldOutlineSegments = Array.isArray(worldGeometry && worldGeometry.worldOutlineSegments) ? worldGeometry.worldOutlineSegments : null;
-    var terrainBoundarySegmentsWorld = buildTerrainTopBoundarySegmentsWorldFromDescriptor(descriptor, chunkOcc);
-    if (!worldPts.length) {
-      step1PrepareFaceInputsMs += Math.max(0, perfNow() - prepareFaceInputsStartAt);
-      continue;
-    }
-    step1PrepareFaceInputsMs += Math.max(0, perfNow() - prepareFaceInputsStartAt);
-    var sortKey = Number(descriptor.sortKey || 0);
-    var tie = Number(descriptor.tie || 0);
-    var buildRenderableBaseStartAt = perfNow();
-    var terrainLoopSignature = buildTerrainPolygonLoopSignature(descriptor);
-    var packetId = descriptor.merged === true
-      ? 'voxel-merge-' + String(cell.instanceId || cell.prefabId || 'x') + '-' + String(descriptor.mergePlane) + '-' + String(descriptor.mergeU) + '-' + String(descriptor.mergeV) + '-' + String(descriptor.mergeWidth || 1) + 'x' + String(descriptor.mergeHeight || 1) + '-' + String(descriptor.memberCount || 1) + '-' + String(terrainLoopSignature || '') + '::' + semanticFace
-      : 'voxel-' + String(cell.id || 'x') + '-' + String(cell.x || 0) + '-' + String(cell.y || 0) + '-' + String(cell.z || 0) + '::' + semanticFace;
-    var faceKey = descriptor.merged === true
-      ? [cell.instanceId || 'unknown', [Number(descriptor.mergePlane || 0), Number(descriptor.mergeU || 0), Number(descriptor.mergeV || 0), Number(descriptor.mergeWidth || 1), Number(descriptor.mergeHeight || 1), Number(descriptor.memberCount || 1)].join(','), terrainLoopSignature || '', semanticFace, screenFace].join('|')
-      : [cell.instanceId || 'unknown', [Number(cell.x || 0), Number(cell.y || 0), Number(cell.z || 0)].join(','), semanticFace, screenFace].join('|');
-    step2BuildRenderableBaseMs += Math.max(0, perfNow() - buildRenderableBaseStartAt);
-    var styleOrMaterialStartAt = perfNow();
-    var terrainPatternDescriptor = getTerrainMaterialPatternDescriptorForRenderCell(cell, semanticFace);
-    var terrainFc = getTerrainMaterialBaseFaceColorsForRenderCell(cell);
-    var fc = terrainFc || getCachedBaseFaceColorsForRenderable((cell && cell.base) || '#7aa2f7');
-    var stroke = terrainPatternDescriptor && terrainPatternDescriptor.lineColor ? terrainPatternDescriptor.lineColor : fc.line;
-    var texture = null;
-    var textureColor = null;
-    var semanticTextureSlot = null;
-    var semanticTextureSlotColor = null;
-    step3BuildStyleOrMaterialMs += Math.max(0, perfNow() - styleOrMaterialStartAt);
-    var buildColorStartAt = perfNow();
-    var terrainSettingsForStep4 = getTerrainRenderSettingsForRender();
-    var lightingActiveForStep4 = isStaticRenderableLightingActiveForBuild(terrainSettingsForStep4);
-    colorBuildStats.usedLightingSignature = lightingActiveForStep4;
-    colorBuildStats.lightingEnabledUi = isStaticRenderableLightingUiEnabledForBuild();
-    var cachedFillResult = getCachedStaticRenderableFill(cell, semanticFace, worldPts, normal, currentViewRotation, colorBuildStats);
-    var assignStartAt = perfNow();
-    var fill = cachedFillResult.fill;
-    var shadowOverlaysWorld = [];
-    var suppressMergedTerrainTopShadows = !!(descriptor && descriptor.isTerrainFaceMergeCandidate === true && String(semanticFace || 'top') === 'top' && Array.isArray(worldLoops) && worldLoops.length > 0);
-    if (lightingActiveForStep4 && !suppressMergedTerrainTopShadows) shadowOverlaysWorld = buildVoxelFaceShadowWorldOverlays(worldPts, normal, cell.instanceId || null, colorBuildStats);
-    else colorBuildStats.shadowOverlaySkippedByLightingOff = true;
-    colorBuildStats.step4h_fillAndOverlayAssignMs += Math.max(0, perfNow() - assignStartAt);
-    step4BuildColorMs += Math.max(0, perfNow() - buildColorStartAt);
-    var objectAllocationStartAt = perfNow();
-    if (descriptor && descriptor.isTerrainFaceMergeCandidate === true) terrainPacketCount += 1;
-    var packet = {
-      id: packetId,
-      kind: 'static-world-face-packet',
-      sortKey: sortKey,
-      tie: tie,
-      instanceId: cell.instanceId || null,
-      prefabId: cell.prefabId || null,
-      renderPath: 'static-world-chunk-packet',
-      cacheViewRotation: currentViewRotation,
-      cacheContentType: 'world-face-packets',
-      cameraIndependent: true,
-      usesScreenSpaceCache: false,
-      semanticFace: semanticFace,
-      screenFace: screenFace,
-      depthKey: descriptor.depthKey != null ? descriptor.depthKey : 0,
-      fill: fill,
-      stroke: stroke,
-      texture: texture,
-      textureColor: textureColor,
-      semanticTextureSlot: semanticTextureSlot,
-      semanticTextureSlotColor: semanticTextureSlotColor,
-      width: 1,
-      worldPts: worldPts,
-      worldLoops: worldLoops,
-      worldOutlineSegments: worldOutlineSegments,
-      terrainBoundarySegmentsWorld: terrainBoundarySegmentsWorld,
-      terrainBoundaryStroke: stroke,
-      terrainBoundaryStrokeWidth: terrainBoundarySegmentsWorld.length ? 2.6 : 0,
-      shadowOverlaysWorld: shadowOverlaysWorld,
-      box: cell || null,
-      cellX: Number(cell.x || 0),
-      cellY: Number(cell.y || 0),
-      cellZ: Number(cell.z || 0),
-      faceKey: faceKey,
-      actorInteractionMemberFaceKeys: buildActorInteractionMemberFaceKeysFromFaceDescriptor(descriptor, currentViewRotation),
-      actorInteractionMemberDescriptors: getActorInteractionMemberDescriptorsFromFaceDescriptor(descriptor),
-      packetNormal: normal,
-      mergedFace: descriptor.merged === true,
-      mergedFaceCount: Number(descriptor.memberCount || 1),
-      mergeWidth: Number(descriptor.mergeWidth || 1),
-      mergeHeight: Number(descriptor.mergeHeight || 1),
-      terrainMaterialMergeKey: descriptor.terrainMaterialMergeKey || null,
-      terrainMaterialId: getTerrainMaterialIdForRenderCell(cell),
-      terrainMaterialLabel: terrainPatternDescriptor && terrainPatternDescriptor.label ? terrainPatternDescriptor.label : null,
-      materialType: cell && (cell.materialType || cell.terrainBand) ? String(cell.materialType || cell.terrainBand) : null,
-      terrainPatternDescriptor: terrainPatternDescriptor || null,
-      terrainPatternOpacity: terrainPatternDescriptor && Number.isFinite(Number(terrainPatternDescriptor.opacity)) ? Number(terrainPatternDescriptor.opacity) : null
-    };
-    step6ObjectAllocationMs += Math.max(0, perfNow() - objectAllocationStartAt);
-    var arrayPushStartAt = perfNow();
-    packets.push(packet);
-    step7ArrayPushMs += Math.max(0, perfNow() - arrayPushStartAt);
-  }
-  var step5BuildPacketsMs = Math.max(0, perfNow() - packetBuildStartAt);
-  var staticRenderableBuildStartAt = perfNow();
-  var finalizeRenderableListStartAt = perfNow();
-  packets.sort(compareRenderablesByDomain);
-  step8FinalizeRenderableListMs += Math.max(0, perfNow() - finalizeRenderableListStartAt);
-  var step6BuildStaticRenderablesMs = Math.max(0, perfNow() - staticRenderableBuildStartAt);
-  var step7SortRenderablesMs = Number(step8FinalizeRenderableListMs.toFixed(3));
-  var sortStartAt = perfNow();
-  var finalizeStartAt = perfNow();
-  var totalStaticRenderableBuildMs = Math.max(0, perfNow() - staticRenderableBuildProfileStartAt);
-  var staticRenderableBuildMs = Number(totalStaticRenderableBuildMs.toFixed(3));
-  var visibleFaceCountAfterCull = Number(surfaceCache.visibleTopFaceCount || 0) + Number(surfaceCache.visibleSideFaceCount || 0);
-  var logicalVoxelCountEstimated = Number(surfaceCache.logicalVoxelCountEstimated || chunkBoxes.length || 0);
-  var candidateFacesPerVoxel = cameraScope.surfaceOnlyRenderingEnabled !== false ? 3 : 5;
-  var exposedFaceCountBeforeCull = Math.max(visibleFaceCountAfterCull, logicalVoxelCountEstimated * candidateFacesPerVoxel);
-  var chunkBounds = chunk && chunk.bounds ? chunk.bounds : null;
-  var overlappedBoxCount = 0;
-  for (var nb = 0; nb < neighborBoxes.length; nb++) {
-    var nbox = neighborBoxes[nb];
-    if (!nbox || !chunkBounds) continue;
-    var nMinX = Number(nbox.x || 0);
-    var nMinY = Number(nbox.y || 0);
-    var nMaxX = nMinX + Math.max(1, Number(nbox.w) || 1);
-    var nMaxY = nMinY + Math.max(1, Number(nbox.d) || 1);
-    if (nMinX < chunkBounds.maxX && nMaxX > chunkBounds.minX && nMinY < chunkBounds.maxY && nMaxY > chunkBounds.minY) overlappedBoxCount += 1;
-  }
-  var columnSet = new Set();
-  for (var cb = 0; cb < chunkBoxes.length; cb++) {
-    var cbox = chunkBoxes[cb];
-    if (!cbox) continue;
-    var w = Math.max(1, Number(cbox.w) || 1);
-    var d = Math.max(1, Number(cbox.d) || 1);
-    for (var dx = 0; dx < w; dx++) {
-      for (var dy = 0; dy < d; dy++) columnSet.add(String(Number(cbox.x || 0) + dx) + ',' + String(Number(cbox.y || 0) + dy));
-    }
-  }
-  var step8FinalizeChunkCacheMs = Math.max(0, perfNow() - finalizeStartAt);
-  var totalChunkBuildMs = Math.max(0, perfNow() - chunkBuildStartAt);
-  var touchedChunkKeys = Array.isArray(opts.touchedChunkKeys) ? opts.touchedChunkKeys.slice() : [chunk && chunk.key ? String(chunk.key) : null].filter(Boolean);
-  var scopePayload = {
-    terrainBatchId: profileContext.terrainBatchId || null,
-    frameIndexAfterTerrainApply: profileContext.frameIndexAfterTerrainApply != null ? Number(profileContext.frameIndexAfterTerrainApply) : null,
-    chunkKey: chunk && chunk.key ? String(chunk.key) : null,
-    localBoxCount: Number(chunkBoxes.length || 0),
-    scannedBoxCount: Number(chunkBoxes.length + neighborBoxes.length || 0),
-    scannedChunkCount: Number(touchedChunkKeys.length || 0),
-    touchedChunkKeys: touchedChunkKeys,
-    touchedGlobalOccupancy: usedGlobalOccupancy === true,
-    touchedGlobalRenderableList: false,
-    touchedGlobalSurfacePass: false,
-    isChunkLocalOnly: usedLocalOccupancyFallback === true
-  };
-  emitChunkRebuildScopeVerify(scopePayload);
-  var detailPayload = {
-    terrainBatchId: profileContext.terrainBatchId || null,
-    frameIndexAfterTerrainApply: profileContext.frameIndexAfterTerrainApply != null ? Number(profileContext.frameIndexAfterTerrainApply) : null,
-    chunkKey: chunk && chunk.key ? String(chunk.key) : null,
-    localBoxCount: Number(chunkBoxes.length || 0),
-    neighborBoxCount: Number(neighborBoxes.length || 0),
-    overlappedBoxCount: Number(overlappedBoxCount || 0),
-    uniqueColumnCount: Number(columnSet.size || 0),
-    exposedFaceCountBeforeCull: Number(exposedFaceCountBeforeCull || 0),
-    visibleFaceCountAfterCull: Number(visibleFaceCountAfterCull || 0),
-    staticRenderableCount: Number(packets.length || 0),
-    packetCount: Number(packets.length || 0),
-    inputFaceDescriptorCount: Number(inputFaceDescriptorCount || 0),
-    mergedFaceDescriptorCount: Number(mergedFaceDescriptorCount || 0),
-    mergedStaticFaceCount: Number(mergedStaticFaceCount || 0),
-    mergeReductionRatio: Number(mergeReductionRatio || 0),
-    faceMergeMode: faceMergeMode,
-    faceMergeFallbackReason: faceMergeFallbackReason,
-    terrainInputFaceDescriptorCount: Number(terrainInputFaceDescriptorCount || 0),
-    terrainMergedFaceDescriptorCount: Number(terrainMergedFaceDescriptorCount || 0),
-    terrainMergedStaticFaceCount: Number(terrainMergedStaticFaceCount || 0),
-    terrainMergeReductionRatio: Number(terrainMergeReductionRatio || 0),
-    terrainSideInputFaceDescriptorCount: Number(terrainSideInputFaceDescriptorCount || 0),
-    terrainSideMergedFaceDescriptorCount: Number(terrainSideMergedFaceDescriptorCount || 0),
-    terrainSideMergedStaticFaceCount: Number(terrainSideMergedStaticFaceCount || 0),
-    terrainSideMergeReductionRatio: Number(terrainSideMergeReductionRatio || 0),
-    terrainSideStepBreakCount: Number(terrainSideStepBreakCount || 0),
-    terrainMergeFaceDescriptorsMs: Number(terrainMergeFaceDescriptorsMs.toFixed(3)),
-    terrainFaceMergeMode: terrainFaceMergeMode,
-    terrainFaceMergeFallbackReason: terrainFaceMergeFallbackReason,
-    terrainPacketCount: Number(terrainPacketCount || 0),
-    occupancyAccessMode: occupancyAccessMode,
-    usedGlobalOccupancy: usedGlobalOccupancy === true,
-    usedLocalOccupancyFallback: usedLocalOccupancyFallback === true,
-    occupancyFallbackReason: occupancyFallbackReason,
-    occupancyValidationSampleCount: occupancyValidationSampleCount,
-    step1_collectChunkBoxesMs: Number(step1CollectChunkBoxesMs.toFixed(3)),
-    step2_collectNeighborBoxesMs: Number(step2CollectNeighborBoxesMs.toFixed(3)),
-    step3_resolveOccupancyMs: Number(step3ResolveOccupancyMs.toFixed(3)),
-    step3_buildLocalOccupancyMs: Number(step3BuildLocalOccupancyMs.toFixed(3)),
-    step4_computeVisibleFacesMs: Number(step4ComputeVisibleFacesMs.toFixed(3)),
-    step5_buildPacketsMs: Number(step5BuildPacketsMs.toFixed(3)),
-    mergeFaceDescriptorsMs: Number(mergeFaceDescriptorsMs.toFixed(3)),
-    step6_buildStaticRenderablesMs: Number(step6BuildStaticRenderablesMs.toFixed(3)),
-    step7_sortRenderablesMs: Number(step7SortRenderablesMs.toFixed(3)),
-    step8_finalizeChunkCacheMs: Number(step8FinalizeChunkCacheMs.toFixed(3)),
-    totalChunkBuildMs: Number(totalChunkBuildMs.toFixed(3))
-  };
-  emitChunkRebuildDetail(detailPayload);
-  var hotspotThresholdMs = 50;
-  if (totalChunkBuildMs >= hotspotThresholdMs) {
-    var stepEntries = [
-      ['step1_collectChunkBoxesMs', step1CollectChunkBoxesMs],
-      ['step2_collectNeighborBoxesMs', step2CollectNeighborBoxesMs],
-      ['step3_resolveOccupancyMs', step3ResolveOccupancyMs],
-      ['step3_buildLocalOccupancyMs', step3BuildLocalOccupancyMs],
-      ['step4_computeVisibleFacesMs', step4ComputeVisibleFacesMs],
-      ['step5_buildPacketsMs', step5BuildPacketsMs],
-      ['step6_buildStaticRenderablesMs', step6BuildStaticRenderablesMs],
-      ['step7_sortRenderablesMs', step7SortRenderablesMs],
-      ['step8_finalizeChunkCacheMs', step8FinalizeChunkCacheMs]
-    ].sort(function (a, b) { return Number(b[1] || 0) - Number(a[1] || 0); });
-    emitChunkRebuildHotspot({
-      terrainBatchId: profileContext.terrainBatchId || null,
-      frameIndexAfterTerrainApply: profileContext.frameIndexAfterTerrainApply != null ? Number(profileContext.frameIndexAfterTerrainApply) : null,
-      chunkKey: chunk && chunk.key ? String(chunk.key) : null,
-      totalChunkBuildMs: Number(totalChunkBuildMs.toFixed(3)),
-      localBoxCount: Number(chunkBoxes.length || 0),
-      visibleFaceCountAfterCull: Number(visibleFaceCountAfterCull || 0),
-      staticRenderableCount: Number(packets.length || 0),
-      packetCount: Number(packets.length || 0),
-      inputFaceDescriptorCount: Number(inputFaceDescriptorCount || 0),
-      mergedFaceDescriptorCount: Number(mergedFaceDescriptorCount || 0),
-      mergedStaticFaceCount: Number(mergedStaticFaceCount || 0),
-      mergeReductionRatio: Number(mergeReductionRatio || 0),
-      mergeFaceDescriptorsMs: Number(mergeFaceDescriptorsMs.toFixed(3)),
-      faceMergeMode: faceMergeMode,
-      faceMergeFallbackReason: faceMergeFallbackReason,
-      terrainInputFaceDescriptorCount: Number(terrainInputFaceDescriptorCount || 0),
-      terrainMergedFaceDescriptorCount: Number(terrainMergedFaceDescriptorCount || 0),
-      terrainMergedStaticFaceCount: Number(terrainMergedStaticFaceCount || 0),
-      terrainMergeReductionRatio: Number(terrainMergeReductionRatio || 0),
-      terrainMergeFaceDescriptorsMs: Number(terrainMergeFaceDescriptorsMs.toFixed(3)),
-      terrainFaceMergeMode: terrainFaceMergeMode,
-      terrainFaceMergeFallbackReason: terrainFaceMergeFallbackReason,
-      terrainPacketCount: Number(terrainPacketCount || 0),
-    inputFaceDescriptorCount: Number(inputFaceDescriptorCount || 0),
-    mergedFaceDescriptorCount: Number(mergedFaceDescriptorCount || 0),
-    mergedStaticFaceCount: Number(mergedStaticFaceCount || 0),
-    mergeReductionRatio: Number(mergeReductionRatio || 0),
-    faceMergeMode: faceMergeMode,
-    faceMergeFallbackReason: faceMergeFallbackReason,
-      dominantStep: String(stepEntries[0] && stepEntries[0][0] || ''),
-      dominantStepMs: Number(Number(stepEntries[0] && stepEntries[0][1] || 0).toFixed(3)),
-      secondStep: String(stepEntries[1] && stepEntries[1][0] || ''),
-      secondStepMs: Number(Number(stepEntries[1] && stepEntries[1][1] || 0).toFixed(3))
-    });
-  }
-  var staticRenderableBuildDetailPayload = {
-    terrainBatchId: profileContext.terrainBatchId || null,
-    frameIndexAfterTerrainApply: profileContext.frameIndexAfterTerrainApply != null ? Number(profileContext.frameIndexAfterTerrainApply) : null,
-    chunkKey: chunk && chunk.key ? String(chunk.key) : null,
-    localBoxCount: Number(chunkBoxes.length || 0),
-    visibleFaceCount: Number(visibleFaceCountAfterCull || 0),
-    inputPacketCount: Number(packets.length || 0),
-    step1_prepareFaceInputsMs: Number(step1PrepareFaceInputsMs.toFixed(3)),
-    step2_buildRenderableBaseMs: Number(step2BuildRenderableBaseMs.toFixed(3)),
-    step3_buildStyleOrMaterialMs: Number(step3BuildStyleOrMaterialMs.toFixed(3)),
-    step4_buildColorMs: Number(step4BuildColorMs.toFixed(3)),
-    step5_computeSortKeyMs: Number(step5ComputeSortKeyMs.toFixed(3)),
-    step6_objectAllocationMs: Number(step6ObjectAllocationMs.toFixed(3)),
-    step7_arrayPushMs: Number(step7ArrayPushMs.toFixed(3)),
-    step8_finalizeRenderableListMs: Number(step8FinalizeRenderableListMs.toFixed(3)),
-    outputRenderableCount: Number(packets.length || 0),
-    inputFaceDescriptorCount: Number(inputFaceDescriptorCount || 0),
-    mergedFaceDescriptorCount: Number(mergedFaceDescriptorCount || 0),
-    mergedStaticFaceCount: Number(mergedStaticFaceCount || 0),
-    mergeReductionRatio: Number(mergeReductionRatio || 0),
-    mergeFaceDescriptorsMs: Number(mergeFaceDescriptorsMs.toFixed(3)),
-    totalStaticRenderableBuildMs: Number(totalStaticRenderableBuildMs.toFixed(3))
-  };
-  emitStaticRenderableBuildDetail(staticRenderableBuildDetailPayload);
-  emitStaticRenderableBuildScopeVerify({
-    terrainBatchId: profileContext.terrainBatchId || null,
-    frameIndexAfterTerrainApply: profileContext.frameIndexAfterTerrainApply != null ? Number(profileContext.frameIndexAfterTerrainApply) : null,
-    chunkKey: chunk && chunk.key ? String(chunk.key) : null,
-    localBoxCount: Number(chunkBoxes.length || 0),
-    scannedFaceCount: Number(scannedFaceCount || 0),
-    scannedRenderableCount: Number(packets.length || 0),
-    touchedGlobalRenderableTemplates: touchedGlobalRenderableTemplates === true,
-    touchedGlobalStyleCache: touchedGlobalStyleCache === true,
-    touchedGlobalMaterialCache: touchedGlobalMaterialCache === true,
-    isChunkLocalOnly: true
-  });
-  if (totalStaticRenderableBuildMs >= hotspotThresholdMs) {
-    var renderableStepEntries = [
-      ['step1_prepareFaceInputsMs', step1PrepareFaceInputsMs],
-      ['step2_buildRenderableBaseMs', step2BuildRenderableBaseMs],
-      ['step3_buildStyleOrMaterialMs', step3BuildStyleOrMaterialMs],
-      ['step4_buildColorMs', step4BuildColorMs],
-      ['step5_computeSortKeyMs', step5ComputeSortKeyMs],
-      ['step6_objectAllocationMs', step6ObjectAllocationMs],
-      ['step7_arrayPushMs', step7ArrayPushMs],
-      ['step8_finalizeRenderableListMs', step8FinalizeRenderableListMs]
-    ].sort(function (a, b) { return Number(b[1] || 0) - Number(a[1] || 0); });
-    emitStaticRenderableBuildHotspot({
-      terrainBatchId: profileContext.terrainBatchId || null,
-      frameIndexAfterTerrainApply: profileContext.frameIndexAfterTerrainApply != null ? Number(profileContext.frameIndexAfterTerrainApply) : null,
-      chunkKey: chunk && chunk.key ? String(chunk.key) : null,
-      localBoxCount: Number(chunkBoxes.length || 0),
-      outputRenderableCount: Number(packets.length || 0),
-    inputFaceDescriptorCount: Number(inputFaceDescriptorCount || 0),
-    mergedFaceDescriptorCount: Number(mergedFaceDescriptorCount || 0),
-    mergedStaticFaceCount: Number(mergedStaticFaceCount || 0),
-    mergeReductionRatio: Number(mergeReductionRatio || 0),
-    mergeFaceDescriptorsMs: Number(mergeFaceDescriptorsMs.toFixed(3)),
-      totalStaticRenderableBuildMs: Number(totalStaticRenderableBuildMs.toFixed(3)),
-      dominantStep: String(renderableStepEntries[0] && renderableStepEntries[0][0] || ''),
-      dominantStepMs: Number(Number(renderableStepEntries[0] && renderableStepEntries[0][1] || 0).toFixed(3)),
-      secondStep: String(renderableStepEntries[1] && renderableStepEntries[1][0] || ''),
-      secondStepMs: Number(Number(renderableStepEntries[1] && renderableStepEntries[1][1] || 0).toFixed(3))
-    });
-  }
-  var uniqueColorKeyCount = Number(colorBuildStats.colorKeyUsage.size || 0);
-  var avgColorBuildMsPerRenderable = packets.length > 0 ? step4BuildColorMs / packets.length : 0;
-  emitColorBuildDetail({
-    terrainBatchId: profileContext.terrainBatchId || null,
-    frameIndexAfterTerrainApply: profileContext.frameIndexAfterTerrainApply != null ? Number(profileContext.frameIndexAfterTerrainApply) : null,
-    chunkKey: chunk && chunk.key ? String(chunk.key) : null,
-    outputRenderableCount: Number(packets.length || 0),
-    inputFaceDescriptorCount: Number(inputFaceDescriptorCount || 0),
-    mergedFaceDescriptorCount: Number(mergedFaceDescriptorCount || 0),
-    mergedStaticFaceCount: Number(mergedStaticFaceCount || 0),
-    mergeReductionRatio: Number(mergeReductionRatio || 0),
-    mergeFaceDescriptorsMs: Number(mergeFaceDescriptorsMs.toFixed(3)),
-    colorCacheEnabled: colorBuildStats.colorCacheEnabled === true,
-    colorCacheHitCount: Number(colorBuildStats.colorCacheHitCount || 0),
-    colorCacheMissCount: Number(colorBuildStats.colorCacheMissCount || 0),
-    uniqueColorKeyCount: uniqueColorKeyCount,
-    step4_buildColorMs: Number(step4BuildColorMs.toFixed(3)),
-    avgColorBuildMsPerRenderable: Number(avgColorBuildMsPerRenderable.toFixed(6))
-  });
-  emitStep4ColorBuildDetail({
-    terrainBatchId: profileContext.terrainBatchId || null,
-    frameIndexAfterTerrainApply: profileContext.frameIndexAfterTerrainApply != null ? Number(profileContext.frameIndexAfterTerrainApply) : null,
-    chunkKey: chunk && chunk.key ? String(chunk.key) : null,
-    outputRenderableCount: Number(packets.length || 0),
-    inputFaceDescriptorCount: Number(inputFaceDescriptorCount || 0),
-    mergedFaceDescriptorCount: Number(mergedFaceDescriptorCount || 0),
-    mergedStaticFaceCount: Number(mergedStaticFaceCount || 0),
-    mergeReductionRatio: Number(mergeReductionRatio || 0),
-    mergeFaceDescriptorsMs: Number(mergeFaceDescriptorsMs.toFixed(3)),
-    colorCacheHitCount: Number(colorBuildStats.colorCacheHitCount || 0),
-    colorCacheMissCount: Number(colorBuildStats.colorCacheMissCount || 0),
-    shadowOverlayCacheHitCount: Number(colorBuildStats.shadowOverlayCacheHitCount || 0),
-    shadowOverlayCacheMissCount: Number(colorBuildStats.shadowOverlayCacheMissCount || 0),
-    shadowOverlayTotalCount: Number(colorBuildStats.shadowOverlayTotalCount || 0),
-    step4a_colorCacheLookupMs: Number(colorBuildStats.step4a_colorCacheLookupMs.toFixed(3)),
-    step4b_colorCacheHitFastPathMs: Number(colorBuildStats.step4b_colorCacheHitFastPathMs.toFixed(3)),
-    step4c_colorMissPathMs: Number(colorBuildStats.step4c_colorMissPathMs.toFixed(3)),
-    step4d_shadowOverlayTotalMs: Number(colorBuildStats.step4d_shadowOverlayTotalMs.toFixed(3)),
-    step4e_shadowOverlayCacheLookupMs: Number(colorBuildStats.step4e_shadowOverlayCacheLookupMs.toFixed(3)),
-    step4f_shadowOverlayCollectMs: Number(colorBuildStats.step4f_shadowOverlayCollectMs.toFixed(3)),
-    step4g_shadowOverlayCloneMs: Number(colorBuildStats.step4g_shadowOverlayCloneMs.toFixed(3)),
-    step4h_fillAndOverlayAssignMs: Number(colorBuildStats.step4h_fillAndOverlayAssignMs.toFixed(3)),
-    totalStep4BuildColorMs: Number(step4BuildColorMs.toFixed(3))
-  });
-  emitStep4ColorBuildScopeVerify({
-    terrainBatchId: profileContext.terrainBatchId || null,
-    frameIndexAfterTerrainApply: profileContext.frameIndexAfterTerrainApply != null ? Number(profileContext.frameIndexAfterTerrainApply) : null,
-    chunkKey: chunk && chunk.key ? String(chunk.key) : null,
-    outputRenderableCount: Number(packets.length || 0),
-    inputFaceDescriptorCount: Number(inputFaceDescriptorCount || 0),
-    mergedFaceDescriptorCount: Number(mergedFaceDescriptorCount || 0),
-    mergedStaticFaceCount: Number(mergedStaticFaceCount || 0),
-    mergeReductionRatio: Number(mergeReductionRatio || 0),
-    mergeFaceDescriptorsMs: Number(mergeFaceDescriptorsMs.toFixed(3)),
-    scannedFaceCount: Number(scannedFaceCount || 0),
-    colorCacheHitCount: Number(colorBuildStats.colorCacheHitCount || 0),
-    colorCacheMissCount: Number(colorBuildStats.colorCacheMissCount || 0),
-    shadowOverlayCacheHitCount: Number(colorBuildStats.shadowOverlayCacheHitCount || 0),
-    shadowOverlayCacheMissCount: Number(colorBuildStats.shadowOverlayCacheMissCount || 0),
-    touchedColorCachePath: colorBuildStats.touchedColorCachePath === true,
-    touchedNaturalColorPath: colorBuildStats.touchedNaturalColorPath === true,
-    touchedLightingPath: colorBuildStats.touchedLightingPath === true,
-    touchedShadowOverlayPath: colorBuildStats.touchedShadowOverlayPath === true,
-    touchedProjectedShadowCollector: colorBuildStats.touchedProjectedShadowCollector === true,
-    isStep4MostlyLocal: colorBuildStats.touchedProjectedShadowCollector !== true
-  });
-  var dominantPathEntry = null;
-  colorBuildStats.actualColorPathUsedCounts.forEach(function (count, key) {
-    if (!dominantPathEntry || Number(count || 0) > Number(dominantPathEntry.count || 0)) dominantPathEntry = { key: key, count: Number(count || 0) };
-  });
-  var terrainSettingsForBuild = getTerrainRenderSettingsForRender();
-  emitBuildColorPathVerify({
-    terrainBatchId: profileContext.terrainBatchId || null,
-    frameIndexAfterTerrainApply: profileContext.frameIndexAfterTerrainApply != null ? Number(profileContext.frameIndexAfterTerrainApply) : null,
-    chunkKey: chunk && chunk.key ? String(chunk.key) : null,
-    terrainBuildColorMode: String((terrainSettingsForBuild && terrainSettingsForBuild.terrainBuildColorMode) || 'natural'),
-    terrainBuildLightingBypass: terrainSettingsForBuild && terrainSettingsForBuild.terrainBuildLightingBypass === true,
-    lightingEnabledUi: isStaticRenderableLightingUiEnabledForBuild(),
-    actualColorPathUsed: String(dominantPathEntry && dominantPathEntry.key || getStaticRenderableActualColorPathUsed(terrainSettingsForBuild)),
-    usedLightingSignature: colorBuildStats.usedLightingSignature === true,
-    dominantColorMode: String(dominantPathEntry && dominantPathEntry.key ? String(dominantPathEntry.key).split('+')[0] : getStaticRenderableBuildColorModeForRender(terrainSettingsForBuild))
-  });
-  emitLightingShadowBypassVerify({
-    terrainBatchId: profileContext.terrainBatchId || null,
-    frameIndexAfterTerrainApply: profileContext.frameIndexAfterTerrainApply != null ? Number(profileContext.frameIndexAfterTerrainApply) : null,
-    chunkKey: chunk && chunk.key ? String(chunk.key) : null,
-    lightingEnabledUi: isStaticRenderableLightingUiEnabledForBuild(),
-    terrainBuildLightingBypass: terrainSettingsForBuild && terrainSettingsForBuild.terrainBuildLightingBypass === true,
-    usedLightingSignature: colorBuildStats.usedLightingSignature === true,
-    touchedShadowOverlayPath: colorBuildStats.touchedShadowOverlayPath === true,
-    touchedProjectedShadowCollector: colorBuildStats.touchedProjectedShadowCollector === true,
-    shadowOverlaySkippedByLightingOff: colorBuildStats.shadowOverlaySkippedByLightingOff === true,
-    actualColorPathUsed: String(dominantPathEntry && dominantPathEntry.key || getStaticRenderableActualColorPathUsed(terrainSettingsForBuild))
-  });
-  emitStep4ShadowPathSummary({
-    terrainBatchId: profileContext.terrainBatchId || null,
-    frameIndexAfterTerrainApply: profileContext.frameIndexAfterTerrainApply != null ? Number(profileContext.frameIndexAfterTerrainApply) : null,
-    chunkKey: chunk && chunk.key ? String(chunk.key) : null,
-    step4_buildColorMs: Number(step4BuildColorMs.toFixed(3)),
-    step4d_shadowOverlayTotalMs: Number(colorBuildStats.step4d_shadowOverlayTotalMs.toFixed(3)),
-    step4h_fillAndOverlayAssignMs: Number(colorBuildStats.step4h_fillAndOverlayAssignMs.toFixed(3)),
-    shadowOverlayCacheHitRate: Number((Number(colorBuildStats.shadowOverlayCacheHitCount || 0) + Number(colorBuildStats.shadowOverlayCacheMissCount || 0)) > 0 ? (Number(colorBuildStats.shadowOverlayCacheHitCount || 0) / (Number(colorBuildStats.shadowOverlayCacheHitCount || 0) + Number(colorBuildStats.shadowOverlayCacheMissCount || 0))).toFixed(6) : '0.000000'),
-    shadowOverlayTotalCount: Number(colorBuildStats.shadowOverlayTotalCount || 0)
-  });
-  emitColorBuildMissBreakdown({
-    terrainBatchId: profileContext.terrainBatchId || null,
-    frameIndexAfterTerrainApply: profileContext.frameIndexAfterTerrainApply != null ? Number(profileContext.frameIndexAfterTerrainApply) : null,
-    chunkKey: chunk && chunk.key ? String(chunk.key) : null,
-    colorCacheMissCount: Number(colorBuildStats.colorCacheMissCount || 0),
-    miss_step1_paletteLookupMs: Number(colorBuildStats.miss_step1_paletteLookupMs.toFixed(3)),
-    miss_step2_heightBucketMs: Number(colorBuildStats.miss_step2_heightBucketMs.toFixed(3)),
-    miss_step3_materialColorMs: Number(colorBuildStats.miss_step3_materialColorMs.toFixed(3)),
-    miss_step4_lightingMixMs: Number(colorBuildStats.miss_step4_lightingMixMs.toFixed(3)),
-    miss_step5_cssOrObjectBuildMs: Number(colorBuildStats.miss_step5_cssOrObjectBuildMs.toFixed(3)),
-    totalMissPathMs: Number((colorBuildStats.miss_step1_paletteLookupMs + colorBuildStats.miss_step2_heightBucketMs + colorBuildStats.miss_step3_materialColorMs + colorBuildStats.miss_step4_lightingMixMs + colorBuildStats.miss_step5_cssOrObjectBuildMs).toFixed(3))
-  });
-  if (step4BuildColorMs >= hotspotThresholdMs) {
-    var dominantColorEntry = null;
-    colorBuildStats.colorKeyUsage.forEach(function (entry) {
-      if (!dominantColorEntry || Number(entry && entry.count || 0) > Number(dominantColorEntry && dominantColorEntry.count || 0)) dominantColorEntry = entry;
-    });
-    var totalColorOps = Number(colorBuildStats.colorCacheHitCount || 0) + Number(colorBuildStats.colorCacheMissCount || 0);
-    var colorCacheHitRate = totalColorOps > 0 ? Number(colorBuildStats.colorCacheHitCount || 0) / totalColorOps : 0;
-    emitColorBuildHotspot({
-      terrainBatchId: profileContext.terrainBatchId || null,
-      frameIndexAfterTerrainApply: profileContext.frameIndexAfterTerrainApply != null ? Number(profileContext.frameIndexAfterTerrainApply) : null,
-      chunkKey: chunk && chunk.key ? String(chunk.key) : null,
-      dominantColorMode: String(dominantColorEntry && dominantColorEntry.terrainColorMode || ''),
-      dominantFaceType: String(dominantColorEntry && dominantColorEntry.dominantFaceType || ''),
-      dominantMaterialType: String(dominantColorEntry && dominantColorEntry.dominantMaterialType || ''),
-      dominantHeightBucket: Number(dominantColorEntry && dominantColorEntry.dominantHeightBucket != null ? dominantColorEntry.dominantHeightBucket : 0),
-      colorCacheHitRate: Number(colorCacheHitRate.toFixed(6)),
-      totalColorBuildMs: Number(step4BuildColorMs.toFixed(3))
-    });
-    var step4Substeps = [
-      ['step4a_colorCacheLookupMs', colorBuildStats.step4a_colorCacheLookupMs],
-      ['step4b_colorCacheHitFastPathMs', colorBuildStats.step4b_colorCacheHitFastPathMs],
-      ['step4c_colorMissPathMs', colorBuildStats.step4c_colorMissPathMs],
-      ['step4d_shadowOverlayTotalMs', colorBuildStats.step4d_shadowOverlayTotalMs],
-      ['step4e_shadowOverlayCacheLookupMs', colorBuildStats.step4e_shadowOverlayCacheLookupMs],
-      ['step4f_shadowOverlayCollectMs', colorBuildStats.step4f_shadowOverlayCollectMs],
-      ['step4g_shadowOverlayCloneMs', colorBuildStats.step4g_shadowOverlayCloneMs],
-      ['step4h_fillAndOverlayAssignMs', colorBuildStats.step4h_fillAndOverlayAssignMs]
-    ].sort(function (a, b) { return Number(b[1] || 0) - Number(a[1] || 0); });
-    emitStep4ColorBuildHotspot({
-      terrainBatchId: profileContext.terrainBatchId || null,
-      frameIndexAfterTerrainApply: profileContext.frameIndexAfterTerrainApply != null ? Number(profileContext.frameIndexAfterTerrainApply) : null,
-      chunkKey: chunk && chunk.key ? String(chunk.key) : null,
-      outputRenderableCount: Number(packets.length || 0),
-    inputFaceDescriptorCount: Number(inputFaceDescriptorCount || 0),
-    mergedFaceDescriptorCount: Number(mergedFaceDescriptorCount || 0),
-    mergedStaticFaceCount: Number(mergedStaticFaceCount || 0),
-    mergeReductionRatio: Number(mergeReductionRatio || 0),
-    mergeFaceDescriptorsMs: Number(mergeFaceDescriptorsMs.toFixed(3)),
-      totalStep4BuildColorMs: Number(step4BuildColorMs.toFixed(3)),
-      shadowOverlayCacheHitRate: Number((Number(colorBuildStats.shadowOverlayCacheHitCount || 0) + Number(colorBuildStats.shadowOverlayCacheMissCount || 0)) > 0 ? (Number(colorBuildStats.shadowOverlayCacheHitCount || 0) / (Number(colorBuildStats.shadowOverlayCacheHitCount || 0) + Number(colorBuildStats.shadowOverlayCacheMissCount || 0))).toFixed(6) : '0.000000'),
-      dominantSubstep: String(step4Substeps[0] && step4Substeps[0][0] || ''),
-      dominantSubstepMs: Number(Number(step4Substeps[0] && step4Substeps[0][1] || 0).toFixed(3)),
-      secondSubstep: String(step4Substeps[1] && step4Substeps[1][0] || ''),
-      secondSubstepMs: Number(Number(step4Substeps[1] && step4Substeps[1][1] || 0).toFixed(3))
-    });
-  }
-  emitChunkRebuildBreakdown({
-    chunkKey: chunk && chunk.key ? String(chunk.key) : null,
-    localBoxCount: Number(chunkBoxes.length || 0),
-    neighborBoxCount: Number(neighborBoxes.length || 0),
-    occupancyBuildMs: Number(occupancyBuildMs.toFixed(3)),
-    occupancyAccessMode: occupancyAccessMode,
-    usedGlobalOccupancy: usedGlobalOccupancy === true,
-    usedLocalOccupancyFallback: usedLocalOccupancyFallback === true,
-    occupancyFallbackReason: occupancyFallbackReason,
-    visibleSurfaceBuildMs: Number(visibleSurfaceBuildMs.toFixed(3)),
-    staticRenderableBuildMs: Number(staticRenderableBuildMs.toFixed(3)),
-    terrainInputFaceDescriptorCount: Number(terrainInputFaceDescriptorCount || 0),
-    terrainMergedFaceDescriptorCount: Number(terrainMergedFaceDescriptorCount || 0),
-    terrainMergedStaticFaceCount: Number(terrainMergedStaticFaceCount || 0),
-    terrainMergeReductionRatio: Number(terrainMergeReductionRatio || 0),
-    terrainSideInputFaceDescriptorCount: Number(terrainSideInputFaceDescriptorCount || 0),
-    terrainSideMergedFaceDescriptorCount: Number(terrainSideMergedFaceDescriptorCount || 0),
-    terrainSideMergedStaticFaceCount: Number(terrainSideMergedStaticFaceCount || 0),
-    terrainSideMergeReductionRatio: Number(terrainSideMergeReductionRatio || 0),
-    terrainSideStepBreakCount: Number(terrainSideStepBreakCount || 0),
-    terrainMergeFaceDescriptorsMs: Number(terrainMergeFaceDescriptorsMs.toFixed(3)),
-    terrainPacketCount: Number(terrainPacketCount || 0),
-    totalChunkBuildMs: Number(totalChunkBuildMs.toFixed(3))
-  });
-  return {
-    packets: packets,
-    stats: {
-      terrainBatchId: profileContext.terrainBatchId || null,
-      frameIndexAfterTerrainApply: profileContext.frameIndexAfterTerrainApply != null ? Number(profileContext.frameIndexAfterTerrainApply) : null,
-      chunkKey: chunk && chunk.key ? String(chunk.key) : null,
-      localBoxCount: chunkBoxes.length,
-      neighborBoxCount: neighborBoxes.length,
-      overlappedBoxCount: Number(overlappedBoxCount || 0),
-      uniqueColumnCount: Number(columnSet.size || 0),
-      exposedFaceCountBeforeCull: Number(exposedFaceCountBeforeCull || 0),
-      visibleFaceCountAfterCull: Number(visibleFaceCountAfterCull || 0),
-      packetCount: Number(packets.length || 0),
-      inputFaceDescriptorCount: Number(inputFaceDescriptorCount || 0),
-      mergedFaceDescriptorCount: Number(mergedFaceDescriptorCount || 0),
-      mergedStaticFaceCount: Number(mergedStaticFaceCount || 0),
-      mergeReductionRatio: Number(mergeReductionRatio || 0),
-      mergeFaceDescriptorsMs: Number(mergeFaceDescriptorsMs.toFixed(3)),
-      faceMergeMode: faceMergeMode,
-      faceMergeFallbackReason: faceMergeFallbackReason,
-    inputFaceDescriptorCount: Number(inputFaceDescriptorCount || 0),
-    mergedFaceDescriptorCount: Number(mergedFaceDescriptorCount || 0),
-    mergedStaticFaceCount: Number(mergedStaticFaceCount || 0),
-    mergeReductionRatio: Number(mergeReductionRatio || 0),
-    faceMergeMode: faceMergeMode,
-    faceMergeFallbackReason: faceMergeFallbackReason,
-      structuredBoxCount: chunkBoxes.length,
-      renderSourceCountBeforeVisibility: chunkBoxes.length,
-      renderSourceCountAfterVisibility: surfaceCells.length,
-      logicalVoxelCountEstimated: logicalVoxelCountEstimated,
-      visibleTopFaceCount: Number(surfaceCache.visibleTopFaceCount || 0),
-      visibleSideFaceCount: Number(surfaceCache.visibleSideFaceCount || 0),
-      hiddenInternalSurfaceSkippedCount: Number(surfaceCache.hiddenInternalSurfaceSkippedCount || 0),
-      voxelFurnitureProcessedCount: Number(surfaceCache.voxelFurnitureProcessedCount || 0),
-      cacheContentType: 'world-face-packets',
-      cameraIndependent: true,
-      usesScreenSpaceCache: false,
-      occupancyAccessMode: occupancyAccessMode,
-      usedGlobalOccupancy: usedGlobalOccupancy === true,
-      usedLocalOccupancyFallback: usedLocalOccupancyFallback === true,
-      occupancyFallbackReason: occupancyFallbackReason,
-      occupancyValidationSampleCount: occupancyValidationSampleCount,
-      occupancyBuildMs: Number(occupancyBuildMs.toFixed(3)),
-      visibleSurfaceBuildMs: Number(visibleSurfaceBuildMs.toFixed(3)),
-      staticRenderableBuildMs: Number(staticRenderableBuildMs.toFixed(3)),
-      step1_collectChunkBoxesMs: Number(step1CollectChunkBoxesMs.toFixed(3)),
-      step2_collectNeighborBoxesMs: Number(step2CollectNeighborBoxesMs.toFixed(3)),
-      step3_resolveOccupancyMs: Number(step3ResolveOccupancyMs.toFixed(3)),
-      step3_buildLocalOccupancyMs: Number(step3BuildLocalOccupancyMs.toFixed(3)),
-      step4_computeVisibleFacesMs: Number(step4ComputeVisibleFacesMs.toFixed(3)),
-      step5_buildPacketsMs: Number(step5BuildPacketsMs.toFixed(3)),
-    mergeFaceDescriptorsMs: Number(mergeFaceDescriptorsMs.toFixed(3)),
-      step6_buildStaticRenderablesMs: Number(step6BuildStaticRenderablesMs.toFixed(3)),
-      step7_sortRenderablesMs: Number(step7SortRenderablesMs.toFixed(3)),
-      step8_finalizeChunkCacheMs: Number(step8FinalizeChunkCacheMs.toFixed(3)),
-      step1_prepareFaceInputsMs: Number(step1PrepareFaceInputsMs.toFixed(3)),
-      mergeFaceDescriptorsMs: Number(mergeFaceDescriptorsMs.toFixed(3)),
-      step2_buildRenderableBaseMs: Number(step2BuildRenderableBaseMs.toFixed(3)),
-      step3_buildStyleOrMaterialMs: Number(step3BuildStyleOrMaterialMs.toFixed(3)),
-      step4_buildColorMs: Number(step4BuildColorMs.toFixed(3)),
-      colorCacheEnabled: colorBuildStats.colorCacheEnabled === true,
-      colorCacheHitCount: Number(colorBuildStats.colorCacheHitCount || 0),
-      colorCacheMissCount: Number(colorBuildStats.colorCacheMissCount || 0),
-      uniqueColorKeyCount: Number(colorBuildStats.colorKeyUsage.size || 0),
-      avgColorBuildMsPerRenderable: Number((packets.length > 0 ? step4BuildColorMs / packets.length : 0).toFixed(6)),
-      terrainBuildColorMode: String((getTerrainRenderSettingsForRender() && getTerrainRenderSettingsForRender().terrainBuildColorMode) || 'natural'),
-      terrainBuildLightingBypass: getTerrainRenderSettingsForRender() && getTerrainRenderSettingsForRender().terrainBuildLightingBypass === true,
-      miss_step1_paletteLookupMs: Number(colorBuildStats.miss_step1_paletteLookupMs.toFixed(3)),
-      miss_step2_heightBucketMs: Number(colorBuildStats.miss_step2_heightBucketMs.toFixed(3)),
-      miss_step3_materialColorMs: Number(colorBuildStats.miss_step3_materialColorMs.toFixed(3)),
-      miss_step4_lightingMixMs: Number(colorBuildStats.miss_step4_lightingMixMs.toFixed(3)),
-      miss_step5_cssOrObjectBuildMs: Number(colorBuildStats.miss_step5_cssOrObjectBuildMs.toFixed(3)),
-      step4a_colorCacheLookupMs: Number(colorBuildStats.step4a_colorCacheLookupMs.toFixed(3)),
-      step4b_colorCacheHitFastPathMs: Number(colorBuildStats.step4b_colorCacheHitFastPathMs.toFixed(3)),
-      step4c_colorMissPathMs: Number(colorBuildStats.step4c_colorMissPathMs.toFixed(3)),
-      step4d_shadowOverlayTotalMs: Number(colorBuildStats.step4d_shadowOverlayTotalMs.toFixed(3)),
-      step4e_shadowOverlayCacheLookupMs: Number(colorBuildStats.step4e_shadowOverlayCacheLookupMs.toFixed(3)),
-      step4f_shadowOverlayCollectMs: Number(colorBuildStats.step4f_shadowOverlayCollectMs.toFixed(3)),
-      step4g_shadowOverlayCloneMs: Number(colorBuildStats.step4g_shadowOverlayCloneMs.toFixed(3)),
-      step4h_fillAndOverlayAssignMs: Number(colorBuildStats.step4h_fillAndOverlayAssignMs.toFixed(3)),
-      shadowOverlayCacheHitCount: Number(colorBuildStats.shadowOverlayCacheHitCount || 0),
-      shadowOverlayCacheMissCount: Number(colorBuildStats.shadowOverlayCacheMissCount || 0),
-      shadowOverlayTotalCount: Number(colorBuildStats.shadowOverlayTotalCount || 0),
-      step5_computeSortKeyMs: Number(step5ComputeSortKeyMs.toFixed(3)),
-      step6_objectAllocationMs: Number(step6ObjectAllocationMs.toFixed(3)),
-      step7_arrayPushMs: Number(step7ArrayPushMs.toFixed(3)),
-      step8_finalizeRenderableListMs: Number(step8FinalizeRenderableListMs.toFixed(3)),
-      scannedFaceCount: Number(scannedFaceCount || 0),
-      scannedRenderableCount: Number(packets.length || 0),
-      touchedGlobalRenderableTemplates: touchedGlobalRenderableTemplates === true,
-      touchedGlobalStyleCache: touchedGlobalStyleCache === true,
-      touchedGlobalMaterialCache: touchedGlobalMaterialCache === true,
-      touchedColorCachePath: colorBuildStats.touchedColorCachePath === true,
-      touchedNaturalColorPath: colorBuildStats.touchedNaturalColorPath === true,
-      touchedLightingPath: colorBuildStats.touchedLightingPath === true,
-      touchedShadowOverlayPath: colorBuildStats.touchedShadowOverlayPath === true,
-      touchedProjectedShadowCollector: colorBuildStats.touchedProjectedShadowCollector === true,
-      totalStaticRenderableBuildMs: Number(totalStaticRenderableBuildMs.toFixed(3)),
-      scannedBoxCount: Number(chunkBoxes.length + neighborBoxes.length || 0),
-      scannedChunkCount: Number(touchedChunkKeys.length || 0),
-      touchedChunkKeys: touchedChunkKeys,
-      touchedGlobalOccupancy: usedGlobalOccupancy === true,
-      touchedGlobalRenderableList: false,
-      touchedGlobalSurfacePass: false,
-      isChunkLocalOnly: usedLocalOccupancyFallback === true,
-      finalRenderableCount: packets.length,
-      totalChunkBuildMs: Number(totalChunkBuildMs.toFixed(3))
-    }
-  };
+  return requireStaticWorldRenderableBuilderForRender().buildStaticWorldChunkRenderables(
+    chunk,
+    options,
+    createStaticWorldRenderableBuilderDepsForRender()
+  );
 }
 
 function emitRenderFrameSummary(payload) {
-  var line = '[RENDER-FRAME-SUMMARY] ';
-  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
-  try {
-    if (typeof pushLog === 'function') pushLog(line);
-    else if (typeof console !== 'undefined' && console.log) console.log(line);
-  } catch (_) {}
-  return line;
+  return requireRenderDiagnosticsForRender().emitRenderFrameSummary(payload);
 }
 
 function maybeLogRenderFrameSummary(payload) {
-  var safe = payload && typeof payload === 'object' ? payload : {};
-  var now = perfNow();
-  var signature = [
-    Number(safe.cameraX || 0).toFixed(3),
-    Number(safe.cameraY || 0).toFixed(3),
-    Number(safe.zoom || 0).toFixed(3),
-    Number(safe.visibleInstances || 0),
-    Number(safe.visibleDynamicInstances || 0),
-    Number(safe.staticSkippedByDynamicLoop || 0),
-    Number(safe.totalBoxes || 0),
-    Number(safe.occupancyCacheVersion || 0),
-    safe.occupancyRebuiltThisFrame === true ? 1 : 0,
-    safe.staticCacheRebuiltThisFrame === true ? 1 : 0,
-    Number(safe.visibleChunkCount || 0),
-    Number(safe.rebuiltChunkCountThisFrame || 0)
-  ].join('|');
-  if ((now - __lastRenderFrameSummaryLogAt) < 1000) return false;
-  if (signature === __lastRenderFrameSummarySignature && (now - __lastRenderFrameSummaryLogAt) < 5000) return false;
-  __lastRenderFrameSummaryLogAt = now;
-  __lastRenderFrameSummarySignature = signature;
-  emitRenderFrameSummary(safe);
-  return true;
+  return requireRenderDiagnosticsForRender().maybeLogRenderFrameSummary(payload);
 }
 
+function shouldForceExactVisibleSummaryForRender(terrainFirstFrameWindow, now) {
+  return requireRenderDiagnosticsForRender().shouldForceExactVisibleSummary(terrainFirstFrameWindow, now);
+}
 
 function emitCameraStaticWorldVerify(payload) {
-  var line = '[CAMERA-STATIC-WORLD-VERIFY] ';
-  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
-  try {
-    if (typeof pushLog === 'function') pushLog(line);
-    else if (typeof console !== 'undefined' && console.log) console.log(line);
-  } catch (_) {}
-  return line;
+  return requireRenderDiagnosticsForRender().emitCameraStaticWorldVerify(payload);
 }
 
 function maybeLogCameraStaticWorldVerify(payload) {
-  var safe = payload && typeof payload === 'object' ? payload : {};
-  var signature = [
-    Number(safe.cameraX || 0).toFixed(3),
-    Number(safe.cameraY || 0).toFixed(3),
-    Number(safe.zoom || 0).toFixed(3),
-    Number(safe.visibleChunkCount || 0),
-    Number(safe.rebuiltChunkCountThisFrame || 0),
-    Number(safe.reusedChunkCountThisFrame || 0),
-    safe.staticCacheRebuiltThisFrame === true ? 1 : 0,
-    safe.usesScreenSpaceCache === true ? 1 : 0
-  ].join('|');
-  if (signature === __lastCameraStaticWorldVerifySignature) return false;
-  __lastCameraStaticWorldVerifySignature = signature;
-  emitCameraStaticWorldVerify(safe);
-  return true;
+  return requireRenderDiagnosticsForRender().maybeLogCameraStaticWorldVerify(payload);
 }
 
 function emitCameraMoveVerify(payload) {
-  var line = '[CAMERA-MOVE-VERIFY] ';
-  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
-  try {
-    if (typeof pushLog === 'function') pushLog(line);
-    else if (typeof console !== 'undefined' && console.log) console.log(line);
-  } catch (_) {}
-  return line;
+  return requireRenderDiagnosticsForRender().emitCameraMoveVerify(payload);
 }
 
 function maybeLogCameraMoveVerify(payload) {
-  var safe = payload && typeof payload === 'object' ? payload : {};
-  var now = perfNow();
-  var signature = [
-    Number(safe.cameraX || 0).toFixed(3),
-    Number(safe.cameraY || 0).toFixed(3),
-    Number(safe.zoom || 0).toFixed(3),
-    Number(safe.visibleChunkCount || 0),
-    safe.staticCacheRebuiltThisFrame === true ? 1 : 0,
-    Number(safe.rebuiltChunkCountThisFrame || 0),
-    Number(safe.reusedChunkCountThisFrame || 0)
-  ].join('|');
-  var slowFrame = Number(safe.frameBuildMs || 0) > 24 || safe.staticCacheRebuiltThisFrame === true || Number(safe.rebuiltChunkCountThisFrame || 0) > 0;
-  var minGapMs = slowFrame ? 750 : 1500;
-  if ((now - (__lastCameraMoveVerifyLogAt || 0)) < minGapMs) return false;
-  if (!slowFrame && signature === (__lastCameraMoveVerifySignature || '') && (now - (__lastCameraMoveVerifyLogAt || 0)) < 5000) return false;
-  __lastCameraMoveVerifyLogAt = now;
-  __lastCameraMoveVerifySignature = signature;
-  emitCameraMoveVerify(safe);
-  return true;
+  return requireRenderDiagnosticsForRender().maybeLogCameraMoveVerify(payload);
 }
 
 function emitFrameWorkBreakdown(payload) {
-  var line = '[FRAME-WORK-BREAKDOWN] ';
-  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
-  try {
-    if (typeof pushLog === 'function') pushLog(line);
-    else if (typeof console !== 'undefined' && console.log) console.log(line);
-  } catch (_) {}
-  return line;
+  return requireRenderDiagnosticsForRender().emitFrameWorkBreakdown(payload);
 }
 
 function maybeLogFrameWorkBreakdown(payload) {
-  var safe = payload && typeof payload === 'object' ? payload : {};
-  var now = perfNow();
-  var slowFrame = Number(safe.frameBuildMs || 0) > 24 || Number(safe.finalDrawMs || 0) > 12 || Number(safe.rebuiltChunkCountThisFrame || 0) > 0;
-  var minGapMs = slowFrame ? 350 : 1000;
-  var signature = [
-    Number(safe.cameraX || 0).toFixed(1),
-    Number(safe.cameraY || 0).toFixed(1),
-    Number(safe.zoom || 0).toFixed(2),
-    Number(safe.visibleChunkCount || 0),
-    Number(safe.visibleStaticChunkCount || 0),
-    Number(safe.visibleStaticPacketCount || 0),
-    Number(safe.dynamicObjectCount || 0),
-    Number(safe.rebuiltChunkCountThisFrame || 0),
-    slowFrame ? 'slow' : 'normal'
-  ].join('|');
-  if ((now - __lastFrameWorkBreakdownLogAt) < minGapMs) return false;
-  if (!slowFrame && signature === __lastFrameWorkBreakdownSignature && (now - __lastFrameWorkBreakdownLogAt) < 3000) return false;
-  __lastFrameWorkBreakdownLogAt = now;
-  __lastFrameWorkBreakdownSignature = signature;
-  emitFrameWorkBreakdown(safe);
-  return true;
+  return requireRenderDiagnosticsForRender().maybeLogFrameWorkBreakdown(payload);
 }
 
-
 function emitZoomStateVerify(payload) {
-  var line = '[ZOOM-STATE-VERIFY] ';
-  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
-  try {
-    if (typeof pushLog === 'function') pushLog(line);
-    else if (typeof console !== 'undefined' && console.log) console.log(line);
-  } catch (_) {}
-  return line;
+  return requireRenderDiagnosticsForRender().emitZoomStateVerify(payload);
 }
 
 function maybeLogZoomStateVerify(payload) {
-  var safe = payload && typeof payload === 'object' ? payload : {};
-  var now = perfNow();
-  var signature = [
-    Number(safe.uiDisplayScale || 0).toFixed(3),
-    Number(safe.tileScale || 0).toFixed(3),
-    Number(safe.runtimeZoom || 0).toFixed(3),
-    Number(safe.renderSummaryZoom || 0).toFixed(3),
-    Number(safe.frameBreakdownZoom || 0).toFixed(3),
-    Number(safe.cullingZoom || 0).toFixed(3),
-    Number(safe.projectionZoom || 0).toFixed(3),
-    safe.isUnified === true ? 1 : 0
-  ].join('|');
-  if ((now - __lastZoomStateVerifyLogAt) < 1000 && signature === __lastZoomStateVerifySignature) return false;
-  __lastZoomStateVerifyLogAt = now;
-  __lastZoomStateVerifySignature = signature;
-  emitZoomStateVerify(safe);
-  return true;
+  return requireRenderDiagnosticsForRender().maybeLogZoomStateVerify(payload);
 }
 
 function emitZoomCameraStateVerify(payload) {
-  var line = '[ZOOM-CAMERA-STATE-VERIFY] ';
-  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
-  try {
-    if (typeof pushLog === 'function') pushLog(line);
-    else if (typeof console !== 'undefined' && console.log) console.log(line);
-  } catch (_) {}
-  return line;
+  return requireRenderDiagnosticsForRender().emitZoomCameraStateVerify(payload);
 }
 
 function maybeLogZoomCameraStateVerify(payload) {
-  var safe = payload && typeof payload === 'object' ? payload : {};
-  var now = perfNow();
-  var signature = [
-    String(safe.sourceOfTruth || ''),
-    Number(safe.runtimeZoom || 0).toFixed(3),
-    Number(safe.summaryZoom || 0).toFixed(3),
-    Number(safe.breakdownZoom || 0).toFixed(3),
-    Number(safe.runtimeCameraX || 0).toFixed(3),
-    Number(safe.runtimeCameraY || 0).toFixed(3),
-    Number(safe.summaryCameraX || 0).toFixed(3),
-    Number(safe.summaryCameraY || 0).toFixed(3),
-    Number(safe.breakdownCameraX || 0).toFixed(3),
-    Number(safe.breakdownCameraY || 0).toFixed(3),
-    Number(safe.cullingZoom || 0).toFixed(3),
-    Number(safe.projectionZoom || 0).toFixed(3),
-    safe.isUnified === true ? 1 : 0
-  ].join('|');
-  if ((now - __lastZoomStateVerifyLogAt) < 1000 && signature === (__lastZoomStateVerifySignature + '|camera')) return false;
-  emitZoomCameraStateVerify(safe);
-  return true;
+  return requireRenderDiagnosticsForRender().maybeLogZoomCameraStateVerify(payload);
 }
 
 function emitStaticCacheInvalidationVerify(payload) {
-  var line = '[STATIC-CACHE-INVALIDATION-VERIFY] ';
-  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
-  try {
-    if (typeof pushLog === 'function') pushLog(line);
-    else if (typeof console !== 'undefined' && console.log) console.log(line);
-  } catch (_) {}
-  return line;
+  return requireRenderDiagnosticsForRender().emitStaticCacheInvalidationVerify(payload);
 }
 
 function maybeLogStaticCacheInvalidationVerify(payload) {
-  var safe = payload && typeof payload === 'object' ? payload : {};
-  var now = perfNow();
-  var shouldInvalidate = safe.shouldInvalidateStaticCache === true || String(safe.invalidationReason || 'none') !== 'none';
-  var signature = [
-    String(safe.invalidationReason || 'none'),
-    String(safe.cacheContentType || ''),
-    safe.cameraIndependent !== false ? 1 : 0,
-    safe.usesScreenSpaceCache === true ? 1 : 0,
-    shouldInvalidate ? 1 : 0
-  ].join('|');
-  var minGapMs = shouldInvalidate ? 250 : 1500;
-  if ((now - __lastStaticCacheInvalidationVerifyLogAt) < minGapMs) return false;
-  if (!shouldInvalidate && signature === __lastStaticCacheInvalidationVerifySignature && (now - __lastStaticCacheInvalidationVerifyLogAt) < 5000) return false;
-  __lastStaticCacheInvalidationVerifyLogAt = now;
-  __lastStaticCacheInvalidationVerifySignature = signature;
-  emitStaticCacheInvalidationVerify(safe);
-  return true;
+  return requireRenderDiagnosticsForRender().maybeLogStaticCacheInvalidationVerify(payload);
 }
 
 function emitStaticBoxCacheProfile(payload) {
-  var line = '[STATIC-BOX-CACHE-PROFILE] ';
-  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
-  try {
-    if (typeof pushLog === 'function') pushLog(line);
-    else if (typeof console !== 'undefined' && console.log) console.log(line);
-  } catch (_) {}
-  return line;
+  return requireRenderDiagnosticsForRender().emitStaticBoxCacheProfile(payload);
 }
 
 function maybeLogStaticBoxCacheProfile(payload, forceLog) {
-  var safe = payload && typeof payload === 'object' ? payload : {};
-  var now = perfNow();
-  var signature = [
-    safe.cacheHit === true ? 1 : 0,
-    String(safe.invalidationReason || 'none'),
-    Number(safe.totalBoxes || 0),
-    Number(safe.structuredBoxCount || 0),
-    Number(safe.scopedBoxCount || 0),
-    Number(safe.visibleChunkCount || 0),
-    Number(safe.rebuiltChunkCountThisFrame || 0),
-    Number(safe.reusedChunkCountThisFrame || 0)
-  ].join('|');
-  if (!forceLog && safe.cacheHit === true && (now - __lastStaticBoxCacheProfileLogAt) < 1000) return false;
-  if (!forceLog && safe.cacheHit === true && signature === __lastStaticBoxCacheProfileSignature && (now - __lastStaticBoxCacheProfileLogAt) < 5000) return false;
-  __lastStaticBoxCacheProfileLogAt = now;
-  __lastStaticBoxCacheProfileSignature = signature;
-  emitStaticBoxCacheProfile(safe);
-  return true;
+  return requireRenderDiagnosticsForRender().maybeLogStaticBoxCacheProfile(payload, forceLog);
 }
 
 function beginRenderFrameDiagnosticState() {
-  __currentRenderFrameStaticCacheState = { rebuilt: false, buildMs: 0, cacheHit: null, invalidationReason: 'none', totalMs: 0, profile: null };
-  return __currentRenderFrameStaticCacheState;
+  return requireRenderDiagnosticsForRender().beginRenderFrameDiagnosticState();
 }
 
 function captureStaticBoxCacheFrameState(payload) {
-  var safe = payload && typeof payload === 'object' ? payload : {};
-  __currentRenderFrameStaticCacheState = {
-    rebuilt: safe.rebuilt === true,
-    buildMs: Number(safe.buildMs || 0),
-    cacheHit: safe.cacheHit === true,
-    invalidationReason: String(safe.invalidationReason || 'none'),
-    totalMs: Number(safe.totalMs || 0),
-    profile: safe.profile || null
-  };
-  __lastStaticBoxCacheProfile = safe.profile || __lastStaticBoxCacheProfile;
-  return __currentRenderFrameStaticCacheState;
+  return requireRenderDiagnosticsForRender().captureStaticBoxCacheFrameState(payload);
 }
 
 function getCurrentRenderFrameStaticCacheState() {
-  return __currentRenderFrameStaticCacheState || { rebuilt: false, buildMs: 0, cacheHit: null, invalidationReason: 'none', totalMs: 0, profile: null };
+  return requireRenderDiagnosticsForRender().getCurrentRenderFrameStaticCacheState();
 }
 
 function emitTerrainFirstFrames(payload) {
-  var line = '[TERRAIN-FIRST-FRAMES] ';
-  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
-  try {
-    if (typeof pushLog === 'function') pushLog(line);
-    else if (typeof console !== 'undefined' && console.log) console.log(line);
-  } catch (_) {}
-  return line;
+  return requireRenderDiagnosticsForRender().emitTerrainFirstFrames(payload);
 }
 
 function isDetailedTerrainProfilingEnabledForRender() {
@@ -2611,13 +1375,7 @@ function isDetailedTerrainProfilingEnabledForRender() {
 
 function emitTerrainFirstFramesDetail(payload) {
   if (!isDetailedTerrainProfilingEnabledForRender()) return null;
-  var line = '[TERRAIN-FIRST-FRAMES-DETAIL] ';
-  try { line += JSON.stringify(payload || {}); } catch (_) { line += '{}'; }
-  try {
-    if (typeof pushLog === 'function') pushLog(line);
-    else if (typeof console !== 'undefined' && console.log) console.log(line);
-  } catch (_) {}
-  return line;
+  return requireRenderDiagnosticsForRender().emitTerrainFirstFramesDetail(payload);
 }
 
 function getTerrainFrameLogContextForRender() {
@@ -2640,7 +1398,7 @@ function getTerrainFrameLogContextForRender() {
 try {
   if (typeof window !== 'undefined') {
     window.__MAIN_RENDER_DIAGNOSTICS__ = Object.assign({}, window.__MAIN_RENDER_DIAGNOSTICS__ || {}, {
-      getLastStaticBoxCacheProfile: function () { return __lastStaticBoxCacheProfile; }
+      getLastStaticBoxCacheProfile: function () { return requireRenderDiagnosticsForRender().getLastStaticBoxCacheProfile(); }
     });
   }
 } catch (_) {}
@@ -2883,85 +1641,56 @@ function habboCompositeCacheKey(prefab, rotation) {
   return String(prefab && prefab.id || 'unknown') + '|habbo-composite|' + rotKeyForSprite(rotation) + '|tileW=' + String(settings && settings.tileW || 64) + '|tileH=' + String(settings && settings.tileH || 32) + '|sig=' + sig;
 }
 
+function getHabboPlacementCoreApiForRender() {
+  try {
+    if (typeof window !== 'undefined' && window.App && window.App.domain && window.App.domain.habboPlacementCore) return window.App.domain.habboPlacementCore;
+  } catch (_) {}
+  try {
+    if (typeof window !== 'undefined' && window.__HABBO_PLACEMENT_CORE__) return window.__HABBO_PLACEMENT_CORE__;
+  } catch (_) {}
+  return null;
+}
+
+function requireHabboPlacementCoreForRender() {
+  var api = getHabboPlacementCoreApiForRender();
+  if (!api) throw new Error('Missing Habbo placement core: src/core/domain/habbo-placement-core.js must load before src/presentation/render/render.js');
+  return api;
+}
+
+function getHabboTileMetricsForRender() {
+  return {
+    tileW: Number(settings && settings.tileW || 64),
+    tileH: Number(settings && settings.tileH || 32)
+  };
+}
+
 function getHabboPlacementShift(prefab, rotation) {
-  var dims = prefab && prefab.habboMeta && prefab.habboMeta.dimensions ? prefab.habboMeta.dimensions : null;
-  var vis = String(prefab && prefab.habboMeta && prefab.habboMeta.visualization || '');
-  if (!dims) return { x: 0, y: 0 };
-  var spanX = Math.max(1, Math.round(Number(dims.x) || Number(prefab && prefab.w) || 1));
-  var spanY = Math.max(1, Math.round(Number(dims.y) || Number(prefab && prefab.d) || 1));
-  var rotKey = ((parseInt(rotation || 0, 10) % 2) + 2) % 2;
-  if (vis === 'furniture_static' && ((spanX === 1 && spanY > 1) || (spanY === 1 && spanX > 1))) {
-    var depthSpan = rotKey === 0 ? spanY : spanX;
-    if (depthSpan > 1) {
-      var shiftX = -Math.round((depthSpan - 1) * settings.tileW / 2);
-      return { x: shiftX, y: 0 };
-    }
-  }
-  return { x: 0, y: 0 };
+  return requireHabboPlacementCoreForRender().getHabboPlacementShift(prefab, rotation, getHabboTileMetricsForRender());
 }
 
 function pixelShiftToCellShift(shift) {
-  var sx = Number(shift && shift.x || 0);
-  var sy = Number(shift && shift.y || 0);
-  if (!sx && !sy) return { x: 0, y: 0 };
-  var halfW = settings.tileW / 2;
-  var halfH = settings.tileH / 2;
-  if (!halfW || !halfH) return { x: 0, y: 0 };
-  var dx = Math.round(((sx / halfW) + (sy / halfH)) / 2);
-  var dy = Math.round(((sy / halfH) - (sx / halfW)) / 2);
-  return { x: dx, y: dy };
+  return requireHabboPlacementCoreForRender().pixelShiftToCellShift(shift, getHabboTileMetricsForRender());
 }
 
 function cellShiftToPixelShift(cellShift) {
-  var dx = Number(cellShift && cellShift.x || 0);
-  var dy = Number(cellShift && cellShift.y || 0);
-  return {
-    x: Math.round((dx - dy) * settings.tileW / 2),
-    y: Math.round((dx + dy) * settings.tileH / 2)
-  };
+  return requireHabboPlacementCoreForRender().cellShiftToPixelShift(cellShift, getHabboTileMetricsForRender());
 }
 
 function getHabboPlacementDecomposition(prefab, rotation) {
-  var raw = getHabboPlacementShift(prefab, rotation);
-  var cellShift = pixelShiftToCellShift(raw);
-  var snapped = cellShiftToPixelShift(cellShift);
-  return {
-    rawShift: { x: Math.round(raw.x || 0), y: Math.round(raw.y || 0) },
-    cellShift: cellShift,
-    residualShift: {
-      x: Math.round((raw.x || 0) - (snapped.x || 0)),
-      y: Math.round((raw.y || 0) - (snapped.y || 0))
-    }
-  };
+  return requireHabboPlacementCoreForRender().getHabboPlacementDecomposition(prefab, rotation, getHabboTileMetricsForRender());
 }
 
 function getHabboPlacementCellShift(prefab, rotation) {
-  var info = getHabboPlacementDecomposition(prefab, rotation);
-  return info && info.cellShift ? info.cellShift : { x: 0, y: 0 };
+  return requireHabboPlacementCoreForRender().getHabboPlacementCellShift(prefab, rotation, getHabboTileMetricsForRender());
 }
 
 function getHabboRoomOrigin(prefab, origin, anchor, rotation) {
-  var foot = iso((origin.x || 0) + (anchor.x || 0), (origin.y || 0) + (anchor.y || 0), (origin.z || 0) + (anchor.z || 0));
-  var info = getHabboPlacementDecomposition(prefab, rotation);
-  var shift = info && info.residualShift ? info.residualShift : { x: 0, y: 0 };
-  return {
-    x: Math.round(foot.x + (shift.x || 0)),
-    // Scuti 的示例房间里 floorThickness 按本轮测试改为 20，
-    // 而当前项目的地面顶面近似按 0 厚度显示。
-    // Habbo floor furni 若直接贴到这里，会整体显得悬浮一小截，
-    // 所以把这段 floor-thickness 差额一次性补到 sprite 基线里。
-    y: Math.round(foot.y + (shift.y || 0) + 20)
-  };
+  return requireHabboPlacementCoreForRender().getHabboRoomOrigin(prefab, origin, anchor, rotation, getHabboTileMetricsForRender(), iso, { floorBaselineOffset: 20 });
 }
 
 
 function getHabboProxyVisualShift(prefab, rotation) {
-  var info = getHabboPlacementDecomposition(prefab, rotation);
-  var residual = info && info.residualShift ? info.residualShift : { x: 0, y: 0 };
-  return {
-    x: Math.round(residual.x || 0),
-    y: Math.round(residual.y || 0)
-  };
+  return requireHabboPlacementCoreForRender().getHabboProxyVisualShift(prefab, rotation, getHabboTileMetricsForRender());
 }
 
 function withScreenTranslate(shift, drawFn) {
@@ -2981,34 +1710,11 @@ function withScreenTranslate(shift, drawFn) {
 }
 
 function getHabboInstanceVisualShift(instance, prefab) {
-  if (!prefab || prefab.kind !== 'habbo_import') return { x: 0, y: 0 };
-  return getHabboProxyVisualShift(prefab, instance && instance.rotation || 0);
+  return requireHabboPlacementCoreForRender().getHabboInstanceVisualShift(instance, prefab, getHabboTileMetricsForRender());
 }
 
 function getHabboLayerLocalBox(layer, totalScale, srcW, srcH, prefab) {
-  var regX = Number(layer && layer.regX);
-  var regY = Number(layer && layer.regY);
-  var propX = Number(layer && layer.propX);
-  var propY = Number(layer && layer.propY);
-  var drawW = Math.max(1, Math.round((srcW || 0) * totalScale));
-  var drawH = Math.max(1, Math.round((srcH || 0) * totalScale));
-  // 这里不再在 draw 阶段重新发明 flip 盒子。
-  // offsetPx 在 state.js 建 layer 时就已经被还原成“真实 top-left”。
-  // draw 阶段只负责把这个 top-left 乘缩放后用同一套 left-anchored 语义画出来。
-  var drawXMin = Math.round((layer && layer.offsetPx && layer.offsetPx.x || 0) * totalScale);
-  var drawY = Math.round((layer && layer.offsetPx && layer.offsetPx.y || 0) * totalScale);
-
-  return {
-    drawX: drawXMin,
-    drawY: drawY,
-    drawW: drawW,
-    drawH: drawH,
-    drawXMax: drawXMin + drawW,
-    regX: regX,
-    regY: regY,
-    propX: propX,
-    propY: propY
-  };
+  return requireHabboPlacementCoreForRender().getHabboLayerLocalBox(layer, totalScale, srcW, srcH, prefab);
 }
 
 function buildHabboComposite(prefab, rotation) {
@@ -3841,302 +2547,71 @@ function buildShiftedVoxelRenderable(cell, occ, shift, idPrefix) {
 }
 
 function drawCachedVoxelRenderable(item) {
-  for (const face of item.faces) {
-    drawPoly(face.points, face.fill, face.stroke, face.width || 1);
-    if (face.overlays) for (const ov of face.overlays) drawPoly(ov.points, ov.fill, ov.stroke, ov.width || 0);
+  return requireCanvas2dStaticWorldFaceDrawPassForRender().drawCachedVoxelRenderable(
+    item,
+    createCanvas2dStaticWorldFaceDrawPassDepsForRender()
+  );
+}
+
+
+function requireStaticWorldRenderCacheCoordinatorForRender() {
+  var api = null;
+  try {
+    api = window.App && window.App.application && window.App.application.render
+      ? window.App.application.render.staticWorldRenderCacheCoordinator || null
+      : null;
+  } catch (_) {}
+  api = api || (typeof window !== 'undefined' ? window.__STATIC_WORLD_RENDER_CACHE_COORDINATOR__ : null);
+  if (!api || typeof api.rebuildStaticWorldRenderCache !== 'function') {
+    throw new Error('static world render cache coordinator is unavailable; ensure src/application/render/static-world-render-cache-coordinator.js loads before render.js');
   }
-  if (item.debugFoot) {
-    ctx.fillStyle = '#ffd166';
-    ctx.beginPath(); ctx.arc(item.debugFoot.x, item.debugFoot.y, 2.5, 0, Math.PI * 2); ctx.fill();
-  }
+  return api;
+}
+
+function createStaticWorldRenderCacheCoordinatorDepsForRender() {
+  return {
+    perfNow: perfNow,
+    getStaticWorldFaceMergeControlStateSnapshotForRender: getStaticWorldFaceMergeControlStateSnapshotForRender,
+    getSafeMainEditorViewRotation: getSafeMainEditorViewRotation,
+    normalizeMainEditorViewRotationValue: normalizeMainEditorViewRotationValue,
+    buildStaticWorldRenderSignature: buildStaticWorldRenderSignature,
+    getRenderVisibilityCoreApi: getRenderVisibilityCoreApi,
+    getMainCameraRenderScope: getMainCameraRenderScope,
+    getSceneOccupancySnapshotForRender: getSceneOccupancySnapshotForRender,
+    getSceneStaticWorldCacheApiForRender: getSceneStaticWorldCacheApiForRender,
+    getSharedStaticWorldChunkCacheApiForRender: getSharedStaticWorldChunkCacheApiForRender,
+    buildInstanceRenderUpdateModeIndex: buildInstanceRenderUpdateModeIndex,
+    isStaticWorldBoxForRender: isStaticWorldBoxForRender,
+    getTerrainFrameLogContextForRender: getTerrainFrameLogContextForRender,
+    compareRenderablesByDomain: compareRenderablesByDomain,
+    buildStaticWorldChunkRenderables: buildStaticWorldChunkRenderables,
+    captureStaticBoxCacheFrameState: captureStaticBoxCacheFrameState,
+    maybeLogStaticBoxCacheProfile: maybeLogStaticBoxCacheProfile,
+    maybeLogStaticCacheInvalidationVerify: maybeLogStaticCacheInvalidationVerify,
+    maybeLogStaticWorldChunkSummary: maybeLogStaticWorldChunkSummary,
+    logItemRotationPrototype: logItemRotationPrototype,
+    buildMainViewRotationSourceCheckPayload: buildMainViewRotationSourceCheckPayload,
+    noteLayerRebuild: noteLayerRebuild,
+    isInteractiveRenderPressure: isInteractiveRenderPressure,
+    setLastSurfaceCacheStats: function (stats) { __lastSurfaceCacheStats = stats || null; }
+  };
 }
 
 function rebuildStaticBoxRenderCacheIfNeeded(force = false) {
-  const profileStartAt = perfNow();
-  const faceMergeControlState = getStaticWorldFaceMergeControlStateSnapshotForRender();
-  const viewRotationInfo = getSafeMainEditorViewRotation(null);
-  const currentViewRotation = normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation);
-  const signatureStartAt = perfNow();
-  const renderSignature = buildStaticWorldRenderSignature(currentViewRotation);
-  const signatureCheckMs = Math.max(0, perfNow() - signatureStartAt);
-  const visibilityCore = getRenderVisibilityCoreApi();
-  const cameraScope = getMainCameraRenderScope(currentViewRotation);
-  const semanticLogSeen = Object.create(null);
-  const occupancyStartAt = perfNow();
-  const occupancySnapshot = getSceneOccupancySnapshotForRender('render:static-world-chunk-cache');
-  const occ = occupancySnapshot && occupancySnapshot.map && typeof occupancySnapshot.map.has === 'function' ? occupancySnapshot.map : new Map();
-  const occupancyBuildMs = Math.max(0, perfNow() - occupancyStartAt);
-  const sceneStaticWorldApi = getSceneStaticWorldCacheApiForRender();
-  const sceneSnapshot = sceneStaticWorldApi && typeof sceneStaticWorldApi.getSnapshot === 'function'
-    ? (sceneStaticWorldApi.getSnapshot() || { cacheVersion: 0, chunkSize: 16, dirtyChunkKeys: [], totalStaticBoxes: 0, lastUpdate: null })
-    : { cacheVersion: 0, chunkSize: 16, dirtyChunkKeys: [], totalStaticBoxes: 0, lastUpdate: null };
-  const sceneUpdates = sceneStaticWorldApi && typeof sceneStaticWorldApi.consumeUpdates === 'function'
-    ? (sceneStaticWorldApi.consumeUpdates() || [])
-    : [];
-  const staticWorldCacheApi = getSharedStaticWorldChunkCacheApiForRender();
-  const deferVisibleRebuild = faceMergeControlState.zoomInteractionActive === true || faceMergeControlState.zoomSettlePending === true;
-  if (!staticWorldCacheApi || typeof staticWorldCacheApi.syncWithScene !== 'function' || typeof staticWorldCacheApi.collectVisibleRenderables !== 'function') {
-    const fallbackPayload = {
-      reason: 'rebuildStaticBoxRenderCacheIfNeeded',
-      cacheHit: true,
-      zoomInteractionActive: faceMergeControlState.zoomInteractionActive === true,
-      zoomSettlePending: faceMergeControlState.zoomSettlePending === true,
-      effectiveFaceMergeMode: String(faceMergeControlState.effectiveFaceMergeMode || 'merge'),
-      pendingFaceMergeMode: String(faceMergeControlState.pendingFaceMergeMode || faceMergeControlState.effectiveFaceMergeMode || 'merge'),
-      invalidationReason: 'missing-static-world-chunk-cache',
-      totalBoxes: Number(boxes.length || 0),
-      structuredBoxCount: 0,
-      scopedBoxCount: 0,
-      occupancyBuildMs: Number(occupancyBuildMs.toFixed(3)),
-      visibleSurfaceBuildMs: 0,
-      staticRenderableBuildMs: 0,
-      signatureCheckMs: Number(signatureCheckMs.toFixed(3)),
-      totalMs: Number(Math.max(0, perfNow() - profileStartAt).toFixed(3))
-    };
-    captureStaticBoxCacheFrameState({ rebuilt: false, buildMs: 0, cacheHit: true, invalidationReason: 'missing-static-world-chunk-cache', totalMs: fallbackPayload.totalMs, profile: fallbackPayload });
-    maybeLogStaticBoxCacheProfile(fallbackPayload, true);
-    staticBoxRenderCache.renderables = [];
-    staticBoxRenderCache.surfaceStats = {
-      renderSourceCountBeforeVisibility: 0,
-      renderSourceCountAfterVisibility: 0,
-      logicalVoxelCountEstimated: 0,
-      visibleTopFaceCount: 0,
-      visibleSideFaceCount: 0,
-      hiddenInternalSurfaceSkippedCount: 0,
-      voxelFurnitureProcessedCount: 0,
-      visibleChunkCount: 0,
-      rebuiltChunkCountThisFrame: 0,
-      reusedChunkCountThisFrame: 0,
-      chunkSize: Number(sceneSnapshot && sceneSnapshot.chunkSize || 16),
-      totalChunkCount: 0,
-      dirtyChunkCount: 0,
-      totalStaticBoxes: 0,
-      totalStaticRenderables: 0,
-      cacheContentType: 'world-face-packets',
-      cameraIndependent: true,
-      usesScreenSpaceCache: false,
-      buildMs: 0
-    };
-    __lastSurfaceCacheStats = staticBoxRenderCache.surfaceStats;
-    return;
-  }
-
-  const instanceRenderUpdateModes = buildInstanceRenderUpdateModeIndex(instances);
-  const sceneSyncStartAt = perfNow();
-  const syncResult = staticWorldCacheApi.syncWithScene({
-    forceFullRebuild: force === true,
-    sceneSnapshot: sceneSnapshot,
-    updates: sceneUpdates,
-    getBoxes: function () {
-      return boxes.filter(function (box) { return isStaticWorldBoxForRender(box, instanceRenderUpdateModes); });
-    }
-  }) || { mode: 'cached', summary: null, appliedUpdateCount: 0 };
-  const sceneSyncMs = Math.max(0, perfNow() - sceneSyncStartAt);
-
-  var terrainFrameLogContext = getTerrainFrameLogContextForRender();
-  const chunkBuildStartAt = perfNow();
-  const chunkResult = staticWorldCacheApi.collectVisibleRenderables({
-    scope: cameraScope,
-    renderSignature: renderSignature,
-    comparePackets: compareRenderablesByDomain,
-    profileContext: terrainFrameLogContext,
-    rebuildChunk: function (chunk) {
-      return buildStaticWorldChunkRenderables(chunk, {
-        visibilityCore: visibilityCore,
-        occupancy: occ,
-        currentViewRotation: currentViewRotation,
-        cameraScope: cameraScope,
-        semanticLogSeen: semanticLogSeen,
-        profileContext: terrainFrameLogContext
-      });
-    }
-  }) || { packets: [], renderables: [], summary: null, visibleChunkKeys: [] };
-  const chunkBuildMs = Math.max(0, perfNow() - chunkBuildStartAt);
-  const chunkSummary = chunkResult.summary || {
-    totalChunkCount: 0,
-    dirtyChunkCount: 0,
-    visibleChunkCount: 0,
-    rebuiltChunkCountThisFrame: 0,
-    reusedChunkCountThisFrame: 0,
-    chunkSize: Number(sceneSnapshot && sceneSnapshot.chunkSize || 16),
-    totalStaticBoxes: 0,
-    totalStaticRenderables: 0,
-    visibleTopFaceCount: 0,
-    visibleSideFaceCount: 0,
-    logicalVoxelCountEstimated: 0,
-    hiddenInternalSurfaceSkippedCount: 0,
-    voxelFurnitureProcessedCount: 0,
-    renderSourceCountBeforeVisibility: 0,
-    renderSourceCountAfterVisibility: 0,
-    buildMs: 0
-  };
-
-  var staticWorldPackets = Array.isArray(chunkResult.packets)
-    ? chunkResult.packets
-    : (Array.isArray(chunkResult.renderables) ? chunkResult.renderables : []);
-  var frameStaticRenderables = staticWorldPackets;
-
-  staticBoxRenderCache.occupancy = occ;
-  staticBoxRenderCache.occupancyCacheVersion = occupancySnapshot && occupancySnapshot.cacheVersion != null ? Number(occupancySnapshot.cacheVersion || 0) : 0;
-  staticBoxRenderCache.packets = staticWorldPackets;
-  staticBoxRenderCache.renderables = frameStaticRenderables;
-  staticBoxRenderCache.geometrySignature = String(sceneSnapshot && sceneSnapshot.cacheVersion != null ? sceneSnapshot.cacheVersion : '0');
-  staticBoxRenderCache.lightingSignature = renderSignature;
-  staticBoxRenderCache.viewRotation = currentViewRotation;
-  staticBoxRenderCache.cacheSignature = renderSignature;
-  staticBoxRenderCache.lastBuiltAt = perfNow();
-  staticBoxRenderCache.dirtyGeometry = false;
-  staticBoxRenderCache.dirtyLighting = false;
-  staticBoxRenderCache.surfaceStats = {
-    terrainColumnCount: 0,
-    logicalVoxelCountEstimated: Number(chunkSummary.logicalVoxelCountEstimated || 0),
-    visibleTopFaceCount: Number(chunkSummary.visibleTopFaceCount || 0),
-    visibleSideFaceCount: Number(chunkSummary.visibleSideFaceCount || 0),
-    internalVoxelSkippedCount: 0,
-    hiddenInternalSurfaceSkippedCount: Number(chunkSummary.hiddenInternalSurfaceSkippedCount || 0),
-    voxelFurnitureProcessedCount: Number(chunkSummary.voxelFurnitureProcessedCount || 0),
-    cameraCulledCount: Math.max(0, Number(chunkSummary.totalChunkCount || 0) - Number(chunkSummary.visibleChunkCount || 0)),
-    surfaceOnlyRenderingEnabled: cameraScope.surfaceOnlyRenderingEnabled !== false,
-    renderSourceCountBeforeVisibility: Number(chunkSummary.renderSourceCountBeforeVisibility || 0),
-    renderSourceCountAfterVisibility: Number(chunkSummary.renderSourceCountAfterVisibility || 0),
-    finalRenderableCount: Number(staticWorldPackets.length || 0),
-    visibleStaticPacketCount: Number(chunkSummary.visibleStaticPacketCount || staticWorldPackets.length || 0),
-    packetMergeMs: Number(chunkSummary.packetMergeMs || 0),
-    cacheContentType: String(chunkSummary.cacheContentType || 'world-face-packets'),
-    cameraIndependent: chunkSummary.cameraIndependent !== false,
-    usesScreenSpaceCache: chunkSummary.usesScreenSpaceCache === true,
-    visibleChunkCount: Number(chunkSummary.visibleChunkCount || 0),
-    rebuiltChunkCountThisFrame: Number(chunkSummary.rebuiltChunkCountThisFrame || 0),
-    rebuiltChunkKeysThisFrame: Array.isArray(chunkSummary.rebuiltChunkKeysThisFrame) ? chunkSummary.rebuiltChunkKeysThisFrame.slice() : [],
-    rebuiltChunkTotalBoxCount: Number(chunkSummary.rebuiltChunkTotalBoxCount || 0),
-    rebuiltChunkTotalRenderableCount: Number(chunkSummary.rebuiltChunkTotalRenderableCount || 0),
-    rebuiltChunkTotalVisibleFaceCount: Number(chunkSummary.rebuiltChunkTotalVisibleFaceCount || 0),
-    reusedChunkCountThisFrame: Number(chunkSummary.reusedChunkCountThisFrame || 0),
-    chunkSize: Number(chunkSummary.chunkSize || sceneSnapshot.chunkSize || 16),
-    totalChunkCount: Number(chunkSummary.totalChunkCount || 0),
-    dirtyChunkCount: Number(chunkSummary.dirtyChunkCount || 0),
-    totalStaticBoxes: Number(chunkSummary.totalStaticBoxes || 0),
-    totalStaticRenderables: Number(chunkSummary.totalStaticRenderables || staticWorldPackets.length || 0),
-    buildMs: Number(chunkBuildMs.toFixed(3))
-  };
-
-  const rebuiltChunkCountThisFrame = Number(chunkSummary.rebuiltChunkCountThisFrame || 0);
-  const remainingDirtyChunkCount = Number(chunkSummary.remainingDirtyChunkCount || chunkSummary.dirtyChunkCount || 0);
-  const invalidationReason = force
-    ? 'force'
-    : (syncResult.mode === 'full-rebuild'
-      ? 'scene-full-rebuild'
-      : (Number(syncResult.appliedUpdateCount || 0) > 0
-        ? 'dirty-chunk-update'
-        : (chunkSummary && chunkSummary.renderSignatureChanged === true
-          ? 'static-content-render-signature-changed'
-          : (rebuiltChunkCountThisFrame > 0 && remainingDirtyChunkCount > 0
-            ? 'dirty-chunk-queue-drain'
-            : 'none'))));
-  var invalidationSignatureFields = ['lightingSignature','xrayFaces','showDebug','surfaceOnlyRenderingEnabled','packetViewRotation','cacheContentType','cameraIndependent','usesScreenSpaceCache'];
-  maybeLogStaticCacheInvalidationVerify({
-    invalidationReason: invalidationReason,
-    cacheContentType: 'world-face-packets',
-    cameraIndependent: true,
-    signatureFields: invalidationSignatureFields.slice(),
-    includesCameraX: invalidationSignatureFields.indexOf('cameraX') >= 0,
-    includesCameraY: invalidationSignatureFields.indexOf('cameraY') >= 0,
-    includesZoom: invalidationSignatureFields.indexOf('zoom') >= 0,
-    includesScreenTransform: invalidationSignatureFields.indexOf('screenTransform') >= 0 || invalidationSignatureFields.indexOf('projectionZoom') >= 0,
-    includesViewportOffset: invalidationSignatureFields.indexOf('viewportOffset') >= 0 || invalidationSignatureFields.indexOf('cameraOffset') >= 0,
-    shouldInvalidateStaticCache: invalidationReason !== 'none'
-  });
-  const staticCacheProfile = {
-    reason: 'rebuildStaticBoxRenderCacheIfNeeded',
-    cacheHit: rebuiltChunkCountThisFrame === 0,
-    invalidationReason: invalidationReason,
-    totalBoxes: Number(boxes.length || 0),
-    structuredBoxCount: Number(chunkSummary.totalStaticBoxes || 0),
-    scopedBoxCount: Number(chunkSummary.renderSourceCountAfterVisibility || 0),
-    occupancyBuildMs: Number(occupancyBuildMs.toFixed(3)),
-    visibleSurfaceBuildMs: Number(Math.max(0, chunkBuildMs - Number(chunkSummary.rebuiltChunkCountThisFrame || 0) * 0).toFixed(3)),
-    staticRenderableBuildMs: Number(chunkBuildMs.toFixed(3)),
-    signatureCheckMs: Number(signatureCheckMs.toFixed(3)),
-    sceneSyncMs: Number(sceneSyncMs.toFixed(3)),
-    visibleChunkCount: Number(chunkSummary.visibleChunkCount || 0),
-    rebuiltChunkCountThisFrame: rebuiltChunkCountThisFrame,
-    reusedChunkCountThisFrame: Number(chunkSummary.reusedChunkCountThisFrame || 0),
-    chunkSize: Number(chunkSummary.chunkSize || sceneSnapshot.chunkSize || 16),
-    occupancyCacheVersion: occupancySnapshot && occupancySnapshot.cacheVersion != null ? Number(occupancySnapshot.cacheVersion || 0) : 0,
-    cacheContentType: String(chunkSummary.cacheContentType || 'world-face-packets'),
-    cameraIndependent: chunkSummary.cameraIndependent !== false,
-    usesScreenSpaceCache: chunkSummary.usesScreenSpaceCache === true,
-    totalMs: Number(Math.max(0, perfNow() - profileStartAt).toFixed(3))
-  };
-  staticBoxRenderCache.lastProfile = staticCacheProfile;
-  __lastSurfaceCacheStats = staticBoxRenderCache.surfaceStats;
-  captureStaticBoxCacheFrameState({
-    rebuilt: rebuiltChunkCountThisFrame > 0,
-    buildMs: Number(chunkBuildMs.toFixed(3)),
-    cacheHit: rebuiltChunkCountThisFrame === 0,
-    invalidationReason: invalidationReason,
-    totalMs: staticCacheProfile.totalMs,
-    profile: staticCacheProfile
-  });
-  maybeLogStaticBoxCacheProfile(staticCacheProfile, rebuiltChunkCountThisFrame > 0 || Number(syncResult.appliedUpdateCount || 0) > 0 || force === true);
-  maybeLogStaticWorldChunkSummary({
-    totalChunkCount: Number(chunkSummary.totalChunkCount || 0),
-    dirtyChunkCount: Number(chunkSummary.dirtyChunkCount || 0),
-    visibleChunkCount: Number(chunkSummary.visibleChunkCount || 0),
-    rebuiltChunkCountThisFrame: rebuiltChunkCountThisFrame,
-    reusedChunkCountThisFrame: Number(chunkSummary.reusedChunkCountThisFrame || 0),
-    chunkSize: Number(chunkSummary.chunkSize || sceneSnapshot.chunkSize || 16),
-    totalStaticBoxes: Number(chunkSummary.totalStaticBoxes || 0),
-    totalStaticRenderables: Number(chunkSummary.totalStaticRenderables || staticWorldPackets.length || 0),
-    visibleStaticPacketCount: Number(chunkSummary.visibleStaticPacketCount || staticWorldPackets.length || 0),
-    packetMergeMs: Number(chunkSummary.packetMergeMs || 0),
-    cacheContentType: String(chunkSummary.cacheContentType || 'world-face-packets'),
-    cameraIndependent: chunkSummary.cameraIndependent !== false,
-    usesScreenSpaceCache: chunkSummary.usesScreenSpaceCache === true,
-    buildMs: Number(chunkBuildMs.toFixed(3))
-  }, rebuiltChunkCountThisFrame > 0 || Number(syncResult.appliedUpdateCount || 0) > 0 || force === true);
-  logItemRotationPrototype('main-static-cache-rebuilt', {
-    currentViewRotation: currentViewRotation,
-    cacheSignature: renderSignature,
-    geometrySignature: String(sceneSnapshot && sceneSnapshot.cacheVersion != null ? sceneSnapshot.cacheVersion : '0'),
-    cacheSignatureIncludesRuntimeViewRotation: true,
-    sourceOfViewRotation: viewRotationInfo && viewRotationInfo.source ? viewRotationInfo.source : 'runtime-state',
-    renderableCount: Number(staticBoxRenderCache.renderables.length || 0),
-    reason: invalidationReason,
-    visibleChunkCount: Number(chunkSummary.visibleChunkCount || 0),
-    rebuiltChunkCountThisFrame: rebuiltChunkCountThisFrame,
-    reusedChunkCountThisFrame: Number(chunkSummary.reusedChunkCountThisFrame || 0)
-  });
-  logItemRotationPrototype('render-surface-cache-summary', {
-    logicalVoxelCountEstimated: Number(staticBoxRenderCache.surfaceStats.logicalVoxelCountEstimated || 0),
-    visibleTopFaceCount: Number(staticBoxRenderCache.surfaceStats.visibleTopFaceCount || 0),
-    visibleSideFaceCount: Number(staticBoxRenderCache.surfaceStats.visibleSideFaceCount || 0),
-    hiddenInternalSurfaceSkippedCount: Number(staticBoxRenderCache.surfaceStats.hiddenInternalSurfaceSkippedCount || 0),
-    voxelFurnitureProcessedCount: Number(staticBoxRenderCache.surfaceStats.voxelFurnitureProcessedCount || 0),
-    surfaceOnlyRenderingEnabled: staticBoxRenderCache.surfaceStats.surfaceOnlyRenderingEnabled !== false,
-    visibleChunkCount: Number(staticBoxRenderCache.surfaceStats.visibleChunkCount || 0),
-    rebuiltChunkCountThisFrame: Number(staticBoxRenderCache.surfaceStats.rebuiltChunkCountThisFrame || 0)
-  });
-  logItemRotationPrototype('main-view-rotation-source-check', buildMainViewRotationSourceCheckPayload(currentViewRotation, currentViewRotation, renderSignature));
-  noteLayerRebuild('static-box', `interactive=${isInteractiveRenderPressure()} chunks=${Number(chunkSummary.visibleChunkCount || 0)} rebuilt=${rebuiltChunkCountThisFrame} viewRotation=${currentViewRotation}`);
+  return requireStaticWorldRenderCacheCoordinatorForRender().rebuildStaticWorldRenderCache({
+    force: force === true,
+    boxes: boxes,
+    instances: instances,
+    staticBoxRenderCache: staticBoxRenderCache
+  }, createStaticWorldRenderCacheCoordinatorDepsForRender());
 }
 
 function mergeSortedRenderables(staticRenderables, dynamicRenderables) {
-  if (!dynamicRenderables.length) return Array.isArray(staticRenderables) ? staticRenderables : [];
-  if (!staticRenderables.length) return Array.isArray(dynamicRenderables) ? dynamicRenderables : [];
-  const merged = [];
-  let i = 0, j = 0;
-  while (i < staticRenderables.length && j < dynamicRenderables.length) {
-    const a = staticRenderables[i], b = dynamicRenderables[j];
-    if (compareRenderablesByDomain(a, b) <= 0) {
-      merged.push(a); i += 1;
-    } else {
-      merged.push(b); j += 1;
-    }
-  }
-  while (i < staticRenderables.length) merged.push(staticRenderables[i++]);
-  while (j < dynamicRenderables.length) merged.push(dynamicRenderables[j++]);
-  return merged;
+  return requireRenderOrderCoreForRender().mergeSortedRenderables(
+    staticRenderables,
+    dynamicRenderables,
+    compareRenderablesByDomain
+  );
 }
 
 function drawFloor(scope) {
@@ -5815,32 +4290,11 @@ function getMainEditorModeForPlayerMoveFastPathDiag() {
 }
 
 function getPlayerMoveFastPathStaticOrderSignature(order, currentViewRotation) {
-  var list = Array.isArray(order) ? order : [];
-  var staticCount = 0;
-  var dynamicCount = 0;
-  var firstStaticId = '';
-  var lastStaticId = '';
-  for (var i = 0; i < list.length; i++) {
-    var r = list[i];
-    if (!r) continue;
-    var isPlayer = r.id === 'player-avatar' || r.kind === 'player-avatar' || r.actorKind === 'player';
-    var isDynamic = isPlayer || r.dynamic === true || r.kind === 'sprite' || r.kind === 'player-sprite';
-    if (isDynamic) {
-      dynamicCount += 1;
-      continue;
-    }
-    staticCount += 1;
-    var id = String(r.id || r.faceKey || r.kind || 'static');
-    if (!firstStaticId) firstStaticId = id;
-    lastStaticId = id;
-  }
-  return [
-    normalizeMainEditorViewRotationValue(currentViewRotation),
-    staticCount,
-    dynamicCount,
-    firstStaticId,
-    lastStaticId
-  ].join('|');
+  return requireRenderOrderCoreForRender().getRenderableStaticOrderSignature(
+    order,
+    currentViewRotation,
+    normalizeMainEditorViewRotationValue
+  );
 }
 
 function shouldEmitPlayerMoveFastPathDiag(signature, candidateEligible, rejectReasons) {
@@ -6007,19 +4461,18 @@ function buildPlayerAvatarRenderableForFastPath(viewRotation, cameraScope) {
 }
 
 function insertSingleDynamicRenderableIntoSortedOrder(staticRenderables, dynamicRenderable) {
-  var list = Array.isArray(staticRenderables) ? staticRenderables : [];
-  if (!dynamicRenderable) return list.slice();
-  var lo = 0;
-  var hi = list.length;
-  while (lo < hi) {
-    var mid = (lo + hi) >> 1;
-    if (compareRenderablesByDomain(list[mid], dynamicRenderable) <= 0) lo = mid + 1;
-    else hi = mid;
-  }
-  var out = list.slice(0, lo);
-  out.push(dynamicRenderable);
-  for (var i = lo; i < list.length; i++) out.push(list[i]);
-  return out;
+  return requireRenderOrderCoreForRender().insertRenderableIntoSortedOrder(
+    staticRenderables,
+    dynamicRenderable,
+    compareRenderablesByDomain
+  );
+}
+
+function sortRenderablesByOrderForRender(renderables) {
+  return requireRenderOrderCoreForRender().sortRenderablesByOrder(
+    renderables,
+    compareRenderablesByDomain
+  );
 }
 
 function emitPlayerMoveFastPathRuntimeDiagnostic(payload, forceLog) {
@@ -6268,8 +4721,7 @@ function compareRenderablesByDomain(a, b) {
   if (domainCore && typeof domainCore.compareRenderableOrder === 'function') {
     return domainCore.compareRenderableOrder(a, b);
   }
-  if (Math.abs((a.sortKey || 0) - (b.sortKey || 0)) > EPS) return (a.sortKey || 0) - (b.sortKey || 0);
-  return (a.tie || 0) - (b.tie || 0);
+  return requireRenderOrderCoreForRender().compareRenderableOrder(a, b);
 }
 
 function computeCandidate(cellX, cellY, proto, ignoreInstanceId = null) {
@@ -6347,104 +4799,64 @@ function computeCandidate(cellX, cellY, proto, ignoreInstanceId = null) {
   return evaluated;
 }
 
+function requireRenderPreviewInteractionControllerForRender() {
+  var api = null;
+  try {
+    api = (window.App && window.App.presentation && window.App.presentation.render && window.App.presentation.render.previewInteractionController) || null;
+  } catch (_) {}
+  if (!api) {
+    try { api = window.__RENDER_PREVIEW_INTERACTION_CONTROLLER__ || null; } catch (_) {}
+  }
+  if (!api) throw new Error('P11a-3 missing render preview interaction controller');
+  return api;
+}
+
+function createRenderPreviewInteractionDepsForRender() {
+  return {
+    editor: editor,
+    mouse: mouse,
+    boxes: function () { return boxes; },
+    xrayFaces: function () { return xrayFaces; },
+    buildSurfaceFaces: buildSurfaceFaces,
+    pointInPoly: pointInPoly,
+    hitTopFace: hitTopFace,
+    screenToFloor: screenToFloor,
+    computeCandidate: computeCandidate,
+    prefabVariant: prefabVariant,
+    getPrefabById: getPrefabById,
+    currentProto: currentProto,
+    currentPrefab: (typeof currentPrefab === 'function' ? currentPrefab : null),
+    logItemRotationPrototype: (typeof logItemRotationPrototype === 'function' ? logItemRotationPrototype : null),
+    getEditorPreviewFacingValue: getEditorPreviewFacingValue,
+    detailLog: detailLog,
+    verboseLog: function () { return verboseLog; },
+    pushLog: pushLog,
+    getLastPreviewSignature: function () { return lastPreviewSignature; },
+    setLastPreviewSignature: function (value) { lastPreviewSignature = value; },
+  };
+}
+
 function updatePreview() {
-  editor.hoverDeleteBox = null;
-  if (!mouse.inside) { editor.preview = null; return; }
-
-  if (editor.mode === 'view') {
-    editor.preview = null;
-    return;
-  }
-
-  if (editor.mode === 'delete') {
-    editor.preview = null;
-    editor.hoverDeleteBox = pickBoxAtScreen(mouse.x, mouse.y);
-    return;
-  }
-
-  let cellX, cellY;
-  const topHit = hitTopFace(mouse.x, mouse.y);
-  if (topHit && editor.mode === 'place') {
-    cellX = topHit.x;
-    cellY = topHit.y;
-  } else {
-    const floor = screenToFloor(mouse.x, mouse.y);
-    cellX = Math.floor(floor.x);
-    cellY = Math.floor(floor.y);
-  }
-
-  if (editor.mode === 'drag' && editor.draggingInstance) {
-    editor.preview = computeCandidate(cellX, cellY, prefabVariant(getPrefabById(editor.draggingInstance.prefabId), editor.draggingInstance.rotation || 0), editor.draggingInstance.instanceId);
-  } else if (editor.mode === 'place') {
-    editor.preview = computeCandidate(cellX, cellY, currentProto());
-  } else {
-    editor.preview = null;
-  }
-
-  if (editor.preview && editor.mode === 'place') {
-    try {
-      logItemRotationPrototype('placement-preview', {
-        prefabId: editor.preview.prefabId || (typeof currentPrefab === 'function' && currentPrefab() ? currentPrefab().id : null),
-        previewFacing: getEditorPreviewFacingValue(),
-        origin: editor.preview.origin || null,
-        footprint: editor.preview.bbox ? { w: editor.preview.bbox.w, d: editor.preview.bbox.d, h: editor.preview.bbox.h } : null,
-        valid: !!editor.preview.valid,
-        reason: editor.preview.reason || 'ok'
-      });
-    } catch (_) {}
-  }
-
-  if (editor.preview && topHit && editor.preview.valid) {
-    detailLog(`preview-hit-top: cell=(${topHit.x},${topHit.y}) topZ=${topHit.z}`);
-  }
-
-  if (editor.preview && editor.preview.prefabId) {
-    var __pp = getPrefabById(editor.preview.prefabId);
-    if (__pp && __pp.kind === 'habbo_import') {
-      detailLog('[place-trace] preview-candidate prefab=' + __pp.id + ' origin=(' + [editor.preview.origin && editor.preview.origin.x, editor.preview.origin && editor.preview.origin.y, editor.preview.origin && editor.preview.origin.z].join(',') + ') bbox=' + (editor.preview.bbox ? JSON.stringify(editor.preview.bbox) : 'null') + ' boxes=' + (editor.preview.boxes ? editor.preview.boxes.length : 0) + ' valid=' + editor.preview.valid + ' reason=' + editor.preview.reason);
-    }
-  }
-
-  if (editor.preview) {
-    const sig = JSON.stringify({
-      mode: editor.mode,
-      x: editor.preview.box ? editor.preview.box.x : null,
-      y: editor.preview.box ? editor.preview.box.y : null,
-      z: editor.preview.box ? editor.preview.box.z : null,
-      valid: editor.preview.valid,
-      reason: editor.preview.reason,
-      overlapIds: editor.preview.overlapIds,
-    });
-    if (sig != lastPreviewSignature && verboseLog) {
-      lastPreviewSignature = sig;
-      pushLog(`preview: ${sig}`);
-    }
-  }
+  return requireRenderPreviewInteractionControllerForRender().updatePreview({
+    deps: createRenderPreviewInteractionDepsForRender()
+  });
 }
 
 function pickBoxAtScreen(sx, sy) {
-  const p = { x: sx, y: sy };
-  const faces = buildSurfaceFaces(boxes, 1, xrayFaces).sort((a, b) => a.fallbackDepth - b.fallbackDepth);
-  let picked = null;
-  for (const f of faces) {
-    if (!pointInPoly(p, f.poly)) continue;
-    if (!picked || f.fallbackDepth >= picked.depth) {
-      const box = boxes.find(b => b.id === f.boxId);
-      if (box) picked = { box, depth: f.fallbackDepth };
-    }
-  }
-  return picked ? picked.box : null;
+  return requireRenderPreviewInteractionControllerForRender().pickBoxAtScreen({
+    deps: createRenderPreviewInteractionDepsForRender(),
+    sx: sx,
+    sy: sy
+  });
 }
 
 function pickFaceAtScreen(sx, sy, includeHidden) {
-  const p = { x: sx, y: sy };
-  const faces = buildSurfaceFaces(boxes, 1, includeHidden == null ? xrayFaces : includeHidden).sort((a, b) => a.fallbackDepth - b.fallbackDepth);
-  let picked = null;
-  for (const f of faces) {
-    if (!pointInPoly(p, f.poly)) continue;
-    if (!picked || f.fallbackDepth >= picked.fallbackDepth) picked = f;
-  }
-  return picked || null;
+  return requireRenderPreviewInteractionControllerForRender().pickFaceAtScreen({
+    deps: createRenderPreviewInteractionDepsForRender(),
+    sx: sx,
+    sy: sy,
+    includeHidden: includeHidden
+  });
 }
 
 // placement 拖拽/落地入口已抽离到 src/application/placement/placement.js
@@ -6976,51 +5388,19 @@ function buildStaticVoxelSemanticMapping(cell, viewRotation, defaultColors, seen
 }
 
 function getSemanticFaceNormal(screenFace) {
-  if (screenFace === 'top') return { x: 0, y: 0, z: 1 };
-  if (screenFace === 'lowerRight' || screenFace === 'east') return { x: 1, y: 0, z: 0 };
-  if (screenFace === 'lowerLeft' || screenFace === 'south') return { x: 0, y: 1, z: 0 };
-  if (screenFace === 'north') return { x: 0, y: -1, z: 0 };
-  if (screenFace === 'west') return { x: -1, y: 0, z: 0 };
-  return { x: 0, y: 0, z: 1 };
-}
-
-function getSemanticFaceGeometryHelpers() {
-  var api = getItemFacingCoreApi();
-  return {
-    getWorldPoints: api && typeof api.getSemanticFaceWorldPoints === 'function' ? api.getSemanticFaceWorldPoints : null,
-    getNeighborDelta: api && typeof api.getSemanticFaceNeighborDelta === 'function' ? api.getSemanticFaceNeighborDelta : null,
-    getVisibleMapping: api && typeof api.getVisibleSemanticFaceMapping === 'function' ? api.getVisibleSemanticFaceMapping : null
-  };
+  return requireIsometricFaceCoreForRender().getSemanticFaceNormal(screenFace);
 }
 
 function getSemanticFaceWorldPolygon(cell, semanticFace) {
-  var helpers = getSemanticFaceGeometryHelpers();
-  if (helpers.getWorldPoints) return helpers.getWorldPoints(cell, semanticFace);
-  var c = cell || {};
-  var x = Number(c.x || 0), y = Number(c.y || 0), z = Number(c.z || 0);
-  if (semanticFace === 'top') return [{x:x,y:y,z:z+1},{x:x+1,y:y,z:z+1},{x:x+1,y:y+1,z:z+1},{x:x,y:y+1,z:z+1}];
-  if (semanticFace === 'east') return [{x:x+1,y:y,z:z},{x:x+1,y:y+1,z:z},{x:x+1,y:y+1,z:z+1},{x:x+1,y:y,z:z+1}];
-  if (semanticFace === 'south') return [{x:x,y:y+1,z:z},{x:x+1,y:y+1,z:z},{x:x+1,y:y+1,z:z+1},{x:x,y:y+1,z:z+1}];
-  if (semanticFace === 'north') return [{x:x,y:y,z:z+1},{x:x+1,y:y,z:z+1},{x:x+1,y:y,z:z},{x:x,y:y,z:z}];
-  if (semanticFace === 'west') return [{x:x,y:y,z:z+1},{x:x,y:y+1,z:z+1},{x:x,y:y+1,z:z},{x:x,y:y,z:z}];
-  return [];
+  return requireIsometricFaceCoreForRender().getSemanticFaceWorldPolygon(cell, semanticFace);
 }
 
 function getSemanticFaceNeighborDeltaForRender(semanticFace) {
-  var helpers = getSemanticFaceGeometryHelpers();
-  if (helpers.getNeighborDelta) return helpers.getNeighborDelta(semanticFace);
-  if (semanticFace === 'east') return { x: 1, y: 0, z: 0 };
-  if (semanticFace === 'south') return { x: 0, y: 1, z: 0 };
-  if (semanticFace === 'west') return { x: -1, y: 0, z: 0 };
-  if (semanticFace === 'north') return { x: 0, y: -1, z: 0 };
-  if (semanticFace === 'top') return { x: 0, y: 0, z: 1 };
-  return { x: 0, y: 0, z: 0 };
+  return requireIsometricFaceCoreForRender().getSemanticFaceNeighborDelta(semanticFace);
 }
 
 function getVisibleSemanticMappingForRender(itemFacing, viewRotation) {
-  var helpers = getSemanticFaceGeometryHelpers();
-  if (helpers.getVisibleMapping) return helpers.getVisibleMapping({ itemFacing: itemFacing, viewRotation: viewRotation });
-  return null;
+  return requireIsometricFaceCoreForRender().getVisibleSemanticMapping(itemFacing, viewRotation);
 }
 
 function textureFillToRgb(fill, fallbackRgb) {
@@ -7211,54 +5591,11 @@ function colorWithAlpha(color, alpha) {
 }
 
 function drawTextBadge(text, x, y, fill, stroke) {
-  ctx.save();
-  ctx.font = '11px monospace';
-  var label = String(text || '');
-  var w = Math.ceil(ctx.measureText(label).width) + 8;
-  ctx.fillStyle = 'rgba(5,8,14,0.78)';
-  ctx.fillRect(x - 3, y - 11, w, 15);
-  ctx.strokeStyle = stroke || 'rgba(255,255,255,0.25)';
-  ctx.strokeRect(x - 3, y - 11, w, 15);
-  ctx.fillStyle = fill || '#fff';
-  ctx.fillText(label, x + 1, y);
-  ctx.restore();
+  return requireCanvas2dDrawPrimitivesForRender().drawTextBadgeOn(ctx, text, x, y, fill, stroke);
 }
 
 function drawMultilineBadge(lines, x, y, fill, stroke) {
-  var list = (Array.isArray(lines) ? lines : []).map(function (line) {
-    if (line && typeof line === 'object') {
-      return {
-        text: String(line.text || ''),
-        color: line.color || null,
-        stroke: line.stroke || null
-      };
-    }
-    return { text: String(line || ''), color: null, stroke: null };
-  }).filter(function (line) { return !!line.text; });
-  if (!list.length) return;
-  ctx.save();
-  ctx.font = '10px monospace';
-  var maxW = 0;
-  for (var i = 0; i < list.length; i++) maxW = Math.max(maxW, Math.ceil(ctx.measureText(list[i].text).width));
-  var pad = 6;
-  var lineH = 12;
-  var boxW = maxW + pad * 2;
-  var boxH = list.length * lineH + 4;
-  ctx.fillStyle = 'rgba(5,8,14,0.78)';
-  ctx.fillRect(x - 4, y - boxH + 3, boxW, boxH);
-  ctx.strokeStyle = stroke || 'rgba(255,255,255,0.28)';
-  ctx.strokeRect(x - 4, y - boxH + 3, boxW, boxH);
-  for (var j = 0; j < list.length; j++) {
-    var yy = y - boxH + 14 + j * lineH;
-    var lineColor = list[j].color || fill || '#fff';
-    var lineStroke = list[j].stroke || 'rgba(5,8,14,0.92)';
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = lineStroke;
-    ctx.strokeText(list[j].text, x + 1, yy);
-    ctx.fillStyle = lineColor;
-    ctx.fillText(list[j].text, x + 1, yy);
-  }
-  ctx.restore();
+  return requireCanvas2dDrawPrimitivesForRender().drawMultilineBadgeOn(ctx, lines, x, y, fill, stroke);
 }
 
 function pickRenderableColorCandidate(value) {
@@ -7967,6 +6304,43 @@ function emitActorInteractionOrderDiag(tag, payload, options) {
   try {
     if (typeof console !== 'undefined' && console.log) console.log('[actor-sort-diag][' + String(tag || 'event') + ']', payload || {});
   } catch (_) {}
+}
+
+function getActorInteractionDiagStorageSnapshotForRender() {
+  var out = { actorSortDiag: null, terrainPlayerDiag: null, terrainSortDiag: null };
+  try {
+    if (typeof localStorage !== 'undefined') {
+      out.actorSortDiag = localStorage.getItem('actorSortDiag');
+      out.terrainPlayerDiag = localStorage.getItem('terrainPlayerDiag');
+      out.terrainSortDiag = localStorage.getItem('terrainSortDiag');
+    }
+  } catch (_) {
+    out.actorSortDiag = 'error';
+    out.terrainPlayerDiag = 'error';
+    out.terrainSortDiag = 'error';
+  }
+  return out;
+}
+
+function noteActorInteractionRenderEntryForRender(payload) {
+  if (!isActorInteractionOrderDiagEnabled()) return false;
+  __actorInteractionOrderDiagState.renderEntryCount += 1;
+  var count = Number(__actorInteractionOrderDiagState.renderEntryCount || 0);
+  if (!(count <= 8 || (count % 120) === 0)) return false;
+  var safe = payload && typeof payload === 'object' ? payload : {};
+  var storage = getActorInteractionDiagStorageSnapshotForRender();
+  emitActorInteractionOrderDiag('render-entry', {
+    version: __actorInteractionOrderDiagState.version,
+    renderEntryCount: count,
+    hasPushLog: safe.hasPushLog === true,
+    hasForceExportLog: safe.hasForceExportLog === true,
+    localStorageActorSortDiag: storage.actorSortDiag,
+    localStorageTerrainPlayerDiag: storage.terrainPlayerDiag,
+    localStorageTerrainSortDiag: storage.terrainSortDiag,
+    totalInstances: Number(safe.totalInstances || 0),
+    totalBoxes: Number(safe.totalBoxes || 0)
+  }, { maxCount: 1000 });
+  return true;
 }
 
 function roundActorDiagNumber(value, digits) {
@@ -9251,576 +7625,23 @@ function applyActorInteractionReplacementToRenderables(staticRenderables, actorF
   };
 }
 
-function buildRenderables() {
-  const faceMergeControlState = getStaticWorldFaceMergeControlStateSnapshotForRender();
-  beginRenderFrameDiagnosticState();
-  if (isActorInteractionOrderDiagEnabled()) {
-    __actorInteractionOrderDiagState.renderEntryCount += 1;
-    if (__actorInteractionOrderDiagState.renderEntryCount <= 8 || (__actorInteractionOrderDiagState.renderEntryCount % 120) === 0) {
-      emitActorInteractionOrderDiag('render-entry', {
-        version: __actorInteractionOrderDiagState.version,
-        renderEntryCount: __actorInteractionOrderDiagState.renderEntryCount,
-        hasPushLog: typeof pushLog === 'function',
-        hasForceExportLog: typeof window !== 'undefined' && typeof window.__forceExportLog === 'function',
-        localStorageActorSortDiag: (function () { try { return typeof localStorage !== 'undefined' ? localStorage.getItem('actorSortDiag') : null; } catch (_) { return 'error'; } })(),
-        localStorageTerrainPlayerDiag: (function () { try { return typeof localStorage !== 'undefined' ? localStorage.getItem('terrainPlayerDiag') : null; } catch (_) { return 'error'; } })(),
-        totalInstances: Number(instances && instances.length || 0),
-        totalBoxes: Number(boxes && boxes.length || 0)
-      }, { maxCount: 1000 });
-    }
+function requireMainFrameRenderableAssemblerForRender() {
+  var globalObj = (typeof window !== 'undefined') ? window : globalThis;
+  var api = (globalObj.App && globalObj.App.application && globalObj.App.application.render && globalObj.App.application.render.mainFrameRenderableAssembler)
+    || globalObj.__MAIN_FRAME_RENDERABLE_ASSEMBLER__
+    || globalObj.IsometricMainFrameRenderableAssembler
+    || globalObj.__APP_APPLICATION_MAIN_FRAME_RENDERABLE_ASSEMBLER__
+    || null;
+  if (!api || typeof api.buildRenderables !== 'function' || typeof api.buildMainFrameRenderables !== 'function') {
+    throw new Error('main-frame-renderable-assembler missing; ensure src/application/render/main-frame-renderable-assembler.js loads before src/presentation/render/render.js');
   }
-  const buildStartAt = perfNow();
-  const viewRotationInfoStartAt = perfNow();
-  const viewRotationInfo = getSafeMainEditorViewRotation(null);
-  recordRenderFunctionTiming('render.buildMainFrameRenderables.getSafeMainEditorViewRotation', perfNow() - viewRotationInfoStartAt);
-  const cameraScopeStartAt = perfNow();
-  const cameraScope = getMainCameraRenderScope(viewRotationInfo.viewRotation);
-  recordRenderFunctionTiming('render.buildMainFrameRenderables.getMainCameraRenderScope', perfNow() - cameraScopeStartAt, { frameViewRotation: Number(viewRotationInfo && viewRotationInfo.viewRotation || 0) });
-  const terrainModelStartAt = perfNow();
-  const terrainModel = getTerrainRuntimeModelForRender();
-  recordRenderFunctionTiming('render.buildMainFrameRenderables.getTerrainRuntimeModelForRender', perfNow() - terrainModelStartAt);
-  const terrainBuildStartAt = perfNow();
-  const terrainBuild = { renderables: [], stats: { terrainCellCount: 0, terrainColumnCount: 0, terrainExpandedVoxelInstanceCount: 0, terrainUsesColumnModel: false, visibleColumnCount: 0, visibleChunkCount: 0, culledColumnCount: 0, culledChunkCount: 0, terrainBuildWasScoped: false, logicalVoxelCountEstimated: 0, visibleTopFaceCount: 0, visibleSideFaceCount: 0, internalVoxelSkippedCount: 0, hiddenInternalSurfaceSkippedCount: 0, renderableCount: 0, buildMode: 'shared-block-pipeline' } };
-  const terrainBuildMs = Math.max(0, perfNow() - terrainBuildStartAt);
-  recordRenderFunctionTiming('render.buildMainFrameRenderables.terrainBuildPlaceholder', terrainBuildMs);
-  const staticCacheStartAt = perfNow();
-  rebuildStaticBoxRenderCacheIfNeeded();
-  recordRenderFunctionTiming('render.buildMainFrameRenderables.rebuildStaticBoxRenderCacheIfNeeded', perfNow() - staticCacheStartAt);
-  const afterStaticCacheAt = perfNow();
-  const staticRenderablesAll = staticBoxRenderCache.renderables || [];
-  const dynamicRenderables = [];
-  const surfaceStats = __lastSurfaceCacheStats || { visibleTopFaceCount: 0, visibleSideFaceCount: 0, hiddenInternalSurfaceSkippedCount: 0, terrainColumnCount: 0, logicalVoxelCountEstimated: 0, voxelFurnitureProcessedCount: 0, surfaceOnlyRenderingEnabled: true, visibleChunkCount: 0, rebuiltChunkCountThisFrame: 0, reusedChunkCountThisFrame: 0, visibleStaticPacketCount: 0, packetMergeMs: 0 };
-  const occupancySnapshotStartAt = perfNow();
-  const occupancySnapshot = getSceneOccupancySnapshotForRender('render:buildRenderables');
-  recordRenderFunctionTiming('render.buildMainFrameRenderables.getSceneOccupancySnapshotForRender', perfNow() - occupancySnapshotStartAt);
-  const visibleOcc = occupancySnapshot && occupancySnapshot.map && typeof occupancySnapshot.map.has === 'function' ? occupancySnapshot.map : new Map();
-  const occupancyCacheVersion = occupancySnapshot && occupancySnapshot.cacheVersion != null ? Number(occupancySnapshot.cacheVersion || 0) : 0;
-  const occupancyRebuiltThisFrame = __lastRenderFrameOccupancyVersion != null && Number(__lastRenderFrameOccupancyVersion || 0) !== occupancyCacheVersion;
-  let occupiedKeySet = null;
-  const dynamicSplitStartAt = perfNow();
-  const dynamicInstanceSplit = getDynamicInstanceSplitForRender(instances);
-  recordRenderFunctionTiming('render.buildMainFrameRenderables.getDynamicInstanceSplitForRender', perfNow() - dynamicSplitStartAt, { totalInstancesForSplit: Number(instances && instances.length || 0) });
-  const dynamicCandidates = Array.isArray(dynamicInstanceSplit.dynamicInstances) ? dynamicInstanceSplit.dynamicInstances : [];
-  const dynamicInstanceIdSet = new Set(dynamicCandidates.map(function (inst) { return inst && inst.instanceId ? String(inst.instanceId) : null; }).filter(Boolean));
-  const dynamicFilterStartAt = perfNow();
-  const visibleDynamicInstances = filterInstancesForMainCameraScope(dynamicCandidates, cameraScope);
-  const dynamicFilterMs = Math.max(0, perfNow() - dynamicFilterStartAt);
-  recordRenderFunctionTiming('render.buildMainFrameRenderables.filterInstancesForMainCameraScope', dynamicFilterMs, { dynamicCandidateCount: Number(dynamicCandidates.length || 0), visibleDynamicInstanceCount: Number(visibleDynamicInstances.length || 0) });
-  const shouldForceExactVisibleSummary = (__terrainFirstFrameWindow && __terrainFirstFrameWindow.remaining > 0) || (perfNow() - Number(__lastRenderFrameSummaryLogAt || 0)) >= 1000;
-  const visibleSummaryStartAt = perfNow();
-  const visibleInstanceSummary = getVisibleInstanceSummaryForRender(cameraScope, visibleDynamicInstances, dynamicInstanceSplit, shouldForceExactVisibleSummary);
-  recordRenderFunctionTiming('render.buildMainFrameRenderables.getVisibleInstanceSummaryForRender', perfNow() - visibleSummaryStartAt, { visibleInstanceCount: Number(visibleInstanceSummary && visibleInstanceSummary.visibleInstances || 0) });
-
-  const dynamicBuildStartAt = perfNow();
-  var debugFaceBuildMs = 0;
-  var habboVoxelFilterMs = 0;
-  var habboVoxelBuildMs = 0;
-  var spriteSortBuildMs = 0;
-  var spriteRenderableBuildMs = 0;
-  for (const inst of visibleDynamicInstances) {
-    const prefab = getPrefabById(inst.prefabId);
-    if (prefab && isFiveFaceDebugPrefab(prefab) && prefabDrawsVoxels(prefab)) {
-      if (!occupiedKeySet) occupiedKeySet = createOccupiedKeySetFromOccupancy(visibleOcc);
-      const debugFaceStartAt = perfNow();
-      const placedFaces = buildPlacedDebugInstanceFaceRenderables(inst, prefab, occupiedKeySet, viewRotationInfo);
-      debugFaceBuildMs += Math.max(0, perfNow() - debugFaceStartAt);
-      for (const item of placedFaces) dynamicRenderables.push(item);
-    } else if (prefab && prefab.kind === 'habbo_import' && prefabDrawsVoxels(prefab)) {
-      const shift = getHabboInstanceVisualShift(inst, prefab);
-      const habboFilterStartAt = perfNow();
-      const instBoxes = filterBoxesForMainCameraScope(boxes.filter(function (b) { return b.instanceId === inst.instanceId; }), cameraScope);
-      habboVoxelFilterMs += Math.max(0, perfNow() - habboFilterStartAt);
-      for (const cell of instBoxes) {
-        const habboVoxelBuildStartAt = perfNow();
-        const item = buildShiftedVoxelRenderable({ x: cell.x, y: cell.y, z: cell.z, box: cell, base: cell.base }, visibleOcc, shift, 'habbo-voxel-' + inst.instanceId);
-        habboVoxelBuildMs += Math.max(0, perfNow() - habboVoxelBuildStartAt);
-        if (item) dynamicRenderables.push(item);
-      }
-    }
-    if (prefabHasSprite(prefab)) {
-      const spriteSortStartAt = perfNow();
-      const spriteParts = getSpriteDepthSplitCandidate(inst, prefab, viewRotationInfo.viewRotation);
-      if (spriteParts && Array.isArray(spriteParts.parts) && spriteParts.parts.length > 1) {
-        const domainCoreForSpriteParts = getDomainSceneCoreApi();
-        for (let partIndex = 0; partIndex < spriteParts.parts.length; partIndex++) {
-          const part = spriteParts.parts[partIndex];
-          const partSort = domainCoreForSpriteParts && typeof domainCoreForSpriteParts.computeVoxelRenderableSort === 'function'
-            ? domainCoreForSpriteParts.computeVoxelRenderableSort({ cell: part.cell || { x: inst.x, y: inst.y, z: inst.z, h: 1 }, viewRotation: normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation) })
-            : computeViewAwareSortMeta(part.cell || { x: inst.x, y: inst.y, z: inst.z }, 1, normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation));
-          const spriteRenderableStartAt = perfNow();
-          dynamicRenderables.push({
-            id: 'sprite-part-' + inst.instanceId + '-' + String(partIndex),
-            kind: 'prefab-sprite-part',
-            sortKey: Number(partSort.sortKey || 0) + 0.0005,
-            tie: Number(partSort.tie || 0) + 300000 + partIndex,
-            instanceId: inst.instanceId || null,
-            prefabId: prefab && prefab.id || null,
-            renderPath: 'dynamic-renderables',
-            spritePart: part,
-            spritePartCount: spriteParts.parts.length,
-            worldBounds: getInstanceWorldBoundsForRender(inst),
-            drawScreenPosition: deriveRenderableDrawPosition({ debugFoot: iso(Number(part.cell && part.cell.x || inst.x || 0) + 0.5, Number(part.cell && part.cell.y || inst.y || 0) + 0.5, Number(part.cell && part.cell.z || inst.z || 0)) }),
-            worldX: Number(part.cell && part.cell.x || inst.x || 0) + 0.5,
-            worldY: Number(part.cell && part.cell.y || inst.y || 0) + 0.5,
-            draw: () => {
-              const drawn = drawPrefabSpritePartInstance(inst, prefab, part, 1);
-              if (!drawn && !prefabDrawsVoxels(prefab)) drawInstanceProxyBoxes(inst, 0.82);
-            },
-          });
-          spriteRenderableBuildMs += Math.max(0, perfNow() - spriteRenderableStartAt);
-        }
-        if (inst.__lastSpriteDepthSplitSignature !== spriteParts.reason + ':' + spriteParts.parts.length) {
-          inst.__lastSpriteDepthSplitSignature = spriteParts.reason + ':' + spriteParts.parts.length;
-          detailLog('sprite-depth-split: ' + String(inst.instanceId) + ' prefab=' + String(prefab && prefab.id || 'unknown') + ' parts=' + String(spriteParts.parts.length) + ' reason=' + String(spriteParts.reason || 'tile-aligned-footprint-split'));
-        }
-      } else {
-        const spriteSort = computeSpriteRenderableSort(inst, prefab);
-        if (inst.__lastSpriteOcclusion !== spriteSort.occlusion) {
-          inst.__lastSpriteOcclusion = spriteSort.occlusion;
-          detailLog(`sprite-sort: ${inst.instanceId} prefab=${prefab.id} mode=${getSpriteProxySortMode(prefab)} occlusion=${spriteSort.occlusion} sortKey=${spriteSort.sortKey.toFixed(4)}`);
-        }
-        const spriteRenderableStartAt = perfNow();
-        dynamicRenderables.push({
-          id: 'sprite-' + inst.instanceId,
-          kind: 'prefab-sprite',
-          sortKey: spriteSort.sortKey,
-          tie: spriteSort.tie,
-          instanceId: inst.instanceId || null,
-          prefabId: prefab && prefab.id || null,
-          renderPath: 'dynamic-renderables',
-          worldBounds: getInstanceWorldBoundsForRender(inst),
-          drawScreenPosition: deriveRenderableDrawPosition({ debugFoot: iso(Number(inst && inst.x || 0) + 0.5, Number(inst && inst.y || 0) + 0.5, Number(inst && inst.z || 0)) }),
-          worldX: Number(inst && inst.x || 0) + 0.5,
-          worldY: Number(inst && inst.y || 0) + 0.5,
-          draw: () => {
-            const drawn = drawPrefabSpriteInstance(inst, 1);
-            if (!drawn && !prefabDrawsVoxels(prefab)) drawInstanceProxyBoxes(inst, 0.82);
-          },
-        });
-        spriteRenderableBuildMs += Math.max(0, perfNow() - spriteRenderableStartAt);
-      }
-      spriteSortBuildMs += Math.max(0, perfNow() - spriteSortStartAt);
-    }
-  }
-
-  recordRenderFunctionTiming('render.buildMainFrameRenderables.dynamicLoop.total', Math.max(0, perfNow() - dynamicBuildStartAt), { visibleDynamicInstanceCount: Number(visibleDynamicInstances.length || 0) });
-  recordRenderFunctionTiming('render.buildMainFrameRenderables.dynamicLoop.buildPlacedDebugInstanceFaceRenderables', debugFaceBuildMs);
-  recordRenderFunctionTiming('render.buildMainFrameRenderables.dynamicLoop.filterHabboInstanceBoxes', habboVoxelFilterMs);
-  recordRenderFunctionTiming('render.buildMainFrameRenderables.dynamicLoop.buildShiftedVoxelRenderable', habboVoxelBuildMs);
-  recordRenderFunctionTiming('render.buildMainFrameRenderables.dynamicLoop.computeSpriteRenderableSort', spriteSortBuildMs);
-  recordRenderFunctionTiming('render.buildMainFrameRenderables.dynamicLoop.pushSpriteRenderable', spriteRenderableBuildMs);
-
-  var playerActorBuildMs = 0;
-  if (SHOW_PLAYER && pointWithinWorldBoundsXY(player.x, player.y, cameraScope.cullingWorldBounds)) {
-    var playerActorStartAt = perfNow();
-    var playerZ = Number(player && player.z != null ? player.z : 0);
-    var playerSortMeta = (getDomainSceneCoreApi() && typeof getDomainSceneCoreApi().computePlayerActorRenderableSort === 'function')
-      ? getDomainSceneCoreApi().computePlayerActorRenderableSort({ player: player, viewRotation: normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation) })
-      : Object.assign({ tie: 700000 }, computeViewAwareSortMeta({ x: player.x, y: player.y, z: playerZ }, 0, normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation)));
-    dynamicRenderables.push({
-      id: 'player-avatar',
-      kind: 'player-avatar',
-      sortMode: 'player-foot-anchor',
-      sortKey: playerSortMeta.sortKey,
-      tie: playerSortMeta.tie,
-      depthAnchor: playerSortMeta.depthAnchor || { x: Number(player.x || 0), y: Number(player.y || 0), z: playerZ },
-      worldX: Number(player.x || 0),
-      worldY: Number(player.y || 0),
-      worldZ: playerZ,
-      draw: () => drawPlayerAvatar(),
-    });
-    playerActorBuildMs += Math.max(0, perfNow() - playerActorStartAt);
-  }
-  recordRenderFunctionTiming('render.buildMainFrameRenderables.playerActor', playerActorBuildMs, { playerRenderableCount: SHOW_PLAYER ? 1 : 0, playerSortMode: 'player-foot-anchor' });
-
-  var actorInteractionReplacementMs = 0;
-  var actorInteractionFaceKeySet = new Set();
-  var actorInteractionStableModeEnabled = isStableActorSortModeEnabledForRender();
-  var actorInteractionResult = { staticRenderables: staticRenderablesAll, replacementRenderables: [], suppressedPacketCount: 0, checkedPacketCount: 0, suppressedFaceKeyCount: 0, stableModeSkipped: actorInteractionStableModeEnabled === true };
-  if (SHOW_PLAYER && pointWithinWorldBoundsXY(player.x, player.y, cameraScope.cullingWorldBounds) && !actorInteractionStableModeEnabled) {
-    var actorInteractionStartAt = perfNow();
-    actorInteractionFaceKeySet = buildActorInteractionCandidateFaceKeySetForPlayer({
-      player: player,
-      sourceBoxes: boxes,
-      occ: visibleOcc,
-      viewRotation: viewRotationInfo.viewRotation,
-      radius: getActorInteractionSortRadiusForRender(),
-      dynamicInstanceIdSet: dynamicInstanceIdSet
-    });
-    actorInteractionResult = applyActorInteractionReplacementToRenderables(
-      staticRenderablesAll,
-      actorInteractionFaceKeySet,
-      normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation),
-      SHOW_PLAYER ? player : null
-    );
-    actorInteractionReplacementMs += Math.max(0, perfNow() - actorInteractionStartAt);
-  } else if (actorInteractionStableModeEnabled && isActorInteractionOrderDiagEnabled()) {
-    emitActorInteractionOrderDiag('stable-mode-skip-dynamic-replacement', {
-      mode: 'stable-renderable-identity',
-      reason: 'dynamic-suppress-replacement-disabled',
-      inputStaticRenderableCount: Number(staticRenderablesAll && staticRenderablesAll.length || 0),
-      player: summarizeActorDiagPlayer(typeof player !== 'undefined' ? player : null)
-    }, { maxCount: 6000 });
-  }
-  recordRenderFunctionTiming('render.buildMainFrameRenderables.actorInteractionReplacement', actorInteractionReplacementMs, {
-    actorInteractionMode: actorInteractionStableModeEnabled ? 'stable-renderable-identity' : 'legacy-dynamic-replacement',
-    actorInteractionStableModeSkippedDynamicReplacement: actorInteractionStableModeEnabled === true,
-    actorInteractionCandidateFaceKeyCount: Number(actorInteractionFaceKeySet && actorInteractionFaceKeySet.size || 0),
-    actorInteractionReplacementRenderableCount: Number(actorInteractionResult && actorInteractionResult.replacementRenderables && actorInteractionResult.replacementRenderables.length || 0),
-    actorInteractionSuppressedStaticPacketCount: Number(actorInteractionResult && actorInteractionResult.suppressedPacketCount || 0),
-    actorInteractionRadius: Number(getActorInteractionSortRadiusForRender() || 0)
-  });
-
-  const dynamicSortStartAt = perfNow();
-  dynamicRenderables.sort(compareRenderablesByDomain);
-  recordRenderFunctionTiming('render.buildMainFrameRenderables.dynamicRenderables.sort', perfNow() - dynamicSortStartAt, { dynamicRenderableCount: Number(dynamicRenderables.length || 0) });
-  const dynamicObjectBuildMs = Math.max(0, perfNow() - dynamicBuildStartAt);
-  const mergeStartAt = perfNow();
-  const staticRenderablesBase = actorInteractionResult && Array.isArray(actorInteractionResult.staticRenderables) ? actorInteractionResult.staticRenderables : staticRenderablesAll;
-  const stableDemergeResult = applyStableActorSortDemergeToStaticRenderables(staticRenderablesBase, normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation), SHOW_PLAYER ? player : null, { radius: getActorInteractionSortRadiusForRender() });
-  const staticRenderablesForSupportTop = stableDemergeResult && Array.isArray(stableDemergeResult.staticRenderables) ? stableDemergeResult.staticRenderables : staticRenderablesBase;
-  const supportTopSortResult = SHOW_PLAYER && pointWithinWorldBoundsXY(player.x, player.y, cameraScope.cullingWorldBounds)
-    ? applyPlayerSupportTopSortOverrideToRenderables(staticRenderablesForSupportTop, player, normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation))
-    : { staticRenderables: staticRenderablesForSupportTop, overrideCount: 0, overrideSamples: [], mode: 'stable-no-player' };
-  const staticRenderables = supportTopSortResult && Array.isArray(supportTopSortResult.staticRenderables) ? supportTopSortResult.staticRenderables : staticRenderablesForSupportTop;
-  const dynamicRenderablesCulled = dynamicRenderables;
-  const renderables = mergeSortedRenderables(staticRenderables, dynamicRenderablesCulled);
-  updatePlayerMoveFastPathStaticOrderCacheForRender({
-    viewRotation: normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation),
-    cameraScope: cameraScope,
-    staticRenderablesForSupportTop: staticRenderablesForSupportTop,
-    staticRenderables: staticRenderables,
-    dynamicRenderableCount: dynamicRenderablesCulled.length,
-    stableDemergeResult: stableDemergeResult,
-    supportTopSortResult: supportTopSortResult,
-    surfaceStats: surfaceStats,
-    occupancyCacheVersion: occupancyCacheVersion
-  });
-  if (isActorInteractionOrderDiagEnabled()) {
-    emitActorInteractionOrderDiag('build-renderables-summary', {
-      frameHint: 'frameplan-' + String((typeof __mainFramePlanSeq !== 'undefined' ? __mainFramePlanSeq : 0) + 1),
-      viewRotation: normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation),
-      player: summarizeActorDiagPlayer(typeof player !== 'undefined' ? player : null),
-      staticRenderableCountBeforeReplacement: Number(staticRenderablesAll.length || 0),
-      staticRenderableCountAfterReplacement: Number(staticRenderables.length || 0),
-      dynamicRenderableCount: Number(dynamicRenderablesCulled.length || 0),
-      mergedRenderableCount: Number(renderables.length || 0),
-      actorInteractionMode: actorInteractionStableModeEnabled ? 'stable-renderable-identity' : 'legacy-dynamic-replacement',
-      actorInteractionStableModeSkippedDynamicReplacement: actorInteractionStableModeEnabled === true,
-      actorInteractionCandidateFaceKeyCount: Number(actorInteractionFaceKeySet && actorInteractionFaceKeySet.size || 0),
-      actorInteractionReplacementRenderableCount: Number(actorInteractionResult && actorInteractionResult.replacementRenderables && actorInteractionResult.replacementRenderables.length || 0),
-      actorInteractionSuppressedStaticPacketCount: Number(actorInteractionResult && actorInteractionResult.suppressedPacketCount || 0),
-      stableDemergeMode: String(stableDemergeResult && stableDemergeResult.mode || 'none'),
-      stableDemergeInputStaticRenderableCount: Number(stableDemergeResult && stableDemergeResult.inputCount || 0),
-      stableDemergeOutputStaticRenderableCount: Number(stableDemergeResult && stableDemergeResult.outputCount || 0),
-      stableDemergeSplitPacketCount: Number(stableDemergeResult && stableDemergeResult.splitPacketCount || 0),
-      stableDemergeCreatedFaceCount: Number(stableDemergeResult && stableDemergeResult.createdFaceCount || 0),
-      supportTopSortMode: String(supportTopSortResult && supportTopSortResult.mode || 'legacy-support-top'),
-      supportTopSortOverrideCount: Number(supportTopSortResult && supportTopSortResult.overrideCount || 0),
-      nearbyBoxes: summarizeActorDiagNearbyBoxes(typeof player !== 'undefined' ? player : null, boxes, getActorInteractionSortRadiusForRender(), 18)
-    }, { maxCount: 6000 });
-  }
-  recordRenderFunctionTiming('render.buildMainFrameRenderables.mergeSortedRenderables', perfNow() - mergeStartAt, {
-    staticRenderableCount: Number(staticRenderables.length || 0),
-    dynamicRenderableCount: Number(dynamicRenderablesCulled.length || 0),
-    mergedRenderableCount: Number(renderables.length || 0),
-    stableDemergeMode: String(stableDemergeResult && stableDemergeResult.mode || 'none'),
-    stableDemergeSplitPacketCount: Number(stableDemergeResult && stableDemergeResult.splitPacketCount || 0),
-    stableDemergeCreatedFaceCount: Number(stableDemergeResult && stableDemergeResult.createdFaceCount || 0),
-    stableDemergePlayerInteractionCellKey: String(stableDemergeResult && stableDemergeResult.playerInteractionCellKey || ''),
-    stableDemergeCacheHit: stableDemergeResult && stableDemergeResult.cacheHit === true,
-    stableDemergeCacheHitCount: Number(stableDemergeResult && stableDemergeResult.cacheHitCount || 0),
-    stableDemergeCacheMissCount: Number(stableDemergeResult && stableDemergeResult.cacheMissCount || 0)
-  });
-  const staticPacketDrawPrepMs = 0;
-  const mergeMs = Math.max(0, perfNow() - mergeStartAt);
-  const beforeVisibilityAt = perfNow();
-  const visibleLightsForStats = getMainCameraVisibleLightsForRender(viewRotationInfo.viewRotation);
-  const afterVisibilityAt = perfNow();
-  recordRenderFunctionTiming('render.buildMainFrameRenderables.getMainCameraVisibleLightsForRender', afterVisibilityAt - beforeVisibilityAt, { visibleLightCount: Number(visibleLightsForStats && visibleLightsForStats.length || 0) });
-  const staticCacheFrameState = getCurrentRenderFrameStaticCacheState();
-  const staticCacheRebuiltThisFrame = staticCacheFrameState && staticCacheFrameState.rebuilt === true;
-  const staticCacheBuildMs = Number(staticCacheFrameState && staticCacheFrameState.buildMs || 0);
-  const terrainStats = terrainBuild && terrainBuild.stats ? terrainBuild.stats : { visibleColumnCount: 0, culledColumnCount: 0, visibleChunkCount: 0, culledChunkCount: 0, terrainColumnCount: 0, logicalVoxelCountEstimated: 0, visibleTopFaceCount: 0, visibleSideFaceCount: 0, internalVoxelSkippedCount: 0, hiddenInternalSurfaceSkippedCount: 0, terrainBuildWasScoped: true, terrainCellCount: 0, terrainExpandedVoxelInstanceCount: 0, terrainUsesColumnModel: false };
-  __lastMainRenderableBuildStats = {
-    currentViewRotation: normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation),
-    staticRenderableCount: staticRenderables.length,
-    dynamicRenderableCount: dynamicRenderablesCulled.length,
-    staticRenderableCountBeforeCulling: staticRenderablesAll.length,
-    dynamicRenderableCountBeforeCulling: dynamicRenderables.length,
-    renderablesBeforeCulling: staticRenderablesAll.length + dynamicRenderables.length,
-    renderablesAfterCulling: renderables.length,
-    cameraCullingEnabled: cameraScope.cameraCullingEnabled !== false,
-    zoom: cameraScope.zoom,
-    reason: 'buildRenderables',
-    terrainBuildMs: terrainBuildMs,
-    staticBuildMs: Math.max(0, afterStaticCacheAt - (terrainBuildStartAt + terrainBuildMs)),
-    dynamicBuildMs: Number(dynamicObjectBuildMs.toFixed(3)),
-    dynamicFilterMs: Number(dynamicFilterMs.toFixed(3)),
-    staticPacketMergeMs: Number(surfaceStats.packetMergeMs || 0),
-    staticPacketProjectMs: 0,
-    staticPacketSortMs: Number(mergeMs.toFixed(3)),
-    staticPacketDrawPrepMs: Number(staticPacketDrawPrepMs.toFixed(3)),
-    visibleStaticChunkCount: Number(surfaceStats.visibleChunkCount || 0),
-    visibleStaticPacketCount: Number(surfaceStats.visibleStaticPacketCount || staticRenderables.length || 0),
-    renderSourceBuildMs: Math.max(0, afterStaticCacheAt - buildStartAt) + terrainBuildMs,
-    visibilityFilterMs: Math.max(0, afterVisibilityAt - beforeVisibilityAt),
-    visibleSurfaceCount: Number(surfaceStats.visibleTopFaceCount || 0) + Number(surfaceStats.visibleSideFaceCount || 0) + Number(terrainStats.visibleTopFaceCount || 0) + Number(terrainStats.visibleSideFaceCount || 0),
-    hiddenInternalSurfaceSkippedCount: Number(surfaceStats.hiddenInternalSurfaceSkippedCount || 0) + Number(terrainStats.hiddenInternalSurfaceSkippedCount || 0),
-    worldObjectCount: Number(instances.length || 0) + Number(lights.length || 0) + Number(boxes.length || 0) + Number(terrainStats.terrainCellCount || 0),
-    lightSourcesBeforeCulling: Number(lights.length || 0),
-    lightSourcesAfterCulling: Number(visibleLightsForStats.length || 0),
-    objectsBeforeCulling: Number(instances.length || 0),
-    objectsAfterCulling: Number(visibleInstanceSummary.visibleInstances || visibleDynamicInstances.length || 0),
-    dynamicLoopCandidatesBeforeFilter: Number(dynamicCandidates.length || 0),
-    dynamicLoopInstanceCount: Number(visibleDynamicInstances.length || 0),
-    dynamicObjectCount: Number(dynamicRenderablesCulled.length || 0),
-    actorInteractionMode: actorInteractionStableModeEnabled ? 'stable-renderable-identity' : 'legacy-dynamic-replacement',
-    actorInteractionStableModeSkippedDynamicReplacement: actorInteractionStableModeEnabled === true,
-    supportTopSortMode: String(supportTopSortResult && supportTopSortResult.mode || 'legacy-support-top'),
-    actorInteractionCandidateFaceKeyCount: Number(actorInteractionFaceKeySet && actorInteractionFaceKeySet.size || 0),
-    actorInteractionReplacementRenderableCount: Number(actorInteractionResult && actorInteractionResult.replacementRenderables && actorInteractionResult.replacementRenderables.length || 0),
-    actorInteractionSuppressedStaticPacketCount: Number(actorInteractionResult && actorInteractionResult.suppressedPacketCount || 0),
-    actorInteractionSuppressionCheckedStaticPacketCount: Number(actorInteractionResult && actorInteractionResult.checkedPacketCount || 0),
-    actorInteractionSuppressedFaceKeyCount: Number(actorInteractionResult && actorInteractionResult.suppressedFaceKeyCount || 0),
-    supportTopSortOverrideCount: Number(supportTopSortResult && supportTopSortResult.overrideCount || 0),
-    actorInteractionRadius: Number(getActorInteractionSortRadiusForRender() || 0),
-    staticInstanceSkippedByDynamicLoop: Number(visibleInstanceSummary.staticSkippedByDynamicLoop || 0),
-    occupancyCacheVersion: occupancyCacheVersion,
-    occupancyRebuiltThisFrame: occupancyRebuiltThisFrame,
-    staticCacheRebuiltThisFrame: staticCacheRebuiltThisFrame,
-    staticCacheBuildMs: staticCacheBuildMs,
-    visibleChunkCount: Number(surfaceStats.visibleChunkCount || 0),
-    rebuiltChunkCountThisFrame: Number(surfaceStats.rebuiltChunkCountThisFrame || 0),
-    reusedChunkCountThisFrame: Number(surfaceStats.reusedChunkCountThisFrame || 0),
-    zoomInteractionActive: faceMergeControlState.zoomInteractionActive === true,
-    zoomSettlePending: faceMergeControlState.zoomSettlePending === true,
-    effectiveFaceMergeMode: String(faceMergeControlState.effectiveFaceMergeMode || 'merge'),
-    pendingFaceMergeMode: String(faceMergeControlState.pendingFaceMergeMode || faceMergeControlState.effectiveFaceMergeMode || 'merge'),
-    faceMergeModeSwitchCount: Number(faceMergeControlState.faceMergeModeSwitchCount || 0),
-    hysteresisHitCount: Number(faceMergeControlState.hysteresisHitCount || 0),
-    stableDemergeMode: String(stableDemergeResult && stableDemergeResult.mode || 'none'),
-    stableDemergeSplitPacketCount: Number(stableDemergeResult && stableDemergeResult.splitPacketCount || 0),
-    stableDemergeCreatedFaceCount: Number(stableDemergeResult && stableDemergeResult.createdFaceCount || 0),
-    stableDemergePlayerInteractionCellKey: String(stableDemergeResult && stableDemergeResult.playerInteractionCellKey || ''),
-    stableDemergeCacheHit: stableDemergeResult && stableDemergeResult.cacheHit === true,
-    stableDemergeCacheHitCount: Number(stableDemergeResult && stableDemergeResult.cacheHitCount || 0),
-    stableDemergeCacheMissCount: Number(stableDemergeResult && stableDemergeResult.cacheMissCount || 0)
-  };
-  __lastRenderFrameOccupancyVersion = occupancyCacheVersion;
-  var frameBuildMs = Number(Math.max(0, perfNow() - buildStartAt).toFixed(3));
-  __lastMainRenderableBuildStats.frameBuildMs = frameBuildMs;
-  var terrainModelForFirstFrames = getTerrainRuntimeModelForRender();
-  var currentTerrainBatchIdForFrames = terrainModelForFirstFrames && terrainModelForFirstFrames.activeTerrainBatchId ? String(terrainModelForFirstFrames.activeTerrainBatchId) : null;
-  if (currentTerrainBatchIdForFrames && currentTerrainBatchIdForFrames !== __lastObservedTerrainBatchIdForFrames) {
-    __terrainFirstFrameWindow = { terrainBatchId: currentTerrainBatchIdForFrames, remaining: 10, nextFrameIndex: 1 };
-  } else if (!currentTerrainBatchIdForFrames) {
-    __terrainFirstFrameWindow = { terrainBatchId: null, remaining: 0, nextFrameIndex: 1 };
-  }
-  __lastObservedTerrainBatchIdForFrames = currentTerrainBatchIdForFrames;
-  if (__terrainFirstFrameWindow.remaining > 0 && currentTerrainBatchIdForFrames && __terrainFirstFrameWindow.terrainBatchId === currentTerrainBatchIdForFrames) {
-    emitTerrainFirstFrames({
-      terrainBatchId: currentTerrainBatchIdForFrames,
-      frameIndexAfterTerrainApply: Number(__terrainFirstFrameWindow.nextFrameIndex || 1),
-      visibleInstances: Number(visibleInstanceSummary.visibleInstances || visibleDynamicInstances.length || 0),
-      visibleDynamicInstances: Number(visibleInstanceSummary.visibleDynamicInstances || visibleDynamicInstances.length || 0),
-      staticSkippedByDynamicLoop: Number(visibleInstanceSummary.staticSkippedByDynamicLoop || 0),
-      totalBoxes: Number(boxes.length || 0),
-      occupancyCacheVersion: occupancyCacheVersion,
-      occupancyRebuiltThisFrame: occupancyRebuiltThisFrame,
-      staticCacheRebuiltThisFrame: staticCacheRebuiltThisFrame,
-      visibleChunkCount: Number(surfaceStats.visibleChunkCount || 0),
-      rebuiltChunkCountThisFrame: Number(surfaceStats.rebuiltChunkCountThisFrame || 0),
-      reusedChunkCountThisFrame: Number(surfaceStats.reusedChunkCountThisFrame || 0),
-      remainingDirtyChunkCount: Number(surfaceStats.remainingDirtyChunkCount || surfaceStats.dirtyChunkCount || 0),
-      frameBuildMs: frameBuildMs,
-      staticCacheBuildMs: Number(staticCacheBuildMs.toFixed(3)),
-      dynamicLoopBuildMs: Number(__lastMainRenderableBuildStats && __lastMainRenderableBuildStats.dynamicBuildMs || 0)
-    });
-    emitTerrainFirstFramesDetail({
-      terrainBatchId: currentTerrainBatchIdForFrames,
-      frameIndexAfterTerrainApply: Number(__terrainFirstFrameWindow.nextFrameIndex || 1),
-      visibleChunkCount: Number(surfaceStats.visibleChunkCount || 0),
-      rebuiltChunkCountThisFrame: Number(surfaceStats.rebuiltChunkCountThisFrame || 0),
-      rebuiltChunkKeysThisFrame: Array.isArray(surfaceStats.rebuiltChunkKeysThisFrame) ? surfaceStats.rebuiltChunkKeysThisFrame.slice() : [],
-      reusedChunkCountThisFrame: Number(surfaceStats.reusedChunkCountThisFrame || 0),
-      remainingDirtyChunkCount: Number(surfaceStats.remainingDirtyChunkCount || surfaceStats.dirtyChunkCount || 0),
-      staticCacheBuildMs: Number(staticCacheBuildMs.toFixed(3)),
-      frameBuildMs: frameBuildMs,
-      rebuiltChunkTotalBoxCount: Number(surfaceStats.rebuiltChunkTotalBoxCount || 0),
-      rebuiltChunkTotalRenderableCount: Number(surfaceStats.rebuiltChunkTotalRenderableCount || 0),
-      rebuiltChunkTotalVisibleFaceCount: Number(surfaceStats.rebuiltChunkTotalVisibleFaceCount || 0)
-    });
-    __terrainFirstFrameWindow.remaining = Math.max(0, Number(__terrainFirstFrameWindow.remaining || 0) - 1);
-    __terrainFirstFrameWindow.nextFrameIndex = Number(__terrainFirstFrameWindow.nextFrameIndex || 1) + 1;
-  }
-  maybeLogRenderFrameSummary({
-    cameraX: Number(cameraScope.cameraX || 0),
-    cameraY: Number(cameraScope.cameraY || 0),
-    zoom: Number(cameraScope.zoom || 1),
-    visibleInstances: Number(visibleInstanceSummary.visibleInstances || visibleDynamicInstances.length || 0),
-    visibleDynamicInstances: Number(visibleInstanceSummary.visibleDynamicInstances || visibleDynamicInstances.length || 0),
-    staticSkippedByDynamicLoop: Number(visibleInstanceSummary.staticSkippedByDynamicLoop || 0),
-    totalBoxes: Number(boxes.length || 0),
-    occupancyCacheVersion: occupancyCacheVersion,
-    occupancyRebuiltThisFrame: occupancyRebuiltThisFrame,
-    staticCacheRebuiltThisFrame: staticCacheRebuiltThisFrame,
-    staticCacheBuildMs: Number(staticCacheBuildMs.toFixed(3)),
-    visibleChunkCount: Number(surfaceStats.visibleChunkCount || 0),
-    rebuiltChunkCountThisFrame: Number(surfaceStats.rebuiltChunkCountThisFrame || 0),
-    reusedChunkCountThisFrame: Number(surfaceStats.reusedChunkCountThisFrame || 0),
-    zoomInteractionActive: faceMergeControlState.zoomInteractionActive === true,
-    zoomSettlePending: faceMergeControlState.zoomSettlePending === true,
-    effectiveFaceMergeMode: String(faceMergeControlState.effectiveFaceMergeMode || 'merge'),
-    pendingFaceMergeMode: String(faceMergeControlState.pendingFaceMergeMode || faceMergeControlState.effectiveFaceMergeMode || 'merge'),
-    faceMergeModeSwitchCount: Number(faceMergeControlState.faceMergeModeSwitchCount || 0),
-    hysteresisHitCount: Number(faceMergeControlState.hysteresisHitCount || 0),
-    frameBuildMs: frameBuildMs
-  });
-  maybeLogCameraStaticWorldVerify({
-    cameraX: Number(cameraScope.cameraX || 0),
-    cameraY: Number(cameraScope.cameraY || 0),
-    zoom: Number(cameraScope.zoom || 1),
-    visibleChunkCount: Number(surfaceStats.visibleChunkCount || 0),
-    rebuiltChunkCountThisFrame: Number(surfaceStats.rebuiltChunkCountThisFrame || 0),
-    reusedChunkCountThisFrame: Number(surfaceStats.reusedChunkCountThisFrame || 0),
-    staticCacheRebuiltThisFrame: staticCacheRebuiltThisFrame,
-    staticCacheBuildMs: Number(staticCacheBuildMs.toFixed(3)),
-    zoomInteractionActive: faceMergeControlState.zoomInteractionActive === true,
-    zoomSettlePending: faceMergeControlState.zoomSettlePending === true,
-    effectiveFaceMergeMode: String(faceMergeControlState.effectiveFaceMergeMode || 'merge'),
-    pendingFaceMergeMode: String(faceMergeControlState.pendingFaceMergeMode || faceMergeControlState.effectiveFaceMergeMode || 'merge'),
-    cacheContentType: String(surfaceStats.cacheContentType || 'world-face-packets'),
-    cameraIndependent: surfaceStats.cameraIndependent !== false,
-    usesScreenSpaceCache: surfaceStats.usesScreenSpaceCache === true,
-    frameBuildMs: frameBuildMs
-  });
-  maybeLogCameraMoveVerify({
-    cameraX: Number(cameraScope.cameraX || 0),
-    cameraY: Number(cameraScope.cameraY || 0),
-    zoom: Number(cameraScope.zoom || 1),
-    visibleChunkCount: Number(surfaceStats.visibleChunkCount || 0),
-    staticCacheRebuiltThisFrame: staticCacheRebuiltThisFrame,
-    rebuiltChunkCountThisFrame: Number(surfaceStats.rebuiltChunkCountThisFrame || 0),
-    reusedChunkCountThisFrame: Number(surfaceStats.reusedChunkCountThisFrame || 0),
-    frameBuildMs: frameBuildMs
-  });
-  __lastRenderVisibilityStats = {
-    worldObjectCount: __lastMainRenderableBuildStats.worldObjectCount,
-    renderSourceCountBeforeVisibility: __lastMainRenderableBuildStats.renderablesBeforeCulling + __lastMainRenderableBuildStats.lightSourcesBeforeCulling,
-    renderSourceCountAfterVisibility: __lastMainRenderableBuildStats.renderablesAfterCulling + __lastMainRenderableBuildStats.lightSourcesAfterCulling,
-    culledByCameraCount: Math.max(0, (__lastMainRenderableBuildStats.renderablesBeforeCulling + __lastMainRenderableBuildStats.lightSourcesBeforeCulling) - (__lastMainRenderableBuildStats.renderablesAfterCulling + __lastMainRenderableBuildStats.lightSourcesAfterCulling)),
-    visibleSurfaceCount: __lastMainRenderableBuildStats.visibleSurfaceCount,
-    hiddenInternalSurfaceSkippedCount: __lastMainRenderableBuildStats.hiddenInternalSurfaceSkippedCount,
-    terrainSourcesBeforeCulling: Number(terrainStats.terrainColumnCount || 0),
-    terrainSourcesAfterCulling: Number(terrainStats.visibleColumnCount || 0),
-    objectsBeforeCulling: Number(__lastMainRenderableBuildStats.objectsBeforeCulling || 0),
-    objectsAfterCulling: Number(__lastMainRenderableBuildStats.objectsAfterCulling || 0),
-    terrainColumnCount: Number(terrainStats.terrainColumnCount || 0),
-    logicalVoxelCountEstimated: Number(terrainStats.logicalVoxelCountEstimated || 0) + Number(surfaceStats.logicalVoxelCountEstimated || 0),
-    voxelFurnitureProcessedCount: Number(surfaceStats.voxelFurnitureProcessedCount || 0),
-    surfaceOnlyRenderingEnabled: (surfaceStats.surfaceOnlyRenderingEnabled !== false) && (terrainStats.surfaceOnlyRenderingEnabled !== false),
-    renderSourceBuildMs: __lastMainRenderableBuildStats.renderSourceBuildMs,
-    visibilityFilterMs: __lastMainRenderableBuildStats.visibilityFilterMs,
-    finalRenderableCount: renderables.length,
-    cameraZoom: cameraScope.zoom,
-    currentViewRotation: normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation),
-    terrainBuildMs: terrainBuildMs,
-    staticBuildMs: __lastMainRenderableBuildStats.staticBuildMs,
-    dynamicBuildMs: __lastMainRenderableBuildStats.dynamicBuildMs,
-    visibleChunkCount: Number(terrainStats.visibleChunkCount || 0),
-    culledChunkCount: Number(terrainStats.culledChunkCount || 0),
-    terrainCellCount: Number(terrainStats.terrainCellCount || 0),
-    terrainExpandedVoxelInstanceCount: Number(terrainStats.terrainExpandedVoxelInstanceCount || 0),
-    terrainUsesColumnModel: terrainStats.terrainUsesColumnModel === true,
-    terrainBatchDrawCount: Number(terrainStats.terrainBatchDrawCount || 0),
-    terrainVisibleFaceCount: Number(terrainStats.terrainVisibleFaceCount || 0),
-    terrainVisibleChunkCount: Number(terrainStats.visibleChunkCount || 0)
-  };
-  logItemRotationPrototype('render-camera-culling-summary', {
-    cameraCullingEnabled: cameraScope.cameraCullingEnabled !== false,
-    viewportWorldBounds: cameraScope.viewportWorldBounds,
-    cullingWorldBounds: cameraScope.cullingWorldBounds,
-    objectsBeforeCulling: Number(__lastRenderVisibilityStats.objectsBeforeCulling || 0),
-    objectsAfterCulling: Number(__lastRenderVisibilityStats.objectsAfterCulling || 0),
-    terrainSourcesBeforeCulling: Number(__lastRenderVisibilityStats.terrainSourcesBeforeCulling || 0),
-    terrainSourcesAfterCulling: Number(__lastRenderVisibilityStats.terrainSourcesAfterCulling || 0),
-    lightSourcesBeforeCulling: Number(__lastMainRenderableBuildStats.lightSourcesBeforeCulling || 0),
-    lightSourcesAfterCulling: Number(__lastMainRenderableBuildStats.lightSourcesAfterCulling || 0)
-  });
-
-  logItemRotationPrototype('render-surface-cache-summary', {
-    terrainColumnCount: Number(__lastRenderVisibilityStats.terrainColumnCount || 0),
-    logicalVoxelCountEstimated: Number(__lastRenderVisibilityStats.logicalVoxelCountEstimated || 0),
-    visibleTopFaceCount: Number((terrainStats && terrainStats.visibleTopFaceCount) || 0) + Number((surfaceStats && surfaceStats.visibleTopFaceCount) || 0),
-    visibleSideFaceCount: Number((terrainStats && terrainStats.visibleSideFaceCount) || 0) + Number((surfaceStats && surfaceStats.visibleSideFaceCount) || 0),
-    internalVoxelSkippedCount: Number((terrainStats && terrainStats.internalVoxelSkippedCount) || 0) + Number((surfaceStats && surfaceStats.internalVoxelSkippedCount) || 0),
-    voxelFurnitureProcessedCount: Number(__lastRenderVisibilityStats.voxelFurnitureProcessedCount || 0),
-    surfaceOnlyRenderingEnabled: __lastRenderVisibilityStats.surfaceOnlyRenderingEnabled !== false
-  });
-  logItemRotationPrototype('render-visibility-summary', {
-    worldObjectCount: Number(__lastRenderVisibilityStats.worldObjectCount || 0),
-    renderSourceCountBeforeVisibility: Number(__lastRenderVisibilityStats.renderSourceCountBeforeVisibility || 0),
-    renderSourceCountAfterVisibility: Number(__lastRenderVisibilityStats.renderSourceCountAfterVisibility || 0),
-    culledByCameraCount: Number(__lastRenderVisibilityStats.culledByCameraCount || 0),
-    visibleSurfaceCount: Number(__lastRenderVisibilityStats.visibleSurfaceCount || 0),
-    hiddenInternalSurfaceSkippedCount: Number(__lastRenderVisibilityStats.hiddenInternalSurfaceSkippedCount || 0)
-  });
-  var mem = (typeof performance !== 'undefined' && performance && performance.memory) ? performance.memory : null;
-  __lastLoggingCostSummary = {
-    highFrequencyLogCount: 0,
-    loggingEnabled: typeof pushLog === 'function',
-    logFlushMs: 0,
-    debugLogHeavyModeEnabled: verboseLog === true
-  };
-  logItemRotationPrototype('logging-cost-summary', __lastLoggingCostSummary);
-  logItemRotationPrototype('render-memory-summary', mem ? {
-    usedJSHeapSize: Number(mem.usedJSHeapSize || 0),
-    totalJSHeapSize: Number(mem.totalJSHeapSize || 0),
-    jsHeapSizeLimit: Number(mem.jsHeapSizeLimit || 0),
-    memoryApiSupported: true
-  } : {
-    memoryApiSupported: false
-  });
-  __lastRenderResourceSummary = {
-    frameDtMs: 0,
-    terrainBuildMs: Number(__lastRenderVisibilityStats.terrainBuildMs || 0),
-    staticBuildMs: Number(__lastMainRenderableBuildStats.staticBuildMs || 0),
-    dynamicBuildMs: Number(__lastMainRenderableBuildStats.dynamicBuildMs || 0),
-    framePlanBuildMs: 0,
-    drawMs: 0,
-    finalRenderableCount: renderables.length,
-    terrainBatchDrawCount: Number(__lastRenderVisibilityStats.terrainBatchDrawCount || 0),
-    terrainVisibleFaceCount: Number(__lastRenderVisibilityStats.terrainVisibleFaceCount || 0),
-    terrainVisibleChunkCount: Number(__lastRenderVisibilityStats.terrainVisibleChunkCount || 0)
-  };
-  logItemRotationPrototype('render-resource-summary', __lastRenderResourceSummary);
-
-  logItemRotationPrototype('render-build-cost-summary', {
-    terrainBuildMs: Number(__lastRenderVisibilityStats.terrainBuildMs || 0),
-    staticBuildMs: Number(__lastMainRenderableBuildStats.staticBuildMs || 0),
-    dynamicBuildMs: Number(__lastMainRenderableBuildStats.dynamicBuildMs || 0),
-    framePlanBuildMs: 0,
-    renderablesBeforeCulling: Number(__lastMainRenderableBuildStats.renderablesBeforeCulling || 0),
-    renderablesAfterCulling: Number(__lastMainRenderableBuildStats.renderablesAfterCulling || 0)
-  });
-  recordRenderFunctionTiming('render.buildMainFrameRenderables.summary', Math.max(0, perfNow() - buildStartAt), {
-    totalRenderableCount: Number(renderables.length || 0),
-    staticRenderableCount: Number(staticRenderables.length || 0),
-    dynamicRenderableCount: Number(dynamicRenderablesCulled.length || 0),
-    visibleStaticPacketCountForSummary: Number(surfaceStats.visibleStaticPacketCount || 0),
-    visibleChunkCountForSummary: Number(surfaceStats.visibleChunkCount || 0)
-  });
-
-  if (verboseLog) {
-    const sec = Math.floor(time);
-    if (sec !== lastRenderLogSecond) {
-      lastRenderLogSecond = sec;
-      pushLog(`render-order ok: total=${renderables.length} static=${staticRenderables.length} dynamic=${dynamicRenderables.length} dynamicLoop=${visibleDynamicInstances.length}/${Number(visibleInstanceSummary.visibleInstances || visibleDynamicInstances.length)} first20=${renderables.slice(0,20).map(r => r.id).join(',')}`);
-    }
-  }
-  return renderables;
+  return api;
 }
+
+function buildRenderables() {
+  return requireMainFrameRenderableAssemblerForRender().buildRenderables();
+}
+
 
 function update(dt) {
   setPhase('update', 'start');
@@ -10009,23 +7830,9 @@ function renderBaseWorldPasses() {
 }
 
 function buildMainFrameRenderables() {
-  var fnStartAt = perfNow();
-  debugState.renderStep = 'build-renderables';
-  var buildRenderablesStartAt = perfNow();
-  const order = buildRenderables();
-  recordRenderFunctionTiming('render.buildMainFrameRenderables.buildRenderables', perfNow() - buildRenderablesStartAt, { renderableCount: Number(order && order.length || 0) });
-  var currentViewRotation = normalizeMainEditorViewRotationValue(getSafeMainEditorViewRotation(null).viewRotation);
-  for (const item of order) {
-    if (!item || typeof item !== 'object') continue;
-    if (item.kind === 'static-world-face-packet') continue;
-    item.currentViewRotation = currentViewRotation;
-    if (typeof item.drawUsedCurrentViewRotation === 'undefined') item.drawUsedCurrentViewRotation = true;
-    if (!item.drawScreenPosition) item.drawScreenPosition = deriveRenderableDrawPosition(item);
-  }
-  if (debugState.frame < 5 || verboseLog) detailLog(`render:buildRenderables count=${order.length} first10=${order.slice(0, 10).map(r => r.id).join(',')}`);
-  recordRenderFunctionTiming('render.buildMainFrameRenderables.total', perfNow() - fnStartAt, { renderableCount: Number(order && order.length || 0) });
-  return order;
+  return requireMainFrameRenderableAssemblerForRender().buildMainFrameRenderables();
 }
+
 
 function drawMainFrameRenderablesLocal(order) {
   order = Array.isArray(order) ? order : [];
@@ -10481,673 +8288,251 @@ function render() {
 
 // --- v1.3 floor-layer cache override ---
 function drawPolyOn(targetCtx, points, fill, stroke = 'rgba(0,0,0,.22)', width = 1) {
-  targetCtx.beginPath();
-  targetCtx.moveTo(points[0].x, points[0].y);
-  for (let i = 1; i < points.length; i++) targetCtx.lineTo(points[i].x, points[i].y);
-  targetCtx.closePath();
-  if (fill) { targetCtx.fillStyle = fill; targetCtx.fill(); }
-  if (stroke) { targetCtx.strokeStyle = stroke; targetCtx.lineWidth = width; targetCtx.stroke(); }
+  return requireCanvas2dDrawPrimitivesForRender().drawPolyOn(targetCtx, points, fill, stroke, width);
 }
 
 
-function getActiveBaseWorldActualPathProfile() {
+function getCanvas2dFloorLayerDrawPassApiForRender() {
   try {
-    if (typeof window !== 'undefined' && window.__ACTIVE_BASEWORLD_ACTUAL_PATH_PROFILE__) return window.__ACTIVE_BASEWORLD_ACTUAL_PATH_PROFILE__;
-  } catch (_) {}
-  return null;
+    return window.App && window.App.presentation && window.App.presentation.render
+      ? window.App.presentation.render.canvas2dFloorLayerDrawPass || null
+      : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function requireCanvas2dFloorLayerDrawPassForRender() {
+  var api = getCanvas2dFloorLayerDrawPassApiForRender();
+  api = api || (typeof window !== 'undefined' ? window.__CANVAS2D_FLOOR_LAYER_DRAW_PASS__ : null);
+  if (!api || typeof api.drawFloor !== 'function') {
+    throw new Error('canvas2d floor layer draw pass is unavailable; ensure src/presentation/render/renderer/canvas2d-floor-layer-draw-pass.js loads before render.js');
+  }
+  return api;
+}
+
+function createCanvas2dFloorLayerDrawPassDepsForRender() {
+  return {
+    VIEW_W: VIEW_W,
+    VIEW_H: VIEW_H,
+    dpr: dpr,
+    settings: settings,
+    camera: camera,
+    ctx: ctx,
+    perfNow: perfNow,
+    createCanvas: function () { return document.createElement('canvas'); },
+    getFloorLayerCanvas: function () { return floorLayerCanvas; },
+    setFloorLayerCanvas: function (value) { floorLayerCanvas = value || null; },
+    getFloorLayerCtx: function () { return floorLayerCtx; },
+    setFloorLayerCtx: function (value) { floorLayerCtx = value || null; },
+    getFloorLayerCache: function () { return floorLayerCache; },
+    setFloorLayerCache: function (value) { floorLayerCache = value || { dirty: true }; },
+    getActiveBaseWorldActualPathProfile: function () {
+      try {
+        if (typeof window !== 'undefined' && window.__ACTIVE_BASEWORLD_ACTUAL_PATH_PROFILE__) return window.__ACTIVE_BASEWORLD_ACTUAL_PATH_PROFILE__;
+      } catch (_) {}
+      return null;
+    },
+    writeBaseWorldActualPathProfile: function (partial) {
+      var profile = null;
+      try {
+        if (typeof window !== 'undefined' && window.__ACTIVE_BASEWORLD_ACTUAL_PATH_PROFILE__) profile = window.__ACTIVE_BASEWORLD_ACTUAL_PATH_PROFILE__;
+      } catch (_) {}
+      if (!profile || !partial || typeof partial !== 'object') return profile;
+      Object.keys(partial).forEach(function (key) {
+        profile[key] = partial[key];
+      });
+      return profile;
+    },
+    getActiveCameraInteractionTypeForFloorLayer: function () {
+      try { return window && window.__habboActiveCameraInteractionType ? String(window.__habboActiveCameraInteractionType) : null; } catch (_) { return null; }
+    },
+    getCameraSettleReuseStateForFloorLayer: function () {
+      try { return window && window.__habboCameraSettleReuseState ? window.__habboCameraSettleReuseState : null; } catch (_) { return null; }
+    },
+    getSharedStaticWorldChunkCacheApiForRender: getSharedStaticWorldChunkCacheApiForRender,
+    screenPointsFromWorldFaceNoCamera: screenPointsFromWorldFaceNoCamera,
+    getSafeMainEditorViewRotation: getSafeMainEditorViewRotation,
+    normalizeMainEditorViewRotationValue: normalizeMainEditorViewRotationValue,
+    getMainEditorZoomValueForRender: getMainEditorZoomValueForRender,
+    getMainCameraRenderScope: getMainCameraRenderScope,
+    floorLayerSignature: floorLayerSignature,
+    isInteractiveRenderPressure: isInteractiveRenderPressure,
+    logItemRotationPrototype: logItemRotationPrototype,
+    noteLayerRebuild: noteLayerRebuild,
+    rgbToCss: rgbToCss,
+    litColor: litColor,
+    hexToRgb: hexToRgb,
+    drawPolyOn: drawPolyOn,
+    setLastDrawFloorBreakdown: function (breakdown) {
+      try {
+        if (typeof window !== 'undefined') window.__LAST_DRAW_FLOOR_BREAKDOWN__ = breakdown;
+      } catch (_) {}
+    }
+  };
+}
+
+function getActiveBaseWorldActualPathProfile() {
+  return requireCanvas2dFloorLayerDrawPassForRender().getActiveBaseWorldActualPathProfile(
+    createCanvas2dFloorLayerDrawPassDepsForRender()
+  );
 }
 
 function writeBaseWorldActualPathProfile(partial) {
-  var profile = getActiveBaseWorldActualPathProfile();
-  if (!profile || !partial || typeof partial !== 'object') return profile;
-  Object.keys(partial).forEach(function (key) {
-    profile[key] = partial[key];
-  });
-  return profile;
+  return requireCanvas2dFloorLayerDrawPassForRender().writeBaseWorldActualPathProfile(
+    partial,
+    createCanvas2dFloorLayerDrawPassDepsForRender()
+  );
 }
 
 function completeFloorLayerBreakdown(partial) {
-  var data = Object.assign({
-    rebuilt: false,
-    skippedByInteractionBudget: false,
-    floorLayerRebuildWallMs: 0,
-    floorLayerPreSetupWallMs: 0,
-    floorLayerLoopWallMs: 0,
-    floorLayerProjectionWallMs: 0,
-    floorLayerColorMaterialWallMs: 0,
-    floorLayerCanvasDrawWallMs: 0,
-    floorLayerPostFinalizeWallMs: 0,
-    floorLayerResidualWallMs: 0,
-    floorLayerReuseCameraDX: 0,
-    floorLayerReuseCameraDY: 0,
-    floorLayerReuseScale: 1,
-    floorLayerBuiltCameraX: 0,
-    floorLayerBuiltCameraY: 0,
-    floorLayerBuiltZoom: 1,
-    floorLayerBlitWallMs: 0,
-    floorLayerActualBranch: 'unknown',
-    floorVisibleChunkCount: 0,
-    floorBuiltChunkCountThisFrame: 0,
-    floorMissingChunkCountBefore: 0,
-    floorMissingChunkCountAfter: 0,
-    floorBuiltTileCountThisFrame: 0,
-    floorChunkSize: 0,
-    floorVersionTag: 'floor-static-chunk-v1'
-  }, partial || {});
-  writeBaseWorldActualPathProfile({
-    baseWorldActualBranch: data.floorLayerActualBranch,
-    floorLayerReusedDuringInteraction: !!data.skippedByInteractionBudget,
-    floorLayerRebuildWallMs: Number(data.floorLayerRebuildWallMs || 0),
-    floorLayerBlitWallMs: Number(data.floorLayerBlitWallMs || 0),
-    floorLoopWallMs: Number(data.floorLayerLoopWallMs || 0),
-    floorProjectionWallMs: Number(data.floorLayerProjectionWallMs || 0),
-    floorColorMaterialWallMs: Number(data.floorLayerColorMaterialWallMs || 0),
-    floorCanvasDrawWallMs: Number(data.floorLayerCanvasDrawWallMs || 0),
-    floorPreSetupWallMs: Number(data.floorLayerPreSetupWallMs || 0),
-    floorPostFinalizeWallMs: Number(data.floorLayerPostFinalizeWallMs || 0),
-    floorResidualWallMs: Number(data.floorLayerResidualWallMs || 0),
-    floorVisibleChunkCount: Number(data.floorVisibleChunkCount || 0),
-    floorBuiltChunkCountThisFrame: Number(data.floorBuiltChunkCountThisFrame || 0),
-    floorMissingChunkCountBefore: Number(data.floorMissingChunkCountBefore || 0),
-    floorMissingChunkCountAfter: Number(data.floorMissingChunkCountAfter || 0),
-    floorBuiltTileCountThisFrame: Number(data.floorBuiltTileCountThisFrame || 0),
-    floorChunkSize: Number(data.floorChunkSize || 0),
-    floorVersionTag: data.floorVersionTag || 'floor-static-chunk-v1'
-  });
-  return data;
+  return requireCanvas2dFloorLayerDrawPassForRender().completeFloorLayerBreakdown(
+    partial,
+    createCanvas2dFloorLayerDrawPassDepsForRender()
+  );
 }
 
 function ensureFloorLayerCanvas() {
-  if (!floorLayerCanvas) {
-    floorLayerCanvas = document.createElement('canvas');
-    floorLayerCtx = floorLayerCanvas.getContext('2d');
-  }
-  var backingW = Math.round(VIEW_W * dpr);
-  var backingH = Math.round(VIEW_H * dpr);
-  if (floorLayerCanvas.width !== backingW || floorLayerCanvas.height !== backingH) {
-    floorLayerCanvas.width = backingW;
-    floorLayerCanvas.height = backingH;
-    floorLayerCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    floorLayerCtx.imageSmoothingEnabled = true;
-    floorLayerCache.dirty = true;
-  }
-  return floorLayerCtx;
+  return requireCanvas2dFloorLayerDrawPassForRender().ensureFloorLayerCanvas(
+    createCanvas2dFloorLayerDrawPassDepsForRender()
+  );
 }
 
 function getActiveCameraInteractionTypeForFloorLayer() {
-  try { return window && window.__habboActiveCameraInteractionType ? String(window.__habboActiveCameraInteractionType) : null; } catch (_) { return null; }
+  return requireCanvas2dFloorLayerDrawPassForRender().getActiveCameraInteractionTypeForFloorLayer(
+    createCanvas2dFloorLayerDrawPassDepsForRender()
+  );
 }
 
 function getCameraSettleReuseStateForFloorLayer() {
-  try { return window && window.__habboCameraSettleReuseState ? window.__habboCameraSettleReuseState : null; } catch (_) { return null; }
+  return requireCanvas2dFloorLayerDrawPassForRender().getCameraSettleReuseStateForFloorLayer(
+    createCanvas2dFloorLayerDrawPassDepsForRender()
+  );
 }
 
 function shouldDeferFloorLayerSettleCommit(currentViewRotation) {
-  if (!floorLayerCanvas || !floorLayerCache || !floorLayerCache.signature) return false;
-  if (Number(floorLayerCache.viewRotation || currentViewRotation) !== Number(currentViewRotation || 0)) return false;
-  var settleState = getCameraSettleReuseStateForFloorLayer();
-  if (!settleState || String(settleState.lastEndedType || '') !== 'zoom') return false;
-  var nowMs = perfNow();
-  if (Number(settleState.deferCommitUntilMs || 0) <= nowMs) return false;
-  var activeType = getActiveCameraInteractionTypeForFloorLayer();
-  return !activeType || activeType === 'drag' || activeType === 'pan' || activeType === 'pinch';
+  return requireCanvas2dFloorLayerDrawPassForRender().shouldDeferFloorLayerSettleCommit(
+    currentViewRotation,
+    createCanvas2dFloorLayerDrawPassDepsForRender()
+  );
 }
 
 function shouldForceFloorLayerInteractionReuse(currentViewRotation) {
-  var activeType = getActiveCameraInteractionTypeForFloorLayer();
-  if (activeType !== 'zoom' && !shouldDeferFloorLayerSettleCommit(currentViewRotation)) return false;
-  if (!floorLayerCanvas || !floorLayerCache || !floorLayerCache.signature) return false;
-  return Number(floorLayerCache.viewRotation || currentViewRotation) === Number(currentViewRotation || 0);
+  return requireCanvas2dFloorLayerDrawPassForRender().shouldForceFloorLayerInteractionReuse(
+    currentViewRotation,
+    createCanvas2dFloorLayerDrawPassDepsForRender()
+  );
 }
 
 function getFloorChunkSizeForLayer() {
-  try {
-    var staticWorldCacheApi = getSharedStaticWorldChunkCacheApiForRender();
-    if (staticWorldCacheApi && typeof staticWorldCacheApi.getChunkSize === 'function') {
-      var chunkSize = Math.max(1, Math.round(Number(staticWorldCacheApi.getChunkSize() || 16) || 16));
-      return chunkSize;
-    }
-  } catch (_) {}
-  return 16;
+  return requireCanvas2dFloorLayerDrawPassForRender().getFloorChunkSizeForLayer(
+    createCanvas2dFloorLayerDrawPassDepsForRender()
+  );
 }
 
 function ensureFloorChunkCacheState(chunkSize) {
-  var targetChunkSize = Math.max(1, Math.round(Number(chunkSize || 16) || 16));
-  if (!floorLayerCache || typeof floorLayerCache !== 'object') floorLayerCache = { dirty: true };
-  if (!(floorLayerCache.chunks instanceof Map)) floorLayerCache.chunks = new Map();
-  if (!Array.isArray(floorLayerCache.visibleChunkKeys)) floorLayerCache.visibleChunkKeys = [];
-  if (Number(floorLayerCache.chunkSize || 0) !== targetChunkSize) {
-    floorLayerCache.chunkSize = targetChunkSize;
-    floorLayerCache.chunks = new Map();
-    floorLayerCache.visibleChunkKeys = [];
-    floorLayerCache.viewSignature = '';
-    floorLayerCache.dirty = true;
-  }
-  return floorLayerCache;
+  return requireCanvas2dFloorLayerDrawPassForRender().ensureFloorChunkCacheState(
+    chunkSize,
+    createCanvas2dFloorLayerDrawPassDepsForRender()
+  );
 }
 
 function getFloorChunkKeyForLayer(chunkX, chunkY) {
-  return String(chunkX) + ',' + String(chunkY);
+  return requireCanvas2dFloorLayerDrawPassForRender().getFloorChunkKeyForLayer(chunkX, chunkY);
 }
 
 function parseFloorChunkKeyForLayer(chunkKey) {
-  var raw = String(chunkKey || '0,0').split(',');
-  return {
-    chunkX: Math.round(Number(raw[0] || 0) || 0),
-    chunkY: Math.round(Number(raw[1] || 0) || 0)
-  };
+  return requireCanvas2dFloorLayerDrawPassForRender().parseFloorChunkKeyForLayer(chunkKey);
 }
 
 function computeVisibleFloorChunkKeysForLayer(scope, chunkSize) {
-  var size = Math.max(1, Math.round(Number(chunkSize || 16) || 16));
-  var maxChunkX = Math.max(0, Math.ceil(Number(settings.gridW || 0) / size) - 1);
-  var maxChunkY = Math.max(0, Math.ceil(Number(settings.gridH || 0) / size) - 1);
-  var bounds = scope && scope.cameraCullingEnabled !== false && scope.cullingWorldBounds
-    ? scope.cullingWorldBounds
-    : { minX: 0, minY: 0, maxX: Number(settings.gridW || 0), maxY: Number(settings.gridH || 0) };
-  var paddingChunks = 1;
-  var minChunkX = Math.max(0, Math.floor((Number(bounds.minX || 0) - paddingChunks * size) / size));
-  var minChunkY = Math.max(0, Math.floor((Number(bounds.minY || 0) - paddingChunks * size) / size));
-  var maxVisibleChunkX = Math.min(maxChunkX, Math.floor((Number(bounds.maxX || 0) + paddingChunks * size - 1) / size));
-  var maxVisibleChunkY = Math.min(maxChunkY, Math.floor((Number(bounds.maxY || 0) + paddingChunks * size - 1) / size));
-  var centerX = (Number(bounds.minX || 0) + Number(bounds.maxX || 0)) * 0.5;
-  var centerY = (Number(bounds.minY || 0) + Number(bounds.maxY || 0)) * 0.5;
-  var keys = [];
-  for (var chunkX = minChunkX; chunkX <= maxVisibleChunkX; chunkX++) {
-    for (var chunkY = minChunkY; chunkY <= maxVisibleChunkY; chunkY++) {
-      keys.push({
-        key: getFloorChunkKeyForLayer(chunkX, chunkY),
-        sortDistance: Math.abs((chunkX + 0.5) * size - centerX) + Math.abs((chunkY + 0.5) * size - centerY)
-      });
-    }
-  }
-  keys.sort(function (left, right) { return Number(left.sortDistance || 0) - Number(right.sortDistance || 0); });
-  return keys.map(function (entry) { return entry.key; });
+  return requireCanvas2dFloorLayerDrawPassForRender().computeVisibleFloorChunkKeysForLayer(
+    scope,
+    chunkSize,
+    createCanvas2dFloorLayerDrawPassDepsForRender()
+  );
 }
 
 function buildFloorLayerViewSignatureForLayer(currentCameraX, currentCameraY, visibleChunkKeys, currentViewRotation) {
-  return JSON.stringify({
-    cameraX: Number((currentCameraX || 0).toFixed(3)),
-    cameraY: Number((currentCameraY || 0).toFixed(3)),
-    viewRotation: Number(currentViewRotation || 0),
-    visibleChunkKeys: Array.isArray(visibleChunkKeys) ? visibleChunkKeys.slice() : []
-  });
+  return requireCanvas2dFloorLayerDrawPassForRender().buildFloorLayerViewSignatureForLayer(
+    currentCameraX,
+    currentCameraY,
+    visibleChunkKeys,
+    currentViewRotation
+  );
 }
 
 function buildFloorChunkEntryForLayer(chunkKey, currentViewRotation, contentSignature) {
-  var chunkSize = getFloorChunkSizeForLayer();
-  var parsed = parseFloorChunkKeyForLayer(chunkKey);
-  var minX = Math.max(0, parsed.chunkX * chunkSize);
-  var minY = Math.max(0, parsed.chunkY * chunkSize);
-  var maxX = Math.min(Number(settings.gridW || 0), minX + chunkSize);
-  var maxY = Math.min(Number(settings.gridH || 0), minY + chunkSize);
-  var tiles = [];
-  var minScreenX = Infinity;
-  var minScreenY = Infinity;
-  var maxScreenX = -Infinity;
-  var maxScreenY = -Infinity;
-  for (var y = minY; y < maxY; y++) {
-    for (var x = minX; x < maxX; x++) {
-      var points = screenPointsFromWorldFaceNoCamera([
-        { x: x, y: y, z: 0 },
-        { x: x + 1, y: y, z: 0 },
-        { x: x + 1, y: y + 1, z: 0 },
-        { x: x, y: y + 1, z: 0 }
-      ], currentViewRotation);
-      for (var p = 0; p < points.length; p++) {
-        var pt = points[p];
-        if (!pt) continue;
-        if (pt.x < minScreenX) minScreenX = pt.x;
-        if (pt.y < minScreenY) minScreenY = pt.y;
-        if (pt.x > maxScreenX) maxScreenX = pt.x;
-        if (pt.y > maxScreenY) maxScreenY = pt.y;
-      }
-      var base = (x + y) % 2 === 0 ? '#33415a' : '#29344b';
-      var lit = rgbToCss(litColor(hexToRgb(base), { x: x + 0.5, y: y + 0.5, z: 0 }, { x: 0, y: 0, z: 1 }));
-      tiles.push({ points: points, fill: lit });
-    }
-  }
-  if (!tiles.length || !isFinite(minScreenX) || !isFinite(minScreenY) || !isFinite(maxScreenX) || !isFinite(maxScreenY)) {
-    return {
-      key: chunkKey,
-      chunkX: parsed.chunkX,
-      chunkY: parsed.chunkY,
-      minX: minX,
-      minY: minY,
-      maxX: maxX,
-      maxY: maxY,
-      contentSignature: String(contentSignature || ''),
-      canvas: null,
-      screenBoundsNoCamera: { x: 0, y: 0, w: 0, h: 0 },
-      tileCount: 0,
-      lastBuiltAt: perfNow()
-    };
-  }
-  var padding = 4;
-  var width = Math.max(1, Math.ceil((maxScreenX - minScreenX) + padding * 2));
-  var height = Math.max(1, Math.ceil((maxScreenY - minScreenY) + padding * 2));
-  var canvasEl = document.createElement('canvas');
-  canvasEl.width = Math.max(1, Math.round(width * dpr));
-  canvasEl.height = Math.max(1, Math.round(height * dpr));
-  var localCtx = canvasEl.getContext('2d');
-  localCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  localCtx.imageSmoothingEnabled = true;
-  localCtx.translate(-minScreenX + padding, -minScreenY + padding);
-  for (var i = 0; i < tiles.length; i++) {
-    var tile = tiles[i];
-    drawPolyOn(localCtx, tile.points, tile.fill, 'rgba(255,255,255,.05)');
-  }
-  return {
-    key: chunkKey,
-    chunkX: parsed.chunkX,
-    chunkY: parsed.chunkY,
-    minX: minX,
-    minY: minY,
-    maxX: maxX,
-    maxY: maxY,
-    contentSignature: String(contentSignature || ''),
-    canvas: canvasEl,
-    screenBoundsNoCamera: {
-      x: minScreenX - padding,
-      y: minScreenY - padding,
-      w: width,
-      h: height
-    },
-    tileCount: tiles.length,
-    lastBuiltAt: perfNow()
-  };
+  return requireCanvas2dFloorLayerDrawPassForRender().buildFloorChunkEntryForLayer(
+    chunkKey,
+    currentViewRotation,
+    contentSignature,
+    createCanvas2dFloorLayerDrawPassDepsForRender()
+  );
 }
 
 function drawFloorOutlineToLayer(targetCtx, currentCameraX, currentCameraY, currentViewRotation) {
-  var outline = screenPointsFromWorldFaceNoCamera([
-    { x: 0, y: 0, z: 0 },
-    { x: Number(settings.gridW || 0), y: 0, z: 0 },
-    { x: Number(settings.gridW || 0), y: Number(settings.gridH || 0), z: 0 },
-    { x: 0, y: Number(settings.gridH || 0), z: 0 }
-  ], currentViewRotation);
-  if (!outline.length) return;
-  targetCtx.strokeStyle = 'rgba(255,255,255,.14)';
-  targetCtx.lineWidth = 2;
-  targetCtx.beginPath();
-  targetCtx.moveTo(outline[0].x + currentCameraX, outline[0].y + currentCameraY);
-  for (var i = 1; i < outline.length; i++) targetCtx.lineTo(outline[i].x + currentCameraX, outline[i].y + currentCameraY);
-  targetCtx.closePath();
-  targetCtx.stroke();
+  return requireCanvas2dFloorLayerDrawPassForRender().drawFloorOutlineToLayer(
+    targetCtx,
+    currentCameraX,
+    currentCameraY,
+    currentViewRotation,
+    createCanvas2dFloorLayerDrawPassDepsForRender()
+  );
 }
 
 function rebuildFloorLayerIfNeeded(force = false) {
-  var rebuildStartAt = perfNow();
-  var currentViewRotation = normalizeMainEditorViewRotationValue(getSafeMainEditorViewRotation(null).viewRotation);
-  var currentZoomForLayer = Number(getMainEditorZoomValueForRender()) || 1;
-  var currentCameraXForLayer = Number(camera && camera.x || 0);
-  var currentCameraYForLayer = Number(camera && camera.y || 0);
-  var activeType = getActiveCameraInteractionTypeForFloorLayer();
-  var forceInteractionReuse = !force && shouldForceFloorLayerInteractionReuse(currentViewRotation);
-  if (forceInteractionReuse && floorLayerCanvas && floorLayerCache.signature && Number(floorLayerCache.viewRotation || currentViewRotation) === Number(currentViewRotation || 0)) {
-    var builtZoomForReuse = Number(floorLayerCache.buildZoom || currentZoomForLayer) || 1;
-    return completeFloorLayerBreakdown({
-      rebuilt: false,
-      skippedByInteractionBudget: true,
-      floorLayerReuseCameraDX: Number((currentCameraXForLayer - Number(floorLayerCache.buildCameraX || 0)).toFixed(3)),
-      floorLayerReuseCameraDY: Number((currentCameraYForLayer - Number(floorLayerCache.buildCameraY || 0)).toFixed(3)),
-      floorLayerReuseScale: Number((currentZoomForLayer / builtZoomForReuse).toFixed(4)),
-      floorLayerBuiltCameraX: Number(floorLayerCache.buildCameraX || 0),
-      floorLayerBuiltCameraY: Number(floorLayerCache.buildCameraY || 0),
-      floorLayerBuiltZoom: builtZoomForReuse,
-      floorLayerActualBranch: (activeType === 'zoom')
-        ? 'floor-layer-cache-reuse-zoom-lock'
-        : 'floor-layer-cache-reuse-zoom-settle-defer'
-    });
-  }
-
-  var contentSignature = floorLayerSignature();
-  var previousViewRotation = typeof floorLayerCache.viewRotation === 'number' ? floorLayerCache.viewRotation : currentViewRotation;
-  var scope = getMainCameraRenderScope(currentViewRotation);
-  var chunkSize = getFloorChunkSizeForLayer();
-  ensureFloorChunkCacheState(chunkSize);
-  var preSetupStartAt = perfNow();
-  var targetCtx = ensureFloorLayerCanvas();
-  var visibleChunkKeys = computeVisibleFloorChunkKeysForLayer(scope, chunkSize);
-  var viewSignature = buildFloorLayerViewSignatureForLayer(currentCameraXForLayer, currentCameraYForLayer, visibleChunkKeys, currentViewRotation);
-  var contentChanged = force || floorLayerCache.dirty || floorLayerCache.signature !== contentSignature || Number(floorLayerCache.viewRotation || currentViewRotation) !== Number(currentViewRotation || 0);
-  if (contentChanged) {
-    floorLayerCache.chunks = new Map();
-    floorLayerCache.visibleChunkKeys = [];
-    floorLayerCache.viewSignature = '';
-  }
-  var preSetupEndAt = perfNow();
-
-  var interactiveChunkBudget = !force && (activeType === 'drag' || activeType === 'pan' || activeType === 'pinch' || isInteractiveRenderPressure());
-  var buildBudgetValue = interactiveChunkBudget ? 1 : Math.max(1, visibleChunkKeys.length);
-  if (!floorLayerCache.chunks || floorLayerCache.chunks.size === 0) buildBudgetValue = Math.max(1, visibleChunkKeys.length);
-
-  var floorProjectionWallMs = 0;
-  var floorColorMaterialWallMs = 0;
-  var floorCanvasDrawWallMs = 0;
-  var floorLoopStartAt = perfNow();
-  var visibleEntries = [];
-  var builtChunkCountThisFrame = 0;
-  var missingChunkCountBefore = 0;
-  var missingChunkCountAfter = 0;
-  var builtTileCountThisFrame = 0;
-  for (var i = 0; i < visibleChunkKeys.length; i++) {
-    var chunkKey = visibleChunkKeys[i];
-    var entry = floorLayerCache.chunks.get(chunkKey) || null;
-    if (!entry || entry.contentSignature !== contentSignature) {
-      missingChunkCountBefore += 1;
-      if (builtChunkCountThisFrame < buildBudgetValue) {
-        var buildStartAt = perfNow();
-        entry = buildFloorChunkEntryForLayer(chunkKey, currentViewRotation, contentSignature);
-        floorProjectionWallMs += Math.max(0, perfNow() - buildStartAt);
-        floorLayerCache.chunks.set(chunkKey, entry);
-        builtChunkCountThisFrame += 1;
-        builtTileCountThisFrame += Number(entry && entry.tileCount || 0);
-      } else {
-        missingChunkCountAfter += 1;
-        continue;
-      }
-    }
-    if (entry) visibleEntries.push(entry);
-  }
-  var composeStartAt = perfNow();
-  targetCtx.clearRect(0, 0, VIEW_W, VIEW_H);
-  for (var entryIndex = 0; entryIndex < visibleEntries.length; entryIndex++) {
-    var visibleEntry = visibleEntries[entryIndex];
-    if (!visibleEntry || !visibleEntry.canvas) continue;
-    var bounds = visibleEntry.screenBoundsNoCamera || { x: 0, y: 0, w: 0, h: 0 };
-    targetCtx.drawImage(visibleEntry.canvas, bounds.x + currentCameraXForLayer, bounds.y + currentCameraYForLayer, bounds.w, bounds.h);
-  }
-  floorCanvasDrawWallMs += Math.max(0, perfNow() - composeStartAt);
-  floorColorMaterialWallMs += Number(floorCanvasDrawWallMs || 0);
-  drawFloorOutlineToLayer(targetCtx, currentCameraXForLayer, currentCameraYForLayer, currentViewRotation);
-  var floorLoopEndAt = perfNow();
-  var floorLoopWallMs = Math.max(0, floorLoopEndAt - floorLoopStartAt);
-
-  var postFinalizeStartAt = perfNow();
-  floorLayerCache.signature = contentSignature;
-  floorLayerCache.contentSignature = contentSignature;
-  floorLayerCache.cacheSignature = contentSignature;
-  floorLayerCache.viewSignature = viewSignature;
-  floorLayerCache.viewRotation = currentViewRotation;
-  floorLayerCache.lastBuiltAt = perfNow();
-  floorLayerCache.dirty = false;
-  floorLayerCache.buildCameraX = currentCameraXForLayer;
-  floorLayerCache.buildCameraY = currentCameraYForLayer;
-  floorLayerCache.buildZoom = currentZoomForLayer;
-  floorLayerCache.visibleChunkKeys = visibleChunkKeys.slice();
-  logItemRotationPrototype('main-floor-rotation-cache-check', {
-    previousViewRotation: normalizeMainEditorViewRotationValue(previousViewRotation),
-    nextViewRotation: currentViewRotation,
-    floorCacheInvalidated: !!contentChanged,
-    floorCacheRebuilt: builtChunkCountThisFrame > 0,
-    floorSignatureIncludesViewRotation: true,
-    floorSignatureIncludesCamera: false,
-    floorDrawUsedCurrentViewRotation: true,
-    floorVisibleChunkCount: visibleChunkKeys.length,
-    floorBuiltChunkCountThisFrame: builtChunkCountThisFrame,
-    floorMissingChunkCountAfter: missingChunkCountAfter,
-    floorChunkSize: chunkSize,
-    floorVersionTag: 'floor-static-chunk-v1'
-  });
-  noteLayerRebuild('floor', 'chunked static-world-aligned visible=' + String(visibleChunkKeys.length) + ' built=' + String(builtChunkCountThisFrame) + ' missing=' + String(missingChunkCountAfter) + ' chunkSize=' + String(chunkSize));
-  var postFinalizeEndAt = perfNow();
-
-  var floorLayerRebuildWallMs = Math.max(0, perfNow() - rebuildStartAt);
-  var floorLayerPreSetupWallMs = Math.max(0, preSetupEndAt - preSetupStartAt);
-  var floorLayerPostFinalizeWallMs = Math.max(0, postFinalizeEndAt - postFinalizeStartAt);
-  var floorLayerResidualWallMs = Math.max(0, floorLayerRebuildWallMs - floorLayerPreSetupWallMs - floorLoopWallMs - floorLayerPostFinalizeWallMs);
-  var floorLayerActualBranch = builtChunkCountThisFrame > 0
-    ? (missingChunkCountAfter > 0 ? 'floor-layer-static-chunk-composite-build-deferred' : 'floor-layer-static-chunk-composite-build')
-    : (contentChanged ? 'floor-layer-static-chunk-composite-content-hit' : 'floor-layer-static-chunk-composite');
-  return completeFloorLayerBreakdown({
-    rebuilt: builtChunkCountThisFrame > 0,
-    floorLayerRebuildWallMs: floorLayerRebuildWallMs,
-    floorLayerPreSetupWallMs: floorLayerPreSetupWallMs,
-    floorLayerLoopWallMs: floorLoopWallMs,
-    floorLayerProjectionWallMs: floorProjectionWallMs,
-    floorLayerColorMaterialWallMs: floorColorMaterialWallMs,
-    floorLayerCanvasDrawWallMs: floorCanvasDrawWallMs,
-    floorLayerPostFinalizeWallMs: floorLayerPostFinalizeWallMs,
-    floorLayerResidualWallMs: floorLayerResidualWallMs,
-    floorLayerReuseCameraDX: 0,
-    floorLayerReuseCameraDY: 0,
-    floorLayerReuseScale: 1,
-    floorLayerBuiltCameraX: currentCameraXForLayer,
-    floorLayerBuiltCameraY: currentCameraYForLayer,
-    floorLayerBuiltZoom: currentZoomForLayer,
-    floorLayerActualBranch: floorLayerActualBranch,
-    floorVisibleChunkCount: visibleChunkKeys.length,
-    floorBuiltChunkCountThisFrame: builtChunkCountThisFrame,
-    floorMissingChunkCountBefore: missingChunkCountBefore,
-    floorMissingChunkCountAfter: missingChunkCountAfter,
-    floorBuiltTileCountThisFrame: builtTileCountThisFrame,
-    floorChunkSize: chunkSize,
-    floorVersionTag: 'floor-static-chunk-v1'
-  });
+  return requireCanvas2dFloorLayerDrawPassForRender().rebuildFloorLayerIfNeeded(
+    force === true,
+    createCanvas2dFloorLayerDrawPassDepsForRender()
+  );
 }
 
 function drawFloor() {
-  var floorDrawStartAt = perfNow();
-  var rebuildBreakdown = rebuildFloorLayerIfNeeded() || null;
-  var blitStartAt = perfNow();
-  var blitWallMs = 0;
-  var reuseDX = Number(rebuildBreakdown && rebuildBreakdown.floorLayerReuseCameraDX || 0);
-  var reuseDY = Number(rebuildBreakdown && rebuildBreakdown.floorLayerReuseCameraDY || 0);
-  var reuseScale = Number(rebuildBreakdown && rebuildBreakdown.floorLayerReuseScale || 1);
-  var builtCameraX = Number(rebuildBreakdown && rebuildBreakdown.floorLayerBuiltCameraX || 0);
-  var builtCameraY = Number(rebuildBreakdown && rebuildBreakdown.floorLayerBuiltCameraY || 0);
-  if (floorLayerCanvas) {
-    if (rebuildBreakdown && rebuildBreakdown.skippedByInteractionBudget) {
-      ctx.save();
-      if (Math.abs(reuseScale - 1) > 0.001) {
-        var anchorX = Number(settings && settings.originX || 0) + builtCameraX;
-        var anchorY = Number(settings && settings.originY || 0) + builtCameraY;
-        ctx.translate(anchorX + reuseDX, anchorY + reuseDY);
-        ctx.scale(reuseScale, reuseScale);
-        ctx.translate(-anchorX, -anchorY);
-        ctx.drawImage(floorLayerCanvas, 0, 0, VIEW_W, VIEW_H);
-      } else {
-        ctx.drawImage(floorLayerCanvas, reuseDX, reuseDY, VIEW_W, VIEW_H);
-      }
-      ctx.restore();
-    } else {
-      ctx.drawImage(floorLayerCanvas, 0, 0, VIEW_W, VIEW_H);
-    }
-    blitWallMs = Math.max(0, perfNow() - blitStartAt);
-    logItemRotationPrototype('main-floor-draw-hit', {
-      currentViewRotation: normalizeMainEditorViewRotationValue(getSafeMainEditorViewRotation(null).viewRotation),
-      floorRenderPath: 'floor-layer-cache',
-      floorCacheSignature: floorLayerCache && floorLayerCache.cacheSignature ? floorLayerCache.cacheSignature : floorLayerCache.signature,
-      floorDrawUsedCurrentViewRotation: !!(floorLayerCache && typeof floorLayerCache.viewRotation === 'number' && floorLayerCache.viewRotation === normalizeMainEditorViewRotationValue(getSafeMainEditorViewRotation(null).viewRotation)),
-      floorLayerReusedDuringInteraction: !!(rebuildBreakdown && rebuildBreakdown.skippedByInteractionBudget),
-      floorLayerReuseCameraDX: reuseDX,
-      floorLayerReuseCameraDY: reuseDY,
-      floorLayerReuseScale: reuseScale
-    });
-  }
-  var drawFloorWallMs = Math.max(0, perfNow() - floorDrawStartAt);
-  var floorLoopWallMs = Number(rebuildBreakdown && rebuildBreakdown.floorLayerLoopWallMs || 0);
-  var floorProjectionWallMs = Number(rebuildBreakdown && rebuildBreakdown.floorLayerProjectionWallMs || 0);
-  var floorColorMaterialWallMs = Number(rebuildBreakdown && rebuildBreakdown.floorLayerColorMaterialWallMs || 0);
-  var floorCanvasDrawWallMs = Number(rebuildBreakdown && rebuildBreakdown.floorLayerCanvasDrawWallMs || 0) + Number(blitWallMs || 0);
-  var breakdown = {
-    baseWorldActualBranch: String(rebuildBreakdown && rebuildBreakdown.floorLayerActualBranch || 'floor-layer-cache-unknown'),
-    drawFloorWallMs: Number(drawFloorWallMs.toFixed(3)),
-    floorLoopWallMs: Number(floorLoopWallMs.toFixed(3)),
-    floorProjectionWallMs: Number(floorProjectionWallMs.toFixed(3)),
-    floorColorMaterialWallMs: Number(floorColorMaterialWallMs.toFixed(3)),
-    floorCanvasDrawWallMs: Number(floorCanvasDrawWallMs.toFixed(3)),
-    floorPreSetupWallMs: Number(rebuildBreakdown && rebuildBreakdown.floorLayerPreSetupWallMs || 0),
-    floorPostFinalizeWallMs: Number(rebuildBreakdown && rebuildBreakdown.floorLayerPostFinalizeWallMs || 0),
-    floorResidualWallMs: Number(rebuildBreakdown && rebuildBreakdown.floorLayerResidualWallMs || 0),
-    floorLayerRebuildWallMs: Number(rebuildBreakdown && rebuildBreakdown.floorLayerRebuildWallMs || 0),
-    floorLayerBlitWallMs: Number(blitWallMs.toFixed(3)),
-    floorLayerRebuilt: !!(rebuildBreakdown && rebuildBreakdown.rebuilt),
-    floorLayerSkippedByInteractionBudget: !!(rebuildBreakdown && rebuildBreakdown.skippedByInteractionBudget),
-    floorLayerReusedDuringInteraction: !!(rebuildBreakdown && rebuildBreakdown.skippedByInteractionBudget),
-    floorLayerReuseCameraDX: Number(reuseDX.toFixed(3)),
-    floorLayerReuseCameraDY: Number(reuseDY.toFixed(3)),
-    floorLayerReuseScale: Number(reuseScale.toFixed(4)),
-    floorVisibleChunkCount: Number(rebuildBreakdown && rebuildBreakdown.floorVisibleChunkCount || 0),
-    floorBuiltChunkCountThisFrame: Number(rebuildBreakdown && rebuildBreakdown.floorBuiltChunkCountThisFrame || 0),
-    floorMissingChunkCountBefore: Number(rebuildBreakdown && rebuildBreakdown.floorMissingChunkCountBefore || 0),
-    floorMissingChunkCountAfter: Number(rebuildBreakdown && rebuildBreakdown.floorMissingChunkCountAfter || 0),
-    floorBuiltTileCountThisFrame: Number(rebuildBreakdown && rebuildBreakdown.floorBuiltTileCountThisFrame || 0),
-    floorChunkSize: Number(rebuildBreakdown && rebuildBreakdown.floorChunkSize || 0),
-    floorVersionTag: String(rebuildBreakdown && rebuildBreakdown.floorVersionTag || 'floor-static-chunk-v1')
-  };
-  writeBaseWorldActualPathProfile({
-    baseWorldActualBranch: breakdown.baseWorldActualBranch,
-    floorLayerReusedDuringInteraction: !!breakdown.floorLayerReusedDuringInteraction,
-    floorLayerRebuildWallMs: Number(breakdown.floorLayerRebuildWallMs || 0),
-    floorLayerBlitWallMs: Number(breakdown.floorLayerBlitWallMs || 0),
-    floorLoopWallMs: Number(breakdown.floorLoopWallMs || 0),
-    floorProjectionWallMs: Number(breakdown.floorProjectionWallMs || 0),
-    floorColorMaterialWallMs: Number(breakdown.floorColorMaterialWallMs || 0),
-    floorCanvasDrawWallMs: Number(breakdown.floorCanvasDrawWallMs || 0),
-    floorPreSetupWallMs: Number(breakdown.floorPreSetupWallMs || 0),
-    floorPostFinalizeWallMs: Number(breakdown.floorPostFinalizeWallMs || 0),
-    floorResidualWallMs: Number(breakdown.floorResidualWallMs || 0),
-    drawFloorWallMs: Number(breakdown.drawFloorWallMs || 0)
-  });
-  try {
-    if (typeof window !== 'undefined') window.__LAST_DRAW_FLOOR_BREAKDOWN__ = breakdown;
-  } catch (_) {}
+  return requireCanvas2dFloorLayerDrawPassForRender().drawFloor(
+    createCanvas2dFloorLayerDrawPassDepsForRender()
+  );
 }
 
-
 // --- v1.4 geometric face-shadow overlay override ---
+// P11a-4 note: shadow overlay projection/cache helpers are delegated to
+// src/presentation/render/renderer/canvas2d-shadow-overlay-cache.js.
 function worldShadowOverlaysToScreen(overlays) {
-  return (overlays || []).map(function (overlay) {
-    return {
-      alpha: overlay.alpha,
-      baseAlpha: overlay.baseAlpha != null ? overlay.baseAlpha : overlay.alpha,
-      worldPolys: overlay.worldPolys || [],
-      clipWorldPts: overlay.clipWorldPts || null,
-      clipPoly: (overlay.clipWorldPts || null) ? overlay.clipWorldPts.map(function (p) { return iso(p.x, p.y, p.z); }) : null,
-      receiverKind: overlay.receiverKind || '',
-      owner: overlay.owner || null,
-      patchId: overlay.patchId != null ? overlay.patchId : null,
-      mergedPlaneKey: overlay.mergedPlaneKey || '',
-      receiverCenter: overlay.receiverCenter || null,
-      sourceComp: overlay.sourceComp || null,
-      casterCenter: overlay.casterCenter || null,
-      lightType: overlay.lightType || 'unknown',
-      polys: (overlay.worldPolys || []).map(function (poly) {
-        return poly.map(function (p) { return iso(p.x, p.y, p.z); });
-      })
-    };
-  });
+  return requireCanvas2dShadowOverlayCacheForRender().worldShadowOverlaysToScreen(
+    overlays,
+    createCanvas2dShadowOverlayCacheDepsForRender()
+  );
 }
 
 function worldShadowOverlaysToNoCamera(overlays, viewRotation) {
-  return (overlays || []).map(function (overlay) {
-    return {
-      alpha: overlay.alpha,
-      baseAlpha: overlay.baseAlpha != null ? overlay.baseAlpha : overlay.alpha,
-      worldPolys: overlay.worldPolys || [],
-      clipWorldPts: overlay.clipWorldPts || null,
-      clipPolyNoCamera: (overlay.clipWorldPts || null) ? screenPointsFromWorldFaceNoCamera(overlay.clipWorldPts, viewRotation) : null,
-      receiverKind: overlay.receiverKind || '',
-      owner: overlay.owner || null,
-      patchId: overlay.patchId != null ? overlay.patchId : null,
-      mergedPlaneKey: overlay.mergedPlaneKey || '',
-      receiverCenter: overlay.receiverCenter || null,
-      sourceComp: overlay.sourceComp || null,
-      casterCenter: overlay.casterCenter || null,
-      lightType: overlay.lightType || 'unknown',
-      polysNoCamera: (overlay.worldPolys || []).map(function (poly) {
-        return screenPointsFromWorldFaceNoCamera(poly, viewRotation);
-      })
-    };
-  });
+  return requireCanvas2dShadowOverlayCacheForRender().worldShadowOverlaysToNoCamera(
+    overlays,
+    viewRotation,
+    createCanvas2dShadowOverlayCacheDepsForRender()
+  );
 }
 
 function drawFaceShadowOverlays(targetCtx, receiverPoints, overlays) {
-  if (!overlays || !overlays.length) return;
-  var unionCtx = ensureShadowPolyUnionCanvas();
-  for (const overlay of overlays) {
-    var clipPoints = (overlay && overlay.clipPoly && overlay.clipPoly.length >= 3) ? overlay.clipPoly : receiverPoints;
-    unionCtx.clearRect(0, 0, VIEW_W, VIEW_H);
-    unionCtx.globalCompositeOperation = 'source-over';
-    var screenPolys = [];
-    var worldPolys = [];
-    for (let pi = 0; pi < (overlay.polys || []).length; pi++) {
-      var poly = overlay.polys[pi];
-      if (!poly || poly.length < 3) continue;
-      screenPolys.push(poly);
-      worldPolys.push((overlay.worldPolys || [])[pi] || []);
-    }
-    if (!screenPolys.length) continue;
-
-    var fadeDebug = {};
-    fillShadowUnionWithDistanceFade(unionCtx, screenPolys, worldPolys, overlay.casterCenter || null, { type: overlay.lightType || 'unknown' }, clamp(overlay.baseAlpha != null ? overlay.baseAlpha : overlay.alpha, 0, 0.95), fadeDebug);
-
-    if (typeof shadowDebugLog === 'function' && shadowDebugDetailed) {
-      shadowDebugLog('recv-screen alpha=' + String(clamp(overlay.alpha,0,0.95).toFixed(3))
-        + ' near=' + String(clamp((overlay.baseAlpha != null ? overlay.baseAlpha : overlay.alpha) * Number((fadeDebug && fadeDebug.factorNear) || 1),0,0.95).toFixed(3))
-        + ' far=' + String(clamp((overlay.baseAlpha != null ? overlay.baseAlpha : overlay.alpha) * Number((fadeDebug && fadeDebug.factorFar) || 1),0,0.95).toFixed(3))
-        + ' recvScreen=' + '[' + clipPoints.map(function (p) { return '(' + p.x.toFixed(1) + ',' + p.y.toFixed(1) + ')'; }).join(' ') + ']'
-        + ' world=' + ((overlay.worldPolys || []).map(function (poly) { return '[' + poly.map(function (p) { return '(' + Number(p.x).toFixed(2) + ',' + Number(p.y).toFixed(2) + ',' + Number(p.z).toFixed(2) + ')'; }).join(' ') + ']'; }).join(' | '))
-        + ' screen=' + ((overlay.polys || []).map(function (poly) { return '[' + poly.map(function (p) { return '(' + p.x.toFixed(1) + ',' + p.y.toFixed(1) + ')'; }).join(' ') + ']'; }).join(' | ')));
-    }
-    if (typeof logScreenOverlayDebug === 'function') logScreenOverlayDebug({ alpha: clamp(overlay.alpha,0,0.95), baseAlpha: clamp(overlay.baseAlpha != null ? overlay.baseAlpha : overlay.alpha,0,0.95), fadeReason: (fadeDebug && fadeDebug.reason) || 'none', fadeMode: (fadeDebug && fadeDebug.mode) || 'solid', fadeDistanceNear: Number((fadeDebug && fadeDebug.distanceNear) || 0), fadeDistanceFar: Number((fadeDebug && fadeDebug.distanceFar) || 0), sourceComp: overlay.sourceComp || null, receiverKind: overlay.receiverKind || '', owner: overlay.owner || null, patchId: overlay.patchId != null ? overlay.patchId : null, receiverScreen: clipPoints, worldPolys: overlay.worldPolys || [], screenPolys: overlay.polys || [], clipWorldPts: overlay.clipWorldPts || null, mergedPlaneKey: overlay.mergedPlaneKey || '', receiverCenter: overlay.receiverCenter || null, casterCenter: overlay.casterCenter || null, gradientStart: (fadeDebug && fadeDebug.gradientStart) || null, gradientEnd: (fadeDebug && fadeDebug.gradientEnd) || null, polyCount: screenPolys.length, probeMatch: (typeof shadowProbeMatchReceiver === 'function') ? shadowProbeMatchReceiver(overlay.receiverKind || '', overlay.owner || null, overlay.clipWorldPts || null, overlay.mergedPlaneKey || '', overlay.patchId != null ? overlay.patchId : null) : null });
-
-    targetCtx.save();
-    targetCtx.beginPath();
-    targetCtx.moveTo(clipPoints[0].x, clipPoints[0].y);
-    for (let i = 1; i < clipPoints.length; i++) targetCtx.lineTo(clipPoints[i].x, clipPoints[i].y);
-    targetCtx.closePath();
-    targetCtx.clip();
-    drawUnionShadowCanvasToTarget(targetCtx, overlay.alpha);
-    if (lightState.highContrastShadow) {
-      targetCtx.strokeStyle = shadowStrokeCss(clamp((overlay.baseAlpha != null ? overlay.baseAlpha : overlay.alpha) * Number((fadeDebug && fadeDebug.factorFar) || 1), 0, 0.95));
-      targetCtx.lineWidth = 0.7;
-      for (const poly of screenPolys) {
-        if (!poly || poly.length < 3) continue;
-        targetCtx.beginPath();
-        targetCtx.moveTo(poly[0].x, poly[0].y);
-        for (let i = 1; i < poly.length; i++) targetCtx.lineTo(poly[i].x, poly[i].y);
-        targetCtx.closePath();
-        targetCtx.stroke();
-      }
-    }
-    targetCtx.restore();
-  }
+  return requireCanvas2dShadowOverlaysForRender().drawFaceShadowOverlays(
+    targetCtx,
+    receiverPoints,
+    overlays,
+    createCanvas2dShadowOverlayDepsForRender()
+  );
 }
+
 
 function drawFaceShadowOverlaysNoCamera(targetCtx, receiverPointsNoCamera, overlaysNoCamera, offsetX, offsetY) {
-  if (!overlaysNoCamera || !overlaysNoCamera.length) return;
-  var dx = Number(offsetX || 0);
-  var dy = Number(offsetY || 0);
-  var unionCtx = ensureShadowPolyUnionCanvas();
-  for (const overlay of overlaysNoCamera) {
-    var clipPoints = (overlay && overlay.clipPolyNoCamera && overlay.clipPolyNoCamera.length >= 3)
-      ? overlay.clipPolyNoCamera.map(function (pt) { return { x: Number(pt.x || 0) + dx, y: Number(pt.y || 0) + dy }; })
-      : (Array.isArray(receiverPointsNoCamera) ? receiverPointsNoCamera.map(function (pt) { return { x: Number(pt.x || 0) + dx, y: Number(pt.y || 0) + dy }; }) : []);
-    unionCtx.clearRect(0, 0, VIEW_W, VIEW_H);
-    unionCtx.globalCompositeOperation = 'source-over';
-    var screenPolys = [];
-    var worldPolys = [];
-    for (let pi = 0; pi < (overlay.polysNoCamera || []).length; pi++) {
-      var polyNoCamera = overlay.polysNoCamera[pi];
-      if (!polyNoCamera || polyNoCamera.length < 3) continue;
-      screenPolys.push(polyNoCamera.map(function (pt) { return { x: Number(pt.x || 0) + dx, y: Number(pt.y || 0) + dy }; }));
-      worldPolys.push((overlay.worldPolys || [])[pi] || []);
-    }
-    if (!screenPolys.length) continue;
-    var fadeDebug = {};
-    fillShadowUnionWithDistanceFade(unionCtx, screenPolys, worldPolys, overlay.casterCenter || null, { type: overlay.lightType || 'unknown' }, clamp(overlay.baseAlpha != null ? overlay.baseAlpha : overlay.alpha, 0, 0.95), fadeDebug);
-    targetCtx.save();
-    targetCtx.beginPath();
-    targetCtx.moveTo(clipPoints[0].x, clipPoints[0].y);
-    for (let i = 1; i < clipPoints.length; i++) targetCtx.lineTo(clipPoints[i].x, clipPoints[i].y);
-    targetCtx.closePath();
-    targetCtx.clip();
-    drawUnionShadowCanvasToTarget(targetCtx, overlay.alpha);
-    targetCtx.restore();
-  }
+  return requireCanvas2dShadowOverlaysForRender().drawFaceShadowOverlaysNoCamera(
+    targetCtx,
+    receiverPointsNoCamera,
+    overlaysNoCamera,
+    offsetX,
+    offsetY,
+    createCanvas2dShadowOverlayDepsForRender()
+  );
 }
+
 
 function buildFaceRenderable(points, fill, stroke, width, shadowOverlays, meta) {
   var face = { points: points, fill: fill, stroke: stroke, width: width || 1, shadowOverlays: shadowOverlays || [] };
@@ -11160,133 +8545,50 @@ function buildFaceRenderable(points, fill, stroke, width, shadowOverlays, meta) 
 }
 
 function shiftShadowOverlays(overlays, sx, sy) {
-  return (overlays || []).map(function (overlay) {
-    return {
-      alpha: overlay.alpha,
-      baseAlpha: overlay.baseAlpha != null ? overlay.baseAlpha : overlay.alpha,
-      worldPolys: overlay.worldPolys || [],
-      clipWorldPts: overlay.clipWorldPts || null,
-      clipPoly: (overlay.clipPoly || []).map(function (pt) { return { x: pt.x + sx, y: pt.y + sy }; }),
-      receiverKind: overlay.receiverKind || '',
-      owner: overlay.owner || null,
-      patchId: overlay.patchId != null ? overlay.patchId : null,
-      mergedPlaneKey: overlay.mergedPlaneKey || '',
-      receiverCenter: overlay.receiverCenter || null,
-      sourceComp: overlay.sourceComp || null,
-      casterCenter: overlay.casterCenter || null,
-      lightType: overlay.lightType || 'unknown',
-      polys: (overlay.polys || []).map(function (poly) {
-        return poly.map(function (pt) { return { x: pt.x + sx, y: pt.y + sy }; });
-      })
-    };
-  });
+  return requireCanvas2dShadowOverlayCacheForRender().shiftShadowOverlays(overlays, sx, sy);
 }
 
-var voxelFaceShadowOverlayCache = { sig: '', map: new Map() };
-
 function currentShadowOverlaySignature() {
-  var parts = [];
-  parts.push(typeof boxesShadowSignature === 'function' ? boxesShadowSignature() : String((boxes || []).length));
-  parts.push(String(!!(lightState && lightState.showShadows)));
-  parts.push(String(!!(typeof isLightingSystemEnabled === 'function' ? isLightingSystemEnabled() : true)));
-  var ls = (typeof getShadowDebugRenderLights === 'function' ? getShadowDebugRenderLights() : ((typeof getLightingRenderLights === 'function' ? getLightingRenderLights() : lights) || [])) || [];
-  for (var i = 0; i < ls.length; i++) {
-    var l = ls[i] || {};
-    parts.push([
-      l.id || l.name || i,
-      l.type || 'light',
-      Number(l.x || 0).toFixed(3), Number(l.y || 0).toFixed(3), Number(l.z || 0).toFixed(3),
-      Number(l.angle || 0).toFixed(3), Number(l.pitch || 0).toFixed(3),
-      Number(l.intensity || 0).toFixed(3), Number(l.size || 0).toFixed(3), Number(l.softness || 0).toFixed(3)
-    ].join(','));
-  }
-  parts.push([
-    !!(lightState && lightState.shadowDistanceFadeEnabled),
-    Number((lightState && lightState.shadowDistanceFadeRate) || 0).toFixed(3),
-    Number((lightState && lightState.shadowDistanceFadeMin) || 0).toFixed(3),
-    !!(lightState && lightState.shadowEdgeFadeEnabled),
-    Number((lightState && lightState.shadowEdgeFadePx) || 0).toFixed(3)
-  ].join(','));
-  return parts.join('|');
+  return requireCanvas2dShadowOverlayCacheForRender().currentShadowOverlaySignature(
+    createCanvas2dShadowOverlayCacheDepsForRender()
+  );
 }
 
 function voxelFaceShadowCacheKey(facePts, normal, ownerInstanceId) {
-  var faceKey = (facePts || []).map(function (p) {
-    return [Number(p.x || 0).toFixed(3), Number(p.y || 0).toFixed(3), Number(p.z || 0).toFixed(3)].join(',');
-  }).join(';');
-  var normalKey = [Number((normal && normal.x) || 0).toFixed(3), Number((normal && normal.y) || 0).toFixed(3), Number((normal && normal.z) || 0).toFixed(3)].join(',');
-  return String(ownerInstanceId || 'none') + '|' + normalKey + '|' + faceKey;
+  return requireCanvas2dShadowOverlayCacheForRender().voxelFaceShadowCacheKey(facePts, normal, ownerInstanceId);
 }
 
 function cloneWorldShadowOverlays(overlays) {
-  return (overlays || []).map(function (overlay) {
-    return {
-      alpha: overlay.alpha,
-      baseAlpha: overlay.baseAlpha != null ? overlay.baseAlpha : overlay.alpha,
-      worldPolys: (overlay.worldPolys || []).map(function (poly) {
-        return (poly || []).map(function (p) { return { x: Number(p.x || 0), y: Number(p.y || 0), z: Number(p.z || 0) }; });
-      }),
-      clipWorldPts: Array.isArray(overlay.clipWorldPts)
-        ? overlay.clipWorldPts.map(function (p) { return { x: Number(p.x || 0), y: Number(p.y || 0), z: Number(p.z || 0) }; })
-        : null,
-      receiverKind: overlay.receiverKind || '',
-      owner: overlay.owner || null,
-      patchId: overlay.patchId != null ? overlay.patchId : null,
-      mergedPlaneKey: overlay.mergedPlaneKey || '',
-      receiverCenter: overlay.receiverCenter || null,
-      sourceComp: overlay.sourceComp || null,
-      casterCenter: overlay.casterCenter || null,
-      lightType: overlay.lightType || 'unknown'
-    };
-  });
+  return requireCanvas2dShadowOverlayCacheForRender().cloneWorldShadowOverlays(overlays);
 }
 
 function getVoxelFaceShadowWorldOverlays(facePts, normal, ownerInstanceId, profileStats) {
-  var totalStartAt = perfNow();
-  var sig = currentShadowOverlaySignature();
-  if (voxelFaceShadowOverlayCache.sig !== sig) {
-    if (typeof noteShadowOverlayCache === 'function') noteShadowOverlayCache('invalidate-all', { oldSig: voxelFaceShadowOverlayCache.sig || '', newSig: sig, reason: 'signature-changed' });
-    voxelFaceShadowOverlayCache.sig = sig;
-    voxelFaceShadowOverlayCache.map = new Map();
-  }
-  var cacheLookupStartAt = perfNow();
-  var key = voxelFaceShadowCacheKey(facePts, normal, ownerInstanceId);
-  var worldOverlays;
-  var cacheHit = voxelFaceShadowOverlayCache.map.has(key);
-  if (cacheHit) {
-    worldOverlays = voxelFaceShadowOverlayCache.map.get(key);
-  } else {
-    var collectStartAt = perfNow();
-    worldOverlays = collectProjectedShadowPolysForReceiver(facePts, normal, ownerInstanceId);
-    if (profileStats) {
-      profileStats.step4f_shadowOverlayCollectMs += Math.max(0, perfNow() - collectStartAt);
-      profileStats.touchedProjectedShadowCollector = true;
-      profileStats.shadowOverlayCacheMissCount += 1;
-    }
-    voxelFaceShadowOverlayCache.map.set(key, worldOverlays);
-  }
-  if (profileStats) {
-    profileStats.step4e_shadowOverlayCacheLookupMs += Math.max(0, perfNow() - cacheLookupStartAt);
-    if (cacheHit) profileStats.shadowOverlayCacheHitCount += 1;
-    profileStats.shadowOverlayTotalCount += Array.isArray(worldOverlays) ? worldOverlays.length : 0;
-  }
-  if (typeof noteShadowOverlayCache === 'function') noteShadowOverlayCache(cacheHit ? 'hit' : 'miss', { owner: ownerInstanceId || null, keyHash: (typeof dbgSimpleHash === 'function' ? dbgSimpleHash(key) : key), cacheSize: voxelFaceShadowOverlayCache.map.size, overlayCount: Array.isArray(worldOverlays) ? worldOverlays.length : 0, facePts: facePts, normal: normal, cameraSig: (typeof cameraSignatureForDebug === 'function' ? cameraSignatureForDebug() : ''), shadowSig: sig });
-  var cloneStartAt = perfNow();
-  var cloned = cloneWorldShadowOverlays(worldOverlays);
-  if (profileStats) {
-    profileStats.step4g_shadowOverlayCloneMs += Math.max(0, perfNow() - cloneStartAt);
-    profileStats.step4d_shadowOverlayTotalMs += Math.max(0, perfNow() - totalStartAt);
-    profileStats.touchedShadowOverlayPath = true;
-  }
-  return cloned;
+  return requireCanvas2dShadowOverlayCacheForRender().getVoxelFaceShadowWorldOverlays(
+    facePts,
+    normal,
+    ownerInstanceId,
+    profileStats,
+    createCanvas2dShadowOverlayCacheDepsForRender()
+  );
 }
 
 function buildVoxelFaceShadowWorldOverlays(facePts, normal, ownerInstanceId, profileStats) {
-  return getVoxelFaceShadowWorldOverlays(facePts, normal, ownerInstanceId, profileStats);
+  return requireCanvas2dShadowOverlayCacheForRender().buildVoxelFaceShadowWorldOverlays(
+    facePts,
+    normal,
+    ownerInstanceId,
+    profileStats,
+    createCanvas2dShadowOverlayCacheDepsForRender()
+  );
 }
 
 function buildVoxelFaceShadowOverlays(facePts, normal, ownerInstanceId) {
-  return worldShadowOverlaysToScreen(getVoxelFaceShadowWorldOverlays(facePts, normal, ownerInstanceId));
+  return requireCanvas2dShadowOverlayCacheForRender().buildVoxelFaceShadowOverlays(
+    facePts,
+    normal,
+    ownerInstanceId,
+    createCanvas2dShadowOverlayCacheDepsForRender()
+  );
 }
 
 function drawVoxelCell(cell, occ, alpha = 1) {
@@ -11451,317 +8753,98 @@ function buildShiftedVoxelRenderable(cell, occ, shift, idPrefix) {
 }
 
 function drawCachedVoxelRenderable(item) {
-  for (const face of item.faces) {
-    drawPoly(face.points, face.fill, face.stroke, face.width || 1);
-    drawFaceShadowOverlays(ctx, face.points, face.shadowOverlays);
-  }
-  if (item.debugFoot) {
-    ctx.fillStyle = '#ffd166';
-    ctx.beginPath(); ctx.arc(item.debugFoot.x, item.debugFoot.y, 2.5, 0, Math.PI * 2); ctx.fill();
-  }
+  return requireCanvas2dStaticWorldFaceDrawPassForRender().drawCachedVoxelRenderable(
+    item,
+    createCanvas2dStaticWorldFaceDrawPassDepsForRender()
+  );
 }
+
 
 function drawCachedVoxelFaceRenderable(item) {
-  if (!item) return;
-  var points = Array.isArray(item.points) ? item.points : [];
-  var loops = Array.isArray(item.loops) ? item.loops : [];
-  if (!points.length && !loops.length) return;
-  var path2d = loops.length ? buildPath2DFromLoops(loops) : buildPath2DFromPoints(points);
-  var strokePath2d = loops.length ? buildPath2DFromSegments((loops || []).reduce(function (acc, loop) {
-    if (!Array.isArray(loop) || loop.length < 2) return acc;
-    for (var i = 0; i < loop.length; i++) acc.push([loop[i], loop[(i + 1) % loop.length]]);
-    return acc;
-  }, [])) : null;
-  if (path2d) {
-    ctx.save();
-    if (item.fill) {
-      ctx.fillStyle = item.fill;
-      if (loops.length) ctx.fill(path2d, 'evenodd');
-      else ctx.fill(path2d);
-    }
-    applyTerrainMaterialPatternOverlay(ctx, loops.length ? (loops[0] || []) : points, path2d, 0, 0, item);
-    if (item.stroke) {
-      ctx.strokeStyle = item.stroke; ctx.lineWidth = item.width || 1;
-      if (strokePath2d) ctx.stroke(strokePath2d);
-      else ctx.stroke(path2d);
-    }
-    ctx.restore();
-  } else if (points.length) {
-    drawPoly(points, item.fill, item.stroke, item.width || 1);
-    applyTerrainMaterialPatternOverlay(ctx, points, null, 0, 0, item);
-  }
-  drawFaceShadowOverlays(ctx, points.length ? points : (loops[0] || []), item.shadowOverlays || []);
+  return requireCanvas2dStaticWorldFaceDrawPassForRender().drawCachedVoxelFaceRenderable(
+    item,
+    createCanvas2dStaticWorldFaceDrawPassDepsForRender()
+  );
 }
 
+
 function buildPath2DFromPoints(points) {
-  if (typeof Path2D === 'undefined') return null;
-  var pts = Array.isArray(points) ? points : [];
-  if (pts.length < 3) return null;
-  var path = new Path2D();
-  path.moveTo(Number(pts[0].x || 0), Number(pts[0].y || 0));
-  for (var i = 1; i < pts.length; i++) path.lineTo(Number(pts[i].x || 0), Number(pts[i].y || 0));
-  path.closePath();
-  return path;
+  return requireCanvas2dDrawPrimitivesForRender().buildPath2DFromPoints(points);
 }
 
 function buildPath2DFromLoops(loops) {
-  if (typeof Path2D === 'undefined') return null;
-  var list = Array.isArray(loops) ? loops : [];
-  var path = new Path2D();
-  var used = false;
-  for (var li = 0; li < list.length; li++) {
-    var pts = Array.isArray(list[li]) ? list[li] : [];
-    if (pts.length < 3) continue;
-    path.moveTo(Number(pts[0].x || 0), Number(pts[0].y || 0));
-    for (var i = 1; i < pts.length; i++) path.lineTo(Number(pts[i].x || 0), Number(pts[i].y || 0));
-    path.closePath();
-    used = true;
-  }
-  return used ? path : null;
+  return requireCanvas2dDrawPrimitivesForRender().buildPath2DFromLoops(loops);
 }
 
 function buildPath2DFromSegments(segments) {
-  if (typeof Path2D === 'undefined') return null;
-  var list = Array.isArray(segments) ? segments : [];
-  var path = new Path2D();
-  var used = false;
-  for (var si = 0; si < list.length; si++) {
-    var seg = Array.isArray(list[si]) ? list[si] : [];
-    if (seg.length < 2) continue;
-    path.moveTo(Number(seg[0].x || 0), Number(seg[0].y || 0));
-    path.lineTo(Number(seg[1].x || 0), Number(seg[1].y || 0));
-    used = true;
-  }
-  return used ? path : null;
+  return requireCanvas2dDrawPrimitivesForRender().buildPath2DFromSegments(segments);
 }
 
 function buildStaticWorldPacketProjectionCacheKey(packet, viewRotation) {
-  var worldLoops = Array.isArray(packet && packet.worldLoops) ? packet.worldLoops : [];
-  var worldOutlineSegments = Array.isArray(packet && packet.worldOutlineSegments) ? packet.worldOutlineSegments : [];
-  return [
-    Number(viewRotation || 0),
-    Number(settings && settings.tileW || 0),
-    Number(settings && settings.tileH || 0),
-    Number(settings && settings.originX || 0),
-    Number(settings && settings.originY || 0),
-    String(packet && packet.fill || ''),
-    String(packet && packet.stroke || ''),
-    Number(packet && packet.width || 1),
-    Array.isArray(packet && packet.worldPts) ? packet.worldPts.length : 0,
-    worldLoops.length,
-    worldLoops.map(function (loop) { return Array.isArray(loop) ? loop.length : 0; }).join(','),
-    worldOutlineSegments.length,
-    Array.isArray(packet && packet.terrainBoundarySegmentsWorld) ? packet.terrainBoundarySegmentsWorld.length : 0,
-    Number(packet && packet.terrainBoundaryStrokeWidth || 0),
-    String(packet && packet.terrainBoundaryStroke || ''),
-    getTerrainTopBoundaryRenderDebugSignature(),
-    Array.isArray(packet && packet.shadowOverlaysWorld) ? packet.shadowOverlaysWorld.length : 0,
-    packet && packet.id ? String(packet.id) : ''
-  ].join('|');
+  return requireCanvas2dStaticWorldFaceDrawPassForRender().buildStaticWorldPacketProjectionCacheKey(
+    packet,
+    viewRotation,
+    createCanvas2dStaticWorldFaceDrawPassDepsForRender()
+  );
 }
+
 
 function getStaticWorldPacketProjectedGeometry(packet, viewRotation) {
-  if (!packet) return null;
-  var cacheKey = buildStaticWorldPacketProjectionCacheKey(packet, viewRotation);
-  var cached = packet.__projectedDrawCache || null;
-  if (cached && cached.key === cacheKey) {
-    packet.__lastStaticPacketCacheState = {
-      geometryCacheHit: true,
-      overlayCacheHit: true,
-      overlayCount: Array.isArray(cached.overlaysNoCamera) ? cached.overlaysNoCamera.length : 0
-    };
-    return cached;
-  }
-  var pointsNoCamera = screenPointsFromWorldFaceNoCamera(packet.worldPts || [], viewRotation);
-  var loopsNoCamera = Array.isArray(packet.worldLoops) && packet.worldLoops.length
-    ? packet.worldLoops.map(function (loop) { return screenPointsFromWorldFaceNoCamera(loop || [], viewRotation); }).filter(function (loop) { return Array.isArray(loop) && loop.length >= 3; })
-    : [];
-  var outlineSegmentsNoCamera = Array.isArray(packet.worldOutlineSegments) && packet.worldOutlineSegments.length
-    ? packet.worldOutlineSegments.map(function (seg) {
-        return [
-          screenPointsFromWorldFaceNoCamera([seg[0] || {}], viewRotation)[0] || null,
-          screenPointsFromWorldFaceNoCamera([seg[1] || {}], viewRotation)[0] || null
-        ];
-      }).filter(function (seg) { return Array.isArray(seg) && seg[0] && seg[1]; })
-    : [];
-  var terrainBoundarySegmentsNoCamera = Array.isArray(packet.terrainBoundarySegmentsWorld) && packet.terrainBoundarySegmentsWorld.length
-    ? packet.terrainBoundarySegmentsWorld.map(function (seg) {
-        return [
-          screenPointsFromWorldFaceNoCamera([seg[0] || {}], viewRotation)[0] || null,
-          screenPointsFromWorldFaceNoCamera([seg[1] || {}], viewRotation)[0] || null
-        ];
-      }).filter(function (seg) { return Array.isArray(seg) && seg[0] && seg[1]; })
-    : [];
-  var overlaysNoCamera = Array.isArray(packet.shadowOverlaysWorld) && packet.shadowOverlaysWorld.length
-    ? worldShadowOverlaysToNoCamera(packet.shadowOverlaysWorld || [], viewRotation)
-    : [];
-  cached = {
-    key: cacheKey,
-    pointsNoCamera: pointsNoCamera,
-    loopsNoCamera: loopsNoCamera,
-    outlineSegmentsNoCamera: outlineSegmentsNoCamera,
-    terrainBoundarySegmentsNoCamera: terrainBoundarySegmentsNoCamera,
-    overlaysNoCamera: overlaysNoCamera,
-    path2d: loopsNoCamera.length ? buildPath2DFromLoops(loopsNoCamera) : buildPath2DFromPoints(pointsNoCamera),
-    strokePath2d: outlineSegmentsNoCamera.length ? buildPath2DFromSegments(outlineSegmentsNoCamera) : null,
-    terrainBoundaryPath2d: terrainBoundarySegmentsNoCamera.length ? buildPath2DFromSegments(terrainBoundarySegmentsNoCamera) : null
-  };
-  packet.__projectedDrawCache = cached;
-  packet.__lastStaticPacketCacheState = {
-    geometryCacheHit: false,
-    overlayCacheHit: false,
-    overlayCount: overlaysNoCamera.length
-  };
-  return cached;
+  return requireCanvas2dStaticWorldFaceDrawPassForRender().getStaticWorldPacketProjectedGeometry(
+    packet,
+    viewRotation,
+    createCanvas2dStaticWorldFaceDrawPassDepsForRender()
+  );
 }
+
 
 function drawTerrainTopBoundarySegmentsForPacket(targetCtx, packet, projected) {
-  if (!targetCtx || !packet || !projected) return;
-  var width = getTerrainTopBoundaryStrokeWidthForPacket(packet);
-  var stroke = getTerrainTopBoundaryStrokeStyleForPacket(packet);
-  if (!width || !stroke) return;
-  var path = projected.terrainBoundaryPath2d || null;
-  var segments = Array.isArray(projected.terrainBoundarySegmentsNoCamera) ? projected.terrainBoundarySegmentsNoCamera : [];
-  if (!path && !segments.length) return;
-  targetCtx.save();
-  targetCtx.strokeStyle = stroke;
-  targetCtx.lineWidth = width;
-  targetCtx.lineJoin = 'round';
-  targetCtx.lineCap = 'round';
-  if (path) {
-    targetCtx.stroke(path);
-  } else {
-    targetCtx.beginPath();
-    for (var i = 0; i < segments.length; i++) {
-      var seg = segments[i];
-      if (!Array.isArray(seg) || !seg[0] || !seg[1]) continue;
-      targetCtx.moveTo(Number(seg[0].x || 0), Number(seg[0].y || 0));
-      targetCtx.lineTo(Number(seg[1].x || 0), Number(seg[1].y || 0));
-    }
-    targetCtx.stroke();
-  }
-  targetCtx.restore();
+  return requireCanvas2dStaticWorldFaceDrawPassForRender().drawTerrainTopBoundarySegmentsForPacket(
+    targetCtx,
+    packet,
+    projected,
+    createCanvas2dStaticWorldFaceDrawPassDepsForRender()
+  );
 }
+
 
 function drawStaticWorldFacePacket(packet) {
-  if (!packet) return;
-  var offsetX = Number(camera && camera.x || 0);
-  var offsetY = Number(camera && camera.y || 0);
-  var currentViewRotation = normalizeMainEditorViewRotationValue(getSafeMainEditorViewRotation(null).viewRotation);
-  var projected = getStaticWorldPacketProjectedGeometry(packet, currentViewRotation);
-  var pointsNoCamera = projected && Array.isArray(projected.pointsNoCamera) ? projected.pointsNoCamera : [];
-  var loopsNoCamera = projected && Array.isArray(projected.loopsNoCamera) ? projected.loopsNoCamera : [];
-  if (!pointsNoCamera.length && !loopsNoCamera.length) return;
-  if (projected && projected.path2d) {
-    ctx.save();
-    if (offsetX || offsetY) ctx.translate(offsetX, offsetY);
-    if (packet.fill) {
-      ctx.fillStyle = packet.fill;
-      if (loopsNoCamera.length) ctx.fill(projected.path2d, 'evenodd');
-      else ctx.fill(projected.path2d);
-    }
-    applyTerrainMaterialPatternOverlay(ctx, loopsNoCamera.length ? (loopsNoCamera[0] || []) : pointsNoCamera, projected.path2d, 0, 0, packet);
-    if (packet.stroke) {
-      ctx.strokeStyle = packet.stroke;
-      ctx.lineWidth = packet.width || 1;
-      if (projected.strokePath2d) ctx.stroke(projected.strokePath2d);
-      else ctx.stroke(projected.path2d);
-    }
-    if (Array.isArray(projected.overlaysNoCamera) && projected.overlaysNoCamera.length) {
-      drawFaceShadowOverlaysNoCamera(ctx, pointsNoCamera, projected.overlaysNoCamera, 0, 0);
-    }
-    drawTerrainTopBoundarySegmentsForPacket(ctx, packet, projected);
-    ctx.restore();
-    return;
-  }
-  drawPolyWithOffset(pointsNoCamera, offsetX, offsetY, packet.fill, packet.stroke, packet.width || 1);
-  applyTerrainMaterialPatternOverlay(ctx, pointsNoCamera, null, offsetX, offsetY, packet);
-  drawFaceShadowOverlaysNoCamera(ctx, pointsNoCamera, projected && projected.overlaysNoCamera ? projected.overlaysNoCamera : worldShadowOverlaysToNoCamera(packet.shadowOverlaysWorld || [], currentViewRotation), offsetX, offsetY);
-  if (projected && Array.isArray(projected.terrainBoundarySegmentsNoCamera) && projected.terrainBoundarySegmentsNoCamera.length) {
-    ctx.save();
-    if (offsetX || offsetY) ctx.translate(offsetX, offsetY);
-    drawTerrainTopBoundarySegmentsForPacket(ctx, packet, projected);
-    ctx.restore();
-  }
+  return requireCanvas2dStaticWorldFaceDrawPassForRender().drawStaticWorldFacePacket(
+    packet,
+    createCanvas2dStaticWorldFaceDrawPassDepsForRender()
+  );
 }
 
+
 function buildStaticVoxelFaceRenderable(baseRenderable, face, faceIndex, viewRotation) {
-  if (!baseRenderable || !face) return null;
-  var faceCell = face.cell || { x: Number(baseRenderable.cellX || 0), y: Number(baseRenderable.cellY || 0), z: Number(baseRenderable.cellZ || 0) };
-  var domainCore = getDomainSceneCoreApi();
-  var orderMeta = domainCore && typeof domainCore.computeVoxelRenderableSort === 'function'
-    ? domainCore.computeVoxelRenderableSort({ cell: faceCell, box: baseRenderable.box || null, viewRotation: viewRotation })
-    : computeViewAwareSortMeta(faceCell, 1, viewRotation);
-  var faceTiePrio = { lowerRight: 1, lowerLeft: 2, top: 3, east: 1, south: 2, north: 0, west: 0 };
-  var centroid = averageScreenPoint(Array.isArray(face.points) ? face.points : []);
-  return {
-    id: String(baseRenderable.id || 'voxel') + '::' + String(face.semanticFace || face.screenFace || faceIndex),
-    kind: 'voxel-face',
-    sortKey: Number(orderMeta.sortKey || 0),
-    tie: Number(orderMeta.tie || 0) + ((faceTiePrio[face.screenFace] || 0) * 0.01),
-    instanceId: baseRenderable.instanceId || null,
-    prefabId: baseRenderable.prefabId || null,
-    renderPath: 'static-cache-face',
-    cacheViewRotation: viewRotation,
-    cacheSignature: baseRenderable.cacheSignature || null,
-    drawUsedSemanticTextureMapping: !!baseRenderable.drawUsedSemanticTextureMapping,
-    drawScreenPosition: { x: Math.round(centroid.x || 0), y: Math.round(centroid.y || 0) },
-    semanticFace: face.semanticFace || null,
-    screenFace: face.screenFace || null,
-    depthKey: face.depthKey != null ? face.depthKey : faceIndex,
-    points: Array.isArray(face.points) ? face.points : [],
-    fill: face.fill,
-    stroke: face.stroke,
-    texture: face.texture || null,
-    textureColor: face.textureColor || null,
-    semanticTextureSlot: face.semanticTextureSlot || null,
-    semanticTextureSlotColor: face.semanticTextureSlotColor || null,
-    width: face.width || 1,
-    shadowOverlays: face.shadowOverlays || [],
-    worldPts: face.worldPts || null,
-    box: baseRenderable.box || null,
-    cellX: Number(faceCell.x || 0),
-    cellY: Number(faceCell.y || 0),
-    cellZ: Number(faceCell.z || 0),
-    faceKey: [baseRenderable.instanceId || 'unknown', [Number(faceCell.x || 0), Number(faceCell.y || 0), Number(faceCell.z || 0)].join(','), face.semanticFace || '', face.screenFace || ''].join('|'),
-    draw: function () { drawCachedVoxelFaceRenderable(this); }
-  };
+  return requireStaticWorldFrameMaterializerForRender().buildStaticVoxelFaceRenderable(
+    baseRenderable,
+    face,
+    faceIndex,
+    viewRotation,
+    createStaticWorldFrameMaterializerDepsForRender()
+  );
 }
 
 function flattenStaticVoxelRenderable(baseRenderable, viewRotation) {
-  if (!baseRenderable) return [];
-  if (!Array.isArray(baseRenderable.faces) || !baseRenderable.faces.length) return [];
-  var out = [];
-  for (var i = 0; i < baseRenderable.faces.length; i++) {
-    var faceRenderable = buildStaticVoxelFaceRenderable(baseRenderable, baseRenderable.faces[i], i, viewRotation);
-    if (faceRenderable) out.push(faceRenderable);
-  }
-  return out;
+  return requireStaticWorldFrameMaterializerForRender().flattenStaticVoxelRenderable(
+    baseRenderable,
+    viewRotation,
+    createStaticWorldFrameMaterializerDepsForRender()
+  );
 }
 
 
 function materializeStaticWorldFacePacket(packet) {
-  if (!packet || typeof packet !== 'object') return null;
-  var points = screenPointsFromWorldFace(packet.worldPts || []);
-  var loops = Array.isArray(packet.worldLoops) ? packet.worldLoops.map(function (loop) { return screenPointsFromWorldFace(loop || []); }).filter(function (loop) { return Array.isArray(loop) && loop.length >= 3; }) : [];
-  var centroid = averageScreenPoint(points.length ? points : (loops[0] || []));
-  return Object.assign({}, packet, {
-    renderPath: 'static-world-frame-face',
-    points: points,
-    loops: loops,
-    shadowOverlays: worldShadowOverlaysToScreen(packet.shadowOverlaysWorld || []),
-    drawScreenPosition: { x: Math.round(centroid.x || 0), y: Math.round(centroid.y || 0) },
-    draw: function () { drawCachedVoxelFaceRenderable(this); }
-  });
+  return requireStaticWorldFrameMaterializerForRender().materializeStaticWorldFacePacket(
+    packet,
+    createStaticWorldFrameMaterializerDepsForRender()
+  );
 }
 
 function materializeStaticWorldFrameRenderables(packets) {
-  var list = Array.isArray(packets) ? packets : [];
-  var out = [];
-  for (var i = 0; i < list.length; i++) {
-    var item = materializeStaticWorldFacePacket(list[i]);
-    if (item) out.push(item);
-  }
-  out.sort(compareRenderablesByDomain);
-  return out;
+  return requireStaticWorldFrameMaterializerForRender().materializeStaticWorldFrameRenderables(
+    packets,
+    createStaticWorldFrameMaterializerDepsForRender()
+  );
 }

@@ -39,6 +39,10 @@
   var sceneCore = typeof __APP_CORE_SCENE_DOMAIN_CORE__ !== 'undefined' ? __APP_CORE_SCENE_DOMAIN_CORE__ : null;
   var portableCore = typeof __APP_CORE_PORTABLE_CORE__ !== 'undefined' ? __APP_CORE_PORTABLE_CORE__ : null;
   var playerStepCore = typeof __APP_CORE_PLAYER_STEP_CORE__ !== 'undefined' ? __APP_CORE_PLAYER_STEP_CORE__ : null;
+  var habboPlacementCore = typeof __APP_CORE_HABBO_PLACEMENT_CORE__ !== 'undefined' ? __APP_CORE_HABBO_PLACEMENT_CORE__ : null;
+  var isometricFaceCore = typeof __APP_CORE_ISOMETRIC_FACE_CORE__ !== 'undefined' ? __APP_CORE_ISOMETRIC_FACE_CORE__ : null;
+  var terrainRenderCore = typeof __APP_CORE_TERRAIN_RENDER_CORE__ !== 'undefined' ? __APP_CORE_TERRAIN_RENDER_CORE__ : null;
+  var renderOrderCore = typeof __APP_CORE_RENDER_ORDER_CORE__ !== 'undefined' ? __APP_CORE_RENDER_ORDER_CORE__ : null;
 
   if (sceneCore) {
     emit('BOOT', 'bind-scene-core', { route: bind('domain.sceneCore', sceneCore), phase: sceneCore.phase || null, owner: sceneCore.owner || null });
@@ -56,5 +60,29 @@
     emit('BOOT', 'bind-player-step-core', { route: bind('domain.playerStepCore', playerStepCore), phase: playerStepCore.phase || null, owner: playerStepCore.owner || null });
   } else {
     emit('BOOT', 'bind-player-step-core-missing', { available: false });
+  }
+
+  if (habboPlacementCore) {
+    emit('BOOT', 'bind-habbo-placement-core', { route: bind('domain.habboPlacementCore', habboPlacementCore), phase: habboPlacementCore.phase || null, owner: habboPlacementCore.owner || null });
+  } else {
+    emit('BOOT', 'bind-habbo-placement-core-missing', { available: false });
+  }
+
+  if (isometricFaceCore) {
+    emit('BOOT', 'bind-isometric-face-core', { route: bind('domain.isometricFaceCore', isometricFaceCore), phase: isometricFaceCore.phase || null, owner: isometricFaceCore.owner || null });
+  } else {
+    emit('BOOT', 'bind-isometric-face-core-missing', { available: false });
+  }
+
+  if (terrainRenderCore) {
+    emit('BOOT', 'bind-terrain-render-core', { route: bind('domain.terrainRenderCore', terrainRenderCore), phase: terrainRenderCore.phase || null, owner: terrainRenderCore.owner || null });
+  } else {
+    emit('BOOT', 'bind-terrain-render-core-missing', { available: false });
+  }
+
+  if (renderOrderCore) {
+    emit('BOOT', 'bind-render-order-core', { route: bind('domain.renderOrderCore', renderOrderCore), phase: renderOrderCore.phase || null, owner: renderOrderCore.owner || null });
+  } else {
+    emit('BOOT', 'bind-render-order-core-missing', { available: false });
   }
 })();

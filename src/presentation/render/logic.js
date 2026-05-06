@@ -1,303 +1,12 @@
 // v1 split file generated from original monolithic app.js
 // 注意：此文件为保持行为稳定的第一刀拆分，允许存在少量跨层函数。
+// P9d note: duplicate historical function declarations were removed; the remaining
+// declaration for each name is the browser-visible implementation.
+// P11a-1 note: controller/view-rotation boundary access is delegated to
+// src/presentation/render/interaction/render-logic-interaction-boundary.js.
+// P11a-2 note: screen/world projection and floor-bounds helpers are delegated to
+// src/presentation/render/interaction/render-hit-test.js.
 
-
-function lightForward(light) {
-var yaw = degToRad(light.angle || 0);
-var pitch = degToRad(light.pitch || 55);
-var cp = Math.cos(pitch);
-var sp = Math.sin(pitch);
-return normalize3({ x: Math.cos(yaw) * cp, y: Math.sin(yaw) * cp, z: -sp });
-}
-
-function lightIncoming(light) {
-var f = lightForward(light);
-return { x: -f.x, y: -f.y, z: -f.z };
-}
-
-function areaSampleOffsets(light) {
-var size = Math.max(0.15, light.size || 1.2);
-var s = size * 0.55;
-var fastMode = shouldUseFastShadowSampling();
-if (fastMode) {
-  return [
-    { x: 0, y: 0 },
-    { x: s * 0.75, y: 0 },
-    { x: -s * 0.75, y: 0 },
-  ];
-}
-
-var offsets = [
-  { x: 0, y: 0 },
-  { x: s, y: 0 },
-  { x: -s, y: 0 },
-  { x: 0, y: s },
-  { x: 0, y: -s },
-];
-if ((light.softness || 0) > 0.55 && !shouldUseMediumAreaSampling()) {
-  offsets.push(
-    { x: s * 0.7, y: s * 0.7 },
-    { x: -s * 0.7, y: s * 0.7 },
-    { x: s * 0.7, y: -s * 0.7 },
-    { x: -s * 0.7, y: -s * 0.7 },
-  );
-}
-return offsets;
-}
-
-
-function worldRadiusFromPixels(px) {
-return px / Math.max(52, settings.tileW * 0.85);
-}
-
-function distanceAttenuation(light, point) {
-var dx = point.x - light.x;
-var dy = point.y - light.y;
-var dz = point.z - light.z;
-var dist = Math.hypot(dx, dy, dz);
-var radiusWorld = worldRadiusFromPixels(light.radius || 240);
-var t = clamp(1 - dist / Math.max(0.001, radiusWorld), 0, 1);
-return t * t;
-}
-
-function spotlightFalloff(light, point) {
-if (light.type !== 'spot') return 1;
-var toPoint = normalize3({ x: point.x - light.x, y: point.y - light.y, z: point.z - light.z });
-var forward = lightForward(light);
-var cosTheta = dot3(toPoint, forward);
-var outer = degToRad(Math.max(2, light.spread || 34) * 0.5);
-var inner = outer * (1 - clamp((light.softness || 0.3) * 0.75, 0.02, 0.75));
-var cosOuter = Math.cos(outer);
-var cosInner = Math.cos(inner);
-if (cosTheta <= cosOuter) return 0;
-if (cosTheta >= cosInner) return 1;
-var t = clamp((cosTheta - cosOuter) / Math.max(1e-5, cosInner - cosOuter), 0, 1);
-return t * t * (3 - 2 * t);
-}
-
-function evaluateSingleLight(light, point, normal) {
-normalizeLight(light);
-var lightRgb = hexToRgb(light.color);
-
-if (light.type === 'directional') {
-  const L = lightIncoming(light);
-  const lambert = Math.max(0, dot3(normal, L));
-  return { raw: lambert * light.intensity, rgb: lightRgb };
-}
-
-var L = normalize3({ x: light.x - point.x, y: light.y - point.y, z: light.z - point.z });
-var lambert = Math.max(0, dot3(normal, L));
-var raw = lambert * distanceAttenuation(light, point) * light.intensity;
-if (light.type === 'spot') raw *= spotlightFalloff(light, point);
-return { raw, rgb: lightRgb };
-}
-
-function evaluateLight(light, point, normal) {
-if (light.type !== 'area') return evaluateSingleLight(light, point, normal);
-var offsets = areaSampleOffsets(light);
-var raw = 0;
-var rgbAccum = { r: 0, g: 0, b: 0 };
-for (const o of offsets) {
-  const sample = { ...light, type: 'point', x: light.x + o.x, y: light.y + o.y };
-  const part = evaluateSingleLight(sample, point, normal);
-  raw += part.raw;
-  rgbAccum.r += part.rgb.r;
-  rgbAccum.g += part.rgb.g;
-  rgbAccum.b += part.rgb.b;
-}
-var n = offsets.length || 1;
-return {
-  raw: raw / n,
-  rgb: { r: rgbAccum.r / n, g: rgbAccum.g / n, b: rgbAccum.b / n },
-};
-}
-
-function spriteLightAt(point) {
-var brightness = 0.35 + settings.ambient * 1.35;
-var tintAccum = { r: 0, g: 0, b: 0 };
-var weight = 0;
-for (const light of getLightingRenderLights()) {
-  const liftedPoint = { x: point.x, y: point.y, z: point.z + 0.3 };
-  const evalUp = evaluateLight(light, liftedPoint, { x: 0, y: 0, z: 1 });
-  const raw = evalUp.raw;
-  brightness += raw * 1.05;
-  tintAccum.r += evalUp.rgb.r * raw;
-  tintAccum.g += evalUp.rgb.g * raw;
-  tintAccum.b += evalUp.rgb.b * raw;
-  weight += raw;
-}
-return {
-  brightness: clamp(brightness, 0.28, 1.9),
-  tint: weight > 0 ? { r: tintAccum.r / weight, g: tintAccum.g / weight, b: tintAccum.b / weight } : { r: 255, g: 255, b: 255 },
-  weight,
-};
-}
-
-function baseFaceColors(base) {
-var rgb = hexToRgb(base);
-return {
-  top: mixColor(rgb, { r: 255, g: 255, b: 255 }, 0.14),
-  east: mulColor(rgb, 0.92),
-  south: mulColor(rgb, 0.75),
-  line: 'rgba(0,0,0,.16)',
-};
-}
-
-function litColor(baseRgb, center, normal) {
-var accum = mulColor(baseRgb, 0.18 + settings.ambient * 0.9);
-for (const light of getLightingRenderLights()) {
-  const evald = evaluateLight(light, center, normal);
-  const t = clamp(evald.raw, 0, 1.35);
-  const warmed = mixColor(baseRgb, evald.rgb, clamp(t * 0.9, 0, 0.9));
-  accum = addColor(accum, mulColor(warmed, t));
-}
-return accum;
-}
-
-function projectGroundPoint(light, point, samplePoint = null) {
-if (light.type === 'directional') {
-  const dir = lightForward(light);
-  if (dir.z >= -0.02) return null;
-  const t = point.z / (-dir.z);
-  return { x: point.x + dir.x * t, y: point.y + dir.y * t, z: 0 };
-}
-var source = samplePoint || light;
-var dz = source.z - point.z;
-if (dz <= 0.05) return null;
-var t = point.z / dz;
-return { x: point.x + (point.x - source.x) * t, y: point.y + (point.y - source.y) * t, z: 0 };
-}
-
-function shadowAlphaForLight(light, receiverPoint) {
-var globalAlpha = clamp(Number(lightState.shadowAlpha ?? 1), 0, 1);
-var opacityScale = Math.max(0, Number(lightState.shadowOpacityScale ?? 1));
-if (globalAlpha <= 0 || opacityScale <= 0 || !lightState.showShadows) return 0;
-
-var alpha;
-if (light.type === 'directional') alpha = clamp(0.05 + light.intensity * 0.07, 0.04, 0.16);
-else if (light.type === 'spot') alpha = clamp((0.04 + light.intensity * 0.09) * (0.65 + spotlightFalloff(light, receiverPoint) * 0.7), 0.03, 0.2);
-else if (light.type === 'area') alpha = clamp(0.03 + light.intensity * 0.05, 0.02, 0.11);
-else alpha = clamp(0.05 + light.intensity * 0.08, 0.04, 0.18);
-
-var scaled = clamp(alpha * opacityScale, 0, 1);
-var capped = Math.min(lightState.highContrastShadow ? 0.95 : 0.7, scaled * globalAlpha);
-return clamp(capped, 0, 1);
-}
-
-function shadowFillCss(alpha) {
-var a = clamp(alpha, 0, 0.95);
-if (lightState.highContrastShadow) {
-  return rgbToCss(hexToRgb(lightState.shadowDebugColor || '#ff2a6d'), a);
-}
-return `rgba(0,0,0,${a})`;
-}
-
-function shadowStrokeCss(alpha) {
-var a = clamp(alpha, 0, 0.95);
-if (lightState.highContrastShadow) {
-  return rgbToCss(hexToRgb(lightState.shadowDebugColor || '#ff2a6d'), Math.min(1, a + 0.22));
-}
-return `rgba(0,0,0,${Math.min(0.35, a + 0.08)})`;
-}
-
-
-function convexHull2(points) {
-if (points.length <= 1) return points.slice();
-var pts = points.slice().sort((a,b)=> a.x === b.x ? a.y - b.y : a.x - b.x);
-var cross = (o,a,b) => (a.x-o.x)*(b.y-o.y) - (a.y-o.y)*(b.x-o.x);
-var lower = [];
-for (const p of pts) {
-  while (lower.length >= 2 && cross(lower[lower.length-2], lower[lower.length-1], p) <= 0) lower.pop();
-  lower.push(p);
-}
-var upper = [];
-for (let i = pts.length - 1; i >= 0; i--) {
-  const p = pts[i];
-  while (upper.length >= 2 && cross(upper[upper.length-2], upper[upper.length-1], p) <= 0) upper.pop();
-  upper.push(p);
-}
-lower.pop(); upper.pop();
-return lower.concat(upper);
-}
-
-function boxShadowWorldPoints(box) {
-return [
-  { x: box.x, y: box.y, z: box.z },
-  { x: box.x + box.w, y: box.y, z: box.z },
-  { x: box.x + box.w, y: box.y + box.d, z: box.z },
-  { x: box.x, y: box.y + box.d, z: box.z },
-  { x: box.x, y: box.y, z: box.z + box.h },
-  { x: box.x + box.w, y: box.y, z: box.z + box.h },
-  { x: box.x + box.w, y: box.y + box.d, z: box.z + box.h },
-  { x: box.x, y: box.y + box.d, z: box.z + box.h },
-];
-}
-
-function drawProjectedShadow(worldPts, light, receiverPoint, debugTag = '') {
-if (!lightState.showShadows) return;
-normalizeLight(light);
-var emitShadow = (projected, alpha) => {
-  if (alpha <= 0.0001) return;
-  if (!projected.length) return;
-  const hull = convexHull2(projected.map(p => ({ x: p.x, y: p.y })));
-  if (hull.length < 3) return;
-  var unionCtx = ensureShadowPolyUnionCanvas();
-  unionCtx.clearRect(0, 0, VIEW_W, VIEW_H);
-  unionCtx.globalCompositeOperation = 'source-over';
-  var worldHull = hull.map(function (p) { return { x: p.x, y: p.y, z: 0 }; });
-  var screenHull = hull.map(function (p) { return iso(p.x, p.y, 0); });
-  var fadeDebug = {};
-  fillShadowPolyWithDistanceFade(unionCtx, screenHull, worldHull, receiverPoint || null, light, alpha, fadeDebug);
-  ctx.save();
-  drawUnionShadowCanvasToTarget(ctx, alpha);
-  if (lightState.highContrastShadow) {
-    ctx.strokeStyle = shadowStrokeCss(clamp(alpha * Number(fadeDebug.factorFar || 1), 0, 0.95));
-    ctx.lineWidth = 0.7;
-    ctx.beginPath();
-    ctx.moveTo(screenHull[0].x, screenHull[0].y);
-    for (let i = 1; i < screenHull.length; i++) ctx.lineTo(screenHull[i].x, screenHull[i].y);
-    ctx.closePath();
-    ctx.stroke();
-  }
-  ctx.restore();
-  if (typeof logStaticShadowEmitDebug === 'function') logStaticShadowEmitDebug({
-    alphaBase: clamp(alpha, 0, 0.95),
-    alphaNear: clamp(alpha * Number(fadeDebug.factorNear || 1), 0, 0.95),
-    alphaFar: clamp(alpha * Number(fadeDebug.factorFar || 1), 0, 0.95),
-    fadeReason: fadeDebug.reason || 'none',
-    fadeMode: fadeDebug.mode || 'solid',
-    fadeDistanceNear: Number(fadeDebug.distanceNear || 0),
-    fadeDistanceFar: Number(fadeDebug.distanceFar || 0),
-    gradientStart: fadeDebug.gradientStart || null,
-    gradientEnd: fadeDebug.gradientEnd || null,
-    edgeFadeEnabled: !!lightState.shadowEdgeFadeEnabled,
-    edgeFadePx: Number(lightState.shadowEdgeFadePx || 0),
-    target: 'main-player',
-    lightId: light.id || light.name || 'light',
-    lightType: light.type || 'unknown',
-    component: debugTag || 'projected-shadow',
-    casterCenter: receiverPoint || null,
-    worldPolys: [worldHull],
-    screenPolys: [screenHull]
-  });
-  if (verboseLog && debugState.frame <= 6) {
-    detailLog(`shadow:${debugTag || 'shape'} light=${light.name}/${light.type} hullN=${hull.length} alpha=${alpha.toFixed(3)} near=${(alpha * Number(fadeDebug.factorNear || 1)).toFixed(3)} far=${(alpha * Number(fadeDebug.factorFar || 1)).toFixed(3)} mode=${String(fadeDebug.mode || 'solid')}`);
-  }
-};
-if (light.type === 'area') {
-  const offsets = areaSampleOffsets(light);
-  const baseAlpha = shadowAlphaForLight(light, receiverPoint) / Math.max(1, offsets.length) * (1.2 + light.softness * 0.8);
-  for (const o of offsets) {
-    const sample = { ...light, x: light.x + o.x, y: light.y + o.y, z: light.z };
-    const projected = worldPts.map(p => projectGroundPoint(light, p, sample)).filter(Boolean);
-    emitShadow(projected, baseAlpha);
-  }
-  return;
-}
-var projected = worldPts.map(p => projectGroundPoint(light, p)).filter(Boolean);
-var a = shadowAlphaForLight(light, receiverPoint);
-emitShadow(projected, a);
-}
 
 function drawWorldShadowPolygon(worldPoly, alpha) {
 if (!worldPoly || worldPoly.length < 3 || alpha <= 0.0001) return;
@@ -305,215 +14,53 @@ var screenPoly = worldPoly.map(function (p) { return iso(p.x, p.y, p.z); });
 drawPoly(screenPoly, shadowFillCss(alpha), lightState.highContrastShadow ? shadowStrokeCss(alpha) : null);
 }
 
-function drawPlayerShadow(shadowLights = null) {
-if (!SHOW_PLAYER) return;
-if (!lightState.showShadows) return;
-
-var activeShadowLights = shadowLights || getShadowDebugRenderLights();
-var proxy = getPlayerProxyBox();
-var worldPts = boxShadowWorldPoints(proxy);
-var center = getPlayerShadowCenter();
-for (const light of activeShadowLights) drawProjectedShadow(worldPts, light, center, 'player-proxy');
-
-var bounds = getPlayerGroundBounds();
-var groundZ = Number(player && player.z != null ? player.z : 0);
-var foot = iso(player.x, player.y, groundZ);
-var widthPx = Math.max(10, bounds.maxX - bounds.minX);
-var heightPx = Math.max(6, bounds.maxY - bounds.minY);
-var contactAlpha = clamp(0.12 + settings.ambient * 0.20, 0.10, 0.24);
-for (const light of activeShadowLights) {
-  contactAlpha += clamp(evaluateLight(light, { x: player.x, y: player.y, z: groundZ + 0.12 }, { x: 0, y: 0, z: 1 }).raw * 0.025, 0, 0.045);
-}
-ctx.save();
-ctx.translate(foot.x, foot.y + 4);
-ctx.scale(Math.max(0.75, widthPx / 26), Math.max(0.42, heightPx / 18));
-ctx.fillStyle = `rgba(0,0,0,${clamp(contactAlpha, 0.10, 0.30)})`;
-ctx.beginPath();
-ctx.arc(0, 0, 13, 0, Math.PI * 2);
-ctx.fill();
-ctx.restore();
-
-if (showDebug) {
-  const pts = cubePoints(proxy.x, proxy.y, proxy.z, proxy.w, proxy.d, proxy.h);
-  drawPoly([pts.p001, pts.p101, pts.p111, pts.p011], 'rgba(255,210,120,.05)', 'rgba(255,210,120,.82)');
-  drawPoly([pts.p101, pts.p111, pts.p110, pts.p100], null, 'rgba(255,210,120,.55)');
-  drawPoly([pts.p011, pts.p111, pts.p110, pts.p010], null, 'rgba(255,210,120,.55)');
-}
+function requireRenderLogicInteractionBoundaryForLogic() {
+  var api = null;
+  try {
+    api = (window.App && window.App.presentation && window.App.presentation.render && window.App.presentation.render.interactionBoundary) || null;
+  } catch (_) {}
+  if (!api) {
+    try { api = window.__RENDER_LOGIC_INTERACTION_BOUNDARY__ || null; } catch (_) {}
+  }
+  if (!api) throw new Error('P11a-1 missing render logic interaction boundary');
+  return api;
 }
 
-function getMainViewRotationCoreApi() {
-try {
-  return (window.App && window.App.domain && window.App.domain.viewRotationCore)
-    ? window.App.domain.viewRotationCore
-    : (window.__VIEW_ROTATION_CORE__ || null);
-} catch (_) {
-  return window.__VIEW_ROTATION_CORE__ || null;
+
+function requireRenderHitTestForLogic() {
+  var api = null;
+  try {
+    api = (window.App && window.App.presentation && window.App.presentation.render && window.App.presentation.render.hitTest) || null;
+  } catch (_) {}
+  if (!api) {
+    try { api = window.__RENDER_HIT_TEST__ || null; } catch (_) {}
+  }
+  if (!api) throw new Error('P11a-2 missing render hit-test boundary');
+  return api;
 }
+
+function createRenderHitTestProjectionInputForLogic(extra) {
+  var input = {
+    settings: settings,
+    camera: camera,
+    viewW: VIEW_W,
+    viewH: VIEW_H,
+    viewRotationCoreApi: getMainViewRotationCoreApi(),
+    rotation: getSafeMainEditorViewRotationValue(),
+    projectionConfig: getMainViewProjectionConfig(),
+  };
+  if (extra && typeof Object.assign === 'function') return Object.assign(input, extra);
+  if (extra) {
+    for (var key in extra) {
+      if (Object.prototype.hasOwnProperty.call(extra, key)) input[key] = extra[key];
+    }
+  }
+  return input;
 }
 
 function isMainEditorViewAnimatingForLogic() {
-  try {
-    var controller = window.App && window.App.controllers ? window.App.controllers.main || null : null;
-    if (controller && typeof controller.isMainEditorViewRotating === 'function') return !!controller.isMainEditorViewRotating('presentation.render.logic');
-  } catch (_) {}
-  try {
-    var runtimeApi = window.App && window.App.state ? window.App.state.runtimeState || null : null;
-    return !!(runtimeApi && runtimeApi.editor && runtimeApi.editor.isViewRotating);
-  } catch (_) {}
-  return false;
+  return requireRenderLogicInteractionBoundaryForLogic().isMainEditorViewAnimating('presentation.render.logic');
 }
-
-function getSafeMainEditorViewRotationValue() {
-try {
-  var controller = window.App && window.App.controllers ? window.App.controllers.main || null : null;
-  if (controller && typeof controller.getMainEditorVisualRotation === 'function') return ((Number(controller.getMainEditorVisualRotation('presentation.render.logic')) || 0) % 4 + 4) % 4;
-  if (controller && typeof controller.getMainEditorViewRotation === 'function') return ((Number(controller.getMainEditorViewRotation('presentation.render.logic')) || 0) % 4 + 4) % 4;
-} catch (_) {}
-try {
-  var runtimeState = window.App && window.App.state ? window.App.state.runtimeState || null : null;
-  if (runtimeState && runtimeState.editor && typeof runtimeState.editor.rotation === 'number') return ((Number(runtimeState.editor.rotation) || 0) % 4 + 4) % 4;
-} catch (_) {}
-return 0;
-}
-
-function getMainViewProjectionConfig() {
-return {
-  tileW: settings.tileW,
-  tileH: settings.tileH,
-  originX: settings.originX,
-  originY: settings.originY,
-  cameraX: camera.x,
-  cameraY: camera.y,
-  worldBoundsOrOrigin: { cols: settings.gridW || settings.worldCols, rows: settings.gridH || settings.worldRows }
-};
-}
-
-function currentProto() {
-var p = currentPrefab();
-return prefabVariant(p, (editor && typeof editor.previewFacing === 'number') ? editor.previewFacing : 0);
-}
-
-function iso(x, y, z = 0) {
-var api = getMainViewRotationCoreApi();
-if (api && typeof api.worldToScreenWithViewRotation === 'function') {
-  return api.worldToScreenWithViewRotation({ x: x, y: y, z: z }, getSafeMainEditorViewRotationValue(), getMainViewProjectionConfig());
-}
-return {
-  x: settings.originX + camera.x + (x - y) * settings.tileW / 2,
-  y: settings.originY + camera.y + (x + y) * settings.tileH / 2 - z * settings.tileH,
-};
-}
-
-function screenToFloor(sx, sy) {
-var api = getMainViewRotationCoreApi();
-if (api && typeof api.screenToWorldWithViewRotation === 'function') {
-  var world = api.screenToWorldWithViewRotation({ x: sx, y: sy, z: 0 }, getSafeMainEditorViewRotationValue(), getMainViewProjectionConfig());
-  return { x: world.x, y: world.y };
-}
-var dx = (sx - settings.originX - camera.x) / (settings.tileW / 2);
-var dy = (sy - settings.originY - camera.y) / (settings.tileH / 2);
-return { x: (dx + dy) / 2, y: (dy - dx) / 2 };
-}
-
-function shadeHex(hex, delta) {
-var v = hex.replace('#', '');
-var n = parseInt(v, 16);
-var r = (n >> 16) + delta;
-var g = ((n >> 8) & 255) + delta;
-var b = (n & 255) + delta;
-r = clamp(r, 0, 255); g = clamp(g, 0, 255); b = clamp(b, 0, 255);
-return `rgb(${r},${g},${b})`;
-}
-
-function hexToRgb(hex) {
-var v = hex.replace('#', '');
-var n = parseInt(v, 16);
-return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
-}
-
-function rgbToCss(rgb, a = 1) {
-return `rgba(${Math.round(rgb.r)}, ${Math.round(rgb.g)}, ${Math.round(rgb.b)}, ${a})`;
-}
-
-function lerp(a, b, t) { return a + (b - a) * t; }
-
-function mixColor(rgb, target, t) {
-return {
-  r: lerp(rgb.r, target.r, t),
-  g: lerp(rgb.g, target.g, t),
-  b: lerp(rgb.b, target.b, t),
-};
-}
-
-function mulColor(rgb, k) {
-return {
-  r: clamp(rgb.r * k, 0, 255),
-  g: clamp(rgb.g * k, 0, 255),
-  b: clamp(rgb.b * k, 0, 255),
-};
-}
-
-function addColor(a, b) {
-return {
-  r: clamp(a.r + b.r, 0, 255),
-  g: clamp(a.g + b.g, 0, 255),
-  b: clamp(a.b + b.b, 0, 255),
-};
-}
-
-function normalize3(v) {
-var len = Math.hypot(v.x, v.y, v.z) || 1;
-return { x: v.x / len, y: v.y / len, z: v.z / len };
-}
-
-function dot3(a, b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
-
-function drawLightGlow() {
-if (!lightState.showGlow) return;
-for (const light of getLightingRenderLights()) {
-  normalizeLight(light);
-  const p = iso(light.x, light.y, light.z);
-  const rgb = hexToRgb(light.color);
-
-  if (light.type === 'directional') {
-    const incoming = lightIncoming(light);
-    const g = ctx.createLinearGradient(
-      VIEW_W * 0.5 - incoming.x * VIEW_W * 0.75,
-      VIEW_H * 0.5 - incoming.y * VIEW_H * 0.55,
-      VIEW_W * 0.5 + incoming.x * VIEW_W * 0.75,
-      VIEW_H * 0.5 + incoming.y * VIEW_H * 0.55,
-    );
-    g.addColorStop(0, rgbToCss(rgb, clamp(light.intensity * 0.14, 0, 0.18)));
-    g.addColorStop(0.55, rgbToCss(rgb, 0.03));
-    g.addColorStop(1, rgbToCss(rgb, 0));
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-    continue;
-  }
-
-  if (light.type === 'area') {
-    const size = 12 + (light.size || 1) * 10;
-    ctx.save();
-    ctx.translate(p.x, p.y);
-    ctx.fillStyle = rgbToCss(rgb, clamp(0.18 * light.intensity, 0, 0.3));
-    ctx.strokeStyle = rgbToCss(rgb, 0.65);
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.rect(-size, -size * 0.55, size * 2, size * 1.1);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  const glow = ctx.createRadialGradient(p.x, p.y, 6, p.x, p.y, light.radius);
-  glow.addColorStop(0, rgbToCss(rgb, clamp(0.18 * light.intensity, 0, 0.32)));
-  glow.addColorStop(0.35, rgbToCss(rgb, clamp(0.08 * light.intensity, 0, 0.22)));
-  glow.addColorStop(1, rgbToCss(rgb, 0));
-  ctx.fillStyle = glow;
-  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-}
-}
-
 
 var shadowGeomCache = {
 signature: '',
@@ -843,17 +390,6 @@ function getMergedReceiverFaceImpl(ownerInstanceId, receiverKind, fallbackFacePt
 var buildMergedReceiverFacesPatched = buildMergedReceiverFacesImpl;
 var getMergedReceiverFacePatched = getMergedReceiverFaceImpl;
 
-function invalidateShadowGeometryCache(reason = 'unknown') {
-shadowGeomCache.signature = '';
-shadowGeomCache.components = [];
-shadowGeomCache.occupancy = new Map();
-shadowGeomCache.totalVoxels = 0;
-shadowGeomCache.totalFaces = 0;
-mergedReceiverCache.signature = '';
-mergedReceiverCache.facesByOwner = new Map();
-detailLog(`shadow-components: invalidated reason=${reason}`);
-}
-
 function ensureShadowMaskCanvas() {
 if (!shadowMaskCanvas) {
   shadowMaskCanvas = document.createElement('canvas');
@@ -938,29 +474,6 @@ for (const axis of ['x', 'y', 'z']) {
   }
   let t1 = (mn - s) / d;
   let t2 = (mx - s) / d;
-  if (t1 > t2) t1, t2 = t2, t1
-  tmin = Math.max(tmin, t1);
-  tmax = Math.min(tmax, t2);
-  if (tmax <= tmin) return false;
-}
-return tmax > 1e-5 && tmin < 1 - 1e-5;
-}
-
-function segmentIntersectsAABB(start, end, min, max) {
-var dir = { x: end.x - start.x, y: end.y - start.y, z: end.z - start.z };
-var tmin = 0;
-var tmax = 1;
-for (const axis of ['x', 'y', 'z']) {
-  const s = start[axis];
-  const d = dir[axis];
-  const mn = min[axis];
-  const mx = max[axis];
-  if (Math.abs(d) < 1e-8) {
-    if (s <= mn || s >= mx) return false;
-    continue;
-  }
-  let t1 = (mn - s) / d;
-  let t2 = (mx - s) / d;
   if (t1 > t2) {
     const tmp = t1; t1 = t2; t2 = tmp;
   }
@@ -1009,20 +522,7 @@ return { hit: false };
 }
 
 function computeFloorScreenBounds() {
-var pts = [
-  iso(0, 0, 0),
-  iso(settings.gridW, 0, 0),
-  iso(settings.gridW, settings.gridH, 0),
-  iso(0, settings.gridH, 0),
-];
-var xs = pts.map(p => p.x);
-var ys = pts.map(p => p.y);
-return {
-  minX: Math.max(0, Math.floor(Math.min(...xs)) - 2),
-  maxX: Math.min(VIEW_W, Math.ceil(Math.max(...xs)) + 2),
-  minY: Math.max(0, Math.floor(Math.min(...ys)) - 2),
-  maxY: Math.min(VIEW_H, Math.ceil(Math.max(...ys)) + 2),
-};
+return requireRenderHitTestForLogic().computeFloorScreenBounds(createRenderHitTestProjectionInputForLogic());
 }
 
 function drawShadowMaskForLightSample(components, light, sampleIndex, sampleCount, samplePoint = null, sampleAlpha = 0) {
@@ -1164,12 +664,6 @@ for (const light of getLightingRenderLights()) {
     if (shadowDebugDetailed) shadowDebugLog('ground hit light=' + (light.name || light.id || 'light') + ' comp=' + comp.debugTag + ' alpha=' + alpha.toFixed(3) + ' bounds=' + boundsText3Shadow(polyBounds3(clipped)) + ' worldPts=' + samplePointsText3Shadow(clipped, 8));
   }
 }
-}
-
-function drawLightShadows() {
-if (!lightState.showShadows) return;
-drawComponentShadows();
-drawPlayerShadow();
 }
 
 function drawLightBulb(light, active = false) {
@@ -1554,38 +1048,15 @@ if (showDebug) {
 }
 
 function getMainViewRotationCoreApi() {
-try {
-  return (window.App && window.App.domain && window.App.domain.viewRotationCore)
-    ? window.App.domain.viewRotationCore
-    : (window.__VIEW_ROTATION_CORE__ || null);
-} catch (_) {
-  return window.__VIEW_ROTATION_CORE__ || null;
-}
+return requireRenderLogicInteractionBoundaryForLogic().getMainViewRotationCoreApi();
 }
 
 function getSafeMainEditorViewRotationValue() {
-try {
-  var controller = window.App && window.App.controllers ? window.App.controllers.main || null : null;
-  if (controller && typeof controller.getMainEditorVisualRotation === 'function') return ((Number(controller.getMainEditorVisualRotation('presentation.render.logic')) || 0) % 4 + 4) % 4;
-  if (controller && typeof controller.getMainEditorViewRotation === 'function') return ((Number(controller.getMainEditorViewRotation('presentation.render.logic')) || 0) % 4 + 4) % 4;
-} catch (_) {}
-try {
-  var runtimeState = window.App && window.App.state ? window.App.state.runtimeState || null : null;
-  if (runtimeState && runtimeState.editor && typeof runtimeState.editor.rotation === 'number') return ((Number(runtimeState.editor.rotation) || 0) % 4 + 4) % 4;
-} catch (_) {}
-return 0;
+return requireRenderLogicInteractionBoundaryForLogic().getSafeMainEditorViewRotationValue('presentation.render.logic');
 }
 
 function getMainViewProjectionConfig() {
-return {
-  tileW: settings.tileW,
-  tileH: settings.tileH,
-  originX: settings.originX,
-  originY: settings.originY,
-  cameraX: camera.x,
-  cameraY: camera.y,
-  worldBoundsOrOrigin: { cols: settings.gridW || settings.worldCols, rows: settings.gridH || settings.worldRows }
-};
+return requireRenderLogicInteractionBoundaryForLogic().getMainViewProjectionConfig({ settings: settings, camera: camera });
 }
 
 function currentProto() {
@@ -1594,25 +1065,11 @@ return prefabVariant(p, (editor && typeof editor.previewFacing === 'number') ? e
 }
 
 function iso(x, y, z = 0) {
-var api = getMainViewRotationCoreApi();
-if (api && typeof api.worldToScreenWithViewRotation === 'function') {
-  return api.worldToScreenWithViewRotation({ x: x, y: y, z: z }, getSafeMainEditorViewRotationValue(), getMainViewProjectionConfig());
-}
-return {
-  x: settings.originX + camera.x + (x - y) * settings.tileW / 2,
-  y: settings.originY + camera.y + (x + y) * settings.tileH / 2 - z * settings.tileH,
-};
+return requireRenderHitTestForLogic().worldToScreen(createRenderHitTestProjectionInputForLogic({ x: x, y: y, z: z }));
 }
 
 function screenToFloor(sx, sy) {
-var api = getMainViewRotationCoreApi();
-if (api && typeof api.screenToWorldWithViewRotation === 'function') {
-  var world = api.screenToWorldWithViewRotation({ x: sx, y: sy, z: 0 }, getSafeMainEditorViewRotationValue(), getMainViewProjectionConfig());
-  return { x: world.x, y: world.y };
-}
-var dx = (sx - settings.originX - camera.x) / (settings.tileW / 2);
-var dy = (sy - settings.originY - camera.y) / (settings.tileH / 2);
-return { x: (dx + dy) / 2, y: (dy - dx) / 2 };
+return requireRenderHitTestForLogic().screenToFloor(createRenderHitTestProjectionInputForLogic({ sx: sx, sy: sy }));
 }
 
 function shadeHex(hex, delta) {
@@ -2083,73 +1540,6 @@ function drawUnionShadowCanvasToTarget(targetCtx, alphaForStroke) {
   }
 }
 
-function drawProjectedComponentShadow(component, light) {
-if (!lightState.showShadows) return;
-normalizeLight(light);
-var receiverPoint = component.center || { x: settings.gridW * 0.5, y: settings.gridH * 0.5, z: 0 };
-
-var emitPolys = (polys, alpha, tag = '') => {
-  if (alpha <= 0.0001 || !polys.length) return;
-
-  const unionCtx = ensureShadowPolyUnionCanvas();
-  unionCtx.clearRect(0, 0, VIEW_W, VIEW_H);
-  unionCtx.globalCompositeOperation = 'source-over';
-  unionCtx.fillStyle = lightState.highContrastShadow
-    ? rgbToCss(hexToRgb(lightState.shadowDebugColor || '#ff2a6d'), 1)
-    : 'rgba(0,0,0,1)';
-
-  const screenPolys = [];
-  for (const poly of polys) {
-    const scr = poly.map(p => iso(p.x, p.y, 0));
-    if (scr.length < 3) continue;
-    screenPolys.push(scr);
-    unionCtx.beginPath();
-    unionCtx.moveTo(scr[0].x, scr[0].y);
-    for (let i = 1; i < scr.length; i++) unionCtx.lineTo(scr[i].x, scr[i].y);
-    unionCtx.closePath();
-    unionCtx.fill();
-  }
-  if (!screenPolys.length) return;
-
-  ctx.save();
-  ctx.globalAlpha = clamp(alpha, 0, 0.95);
-  ctx.drawImage(shadowPolyUnionCanvas, 0, 0);
-  ctx.restore();
-
-  if (lightState.highContrastShadow) {
-    ctx.save();
-    ctx.strokeStyle = shadowStrokeCss(alpha);
-    ctx.lineWidth = 0.7;
-    for (const scr of screenPolys) {
-      ctx.beginPath();
-      ctx.moveTo(scr[0].x, scr[0].y);
-      for (let i = 1; i < scr.length; i++) ctx.lineTo(scr[i].x, scr[i].y);
-      ctx.closePath();
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
-
-  if (verboseLog && debugState.frame <= 6) {
-    detailLog(`shadow-comp:${component.debugTag || tag || 'component'} light=${light.name}/${light.type} polys=${screenPolys.length} alpha=${alpha.toFixed(3)} union=offscreen`);
-  }
-};
-
-if (light.type === 'area') {
-  const offsets = areaSampleOffsets(light);
-  const baseAlpha = shadowAlphaForLight(light, receiverPoint) / Math.max(1, offsets.length) * (1.05 + light.softness * 0.65);
-  offsets.forEach((o) => {
-    const sample = { ...light, x: light.x + o.x, y: light.y + o.y, z: light.z };
-    const polys = collectShadowFacePolys(component, light, sample);
-    emitPolys(polys, baseAlpha, component.debugTag);
-  });
-  return;
-}
-
-var polys = collectShadowFacePolys(component, light, null);
-emitPolys(polys, shadowAlphaForLight(light, receiverPoint), component.debugTag);
-}
-
 function getShadowDebugRenderLights() {
   var renderLights = (typeof getLightingRenderLights === 'function') ? getLightingRenderLights() : lights;
   if (!renderLights || !renderLights.length) return renderLights;
@@ -2176,21 +1566,6 @@ function logShadowLightSet(lights, scope) {
   var tags = (lights || []).map(shadowLightTag);
   shadowDebugLog('light-set scope=' + String(scope || 'shadow') + ' count=' + String(tags.length) + ' lights=' + tags.join(' | '), true);
 }
-
-function drawLightShadows() {
-if (!lightState.showShadows) return;
-var components = buildShadowComponents();
-var shadowLights = getShadowDebugRenderLights();
-logShadowLightSet(shadowLights, 'drawLightShadows');
-for (const comp of components) {
-  if (verboseLog && debugState.frame <= 3) {
-    detailLog(`shadow-component ${comp.debugTag} faces=${comp.faces.length} cells=${comp.cells.length}`);
-  }
-  for (const light of shadowLights) drawProjectedComponentShadow(comp, light);
-}
-drawPlayerShadow(shadowLights);
-}
-
 
 // --- v1.3 static-shadow-layer override ---
 
@@ -2455,11 +1830,6 @@ function estimateFaceShadowAmount(facePts, normal, ownerInstanceId = null) {
   }
 
   return clamp(alpha * 1.1, 0, 0.78);
-}
-
-function litFaceColor(baseRgb, facePts, normal, ownerInstanceId = null) {
-  var center = faceReceiverCenter(facePts);
-  return litColor(baseRgb, center, normal);
 }
 
 function faceShadowGridSpec(normal) {

@@ -36,6 +36,12 @@ const context = {
 };
 vm.createContext(context);
 runFile(context, 'src/core/domain/item-facing-core.js');
+runFile(context, 'src/application/controllers/controller-registry.js');
+runFile(context, 'src/application/controllers/controller-diagnostics.js');
+runFile(context, 'src/application/controllers/terrain-generation-diagnostics.js');
+runFile(context, 'src/application/controllers/terrain-apply-job-controller.js');
+runFile(context, 'src/application/controllers/terrain-clear-controller.js');
+runFile(context, 'src/application/controllers/terrain-generation-controller.js');
 runFile(context, 'src/application/controllers/app-controllers.js');
 const placement = app.controllers.placement;
 assert(runtimeState.editor.previewFacing === 0, 'previewFacing should initialize to 0');

@@ -46,5 +46,8 @@ const out = {
   rectFacing0: evidence('debug_rect_2x1_5faces', 0),
   rectFacing1: evidence('debug_rect_2x1_5faces', 1)
 };
-fs.writeFileSync(path.join(process.cwd(), 'v47_semantic_texture_evidence.json'), JSON.stringify(out, null, 2));
-console.log('wrote v47_semantic_texture_evidence.json');
+const outDir = path.join(process.cwd(), 'docs', 'evidence');
+fs.mkdirSync(outDir, { recursive: true });
+const outPath = path.join(outDir, 'v47_semantic_texture_evidence.json');
+fs.writeFileSync(outPath, JSON.stringify(out, null, 2));
+console.log('wrote', outPath);

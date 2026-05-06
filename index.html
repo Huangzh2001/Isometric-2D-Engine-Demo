@@ -704,6 +704,8 @@
   <script src="src/presentation/lighting/lighting.js"></script>
   <script src="src/presentation/shell/dom-registry.js?v=20260429-terrain-edge-outline-debug-v3"></script>
   <script src="src/core/state/runtime-state.js"></script>
+  <script src="src/core/domain/spatial-geometry-core.js"></script>
+  <script src="src/core/domain/habbo-placement-core.js"></script>
   <script src="src/core/state/prefab-registry.js"></script>
   <script src="src/core/state/scene-session-state.js"></script>
   <script src="src/application/state/state-actions.js"></script>
@@ -711,6 +713,7 @@
   <script src="src/core/domain/scene-domain-core.js"></script>
   <script src="src/core/domain/view-rotation-core.js"></script>
   <script src="src/core/domain/item-facing-core.js"></script>
+  <script src="src/core/domain/isometric-face-core.js"></script>
   <script src="src/core/domain/render-face-oracle-core.js"></script>
   <script src="src/core/domain/terrain-generator-core.js"></script>
   <script src="src/core/domain/terrain-material-core.js"></script>
@@ -718,10 +721,13 @@
   <script src="src/core/domain/occupancy-reader-core.js"></script>
   <script src="src/core/domain/static-world-face-merge-core.js"></script>
   <script src="src/core/domain/terrain-face-merge-core.js"></script>
+  <script src="src/core/domain/terrain-render-core.js"></script>
+  <script src="src/core/domain/render-order-core.js"></script>
   <script src="src/core/domain/player-step-core.js"></script>
   <script src="src/infrastructure/logging/item-rotation-diagnostic-log.js"></script>
   <script src="src/core/domain/portable-core.js"></script>
   <script src="src/infrastructure/bootstrap/core-domain-bindings.js"></script>
+  <script src="src/infrastructure/legacy/state-bridge.js"></script>
   <script src="src/infrastructure/legacy/state.js"></script>
   <script src="src/infrastructure/services/scene-api.js"></script>
   <script src="src/infrastructure/services/prefab-api.js"></script>
@@ -729,21 +735,66 @@
   <script src="src/infrastructure/services/asset-api.js"></script>
   <script src="src/infrastructure/services/editor-handoff-api.js"></script>
   <script src="src/application/assets/asset-import.js"></script>
+  <script src="src/infrastructure/assets/asset-prefab-scan-service.js"></script>
+  <script src="src/infrastructure/assets/habbo-root-config-service.js"></script>
+  <script src="src/infrastructure/assets/habbo-library-service.js"></script>
+  <script src="src/infrastructure/assets/custom-prefab-storage.js"></script>
+  <script src="src/infrastructure/assets/habbo-asset-file-service.js"></script>
+  <script src="src/infrastructure/assets/habbo-placement-import-service.js"></script>
+  <script src="src/infrastructure/assets/asset-workflow-service.js"></script>
+  <script src="src/presentation/ui/prefab-select-refresh.js"></script>
   <script src="src/infrastructure/assets/asset-management.js"></script>
+  <script src="src/infrastructure/storage/scene-snapshot-builder.js"></script>
+  <script src="src/infrastructure/storage/scene-snapshot-applier.js"></script>
   <script src="src/infrastructure/storage/scene-storage.js"></script>
+  <script src="src/application/controllers/controller-boundary.js"></script>
+  <script src="src/application/controllers/controller-registry.js"></script>
+  <script src="src/application/controllers/controller-diagnostics.js"></script>
+  <script src="src/application/controllers/terrain-generation-diagnostics.js"></script>
+  <script src="src/application/controllers/terrain-apply-job-controller.js"></script>
+  <script src="src/application/controllers/terrain-clear-controller.js"></script>
+  <script src="src/application/controllers/terrain-generation-controller.js"></script>
   <script src="src/application/controllers/app-controllers.js"></script>
   <script src="src/infrastructure/legacy/placement-legacy-bridge.js"></script>
   <script src="src/infrastructure/self-check/self-check.js"></script>
   <script src="src/application/player/player.js?v=20260429-player-input-screen-space-v2"></script>
+  <script src="src/presentation/ui/ui-boundary.js"></script>
   <script src="src/presentation/ui/ui-tabs.js"></script>
   <script src="src/presentation/ui/ui-inspectors.js"></script>
   <script src="src/presentation/ui/ui-habbo-library.js"></script>
+  <script src="src/presentation/ui/ui-camera-render-panel.js"></script>
+  <script src="src/presentation/ui/ui-terrain-panel-refresh.js"></script>
   <script src="src/presentation/ui/ui.js?v=20260429-terrain-edge-outline-debug-v3"></script>
+  <script src="src/presentation/render/interaction/render-logic-interaction-boundary.js"></script>
+  <script src="src/presentation/render/interaction/render-hit-test.js"></script>
+  <script src="src/presentation/render/interaction/render-preview-interaction-controller.js"></script>
   <script src="src/presentation/render/logic.js"></script>
+  <script src="src/application/render/static-world-renderable-builder.js"></script>
+  <script src="src/application/render/static-world-render-cache-coordinator.js"></script>
+  <script src="src/application/render/main-frame-renderable-assembler.js"></script>
   <script src="src/presentation/render/static-world-cache.js"></script>
   <script src="src/presentation/render/actor-sort-stable.js"></script>
+  <script src="src/presentation/render/renderer/canvas2d-draw-primitives.js?v=20260429-terrain-edge-outline-debug-v3"></script>
+  <script src="src/presentation/render/renderer/canvas2d-shadow-overlays.js?v=20260429-terrain-edge-outline-debug-v3"></script>
+  <script src="src/presentation/render/renderer/canvas2d-shadow-overlay-cache.js?v=20260502-p11a4-shadow-overlay-cache"></script>
+  <script src="src/presentation/render/renderer/canvas2d-static-world-face-draw-pass.js?v=20260429-terrain-edge-outline-debug-v3"></script>
+  <script src="src/presentation/render/renderer/canvas2d-floor-layer-draw-pass.js?v=20260429-terrain-edge-outline-debug-v3"></script>
+  <script src="src/presentation/render/renderer/canvas2d-frame-diagnostics.js?v=20260503-p11c1-frame-diagnostics"></script>
+  <script src="src/presentation/render/renderer/canvas2d-zoom-preview-state.js?v=20260503-p11c2-zoom-preview-state"></script>
+  <script src="src/presentation/render/renderer/canvas2d-static-bitmap-run-cache.js?v=20260503-p11c3-static-bitmap-run-cache"></script>
+  <script src="src/presentation/render/renderer/canvas2d-static-packet-fallback-draw.js?v=20260503-p11c4-static-packet-fallback-draw"></script>
+  <script src="src/presentation/render/renderer/canvas2d-renderable-order-draw.js?v=20260503-p11c5-renderable-order-draw"></script>
+  <script src="src/presentation/render/renderer/canvas2d-overlay-hud-pass.js?v=20260503-p11c6-overlay-hud-pass"></script>
+  <script src="src/presentation/render/renderer/canvas2d-interaction-pipeline-capture.js?v=20260503-p11c6-interaction-pipeline-capture"></script>
+  <script src="src/presentation/render/renderer/canvas2d-frame-pipeline.js?v=20260503-p11c7-frame-pipeline"></script>
+  <script src="src/presentation/render/renderer/canvas2d-active-render-frame.js?v=20260503-p11c8-active-render-frame"></script>
+  <script src="src/presentation/render/renderables/static-renderable-color-cache.js?v=20260502-p11a6-color-cache"></script>
+  <script src="src/presentation/render/renderables/static-world-frame-materializer.js?v=20260502-p11a5-materializer"></script>
+  <script src="src/presentation/render/diagnostics/render-diagnostics.js?v=20260429-terrain-edge-outline-debug-v3"></script>
+  <script src="src/presentation/render/diagnostics/render-build-diagnostics-gate.js?v=20260429-terrain-edge-outline-debug-v3"></script>
   <script src="src/presentation/render/render.js?v=20260429-terrain-edge-outline-debug-v3"></script>
   <script src="src/presentation/render/renderer/canvas2d-renderer.js?v=20260429-terrain-edge-outline-debug-v3"></script>
+  <script src="src/presentation/shell/diagnostics/shell-diagnostics.js"></script>
   <script src="src/presentation/shell/app-shell.js"></script>
   <script src="src/presentation/shell/app.js"></script>
   <script src="src/infrastructure/self-check/scenario-runner.js"></script>
