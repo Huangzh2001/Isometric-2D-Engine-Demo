@@ -27,10 +27,13 @@ function listRootHtml() {
 
 const diagnosticsRel = 'src/presentation/render/diagnostics/render-diagnostics.js';
 const renderRel = 'src/presentation/render/render.js';
+const facadeRel = 'src/presentation/render/diagnostics/render-diagnostics-facade.js';
 if (!exists(diagnosticsRel)) errors.push(`missing ${diagnosticsRel}`);
 if (!exists(renderRel)) errors.push(`missing ${renderRel}`);
+if (!exists(facadeRel)) errors.push(`missing ${facadeRel}`);
 const diagnosticsSource = exists(diagnosticsRel) ? read(diagnosticsRel) : '';
 const renderSource = exists(renderRel) ? read(renderRel) : '';
+const facadeSource = exists(facadeRel) ? read(facadeRel) : '';
 const frameAssemblerRel = 'src/application/render/main-frame-renderable-assembler.js';
 const frameAssemblerSource = exists(frameAssemblerRel) ? read(frameAssemblerRel) : '';
 
@@ -38,8 +41,11 @@ for (const htmlRel of listRootHtml()) {
   const source = read(htmlRel);
   const diagnosticsIdx = idx(source, diagnosticsRel);
   const renderIdx = idx(source, renderRel);
+  const facadeIdx = idx(source, facadeRel);
   if (renderIdx >= 0 && diagnosticsIdx < 0) errors.push(`${htmlRel}: missing ${diagnosticsRel} before render.js`);
   else if (renderIdx >= 0 && diagnosticsIdx > renderIdx) errors.push(`${htmlRel}: ${diagnosticsRel} must load before ${renderRel}`);
+  if (renderIdx >= 0 && facadeIdx < 0) errors.push(`${htmlRel}: missing ${facadeRel} before render.js`);
+  else if (renderIdx >= 0 && facadeIdx > renderIdx) errors.push(`${htmlRel}: ${facadeRel} must load before ${renderRel}`);
 }
 
 if (!diagnosticsSource.includes("layer: 'presentation/render/diagnostics'")) errors.push(`${diagnosticsRel}: must identify presentation/render/diagnostics layer`);
@@ -77,10 +83,19 @@ const requiredRenderDiagnosticsDelegationMarkers = [
   'requireRenderDiagnosticsForRender().getCurrentRenderFrameStaticCacheState'
 ];
 for (const marker of requiredRenderDiagnosticsDelegationMarkers) {
-  if (!renderSource.includes(marker)) errors.push(`${renderRel}: missing render diagnostics delegation marker ${marker}`);
+  if (!facadeSource.includes(marker)) errors.push(`${facadeRel}: missing render diagnostics delegation marker ${marker}`);
 }
-if (!renderSource.includes("emitRenderBuildDiagnostic('emitChunkRebuildBreakdown'") && !renderSource.includes('requireRenderBuildDiagnosticsGateForRender().emitChunkRebuildBreakdown')) {
-  errors.push(`${renderRel}: missing render build diagnostics gate delegation marker emitChunkRebuildBreakdown`);
+if (!facadeSource.includes("emitRenderBuildDiagnostic('emitChunkRebuildBreakdown'")) {
+  errors.push(`${facadeRel}: missing render build diagnostics gate delegation marker emitChunkRebuildBreakdown`);
+}
+for (const moved of [
+  'function getRenderDiagnosticsApiForRender',
+  'function emitRenderFrameSummary',
+  'function maybeLogRenderFrameSummary',
+  'function emitChunkRebuildBreakdown',
+  'function recordRenderFunctionTiming'
+]) {
+  if (renderSource.includes(moved)) errors.push(`${renderRel}: moved diagnostics facade function still lives in render.js: ${moved}`);
 }
 
 for (const forbidden of [

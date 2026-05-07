@@ -14,13 +14,16 @@ function indexOfOrFail(source, needle) {
 
 const diagnosticsRel = 'src/presentation/render/diagnostics/render-diagnostics.js';
 const renderRel = 'src/presentation/render/render.js';
+const facadeRel = 'src/presentation/render/diagnostics/render-diagnostics-facade.js';
 const diagnosticsSource = read(diagnosticsRel);
 const renderSource = read(renderRel);
+const facadeSource = read(facadeRel);
 const indexSource = read('index.html');
 
 assert(diagnosticsSource.includes("layer: 'presentation/render/diagnostics'"), 'diagnostics module must declare diagnostics layer');
 assert(diagnosticsSource.includes("phase: 'P8e'"), 'diagnostics module must declare P8e phase');
 assert(indexOfOrFail(indexSource, diagnosticsRel) < indexOfOrFail(indexSource, renderRel), 'render diagnostics must load before render.js');
+assert(indexOfOrFail(indexSource, facadeRel) < indexOfOrFail(indexSource, renderRel), 'render diagnostics facade must load before render.js');
 for (const marker of [
   'requireRenderDiagnosticsForRender().maybeLogStaticWorldChunkSummary',
   'requireRenderDiagnosticsForRender().maybeLogRenderFrameSummary',
@@ -28,7 +31,16 @@ for (const marker of [
   'requireRenderDiagnosticsForRender().maybeLogStaticBoxCacheProfile',
   'requireRenderDiagnosticsForRender().captureStaticBoxCacheFrameState'
 ]) {
-  assert(renderSource.includes(marker), `render.js missing diagnostics delegation marker: ${marker}`);
+  assert(facadeSource.includes(marker), `render diagnostics facade missing diagnostics delegation marker: ${marker}`);
+}
+for (const moved of [
+  'function getRenderDiagnosticsApiForRender',
+  'function emitRenderFrameSummary',
+  'function maybeLogRenderFrameSummary',
+  'function emitChunkRebuildBreakdown',
+  'function recordRenderFunctionTiming'
+]) {
+  assert(!renderSource.includes(moved), `render.js still owns moved diagnostics function: ${moved}`);
 }
 for (const forbidden of [
   '__lastRenderFrameSummaryLogAt',

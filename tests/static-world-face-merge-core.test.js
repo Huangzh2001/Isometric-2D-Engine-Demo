@@ -4,13 +4,13 @@ const vm = require('vm');
 function assert(cond, msg) { if (!cond) throw new Error(msg); }
 
 const indexSource = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-const renderSource = fs.readFileSync(path.join(__dirname, '..', 'src/presentation/render/render.js'), 'utf8');
+const builderSource = fs.readFileSync(path.join(__dirname, '..', 'src/application/render/static-world-renderable-builder.js'), 'utf8');
 const mergeCoreSource = fs.readFileSync(path.join(__dirname, '..', 'src/core/domain/static-world-face-merge-core.js'), 'utf8');
 const sandbox = { window: {} };
 vm.runInNewContext(mergeCoreSource, sandbox, { filename: 'static-world-face-merge-core.js' });
 const api = sandbox.window.__STATIC_WORLD_FACE_MERGE_CORE__;
 assert(indexSource.includes('src/core/domain/static-world-face-merge-core.js'), 'main entry should load static-world face merge core');
-assert(renderSource.includes('mergeFaceDescriptors'), 'render layer should invoke face merge descriptors helper');
+assert(builderSource.includes('mergeFaceDescriptors'), 'static world renderable builder should invoke face merge descriptors helper');
 assert(api && typeof api.mergeFaceDescriptors === 'function', 'face merge core should expose mergeFaceDescriptors');
 const base = { instanceId: 'inst-1', semanticFace: 'top', screenFace: 'top', mergePlane: 1, mergeSignature: 'sig', sortKey: 1, tie: 1, cell: { x: 0, y: 0, z: 0 } };
 const res = api.mergeFaceDescriptors([

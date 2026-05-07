@@ -1605,3 +1605,281 @@ Hard rules after this freeze:
 - New functionality must prefer a single-purpose owner file under the existing four-layer structure.
 - New owner files must not become new large mixed-responsibility nodes.
 - Any new boundary must update tests or guardrail scripts.
+
+---
+
+## P12a-1 Terrain renderable builder boundary
+
+P12 starts the Render.js De-Hub Round. The first boundary moves terrain runtime/chunk/face renderable construction out of `src/presentation/render/render.js`.
+
+Rules:
+
+- `src/presentation/render/terrain/terrain-renderable-builder.js` owns terrain model helpers used by rendering, terrain chunk render cache, terrain surface source construction, terrain face geometry packets, terrain batched face renderables, and scoped terrain renderable assembly.
+- `src/presentation/render/render.js` may keep compatibility wrappers such as `terrainModelHasData`, `buildTerrainChunkBatchedRenderables`, `buildTerrainFaceRenderableItem`, and `buildScopedTerrainRenderables`, but they must delegate to `window.__APP_PRESENTATION_TERRAIN_RENDERABLE_BUILDER__` through explicit dependencies.
+- This owner is a presentation/render/terrain owner only. It must not own controller flow, scene storage, asset management, UI panel refresh, Canvas2D backend frame pipeline, or DOM/localStorage/fetch concerns.
+- Do not add unrelated sprite, player, placement-preview, render-order, or debug-overlay logic to `terrain-renderable-builder.js`. If those responsibilities need extraction, create their own owners.
+- Keep `terrain-renderable-builder.js` loaded before `src/presentation/render/render.js` in `index.html`.
+
+Required checks:
+
+```bash
+node tests/terrain-renderable-builder-boundary.test.js
+node scripts/check_terrain_renderable_builder_boundary.js
+node scripts/check_all_guardrails.js
+```
+
+---
+
+## P12a-3 Render frame plan / player move fast-path boundary
+
+P12a-3 continues the Render.js De-Hub Round by moving frame-plan construction, player move fast-path order construction, and render-order diagnostics out of `src/presentation/render/render.js`.
+
+Rules:
+
+- `src/presentation/render/frame/player-move-fast-path.js` owns player move fast-path diagnostic state, eligibility diagnostics, static-order cache state, guarded fast-path order construction, and runtime diagnostics.
+- `src/presentation/render/diagnostics/render-order-diagnostics.js` owns render-order/frame-plan diagnostics gating and render-order diagnostic payload emission.
+- `src/presentation/render/frame/render-frame-plan-builder.js` owns `buildRendererFramePlan` and `drawRendererFramePlan` orchestration only.
+- `src/presentation/render/render.js` must not re-own the implementations of `buildRendererFramePlan`, `tryBuildPlayerMoveFastPathFrameOrderForRender`, `evaluatePlayerMoveFastPathEligibilityForRender`, or `logRenderOrderDiagnostics`.
+- These owners must not own sprite rendering, terrain renderable construction, Canvas2D backend drawing, UI panel refresh, controller flow, asset management, or scene storage.
+- Keep `player-move-fast-path.js`, `render-order-diagnostics.js`, and `render-frame-plan-builder.js` loaded after terrain renderable builder and before `src/presentation/render/render.js` in `index.html`.
+- If any of these owner files grows beyond its focused responsibility, split it by function domain instead of creating a new `utils/helpers/common` bucket.
+
+Required checks:
+
+```bash
+node tests/render-frame-plan-boundary.test.js
+node scripts/check_render_frame_plan_boundary.js
+node scripts/check_all_guardrails.js
+```
+
+
+---
+
+## P12a-4 Sprite / prefab / Habbo / player renderer boundary
+
+P12a-4 continues the Render.js De-Hub Round by moving sprite, prefab, Habbo composite, and player sprite-frame rendering out of `src/presentation/render/render.js`.
+
+Rules:
+
+- `src/presentation/render/sprites/habbo-composite-renderer.js` owns Habbo layer configuration, placement visual shifts, room-origin helpers, layer drawable resolution, Habbo composite caching/building, and Habbo placement pixel/cell shift helpers.
+- `src/presentation/render/sprites/prefab-sprite-renderer.js` owns prefab sprite config/image resolution, prefab sprite drawing, Habbo debug overlay, sprite depth split, proxy bounds, and sprite render-sort metadata.
+- `src/presentation/render/sprites/player-sprite-frame.js` owns player visual scale, player unified light center, prepared player sprite-frame caching, and player avatar drawing.
+- `src/presentation/render/render.js` may keep compatibility wrappers for these functions, but wrappers must delegate to `window.__APP_PRESENTATION_HABBO_COMPOSITE_RENDERER__`, `window.__APP_PRESENTATION_PREFAB_SPRITE_RENDERER__`, or `window.__APP_PRESENTATION_PLAYER_SPRITE_FRAME__`.
+- These owners are presentation/render/sprites owners only. They must not own terrain renderable construction, frame-plan ordering, Canvas2D backend frame pipeline, UI panel refresh, controller flow, asset management, or scene storage.
+- Keep all sprite owners loaded before `src/presentation/render/render.js` in `index.html`.
+- Do not create `render-utils.js`, `sprite-helpers.js`, or similar mixed buckets; if an owner grows beyond its focused responsibility, split by sprite/prefab/Habbo/player domain.
+
+Required checks:
+
+```bash
+node tests/sprite-renderer-boundaries.test.js
+node scripts/check_sprite_renderer_boundaries.js
+node scripts/check_all_guardrails.js
+```
+
+---
+
+## P12a-5 Placement preview / projection debug overlay boundary
+
+P12a-5 continues the Render.js De-Hub Round by moving placement preview drawing, debug cuboid face renderable helpers, and projection debug overlays out of `src/presentation/render/render.js`.
+
+Rules:
+
+- `src/presentation/render/preview/placement-preview-renderer.js` owns placement preview drawing, debug five-face preview drawing, debug cuboid face renderable helpers, placed debug face renderables, and placement-preview status labeling.
+- `src/presentation/render/debug/projection-debug-overlay.js` owns selected-instance projection debug overlay, item-facing prototype overlay, facing legend drawing, and facing overlay polygon helpers.
+- `src/presentation/render/render.js` may keep compatibility wrappers such as `drawPlacementPreview`, `drawDebugFiveFacePlacementPreview`, `buildPlacedDebugInstanceFaceRenderables`, `drawSelectedInstanceProjectionDebug`, and `drawItemFacingPrototypeOverlay`, but they must delegate to the focused owners.
+- These owners must not own terrain renderable construction, sprite/Habbo/player rendering, frame-plan ordering, Canvas2D backend frame pipeline, UI panel refresh, controller flow, asset management, or scene storage.
+- Keep `placement-preview-renderer.js` and `projection-debug-overlay.js` loaded before `src/presentation/render/render.js` in `index.html`.
+- Do not create `render-debug-utils.js`, `preview-helpers.js`, or similar mixed buckets; if an owner grows beyond its focused responsibility, split by placement-preview versus projection-debug domain.
+
+Required checks:
+
+```bash
+node tests/placement-preview-debug-overlay-boundaries.test.js
+node scripts/check_placement_preview_debug_overlay_boundaries.js
+node scripts/check_all_guardrails.js
+```
+
+---
+
+## P12b-0 Render dead-code pruning boundary
+
+P12b-0 runs before further Render.js de-hub work. It removes high-confidence unused legacy declarations from `src/presentation/render/render.js` instead of moving stale code into new owners.
+
+Rules:
+
+- Do not reintroduce the removed render.js-only legacy declarations: `projectedBounds`, `buildBoxFaces`, `highestTopAtCell`, `isMainEditorCameraCullingEnabledForRender`, `getMainCameraVisibleBoxesForRender`, `isActorInteractionSingleColumnTallGroup`, `areAllActorInteractionPacketKeysHit`, or `accumulateRenderFunctionTiming`.
+- This pruning only applies to stale declarations in `src/presentation/render/render.js`. It does not remove active owners with similar names in `core`, such as `scene-domain-core.js`.
+- Future de-hub work must run a dead-code audit first when a candidate function appears to be historical residue. Do not preserve unused code by moving it into new owner files.
+- Do not delete compatibility wrappers merely because they have few direct textual references; namespace-bound APIs and guardrail-owned wrappers need explicit verification before removal.
+
+Required checks:
+
+```bash
+node tests/render-dead-code-pruning.test.js
+node scripts/check_render_dead_code_pruning.js
+node scripts/check_all_guardrails.js
+```
+
+---
+
+## P12b-1 Instance / actor renderable builder boundary
+
+P12b-1 continues the Render.js De-Hub Round by moving instance render update-mode splitting, visible-instance summary caching, and proxy-box fallback drawing out of `src/presentation/render/render.js`.
+
+Rules:
+
+- `src/presentation/render/instances/instance-renderable-builder.js` owns instance render update-mode normalization, prefab render update-mode selection, dynamic/static instance splitting, visible-instance summary caching, and instance proxy box fallback drawing.
+- `src/presentation/render/render.js` must not re-own implementations of `isInstanceDynamicRenderableForFrame`, `buildInstanceRenderUpdateModeIndex`, `getDynamicInstanceSplitForRender`, `getVisibleInstanceSummaryForRender`, or `drawInstanceProxyBoxes`.
+- This owner must not own sprite/Habbo/player rendering, terrain renderable construction, render frame planning, placement preview, projection debug overlays, Canvas2D backend drawing, UI panel refresh, controller flow, asset management, or scene storage.
+- Keep `instance-renderable-builder.js` loaded before `src/presentation/render/render.js` in `index.html`.
+- Do not create `instance-utils.js`, `render-helpers.js`, or similar mixed buckets; if instance rendering grows further, split by update-mode, visibility summary, and proxy fallback domains.
+
+Required checks:
+
+```bash
+node tests/instance-renderable-builder-boundary.test.js
+node scripts/check_instance_renderable_builder_boundary.js
+node scripts/check_all_guardrails.js
+```
+
+---
+
+## P12b-2 Projection / camera render-scope boundary
+
+P12b-2 continues the Render.js De-Hub Round by moving main-camera settings, viewport/world-bound projection, camera-culling filters, visibility-count caching, and camera-bounds debug drawing out of `src/presentation/render/render.js`.
+
+Rules:
+
+- `src/presentation/render/projection/render-scope-builder.js` owns main camera render settings accessors, viewport screen bounds, viewport-to-world bounds projection, culling-world bounds expansion, camera-scope caching, visibility-count caching, camera-culling filters, and camera-bounds debug drawing.
+- `src/presentation/render/render.js` must not re-own implementations of `getMainCameraRenderScope`, `computeMainEditorViewportWorldBounds`, `filterRenderablesForMainCameraScope`, `filterLightsForMainCameraScope`, `filterBoxesForMainCameraScope`, or `drawMainCameraBoundsDebug`.
+- This owner must not own terrain renderable construction, sprite/Habbo/player rendering, instance render update-mode splitting, render frame planning, placement preview, Canvas2D backend drawing, UI panel refresh, controller flow, asset management, or scene storage.
+- Keep `render-scope-builder.js` loaded before `src/presentation/render/render.js` in `index.html`.
+- Do not create `projection-utils.js`, `camera-helpers.js`, or similar mixed buckets; if projection/camera scope grows further, split by projection math, visibility filtering, and debug drawing domains.
+
+Required checks:
+
+```bash
+node tests/render-scope-builder-boundary.test.js
+node scripts/check_render_scope_builder_boundary.js
+node scripts/check_all_guardrails.js
+```
+
+---
+
+## P12b-3 Static Renderable Facade Boundary
+
+`src/presentation/render/renderables/static-renderable-facade.js` owns the static-world renderable builder and static-world render-cache coordinator lookup/dependency glue.
+
+Rules:
+
+- `render.js` must not reimplement `resolveRenderFunctionDependency`, `requireStaticWorldRenderableBuilderForRender`, `createStaticWorldRenderableBuilderDepsForRender`, `buildStaticWorldChunkRenderables`, `requireStaticWorldRenderCacheCoordinatorForRender`, `createStaticWorldRenderCacheCoordinatorDepsForRender`, or `rebuildStaticBoxRenderCacheIfNeeded`.
+- The facade owner must stay limited to static renderable build/cache delegation. Do not add terrain renderable construction, sprite drawing, placement preview, frame plan, or projection scope logic to this file.
+- `src/presentation/render/renderables/static-renderable-facade.js` must load before `src/presentation/render/render.js`.
+- Run `node scripts/check_static_renderable_facade_boundary.js` after touching this boundary.
+
+### P12b-4：Render diagnostics facade boundary
+
+- `src/presentation/render/diagnostics/render-diagnostics-facade.js` owns render.js-facing diagnostics lookup, build-diagnostics gate delegation, frame/cache/zoom diagnostic forwarding, terrain first-frame diagnostics context, and render-function timing/debug breakdown buckets.
+- `src/presentation/render/render.js` must not re-own these diagnostics/debug payload functions. It may call the global facade functions for compatibility, but implementation must remain in the diagnostics owner.
+- The diagnostics facade must not contain Canvas drawing, terrain/sprite/preview/frame-plan construction, UI DOM, controller flow, asset/storage/file IO, or generic render helpers.
+- Boundary checks: `node scripts/check_render_diagnostics_facade_boundary.js` and `node tests/render-diagnostics-facade-boundary.test.js`.
+
+
+### P12b-5：Actor interaction order diagnostics boundary
+
+- `src/presentation/render/diagnostics/actor-interaction-order-diagnostics.js` owns actor interaction sort diagnostic runtime state, enablement checks, export-channel logging, render-entry/final-order diagnostic payloads, actor diagnostic summarizers, and duplicate diagnostic signature suppression.
+- `src/presentation/render/render.js` must not re-own `__actorInteractionOrderDiagState`, actor-sort localStorage flag reads, actor diagnostic payload summarizer bodies, or candidate/replacement/final-order duplicate signature state. It may keep compatibility wrappers that delegate to the diagnostics owner.
+- The actor diagnostics owner must stay diagnostics-only. It must not own actor interaction sorting/replacement rules, renderable construction, Canvas drawing, frame-plan assembly, UI DOM, controller flow, asset/storage/file IO, or generic render helpers.
+- Boundary checks: `node scripts/check_actor_interaction_order_diagnostics_boundary.js` and `node tests/actor-interaction-order-diagnostics-boundary.test.js`.
+
+### P12b-6：Stable local actor demerge boundary
+
+- `src/presentation/render/interaction/stable-local-demerge.js` owns stable local actor demerge, support-top packet predicates, local demerge cache state, near-player descriptor splitting, residual descriptor re-merge, and stable local demerge result summaries.
+- `src/presentation/render/render.js` must not re-own `__stableLocalDemergeCache`, stable-local demerge cache key construction, near-player descriptor classification bodies, residual descriptor merge bodies, or stable local demerge packet construction. It may keep compatibility wrappers that delegate to the interaction owner.
+- The stable local demerge owner must stay interaction/sort-domain only. It must not own actor order diagnostics runtime state, Canvas drawing, DOM/UI, controller flow, asset/storage/file IO, generic render helpers, or the full actor replacement pipeline.
+- Boundary checks: `node scripts/check_stable_local_demerge_boundary.js` and `node tests/stable-local-demerge-boundary.test.js`.
+
+## P12b-7 Renderable Order Adapter Boundary
+
+P12b-7 starts the static/dynamic occlusion cleanup by moving render-facing sort-meta, comparator, draw-position, and sorted stream merge adapter logic out of `src/presentation/render/render.js` into:
+
+```text
+src/presentation/render/renderables/renderable-order-adapter.js
+```
+
+Rules:
+
+1. `renderable-order-adapter.js` owns only adapter glue from render-facing callers to pure domain order/view-rotation cores.
+2. Pure order algorithms remain in `src/core/domain/render-order-core.js`; pure view-rotation sort meta remains in `src/core/domain/view-rotation-core.js`.
+3. Actor replacement, stable local demerge, static-world face descriptor construction, canvas drawing, and scene mutation must not be added to this owner.
+4. `render.js` may keep compatibility wrappers, but wrappers must delegate to `requireRenderableOrderAdapterForRender()`.
+5. The owner must load before `src/presentation/render/render.js`.
+
+Required checks:
+
+```bash
+node tests/renderable-order-adapter-boundary.test.js
+node scripts/check_renderable_order_adapter_boundary.js
+node tests/render-order-core.test.js
+node scripts/check_render_order_boundary.js
+```
+
+## P12b-8 Actor Interaction Geometry Boundary
+
+P12b-8 continues actor/static occlusion cleanup by moving actor interaction face-key, group-summary, player sort-meta, no-camera projection, and single-footprint relation geometry out of `src/presentation/render/render.js` into:
+
+```text
+src/presentation/render/interaction/actor-interaction-geometry.js
+```
+
+Rules:
+
+- `actor-interaction-geometry.js` owns actor interaction geometry only: face keys, group keys, group summaries, player-relative sort meta, projection without camera, and single-footprint player relation classification.
+- It must not draw, mutate scene state, emit diagnostics, own replacement packet construction, or own support-top sort override.
+- `render.js` must keep only compatibility wrappers for these functions and delegate to `requireActorInteractionGeometryForRender()`.
+- The owner must load before `stable-local-demerge.js` and before `render.js`.
+- Guardrail: `node scripts/check_actor_interaction_geometry_boundary.js`.
+
+
+## P12b-9 Actor Interaction Replacement Boundary
+
+P12b-9 completes the actor/static replacement slice of the actor occlusion cleanup by moving candidate face-set generation, replacement eligibility, static packet suppression, replacement renderable construction, and replacement result assembly out of `src/presentation/render/render.js` into:
+
+```text
+src/presentation/render/interaction/actor-interaction-replacement.js
+```
+
+Rules:
+
+- `actor-interaction-replacement.js` owns replacement candidate/suppression/replacement assembly only.
+- It must not own actor interaction geometry, stable-local demerge, support-top sort override, diagnostics runtime state, canvas drawing, scene mutation, DOM, storage, or asset loading.
+- `render.js` may keep compatibility wrappers but must delegate replacement logic through `requireActorInteractionReplacementForRender()`.
+- Guardrail: `node scripts/check_actor_interaction_replacement_boundary.js`.
+- Test: `node tests/actor-interaction-replacement-boundary.test.js`.
+
+## P12b-10 Actor Support-Top Sort Override Boundary
+
+P12b-10 completes the support-top special ordering slice by moving the player support-top sort override out of `src/presentation/render/render.js` into:
+
+```text
+src/presentation/render/interaction/actor-support-top-sort-override.js
+```
+
+Rules:
+
+- `actor-support-top-sort-override.js` owns only player support-top sort override.
+- It must not own actor interaction replacement, stable-local demerge, diagnostics runtime state, canvas drawing, scene mutation, DOM, storage, or asset loading.
+- `render.js` may keep a compatibility wrapper but must delegate support-top override through `requireActorSupportTopSortOverrideForRender()`.
+- Guardrail: `node scripts/check_actor_support_top_sort_override_boundary.js`.
+- Test: `node tests/actor-support-top-sort-override-boundary.test.js`.
+
+---
+
+## P12c-1 / P12c-2 static world descriptor + ordering boundaries
+
+- Static world visible-surface cell to face descriptor construction is owned by `src/application/render/static-world-face-descriptor-builder.js`.
+- Static world packet identity and packet ordering are owned by `src/application/render/static-world-packet-ordering.js`.
+- `src/application/render/static-world-renderable-builder.js` remains the chunk-level orchestrator and must not re-own large visible face descriptor loops, face tie priority tables, packet ID/faceKey construction, or direct `packets.sort(compareRenderablesByDomain)` logic.
+- Both owner files stay in `src/application/render/`; they must not depend on DOM, Canvas, localStorage, Image, fetch, storage, UI, or renderer implementation details.
+- Guardrails: `node scripts/check_static_world_face_descriptor_builder_boundary.js` and `node scripts/check_static_world_packet_ordering_boundary.js`.

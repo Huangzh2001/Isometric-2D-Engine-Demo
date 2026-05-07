@@ -7,6 +7,7 @@ const root = path.join(__dirname, '..');
 const indexSource = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const coordinatorSource = fs.readFileSync(path.join(root, 'src/application/render/static-world-render-cache-coordinator.js'), 'utf8');
 const renderSource = fs.readFileSync(path.join(root, 'src/presentation/render/render.js'), 'utf8');
+const staticRenderableFacadeSource = fs.readFileSync(path.join(root, 'src/presentation/render/renderables/static-renderable-facade.js'), 'utf8');
 
 const sandbox = {
   window: {},
@@ -33,9 +34,10 @@ assert(indexSource.includes('src/application/render/static-world-render-cache-co
 assert(indexSource.indexOf('src/application/render/static-world-renderable-builder.js') < indexSource.indexOf('src/application/render/static-world-render-cache-coordinator.js'), 'coordinator should load after static world renderable builder');
 assert(indexSource.indexOf('src/application/render/static-world-render-cache-coordinator.js') < indexSource.indexOf('src/presentation/render/render.js'), 'coordinator must load before render.js');
 
-assert(renderSource.includes('requireStaticWorldRenderCacheCoordinatorForRender'), 'render.js should use coordinator require wrapper');
-assert(renderSource.includes('createStaticWorldRenderCacheCoordinatorDepsForRender'), 'render.js should provide explicit coordinator deps');
-assert(renderSource.includes('.rebuildStaticWorldRenderCache('), 'render.js wrapper should delegate to coordinator.rebuildStaticWorldRenderCache');
+assert(staticRenderableFacadeSource.includes('requireStaticWorldRenderCacheCoordinatorForRender'), 'static-renderable-facade should use coordinator require wrapper');
+assert(staticRenderableFacadeSource.includes('createStaticWorldRenderCacheCoordinatorDepsForRender'), 'static-renderable-facade should provide explicit coordinator deps');
+assert(staticRenderableFacadeSource.includes('.rebuildStaticWorldRenderCache('), 'static-renderable-facade wrapper should delegate to coordinator.rebuildStaticWorldRenderCache');
+assert(!renderSource.includes('function requireStaticWorldRenderCacheCoordinatorForRender('), 'render.js should not own coordinator require wrapper');
 assert(!/function rebuildStaticBoxRenderCacheIfNeeded\s*\([^)]*\)\s*\{[\s\S]{0,2000}const profileStartAt = perfNow/.test(renderSource), 'render.js should no longer own static cache rebuild body');
 
 assert(!/\bctx\s*\./.test(coordinatorSource), 'coordinator must not draw through ctx');

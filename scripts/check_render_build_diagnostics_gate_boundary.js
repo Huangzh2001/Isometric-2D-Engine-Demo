@@ -40,22 +40,29 @@ function listRootHtml() {
 const ownerRel = 'src/presentation/render/diagnostics/render-build-diagnostics-gate.js';
 const diagnosticsRel = 'src/presentation/render/diagnostics/render-diagnostics.js';
 const renderRel = 'src/presentation/render/render.js';
+const facadeRel = 'src/presentation/render/diagnostics/render-diagnostics-facade.js';
 
 if (!exists(ownerRel)) errors.push(`missing ${ownerRel}`);
 if (!exists(diagnosticsRel)) errors.push(`missing ${diagnosticsRel}`);
 if (!exists(renderRel)) errors.push(`missing ${renderRel}`);
+if (!exists(facadeRel)) errors.push(`missing ${facadeRel}`);
 
 const ownerSource = exists(ownerRel) ? read(ownerRel) : '';
 const renderSource = exists(renderRel) ? read(renderRel) : '';
+const facadeSource = exists(facadeRel) ? read(facadeRel) : '';
 
 for (const htmlRel of listRootHtml()) {
   const source = read(htmlRel);
   const ownerIdx = idx(source, ownerRel);
   const diagnosticsIdx = idx(source, diagnosticsRel);
   const renderIdx = idx(source, renderRel);
+  const facadeIdx = idx(source, facadeRel);
   if (renderIdx >= 0 && ownerIdx < 0) errors.push(`${htmlRel}: missing ${ownerRel} before render.js`);
   if (renderIdx >= 0 && ownerIdx > renderIdx) errors.push(`${htmlRel}: ${ownerRel} must load before ${renderRel}`);
+  if (renderIdx >= 0 && facadeIdx < 0) errors.push(`${htmlRel}: missing ${facadeRel} before render.js`);
+  if (renderIdx >= 0 && facadeIdx > renderIdx) errors.push(`${htmlRel}: ${facadeRel} must load before ${renderRel}`);
   if (ownerIdx >= 0 && diagnosticsIdx >= 0 && diagnosticsIdx > ownerIdx) errors.push(`${htmlRel}: ${diagnosticsRel} must load before ${ownerRel}`);
+  if (facadeIdx >= 0 && ownerIdx >= 0 && ownerIdx > facadeIdx) errors.push(`${htmlRel}: ${ownerRel} must load before ${facadeRel}`);
 }
 
 if (!ownerSource.includes("layer: 'presentation/render/diagnostics'")) errors.push(`${ownerRel}: must identify presentation/render/diagnostics layer`);
@@ -87,9 +94,9 @@ for (const required of [
 for (const marker of [
   'function requireRenderBuildDiagnosticsGateForRender()',
   'function createRenderBuildDiagnosticsGateDepsForRender()',
-  'P11a-7 note: detailed static/chunk/color build diagnostic emitter gating'
+  'emitRenderBuildDiagnostic'
 ]) {
-  if (!renderSource.includes(marker)) errors.push(`${renderRel}: missing build diagnostics gate marker ${marker}`);
+  if (!facadeSource.includes(marker)) errors.push(`${facadeRel}: missing build diagnostics gate marker ${marker}`);
 }
 
 for (const fn of [
@@ -110,19 +117,22 @@ for (const fn of [
   'emitLightingShadowBypassVerify',
   'emitStep4ShadowPathSummary'
 ]) {
-  const body = bodyOf(renderSource, fn);
+  const body = bodyOf(facadeSource, fn);
   if (!body) {
-    errors.push(`${renderRel}: missing ${fn}`);
+    errors.push(`${facadeRel}: missing ${fn}`);
     continue;
   }
+  if (renderSource.includes(`function ${fn}(`)) {
+    errors.push(`${renderRel}: ${fn} moved to diagnostics facade but is still defined in render.js`);
+  }
   if (!body.includes('emitRenderBuildDiagnostic(') && !body.includes('requireRenderBuildDiagnosticsGateForRender()')) {
-    errors.push(`${renderRel}: ${fn} must delegate to ${ownerRel}`);
+    errors.push(`${facadeRel}: ${fn} must delegate to ${ownerRel}`);
   }
   if (body.includes('isDetailedTerrainProfilingEnabledForRender()')) {
-    errors.push(`${renderRel}: ${fn} must not own detailed profiling gate`);
+    errors.push(`${facadeRel}: ${fn} must not own detailed profiling gate`);
   }
   if (body.includes('requireRenderDiagnosticsForRender().')) {
-    errors.push(`${renderRel}: ${fn} must not call render diagnostics directly`);
+    errors.push(`${facadeRel}: ${fn} must not call render diagnostics directly`);
   }
 }
 

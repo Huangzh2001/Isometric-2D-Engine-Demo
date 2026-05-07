@@ -26,9 +26,27 @@
     if (ak !== bk) return ak - bk;
     return Number(a && a.tie || 0) - Number(b && b.tie || 0);
   }
+  function requireStaticWorldFaceDescriptorBuilder(deps) {
+    var api = deps && deps.staticWorldFaceDescriptorBuilder ? deps.staticWorldFaceDescriptorBuilder : null;
+    try { api = api || (global && (global.__STATIC_WORLD_FACE_DESCRIPTOR_BUILDER__ || global.__APP_APPLICATION_STATIC_WORLD_FACE_DESCRIPTOR_BUILDER__)); } catch (_) {}
+    if (!api || typeof api.buildStaticWorldFaceDescriptors !== 'function') {
+      throw new Error('Missing static world face descriptor builder owner');
+    }
+    return api;
+  }
+  function requireStaticWorldPacketOrdering(deps) {
+    var api = deps && deps.staticWorldPacketOrdering ? deps.staticWorldPacketOrdering : null;
+    try { api = api || (global && (global.__STATIC_WORLD_PACKET_ORDERING__ || global.__APP_APPLICATION_STATIC_WORLD_PACKET_ORDERING__)); } catch (_) {}
+    if (!api || typeof api.buildStaticWorldPacketIdentity !== 'function' || typeof api.sortStaticWorldPackets !== 'function') {
+      throw new Error('Missing static world packet ordering owner');
+    }
+    return api;
+  }
 
   function buildStaticWorldChunkRenderables(chunk, options, deps) {
     var __deps = deps && typeof deps === 'object' ? deps : {};
+    var staticWorldFaceDescriptorBuilder = requireStaticWorldFaceDescriptorBuilder(__deps);
+    var staticWorldPacketOrdering = requireStaticWorldPacketOrdering(__deps);
     var perfNow = resolveFunction(__deps, 'perfNow', defaultPerfNow);
     var getRenderVisibilityCoreApi = resolveFunction(__deps, 'getRenderVisibilityCoreApi', nullFn);
     var getMainCameraRenderScope = resolveFunction(__deps, 'getMainCameraRenderScope', nullFn);
@@ -149,7 +167,6 @@
     var packets = [];
     var surfaceCells = Array.isArray(surfaceCache.surfaceCells) ? surfaceCache.surfaceCells : [];
     var domainCore = getDomainSceneCoreApi();
-    var faceTiePrio = { lowerRight: 1, lowerLeft: 2, top: 3, east: 1, south: 2, north: 0, west: 0 };
     var staticRenderableBuildProfileStartAt = perfNow();
     var step1PrepareFaceInputsMs = 0;
     var step2BuildRenderableBaseMs = 0;
@@ -203,74 +220,29 @@
     var touchedGlobalRenderableTemplates = false;
     var touchedGlobalStyleCache = false;
     var touchedGlobalMaterialCache = false;
-    var faceDescriptors = [];
-    for (var i = 0; i < surfaceCells.length; i++) {
-      var entry = surfaceCells[i];
-      var cell = entry && entry.box ? entry.box : entry;
-      if (!cell) continue;
-      var visibleFaces = Array.isArray(entry && entry.visibleFaces) && entry.visibleFaces.length ? entry.visibleFaces.slice() : ['top', 'east', 'south'];
-      for (var vf = 0; vf < visibleFaces.length; vf++) {
-        scannedFaceCount += 1;
-        var prepareFaceInputsStartAt = perfNow();
-        var semanticFace = String(visibleFaces[vf] || 'top');
-        var screenFace = getScreenFaceForSemanticFace(semanticFace, currentViewRotation);
-        var normal = getSemanticFaceNormal(semanticFace || screenFace);
-        var mergeCoords = getStaticWorldFaceMergeCoords(cell, semanticFace);
-        if (!mergeCoords) {
-          step1PrepareFaceInputsMs += Math.max(0, perfNow() - prepareFaceInputsStartAt);
-          continue;
-        }
-        step1PrepareFaceInputsMs += Math.max(0, perfNow() - prepareFaceInputsStartAt);
-        var sortKeyStartAt = perfNow();
-        var orderMeta = domainCore && typeof domainCore.computeVoxelRenderableSort === 'function'
-          ? domainCore.computeVoxelRenderableSort({ cell: { x: Number(cell.x || 0), y: Number(cell.y || 0), z: Number(cell.z || 0) }, box: cell, viewRotation: currentViewRotation })
-          : computeViewAwareSortMeta({ x: Number(cell.x || 0), y: Number(cell.y || 0), z: Number(cell.z || 0) }, 1, currentViewRotation);
-        var sortKey = Number(orderMeta.sortKey || 0);
-        var tie = Number(orderMeta.tie || 0) + ((faceTiePrio[screenFace] || 0) * 0.01);
-        var terrainSortBandKey = getTerrainSortBandKeyForRenderFace(cell, semanticFace, mergeCoords, orderMeta);
-        var edgeVisibilitySignature = (cell && cell.generatedBy === 'terrain-generator' && (semanticFace === 'east' || semanticFace === 'south'))
-          ? getTerrainSideEdgeVisibilitySignature(visibleFaces, semanticFace)
-          : null;
-        var sideStepBreakSignature = (cell && cell.generatedBy === 'terrain-generator' && (semanticFace === 'east' || semanticFace === 'south'))
-          ? getTerrainSideStepBreakSignature(cell, semanticFace, chunkOcc)
-          : null;
-        step5ComputeSortKeyMs += Math.max(0, perfNow() - sortKeyStartAt);
-        inputFaceDescriptorCount += 1;
-        var isTerrainFaceMergeCandidate = !!(cell && cell.generatedBy === 'terrain-generator');
-        var terrainMaterialMergeKey = getTerrainMaterialMergeKeyForRenderCell(cell);
-        var terrainMergeSignature = isTerrainFaceMergeCandidate
-          ? getTerrainFaceMergeSignature(cell, semanticFace, screenFace, currentViewRotation)
-          : null;
-        faceDescriptors.push({
-          cell: cell,
-          box: cell || null,
-          instanceId: cell.instanceId || null,
-          prefabId: cell.prefabId || null,
-          semanticFace: semanticFace,
-          screenFace: screenFace,
-          depthKey: vf,
-          sortKey: sortKey,
-          tie: tie,
-          normal: normal,
-          mergePlane: Number(mergeCoords.plane || 0),
-          mergeU: Number(mergeCoords.u || 0),
-          mergeV: Number(mergeCoords.v || 0),
-          mergeWidth: 1,
-          mergeHeight: 1,
-          mergeSignature: isTerrainFaceMergeCandidate
-            ? terrainMergeSignature
-            : getStaticWorldFaceMergeSignature(cell, semanticFace, screenFace, currentViewRotation),
-          terrainMaterialMergeKey: terrainMaterialMergeKey,
-          terrainMergeSignature: terrainMergeSignature,
-          terrainSortBandKey: terrainSortBandKey,
-          edgeVisibilitySignature: edgeVisibilitySignature,
-          sideStepBreakSignature: sideStepBreakSignature,
-          isTerrainFaceMergeCandidate: isTerrainFaceMergeCandidate,
-          memberCount: 1,
-          merged: false
-        });
-      }
-    }
+    var faceDescriptorResult = staticWorldFaceDescriptorBuilder.buildStaticWorldFaceDescriptors({
+      surfaceCells: surfaceCells,
+      currentViewRotation: currentViewRotation,
+      chunkOcc: chunkOcc,
+      domainCore: domainCore
+    }, {
+      perfNow: perfNow,
+      getScreenFaceForSemanticFace: getScreenFaceForSemanticFace,
+      getSemanticFaceNormal: getSemanticFaceNormal,
+      getStaticWorldFaceMergeCoords: getStaticWorldFaceMergeCoords,
+      computeViewAwareSortMeta: computeViewAwareSortMeta,
+      getTerrainSortBandKeyForRenderFace: getTerrainSortBandKeyForRenderFace,
+      getTerrainSideEdgeVisibilitySignature: getTerrainSideEdgeVisibilitySignature,
+      getTerrainSideStepBreakSignature: getTerrainSideStepBreakSignature,
+      getTerrainMaterialMergeKeyForRenderCell: getTerrainMaterialMergeKeyForRenderCell,
+      getTerrainFaceMergeSignature: getTerrainFaceMergeSignature,
+      getStaticWorldFaceMergeSignature: getStaticWorldFaceMergeSignature
+    });
+    var faceDescriptors = faceDescriptorResult && Array.isArray(faceDescriptorResult.faceDescriptors) ? faceDescriptorResult.faceDescriptors : [];
+    scannedFaceCount += Number(faceDescriptorResult && faceDescriptorResult.scannedFaceCount || 0);
+    inputFaceDescriptorCount += Number(faceDescriptorResult && faceDescriptorResult.inputFaceDescriptorCount || faceDescriptors.length || 0);
+    step1PrepareFaceInputsMs += Number(faceDescriptorResult && faceDescriptorResult.step1PrepareFaceInputsMs || 0);
+    step5ComputeSortKeyMs += Number(faceDescriptorResult && faceDescriptorResult.step5ComputeSortKeyMs || 0);
     var renderFaceDescriptors = faceDescriptors;
     var terrainInputFaceDescriptorCount = 0;
     var terrainMergedFaceDescriptorCount = 0;
@@ -388,12 +360,14 @@
       var tie = Number(descriptor.tie || 0);
       var buildRenderableBaseStartAt = perfNow();
       var terrainLoopSignature = buildTerrainPolygonLoopSignature(descriptor);
-      var packetId = descriptor.merged === true
-        ? 'voxel-merge-' + String(cell.instanceId || cell.prefabId || 'x') + '-' + String(descriptor.mergePlane) + '-' + String(descriptor.mergeU) + '-' + String(descriptor.mergeV) + '-' + String(descriptor.mergeWidth || 1) + 'x' + String(descriptor.mergeHeight || 1) + '-' + String(descriptor.memberCount || 1) + '-' + String(terrainLoopSignature || '') + '::' + semanticFace
-        : 'voxel-' + String(cell.id || 'x') + '-' + String(cell.x || 0) + '-' + String(cell.y || 0) + '-' + String(cell.z || 0) + '::' + semanticFace;
-      var faceKey = descriptor.merged === true
-        ? [cell.instanceId || 'unknown', [Number(descriptor.mergePlane || 0), Number(descriptor.mergeU || 0), Number(descriptor.mergeV || 0), Number(descriptor.mergeWidth || 1), Number(descriptor.mergeHeight || 1), Number(descriptor.memberCount || 1)].join(','), terrainLoopSignature || '', semanticFace, screenFace].join('|')
-        : [cell.instanceId || 'unknown', [Number(cell.x || 0), Number(cell.y || 0), Number(cell.z || 0)].join(','), semanticFace, screenFace].join('|');
+      var packetIdentity = staticWorldPacketOrdering.buildStaticWorldPacketIdentity(descriptor, {
+        cell: cell,
+        semanticFace: semanticFace,
+        screenFace: screenFace,
+        terrainLoopSignature: terrainLoopSignature
+      });
+      var packetId = String(packetIdentity && packetIdentity.packetId || 'voxel-missing::' + semanticFace);
+      var faceKey = String(packetIdentity && packetIdentity.faceKey || 'unknown|missing|' + semanticFace + '|' + screenFace);
       step2BuildRenderableBaseMs += Math.max(0, perfNow() - buildRenderableBaseStartAt);
       var styleOrMaterialStartAt = perfNow();
       var terrainPatternDescriptor = getTerrainMaterialPatternDescriptorForRenderCell(cell, semanticFace);
@@ -477,8 +451,11 @@
     var step5BuildPacketsMs = Math.max(0, perfNow() - packetBuildStartAt);
     var staticRenderableBuildStartAt = perfNow();
     var finalizeRenderableListStartAt = perfNow();
-    packets.sort(compareRenderablesByDomain);
-    step8FinalizeRenderableListMs += Math.max(0, perfNow() - finalizeRenderableListStartAt);
+    var packetOrderResult = staticWorldPacketOrdering.sortStaticWorldPackets(packets, {
+      compareRenderablesByDomain: compareRenderablesByDomain,
+      perfNow: perfNow
+    });
+    step8FinalizeRenderableListMs += Number(packetOrderResult && packetOrderResult.sortMs || 0);
     var step6BuildStaticRenderablesMs = Math.max(0, perfNow() - staticRenderableBuildStartAt);
     var step7SortRenderablesMs = Number(step8FinalizeRenderableListMs.toFixed(3));
     var sortStartAt = perfNow();

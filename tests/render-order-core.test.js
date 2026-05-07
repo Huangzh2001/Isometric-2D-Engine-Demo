@@ -19,6 +19,8 @@ function assertLoadsBefore(html, before, after) {
 const coreRel = 'src/core/domain/render-order-core.js';
 const coreSource = read(coreRel);
 const renderSource = read('src/presentation/render/render.js');
+const orderAdapterSource = read('src/presentation/render/renderables/renderable-order-adapter.js');
+const playerFastPathSource = read('src/presentation/render/frame/player-move-fast-path.js');
 const indexHtml = read('index.html');
 const bindingsSource = read('src/infrastructure/bootstrap/core-domain-bindings.js');
 
@@ -35,7 +37,8 @@ assert.strictEqual(typeof api.getRenderableStaticOrderSignature, 'function', 'ge
 
 assertLoadsBefore(indexHtml, coreRel, 'src/application/render/static-world-renderable-builder.js');
 assertLoadsBefore(indexHtml, coreRel, 'src/application/render/main-frame-renderable-assembler.js');
-assertLoadsBefore(indexHtml, coreRel, 'src/presentation/render/render.js');
+assertLoadsBefore(indexHtml, coreRel, 'src/presentation/render/renderables/renderable-order-adapter.js');
+assertLoadsBefore(indexHtml, 'src/presentation/render/renderables/renderable-order-adapter.js', 'src/presentation/render/render.js');
 assert(bindingsSource.includes('domain.renderOrderCore'), 'bootstrap should bind render order core into App.domain');
 
 assert(coreSource.includes("layer: 'core/domain'"), 'render order core should identify core/domain layer');
@@ -45,14 +48,16 @@ assert(!/\blocalStorage\s*\./.test(coreSource), 'render order core must not read
 assert(!/\bnew\s+Image\b/.test(coreSource), 'render order core must not allocate Image');
 
 assert(renderSource.includes('requireRenderOrderCoreForRender'), 'render.js should require render-order core');
-assert(renderSource.includes('requireRenderOrderCoreForRender().compareRenderableOrder'), 'render compare fallback should delegate to render-order core');
-assert(renderSource.includes('requireRenderOrderCoreForRender().mergeSortedRenderables'), 'render merge wrapper should delegate to render-order core');
-assert(renderSource.includes('requireRenderOrderCoreForRender().insertRenderableIntoSortedOrder'), 'render binary insertion wrapper should delegate to render-order core');
-assert(renderSource.includes('requireRenderOrderCoreForRender().sortRenderablesByOrder'), 'render sort wrapper should delegate to render-order core');
+assert(orderAdapterSource.includes('orderCore.compareRenderableOrder'), 'renderable order adapter compare fallback should delegate to render-order core');
+assert(orderAdapterSource.includes('orderCore.mergeSortedRenderables'), 'renderable order adapter merge wrapper should delegate to render-order core');
+assert(renderSource.includes('requireRenderableOrderAdapterForRender().compareRenderablesByDomain'), 'render compare wrapper should delegate to renderable order adapter');
+assert(renderSource.includes('requireRenderableOrderAdapterForRender().mergeSortedRenderables'), 'render merge wrapper should delegate to renderable order adapter');
+assert((renderSource + playerFastPathSource).includes('requireRenderOrderCoreForRender().insertRenderableIntoSortedOrder'), 'render/player fast-path binary insertion wrapper should delegate to render-order core');
+assert((renderSource + playerFastPathSource).includes('requireRenderOrderCoreForRender().sortRenderablesByOrder'), 'render/player fast-path sort wrapper should delegate to render-order core');
 const assemblerSource = read('src/application/render/main-frame-renderable-assembler.js');
 assert(assemblerSource.includes('sortRenderablesByOrderForRender(dynamicRenderables)'), 'main frame assembler should sort dynamic renderables through render-order wrapper');
 assert(!assemblerSource.includes('dynamicRenderables.sort(compareRenderablesByDomain)'), 'main frame assembler must not sort dynamic renderables with direct comparator');
-assert(renderSource.includes('requireRenderOrderCoreForRender().getRenderableStaticOrderSignature'), 'render static signature wrapper should delegate to render-order core');
+assert((renderSource + playerFastPathSource).includes('requireRenderOrderCoreForRender().getRenderableStaticOrderSignature'), 'render/player fast-path static signature wrapper should delegate to render-order core');
 assert(!renderSource.includes('while (i < staticRenderables.length && j < dynamicRenderables.length)'), 'render.js should not retain merge loop body');
 assert(!renderSource.includes('var firstStaticId ='), 'render.js should not retain static order signature body');
 assert(!renderSource.includes('var lo = 0;\n  var hi = list.length;'), 'render.js should not retain binary insertion body');

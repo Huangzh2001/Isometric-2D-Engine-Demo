@@ -36,16 +36,20 @@ function htmlLoadsBefore(source, before, after, htmlRel) {
 
 const builderRel = 'src/application/render/static-world-renderable-builder.js';
 const renderRel = 'src/presentation/render/render.js';
+const facadeRel = 'src/presentation/render/renderables/static-renderable-facade.js';
 
 if (!exists(builderRel)) errors.push(`missing builder: ${builderRel}`);
 if (!exists(renderRel)) errors.push(`missing render file: ${renderRel}`);
+if (!exists(facadeRel)) errors.push(`missing static renderable facade: ${facadeRel}`);
 
 const builderSource = exists(builderRel) ? read(builderRel) : '';
 const renderSource = exists(renderRel) ? read(renderRel) : '';
+const facadeSource = exists(facadeRel) ? read(facadeRel) : '';
 
 for (const htmlRel of listRootHtml()) {
   const source = read(htmlRel);
   htmlLoadsBefore(source, builderRel, renderRel, htmlRel);
+  htmlLoadsBefore(source, facadeRel, renderRel, htmlRel);
 }
 
 if (!builderSource.includes('buildStaticWorldChunkRenderables')) {
@@ -68,14 +72,21 @@ for (const item of forbiddenBuilderPatterns) {
   if (item.pattern.test(builderSource)) errors.push(`${builderRel}: forbidden ${item.reason}`);
 }
 
-if (!renderSource.includes('requireStaticWorldRenderableBuilderForRender')) {
-  errors.push(`${renderRel}: missing requireStaticWorldRenderableBuilderForRender wrapper`);
+const builderFacadeSource = facadeSource || renderSource;
+if (!builderFacadeSource.includes('requireStaticWorldRenderableBuilderForRender')) {
+  errors.push(`${facadeRel}: missing requireStaticWorldRenderableBuilderForRender wrapper`);
 }
-if (!renderSource.includes('createStaticWorldRenderableBuilderDepsForRender')) {
-  errors.push(`${renderRel}: missing explicit builder dependency factory`);
+if (!builderFacadeSource.includes('createStaticWorldRenderableBuilderDepsForRender')) {
+  errors.push(`${facadeRel}: missing explicit builder dependency factory`);
 }
-if (!renderSource.includes('.buildStaticWorldChunkRenderables(')) {
-  errors.push(`${renderRel}: wrapper must delegate to builder.buildStaticWorldChunkRenderables`);
+if (!builderFacadeSource.includes('.buildStaticWorldChunkRenderables(')) {
+  errors.push(`${facadeRel}: wrapper must delegate to builder.buildStaticWorldChunkRenderables`);
+}
+if (renderSource.includes('function requireStaticWorldRenderableBuilderForRender(')) {
+  errors.push(`${renderRel}: static renderable builder lookup must stay in ${facadeRel}`);
+}
+if (renderSource.includes('function createStaticWorldRenderableBuilderDepsForRender(')) {
+  errors.push(`${renderRel}: static renderable builder deps must stay in ${facadeRel}`);
 }
 if (renderSource.includes('var surfaceCells = Array.isArray(surfaceCache.surfaceCells)')) {
   errors.push(`${renderRel}: still owns static world chunk renderable builder body`);
@@ -89,6 +100,7 @@ const report = {
   checkedHtmlEntries: listRootHtml(),
   builderRel,
   renderRel,
+  facadeRel,
   errors,
   warnings
 };

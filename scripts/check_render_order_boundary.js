@@ -31,16 +31,23 @@ function hasFunction(source, name) {
 
 const coreRel = 'src/core/domain/render-order-core.js';
 const renderRel = 'src/presentation/render/render.js';
+const playerFastPathRel = 'src/presentation/render/frame/player-move-fast-path.js';
+const orderAdapterRel = 'src/presentation/render/renderables/renderable-order-adapter.js';
 const assemblerRel = 'src/application/render/main-frame-renderable-assembler.js';
 const bindingsRel = 'src/infrastructure/bootstrap/core-domain-bindings.js';
 
 if (!exists(coreRel)) errors.push(`missing ${coreRel}`);
 if (!exists(renderRel)) errors.push(`missing ${renderRel}`);
+if (!exists(orderAdapterRel)) errors.push(`missing ${orderAdapterRel}`);
+if (!exists(playerFastPathRel)) warnings.push(`missing optional ${playerFastPathRel}; P12a-3 player fast-path boundary may not be present`);
 if (!exists(assemblerRel)) errors.push(`missing ${assemblerRel}`);
 if (!exists(bindingsRel)) errors.push(`missing ${bindingsRel}`);
 
 const coreSource = exists(coreRel) ? read(coreRel) : '';
 const renderSource = exists(renderRel) ? read(renderRel) : '';
+const playerFastPathSource = exists(playerFastPathRel) ? read(playerFastPathRel) : '';
+const orderAdapterSource = exists(orderAdapterRel) ? read(orderAdapterRel) : '';
+const renderOrderDelegationSource = renderSource + '\n' + playerFastPathSource + '\n' + orderAdapterSource;
 const assemblerSource = exists(assemblerRel) ? read(assemblerRel) : '';
 const bindingsSource = exists(bindingsRel) ? read(bindingsRel) : '';
 
@@ -49,7 +56,8 @@ for (const htmlRel of listRootHtml()) {
   htmlLoadsBefore(source, coreRel, 'src/application/render/static-world-renderable-builder.js', htmlRel);
   htmlLoadsBefore(source, coreRel, 'src/application/render/static-world-render-cache-coordinator.js', htmlRel);
   htmlLoadsBefore(source, coreRel, 'src/application/render/main-frame-renderable-assembler.js', htmlRel);
-  htmlLoadsBefore(source, coreRel, 'src/presentation/render/render.js', htmlRel);
+  htmlLoadsBefore(source, coreRel, orderAdapterRel, htmlRel);
+  htmlLoadsBefore(source, orderAdapterRel, 'src/presentation/render/render.js', htmlRel);
 }
 
 for (const name of [
@@ -70,13 +78,13 @@ if (/\bnew\s+Image\b/.test(coreSource)) errors.push(`${coreRel}: must not alloca
 if (!bindingsSource.includes('domain.renderOrderCore')) errors.push(`${bindingsRel}: must bind domain.renderOrderCore`);
 
 for (const marker of [
-  'requireRenderOrderCoreForRender().compareRenderableOrder',
-  'requireRenderOrderCoreForRender().mergeSortedRenderables',
   'requireRenderOrderCoreForRender().insertRenderableIntoSortedOrder',
   'requireRenderOrderCoreForRender().getRenderableStaticOrderSignature'
 ]) {
-  if (!renderSource.includes(marker)) errors.push(`${renderRel}: missing delegation marker ${marker}`);
+  if (!renderOrderDelegationSource.includes(marker)) errors.push(`${renderRel}/${playerFastPathRel}/${orderAdapterRel}: missing delegation marker ${marker}`);
 }
+if (!orderAdapterSource.includes('orderCore.compareRenderableOrder')) errors.push(`${orderAdapterRel}: missing orderCore.compareRenderableOrder delegation`);
+if (!orderAdapterSource.includes('orderCore.mergeSortedRenderables')) errors.push(`${orderAdapterRel}: missing orderCore.mergeSortedRenderables delegation`);
 
 const forbiddenRenderBodies = [
   { snippet: 'while (i < staticRenderables.length && j < dynamicRenderables.length)', reason: 'merge loop belongs in render-order-core' },
@@ -84,7 +92,7 @@ const forbiddenRenderBodies = [
   { snippet: 'var lo = 0;\n  var hi = list.length;', reason: 'binary insertion body belongs in render-order-core' }
 ];
 for (const item of forbiddenRenderBodies) {
-  if (renderSource.includes(item.snippet)) errors.push(`${renderRel}: ${item.reason}`);
+  if (renderOrderDelegationSource.includes(item.snippet)) errors.push(`${renderRel}/${playerFastPathRel}: ${item.reason}`);
 }
 
 if (assemblerSource.includes('dynamicRenderables.sort(compareRenderablesByDomain)')) {
@@ -93,11 +101,11 @@ if (assemblerSource.includes('dynamicRenderables.sort(compareRenderablesByDomain
 if (!assemblerSource.includes('sortRenderablesByOrderForRender(dynamicRenderables)')) {
   errors.push(`${assemblerRel}: missing sortRenderablesByOrderForRender(dynamicRenderables) delegation`);
 }
-if (!renderSource.includes('function sortRenderablesByOrderForRender')) {
-  errors.push(`${renderRel}: missing sortRenderablesByOrderForRender wrapper`);
+if (!renderOrderDelegationSource.includes('function sortRenderablesByOrderForRender')) {
+  errors.push(`${renderRel}/${playerFastPathRel}: missing sortRenderablesByOrderForRender wrapper`);
 }
-if (!renderSource.includes('requireRenderOrderCoreForRender().sortRenderablesByOrder')) {
-  errors.push(`${renderRel}: sortRenderablesByOrderForRender must delegate to render-order-core`);
+if (!renderOrderDelegationSource.includes('requireRenderOrderCoreForRender().sortRenderablesByOrder')) {
+  errors.push(`${renderRel}/${playerFastPathRel}: sortRenderablesByOrderForRender must delegate to render-order-core`);
 }
 
 const report = { status: errors.length ? 'FAIL' : 'PASS', errors, warnings };

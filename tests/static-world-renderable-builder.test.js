@@ -5,8 +5,11 @@ const assert = require('assert');
 
 const root = path.join(__dirname, '..');
 const indexSource = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const faceDescriptorBuilderSource = fs.readFileSync(path.join(root, 'src/application/render/static-world-face-descriptor-builder.js'), 'utf8');
+const packetOrderingSource = fs.readFileSync(path.join(root, 'src/application/render/static-world-packet-ordering.js'), 'utf8');
 const builderSource = fs.readFileSync(path.join(root, 'src/application/render/static-world-renderable-builder.js'), 'utf8');
 const renderSource = fs.readFileSync(path.join(root, 'src/presentation/render/render.js'), 'utf8');
+const staticRenderableFacadeSource = fs.readFileSync(path.join(root, 'src/presentation/render/renderables/static-renderable-facade.js'), 'utf8');
 
 const sandbox = {
   window: {},
@@ -22,24 +25,37 @@ const sandbox = {
   console,
   performance: { now: () => 0 }
 };
+vm.runInNewContext(faceDescriptorBuilderSource, sandbox, { filename: 'static-world-face-descriptor-builder.js' });
+vm.runInNewContext(packetOrderingSource, sandbox, { filename: 'static-world-packet-ordering.js' });
 vm.runInNewContext(builderSource, sandbox, { filename: 'static-world-renderable-builder.js' });
 
 const api = sandbox.window.__STATIC_WORLD_RENDERABLE_BUILDER__;
 assert(api, 'static world renderable builder should expose window.__STATIC_WORLD_RENDERABLE_BUILDER__');
 assert.strictEqual(sandbox.window.__APP_APPLICATION_STATIC_WORLD_RENDERABLE_BUILDER__, api, 'builder should expose app bootstrap handle');
 assert.strictEqual(typeof api.buildStaticWorldChunkRenderables, 'function', 'buildStaticWorldChunkRenderables should be an application function');
+assert(indexSource.includes('src/application/render/static-world-face-descriptor-builder.js'), 'index should load face descriptor builder');
+assert(indexSource.includes('src/application/render/static-world-packet-ordering.js'), 'index should load packet ordering owner');
 assert(indexSource.includes('src/application/render/static-world-renderable-builder.js'), 'index should load static world renderable builder');
+assert(indexSource.indexOf('src/application/render/static-world-face-descriptor-builder.js') < indexSource.indexOf('src/application/render/static-world-renderable-builder.js'), 'face descriptor owner must load before static world renderable builder');
+assert(indexSource.indexOf('src/application/render/static-world-packet-ordering.js') < indexSource.indexOf('src/application/render/static-world-renderable-builder.js'), 'packet ordering owner must load before static world renderable builder');
 assert(indexSource.indexOf('src/application/render/static-world-renderable-builder.js') < indexSource.indexOf('src/presentation/render/render.js'), 'builder must load before render.js');
 
-assert(renderSource.includes('requireStaticWorldRenderableBuilderForRender'), 'render.js should use builder require wrapper');
-assert(renderSource.includes('createStaticWorldRenderableBuilderDepsForRender'), 'render.js should provide explicit builder deps');
-assert(renderSource.includes('staticWorldRenderableBuilder'), 'render.js wrapper should call application builder');
+assert(staticRenderableFacadeSource.includes('requireStaticWorldRenderableBuilderForRender'), 'static-renderable-facade should use builder require wrapper');
+assert(staticRenderableFacadeSource.includes('createStaticWorldRenderableBuilderDepsForRender'), 'static-renderable-facade should provide explicit builder deps');
+assert(staticRenderableFacadeSource.includes('staticWorldRenderableBuilder'), 'static-renderable-facade wrapper should call application builder');
+assert(!renderSource.includes('function requireStaticWorldRenderableBuilderForRender('), 'render.js should not own builder require wrapper');
+assert(!renderSource.includes('function createStaticWorldRenderableBuilderDepsForRender('), 'render.js should not own explicit builder deps');
 assert(!/function buildStaticWorldChunkRenderables\s*\([^)]*\)\s*\{[\s\S]{3000,}var surfaceCells/.test(renderSource), 'render.js should no longer own the large static world chunk builder body');
 
 assert(!/\bctx\s*\./.test(builderSource), 'builder must not draw to canvas ctx');
 assert(!/\bdocument\s*\./.test(builderSource), 'builder must not access document');
 assert(!/\blocalStorage\s*\./.test(builderSource) && !/global\s*\.\s*localStorage/.test(builderSource), 'builder must not access localStorage');
 assert(!/\bnew\s+Image\b/.test(builderSource), 'builder must not allocate Image');
+
+assert(builderSource.includes('requireStaticWorldFaceDescriptorBuilder'), 'builder should require face descriptor owner');
+assert(builderSource.includes('requireStaticWorldPacketOrdering'), 'builder should require packet ordering owner');
+assert(!builderSource.includes('var faceTiePrio ='), 'builder should not own face tie priority table');
+assert(!builderSource.includes('packets.sort(compareRenderablesByDomain)'), 'builder should delegate packet sorting to ordering owner');
 
 const emitted = [];
 function emit(name) {

@@ -34,18 +34,22 @@ function htmlLoadsBefore(source, before, after, htmlRel) {
 const builderRel = 'src/application/render/static-world-renderable-builder.js';
 const coordinatorRel = 'src/application/render/static-world-render-cache-coordinator.js';
 const renderRel = 'src/presentation/render/render.js';
+const facadeRel = 'src/presentation/render/renderables/static-renderable-facade.js';
 
 if (!exists(builderRel)) errors.push(`missing builder: ${builderRel}`);
 if (!exists(coordinatorRel)) errors.push(`missing coordinator: ${coordinatorRel}`);
 if (!exists(renderRel)) errors.push(`missing render file: ${renderRel}`);
+if (!exists(facadeRel)) errors.push(`missing static renderable facade: ${facadeRel}`);
 
 const coordinatorSource = exists(coordinatorRel) ? read(coordinatorRel) : '';
 const renderSource = exists(renderRel) ? read(renderRel) : '';
+const facadeSource = exists(facadeRel) ? read(facadeRel) : '';
 
 for (const htmlRel of listRootHtml()) {
   const source = read(htmlRel);
   htmlLoadsBefore(source, builderRel, coordinatorRel, htmlRel);
   htmlLoadsBefore(source, coordinatorRel, renderRel, htmlRel);
+  htmlLoadsBefore(source, facadeRel, renderRel, htmlRel);
 }
 
 if (!coordinatorSource.includes('rebuildStaticWorldRenderCache')) {
@@ -68,18 +72,25 @@ for (const item of forbiddenCoordinatorPatterns) {
   if (item.pattern.test(coordinatorSource)) errors.push(`${coordinatorRel}: forbidden ${item.reason}`);
 }
 
-if (!renderSource.includes('requireStaticWorldRenderCacheCoordinatorForRender')) {
-  errors.push(`${renderRel}: missing requireStaticWorldRenderCacheCoordinatorForRender wrapper`);
+const cacheFacadeSource = facadeSource || renderSource;
+if (!cacheFacadeSource.includes('requireStaticWorldRenderCacheCoordinatorForRender')) {
+  errors.push(`${facadeRel}: missing requireStaticWorldRenderCacheCoordinatorForRender wrapper`);
 }
-if (!renderSource.includes('createStaticWorldRenderCacheCoordinatorDepsForRender')) {
-  errors.push(`${renderRel}: missing explicit coordinator dependency factory`);
+if (!cacheFacadeSource.includes('createStaticWorldRenderCacheCoordinatorDepsForRender')) {
+  errors.push(`${facadeRel}: missing explicit coordinator dependency factory`);
 }
-if (!renderSource.includes('.rebuildStaticWorldRenderCache(')) {
-  errors.push(`${renderRel}: wrapper must delegate to coordinator.rebuildStaticWorldRenderCache`);
+if (!cacheFacadeSource.includes('.rebuildStaticWorldRenderCache(')) {
+  errors.push(`${facadeRel}: wrapper must delegate to coordinator.rebuildStaticWorldRenderCache`);
 }
-const rebuildWrapperStart = renderSource.indexOf('function rebuildStaticBoxRenderCacheIfNeeded');
-const rebuildWrapperEnd = rebuildWrapperStart >= 0 ? renderSource.indexOf('function mergeSortedRenderables', rebuildWrapperStart) : -1;
-const rebuildWrapperSource = rebuildWrapperStart >= 0 && rebuildWrapperEnd > rebuildWrapperStart ? renderSource.slice(rebuildWrapperStart, rebuildWrapperEnd) : '';
+if (renderSource.includes('function requireStaticWorldRenderCacheCoordinatorForRender(')) {
+  errors.push(`${renderRel}: static render cache coordinator lookup must stay in ${facadeRel}`);
+}
+if (renderSource.includes('function createStaticWorldRenderCacheCoordinatorDepsForRender(')) {
+  errors.push(`${renderRel}: static render cache coordinator deps must stay in ${facadeRel}`);
+}
+const rebuildWrapperStart = cacheFacadeSource.indexOf('function rebuildStaticBoxRenderCacheIfNeeded');
+const rebuildWrapperEnd = rebuildWrapperStart >= 0 ? cacheFacadeSource.indexOf('var api = {', rebuildWrapperStart) : -1;
+const rebuildWrapperSource = rebuildWrapperStart >= 0 && rebuildWrapperEnd > rebuildWrapperStart ? cacheFacadeSource.slice(rebuildWrapperStart, rebuildWrapperEnd) : '';
 if (rebuildWrapperSource.includes('const profileStartAt = perfNow')) {
   errors.push(`${renderRel}: still owns static cache rebuild body`);
 }
@@ -93,6 +104,7 @@ const report = {
   builderRel,
   coordinatorRel,
   renderRel,
+  facadeRel,
   errors,
   warnings
 };
