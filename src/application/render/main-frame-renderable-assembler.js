@@ -185,16 +185,18 @@ function buildRenderablesForMainFrameAssembler() {
     var playerSortMeta = (getDomainSceneCoreApi() && typeof getDomainSceneCoreApi().computePlayerActorRenderableSort === 'function')
       ? getDomainSceneCoreApi().computePlayerActorRenderableSort({ player: player, viewRotation: normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation) })
       : Object.assign({ tie: 700000 }, computeViewAwareSortMeta({ x: player.x, y: player.y, z: playerZ }, 0, normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation)));
+    var playerRenderZ = Number(playerSortMeta && playerSortMeta.depthAnchor && playerSortMeta.depthAnchor.z != null ? playerSortMeta.depthAnchor.z : playerZ);
+    if (!Number.isFinite(playerRenderZ)) playerRenderZ = playerZ;
     dynamicRenderables.push({
       id: 'player-avatar',
       kind: 'player-avatar',
       sortMode: 'player-foot-anchor',
       sortKey: playerSortMeta.sortKey,
       tie: playerSortMeta.tie,
-      depthAnchor: playerSortMeta.depthAnchor || { x: Number(player.x || 0), y: Number(player.y || 0), z: playerZ },
+      depthAnchor: playerSortMeta.depthAnchor || { x: Number(player.x || 0), y: Number(player.y || 0), z: playerRenderZ },
       worldX: Number(player.x || 0),
       worldY: Number(player.y || 0),
-      worldZ: playerZ,
+      worldZ: playerRenderZ,
       draw: () => drawPlayerAvatar(),
     });
     playerActorBuildMs += Math.max(0, perfNow() - playerActorStartAt);

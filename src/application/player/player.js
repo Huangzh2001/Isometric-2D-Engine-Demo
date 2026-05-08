@@ -40,6 +40,7 @@ function getPlayerStepCoreApi() {
 function ensurePlayerStepState() {
   if (player.z == null || !Number.isFinite(Number(player.z))) player.z = 0;
   if (player.visualZ == null || !Number.isFinite(Number(player.visualZ))) player.visualZ = Number(player.z || 0);
+  if (player.renderSortZ == null || !Number.isFinite(Number(player.renderSortZ))) player.renderSortZ = Number(player.z || 0);
   if (!player.jump || typeof player.jump !== 'object') player.jump = {};
   if (player.jump.active == null) player.jump.active = false;
   if (player.jump.fromZ == null) player.jump.fromZ = Number(player.z || 0);
@@ -54,6 +55,7 @@ function resetPlayer() {
   player.y = 1.1;
   player.z = 0;
   player.visualZ = 0;
+  player.renderSortZ = 0;
   player.walk = 0;
   player.dir = 'down';
   player.moving = false;
@@ -65,7 +67,7 @@ function resetPlayer() {
     duration: Number(settings.playerJumpDurationSec || 0.18),
     lift: Number(settings.playerJumpLiftCells || 0.35),
   };
-  playerRoute('resetPlayer', { x: player.x, y: player.y, z: player.z, visualZ: player.visualZ });
+  playerRoute('resetPlayer', { x: player.x, y: player.y, z: player.z, visualZ: player.visualZ, renderSortZ: player.renderSortZ });
 }
 
 function clampPlayerToWorld() {
@@ -292,6 +294,7 @@ function startPlayerStepJump(fromZ, toZ, axis, mode) {
   ));
 
   player.visualZ = player.jump.fromZ;
+  player.renderSortZ = player.jump.fromZ;
 
   playerStepLog(isDrop ? 'drop-start' : 'jump-start', {
     axis: axis || null,
@@ -307,6 +310,7 @@ function updatePlayerJumpVisual(dt) {
   ensurePlayerStepState();
   if (!player.jump.active) {
     player.visualZ = Number(player.z || 0);
+    player.renderSortZ = Number(player.z || 0);
     return false;
   }
   var duration = Math.max(0.05, Number(player.jump.duration || settings.playerJumpDurationSec || 0.18));
@@ -314,12 +318,14 @@ function updatePlayerJumpVisual(dt) {
   var p = clamp(player.jump.t / duration, 0, 1);
   var baseZ = Number(player.jump.fromZ || 0) + (Number(player.jump.toZ || 0) - Number(player.jump.fromZ || 0)) * p;
   var arc = Math.sin(Math.PI * p) * Math.max(0, Number(player.jump.lift || settings.playerJumpLiftCells || 0.35));
+  player.renderSortZ = baseZ;
   player.visualZ = baseZ + arc;
   if (p >= 1) {
     var endedMode = player.jump.mode || 'jump-up';
     player.jump.active = false;
     player.z = Number(player.jump.toZ || player.z || 0);
     player.visualZ = player.z;
+    player.renderSortZ = player.z;
     playerStepLog(endedMode === 'drop' ? 'drop-end' : 'jump-end', { z: Number(player.z.toFixed(3)), position: { x: Number(player.x.toFixed(3)), y: Number(player.y.toFixed(3)) } });
   }
   return true;
@@ -342,6 +348,7 @@ function applyResolvedPlayerMove(result, axis) {
     startPlayerStepJump(result.fromZ, result.toZ, axis, result.mode);
   } else if (!player.jump || !player.jump.active) {
     player.visualZ = player.z;
+    player.renderSortZ = player.z;
   }
   if (result.mode === 'jump-up' || result.mode === 'drop' || verboseLog) {
     playerStepLog('move-accepted', {

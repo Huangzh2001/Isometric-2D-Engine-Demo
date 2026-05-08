@@ -123,14 +123,26 @@
     var effectiveSettings = uiBuildEffectiveRenderSettings(settings, deps);
     var inspectorState = getInspectorState(deps);
     var skipControlWrite = uiIsRenderControlsInteractionLocked() || !!(inspectorState && inspectorState.activeTab === 'render');
-    if (!skipControlWrite && ui.renderFaceMergeEnabled) ui.renderFaceMergeEnabled.checked = effectiveSettings.staticWorldFaceMergeEnabled !== false;
+    var faceMergeEnabled = effectiveSettings.staticWorldFaceMergeEnabled !== false;
+    if (!skipControlWrite && ui.renderFaceMergeEnabled) ui.renderFaceMergeEnabled.checked = faceMergeEnabled;
+    if (ui.renderFaceMergeSubPage) {
+      ui.renderFaceMergeSubPage.disabled = !faceMergeEnabled;
+      try { ui.renderFaceMergeSubPage.classList.toggle('isDisabled', !faceMergeEnabled); } catch (_) {}
+    }
+    if (ui.renderFaceMergeSubPageHint) {
+      ui.renderFaceMergeSubPageHint.textContent = faceMergeEnabled
+        ? '这些设置只在 Face Merge 开启时有效。'
+        : 'Face Merge 已关闭：下面的 zoom 条件禁用规则当前无效。';
+    }
     if (!skipControlWrite && ui.renderDisableFaceMergeAtZoomEnabled) ui.renderDisableFaceMergeAtZoomEnabled.checked = !!effectiveSettings.disableFaceMergeAtOrAboveZoomEnabled;
     if (!skipControlWrite && ui.renderDisableFaceMergeAtZoomThreshold) ui.renderDisableFaceMergeAtZoomThreshold.value = String(Number(effectiveSettings.disableFaceMergeAtOrAboveZoomThreshold || 1.6).toFixed(2));
     if (ui.renderSettingsSummary) {
-      var mergeSummary = effectiveSettings.staticWorldFaceMergeEnabled === false ? '关闭' : '开启';
-      var zoomRuleSummary = effectiveSettings.disableFaceMergeAtOrAboveZoomEnabled === true
-        ? ('开启（zoom ≥ ' + Number(effectiveSettings.disableFaceMergeAtOrAboveZoomThreshold || 1.6).toFixed(2) + ' 时禁用）')
-        : '关闭';
+      var mergeSummary = faceMergeEnabled ? '开启' : '关闭';
+      var zoomRuleSummary = !faceMergeEnabled
+        ? '无效（Face Merge 已关闭）'
+        : (effectiveSettings.disableFaceMergeAtOrAboveZoomEnabled === true
+          ? ('开启（zoom ≥ ' + Number(effectiveSettings.disableFaceMergeAtOrAboveZoomThreshold || 1.6).toFixed(2) + ' 时禁用）')
+          : '关闭');
       ui.renderSettingsSummary.textContent = 'Face Merge：' + mergeSummary + '；Zoom 条件禁用：' + zoomRuleSummary + '；当前 Zoom：' + Number(effectiveSettings.zoom || 1).toFixed(2) + 'x';
     }
     return effectiveSettings;

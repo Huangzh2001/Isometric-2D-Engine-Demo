@@ -3458,6 +3458,15 @@ function isStableActorSortModeEnabledForRender() {
   return true;
 }
 
+function isStableLocalDemergeExplicitlyEnabledForRender() {
+  try {
+    if (typeof localStorage === 'undefined') return false;
+    return localStorage.getItem('stableActorSortDemerge') === '1' || localStorage.getItem('experimentalStableLocalDemerge') === '1';
+  } catch (_) {
+    return false;
+  }
+}
+
 
 function requireStableLocalDemergeForRender() {
   var globalObj = (typeof window !== 'undefined') ? window : globalThis;
@@ -3476,6 +3485,7 @@ function createStableLocalDemergeDepsForRender() {
   return {
     getStableActorSortApiForRender: getStableActorSortApiForRender,
     isStableActorSortModeEnabledForRender: isStableActorSortModeEnabledForRender,
+    isStableLocalDemergeExplicitlyEnabledForRender: isStableLocalDemergeExplicitlyEnabledForRender,
     normalizeMainEditorViewRotationValue: normalizeMainEditorViewRotationValue,
     getActorInteractionSortRadiusForRender: getActorInteractionSortRadiusForRender,
     compareRenderablesByDomain: compareRenderablesByDomain,

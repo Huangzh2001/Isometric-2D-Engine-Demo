@@ -1062,6 +1062,15 @@ def guess_content_type(path: Path) -> str:
 
 
 class Handler(SimpleHTTPRequestHandler):
+    def end_headers(self):
+        try:
+            self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+            self.send_header('Pragma', 'no-cache')
+            self.send_header('Expires', '0')
+        except Exception:
+            pass
+        return super().end_headers()
+
     def _json(self, code: int, payload: dict | list):
         data = json.dumps(payload, ensure_ascii=False, indent=2).encode('utf-8')
         parsed_path = ''

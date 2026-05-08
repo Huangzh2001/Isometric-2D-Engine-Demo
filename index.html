@@ -236,11 +236,24 @@
       <div class="controls">
         <div class="group inspectorGroup">
           <h2>渲染 / Rendering</h2>
-          <div class="hintBox">这里集中控制 static-world face merge 相关开关。你可以直接关闭 face merge，或设置为当 zoom 放大到某个程度时自动退回逐方块/逐小面渲染。</div>
-          <label style="display:flex;align-items:center;gap:8px;"><input id="renderFaceMergeEnabled" type="checkbox" checked onclick="window.__UI_RENDER_CONTROLS_API__&&window.__UI_RENDER_CONTROLS_API__.setFaceMergeEnabled(this.checked, 'render-panel:inline-click')" onchange="window.__UI_RENDER_CONTROLS_API__&&window.__UI_RENDER_CONTROLS_API__.setFaceMergeEnabled(this.checked, 'render-panel:inline-change')"> 启用 Face Merge</label>
-          <label style="display:flex;align-items:center;gap:8px;"><input id="renderDisableFaceMergeAtZoomEnabled" type="checkbox" onclick="window.__UI_RENDER_CONTROLS_API__&&window.__UI_RENDER_CONTROLS_API__.setZoomDisableEnabled(this.checked, 'render-panel:inline-click')" onchange="window.__UI_RENDER_CONTROLS_API__&&window.__UI_RENDER_CONTROLS_API__.setZoomDisableEnabled(this.checked, 'render-panel:inline-change')"> Zoom 放大到阈值时禁用 Face Merge</label>
-          <label>禁用阈值 Zoom <input id="renderDisableFaceMergeAtZoomThreshold" type="number" min="0.1" max="8" step="0.05" value="1.6" oninput="window.__UI_RENDER_CONTROLS_API__&&window.__UI_RENDER_CONTROLS_API__.setZoomDisableThreshold(this.value, 'render-panel:inline-input')" onchange="window.__UI_RENDER_CONTROLS_API__&&window.__UI_RENDER_CONTROLS_API__.setZoomDisableThreshold(this.value, 'render-panel:inline-change')"></label>
+          <div class="hintBox">这里集中控制 static-world face merge 相关开关。Face Merge 是总开关；只有总开关开启时，下面的 zoom 阈值禁用规则才会生效。</div>
+          <label class="renderFeatureToggle"><input id="renderFaceMergeEnabled" type="checkbox" checked onclick="window.__UI_RENDER_CONTROLS_API__&&window.__UI_RENDER_CONTROLS_API__.setFaceMergeEnabled(this.checked, 'render-panel:inline-click')" onchange="window.__UI_RENDER_CONTROLS_API__&&window.__UI_RENDER_CONTROLS_API__.setFaceMergeEnabled(this.checked, 'render-panel:inline-change')"> <span class="renderFeatureToggleText"><strong>启用 Face Merge</strong><small>关闭后，所有 Face Merge 子设置都会灰显且不可操作。</small></span></label>
+          <fieldset id="renderFaceMergeSubPage" class="renderControlSubPage">
+            <legend>Face Merge 子设置</legend>
+            <div id="renderFaceMergeSubPageHint" class="hintBox">这些设置只在 Face Merge 开启时有效。</div>
+            <label style="display:flex;align-items:center;gap:8px;"><input id="renderDisableFaceMergeAtZoomEnabled" type="checkbox" onclick="window.__UI_RENDER_CONTROLS_API__&&window.__UI_RENDER_CONTROLS_API__.setZoomDisableEnabled(this.checked, 'render-panel:inline-click')" onchange="window.__UI_RENDER_CONTROLS_API__&&window.__UI_RENDER_CONTROLS_API__.setZoomDisableEnabled(this.checked, 'render-panel:inline-change')"> Zoom 放大到阈值时禁用 Face Merge</label>
+            <label>禁用阈值 Zoom <input id="renderDisableFaceMergeAtZoomThreshold" type="number" min="0.1" max="8" step="0.05" value="1.6" oninput="window.__UI_RENDER_CONTROLS_API__&&window.__UI_RENDER_CONTROLS_API__.setZoomDisableThreshold(this.value, 'render-panel:inline-input')" onchange="window.__UI_RENDER_CONTROLS_API__&&window.__UI_RENDER_CONTROLS_API__.setZoomDisableThreshold(this.value, 'render-panel:inline-change')"></label>
+          </fieldset>
           <div id="renderSettingsSummary" class="hintBox">Face Merge：开启。Zoom 条件禁用：关闭。</div>
+          <div class="renderDiagnosticBox">
+            <h3>排序诊断日志 / Actor Sort Diagnostics</h3>
+            <div class="hintBox">用于复现“旋转后人物与台阶/物品排序错误”。点击启动后会自动写入诊断开关并刷新页面；刷新后再复现问题并下载日志。</div>
+            <div class="rowButtons rowButtons2">
+              <button id="enableActorSortDiagAndReload" type="button">启动排序诊断并刷新</button>
+              <button id="disableActorSortDiagAndReload" class="diagButtonDanger" type="button">关闭排序诊断并刷新</button>
+            </div>
+            <div id="actorSortDiagStatus" class="hintBox">排序诊断：未读取。</div>
+          </div>
         </div>
       </div>
       </section>
@@ -710,7 +723,7 @@
   <script src="src/core/state/scene-session-state.js"></script>
   <script src="src/application/state/state-actions.js"></script>
   <script src="src/infrastructure/adapters/placement-effects.js"></script>
-  <script src="src/core/domain/scene-domain-core.js"></script>
+  <script src="src/core/domain/scene-domain-core.js?v=20260508-v14-footprint-sort-anchor"></script>
   <script src="src/core/domain/view-rotation-core.js"></script>
   <script src="src/core/domain/item-facing-core.js"></script>
   <script src="src/core/domain/isometric-face-core.js"></script>
@@ -775,7 +788,7 @@
   <script src="src/application/render/static-world-render-cache-coordinator.js"></script>
   <script src="src/application/render/main-frame-renderable-assembler.js"></script>
   <script src="src/presentation/render/static-world-cache.js"></script>
-  <script src="src/presentation/render/actor-sort-stable.js"></script>
+  <script src="src/presentation/render/actor-sort-stable.js?v=20260508-v15-no-local-demerge"></script>
   <script src="src/presentation/render/renderer/canvas2d-draw-primitives.js?v=20260429-terrain-edge-outline-debug-v3"></script>
   <script src="src/presentation/render/renderer/canvas2d-shadow-overlays.js?v=20260429-terrain-edge-outline-debug-v3"></script>
   <script src="src/presentation/render/renderer/canvas2d-shadow-overlay-cache.js?v=20260502-p11a4-shadow-overlay-cache"></script>
@@ -799,7 +812,7 @@
   <script src="src/presentation/render/diagnostics/actor-interaction-order-diagnostics.js?v=20260507-p12b5-actor-order-diagnostics"></script>
   <script src="src/presentation/render/interaction/actor-interaction-geometry.js?v=20260507-p12b8-actor-interaction-geometry"></script>
   <script src="src/presentation/render/interaction/actor-interaction-replacement.js?v=20260507-p12b9-actor-interaction-replacement"></script>
-  <script src="src/presentation/render/interaction/stable-local-demerge.js?v=20260507-p12b6-stable-local-demerge"></script>
+  <script src="src/presentation/render/interaction/stable-local-demerge.js?v=20260508-v15-disabled-by-default"></script>
   <script src="src/presentation/render/interaction/actor-support-top-sort-override.js?v=20260507-p12b10-support-top-sort-override"></script>
   <script src="src/presentation/render/terrain/terrain-renderable-builder.js?v=20260506-p12a1-terrain-renderable-builder"></script>
   <script src="src/presentation/render/frame/player-move-fast-path.js?v=20260507-p12a3-frame-plan-boundary"></script>

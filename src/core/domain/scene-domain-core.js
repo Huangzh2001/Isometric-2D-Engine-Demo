@@ -283,6 +283,34 @@ var __APP_CORE_SCENE_DOMAIN_CORE__ = (function () {
     };
   }
 
+  function computeViewAwareFootprintSortMeta(point, w, d, h, viewRotation, sortBias) {
+    var x = toInt(point && point.x, 0);
+    var y = toInt(point && point.y, 0);
+    var z = toInt(point && point.z, 0);
+    var width = Math.max(1, toInt(w, 1));
+    var depth = Math.max(1, toInt(d, 1));
+    var corners = [
+      rotatePointForSort({ x: x, y: y }, viewRotation),
+      rotatePointForSort({ x: x + width, y: y }, viewRotation),
+      rotatePointForSort({ x: x, y: y + depth }, viewRotation),
+      rotatePointForSort({ x: x + width, y: y + depth }, viewRotation)
+    ];
+    var minX = corners[0].x;
+    var minY = corners[0].y;
+    for (var i = 1; i < corners.length; i++) {
+      if (corners[i].x < minX) minX = corners[i].x;
+      if (corners[i].y < minY) minY = corners[i].y;
+    }
+    var anchor = { x: minX, y: minY };
+    return {
+      sortKey: anchor.x + anchor.y + z + Math.max(0, toInt(h, 0)) + Number(sortBias || 0),
+      tie: z * 100000 + anchor.y * 100 + anchor.x,
+      rotatedPoint: anchor,
+      footprintCorners: corners,
+      sortAnchorMode: 'view-footprint-min'
+    };
+  }
+
   function computeProjectedPlayerSpriteOcclusion(playerBox, spriteBox) {
     if (!playerBox || !spriteBox) return false;
     var viewRotation = normalizeViewRotationLocal(spriteBox && spriteBox.viewRotation != null ? spriteBox.viewRotation : 0);
@@ -307,15 +335,17 @@ var __APP_CORE_SCENE_DOMAIN_CORE__ = (function () {
     var x = toInt(cell.x != null ? cell.x : b.x, 0);
     var y = toInt(cell.y != null ? cell.y : b.y, 0);
     var z = toInt(cell.z != null ? cell.z : b.z, 0);
+    var w = Math.max(1, toInt(cell.w != null ? cell.w : b.w, 1));
+    var d = Math.max(1, toInt(cell.d != null ? cell.d : b.d, 1));
     var h = Math.max(1, toInt(cell.h != null ? cell.h : b.h, 1));
     var viewRotation = normalizeViewRotationLocal(b.viewRotation != null ? b.viewRotation : 0);
-    var sortMeta = computeViewAwareSortMeta({ x: x, y: y, z: z }, h, viewRotation, sortBias);
-    var occludesPlayer = computeProjectedPlayerSpriteOcclusion(playerBox, { x: x, y: y, z: z, w: 1, d: 1, h: h, viewRotation: viewRotation });
+    var sortMeta = computeViewAwareFootprintSortMeta({ x: x, y: y, z: z }, w, d, h, viewRotation, sortBias);
+    var occludesPlayer = computeProjectedPlayerSpriteOcclusion(playerBox, { x: x, y: y, z: z, w: w, d: d, h: h, viewRotation: viewRotation });
     return {
       sortKey: sortMeta.sortKey,
       tie: sortMeta.tie,
       occludesPlayer: !!occludesPlayer,
-      sortMode: 'voxel'
+      sortMode: 'voxel-footprint-anchor'
     };
   }
 
@@ -354,17 +384,24 @@ var __APP_CORE_SCENE_DOMAIN_CORE__ = (function () {
     if (!Number.isFinite(x)) x = 0;
     var y = Number(player && player.y);
     if (!Number.isFinite(y)) y = 0;
-    var z = Number(player && player.z);
-    if (!Number.isFinite(z)) z = 0;
+    var logicalZ = Number(player && player.z);
+    if (!Number.isFinite(logicalZ)) logicalZ = 0;
+    var renderSortZ = Number(player && player.renderSortZ);
+    var visualZ = Number(player && player.visualZ);
+    var sortZ = Number.isFinite(renderSortZ) ? renderSortZ : (Number.isFinite(visualZ) ? visualZ : logicalZ);
     var viewRotation = normalizeViewRotationLocal(payload.viewRotation != null ? payload.viewRotation : 0);
-    var sortMeta = computeViewAwareSortMeta({ x: x, y: y, z: z }, 0, viewRotation, sortBias);
+    var sortMeta = computeViewAwareSortMeta({ x: x, y: y, z: sortZ }, 0, viewRotation, sortBias);
     return {
       sortKey: Number(sortMeta.sortKey || 0) + 0.0007,
       tie: 700000 + Number(sortMeta.tie || 0),
       occludesPlayer: false,
       sortMode: 'player-foot-anchor',
-      depthAnchor: { x: x, y: y, z: z },
-      rotatedPoint: sortMeta.rotatedPoint || null
+      depthAnchor: { x: x, y: y, z: sortZ },
+      rotatedPoint: sortMeta.rotatedPoint || null,
+      logicalZ: logicalZ,
+      visualZ: Number.isFinite(visualZ) ? visualZ : null,
+      renderSortZ: Number.isFinite(renderSortZ) ? renderSortZ : null,
+      sortZ: sortZ
     };
   }
 

@@ -1147,31 +1147,94 @@ safeListen(ui.verboseLog, 'change', () => {
   verboseLog = ui.verboseLog.checked;
   pushLog(`ui: verboseLog=${verboseLog}`);
 });
-function syncActorSortDiagUiFromStorage() {
-  if (!ui.actorSortDiagEnabled) return;
+var ACTOR_SORT_DIAG_FLAG_KEYS = [
+  'debugConsoleToExport',
+  'actorSortDiag',
+  'terrainPlayerDiag',
+  'terrainSortDiag',
+  'renderOrderHeavyDiagnostics'
+];
+
+function readActorSortDiagStorageSnapshot() {
+  var flags = {};
   var enabled = false;
-  try { enabled = localStorage.getItem('actorSortDiag') === '1'; } catch (_) { enabled = false; }
-  ui.actorSortDiagEnabled.checked = enabled;
+  var allEnabled = true;
+  try {
+    ACTOR_SORT_DIAG_FLAG_KEYS.forEach(function (key) {
+      var value = localStorage.getItem(key);
+      flags[key] = value;
+      var on = value === '1' || value === 'true';
+      if (on) enabled = true;
+      if (!on) allEnabled = false;
+    });
+  } catch (err) {
+    flags.error = String(err && err.message || err || 'localStorage-error');
+    allEnabled = false;
+  }
+  return { enabled: enabled, allEnabled: allEnabled, flags: flags };
 }
-function setActorSortDiagFromUi(enabled) {
+
+function writeActorSortDiagStorageProfile(enabled) {
   var next = !!enabled;
   try {
-    if (next) {
-      localStorage.setItem('actorSortDiag', '1');
-    } else {
-      localStorage.removeItem('actorSortDiag');
-    }
+    ACTOR_SORT_DIAG_FLAG_KEYS.forEach(function (key) {
+      if (next) localStorage.setItem(key, '1');
+      else localStorage.removeItem(key);
+    });
   } catch (_) {}
-  if (ui.actorSortDiagEnabled) ui.actorSortDiagEnabled.checked = next;
+  return readActorSortDiagStorageSnapshot();
+}
+
+function stringifyActorSortDiagFlags(flags) {
+  try {
+    return ACTOR_SORT_DIAG_FLAG_KEYS.map(function (key) {
+      return key + '=' + String(flags && Object.prototype.hasOwnProperty.call(flags, key) ? flags[key] : null);
+    }).join(', ');
+  } catch (_) {
+    return 'flags-unavailable';
+  }
+}
+
+function updateActorSortDiagUiStatus(reason) {
+  var snapshot = readActorSortDiagStorageSnapshot();
+  if (ui.actorSortDiagEnabled) ui.actorSortDiagEnabled.checked = snapshot.enabled;
+  if (ui.actorSortDiagStatus) {
+    var status = snapshot.allEnabled ? '已开启' : (snapshot.enabled ? '部分开启' : '关闭');
+    ui.actorSortDiagStatus.textContent = '排序诊断：' + status + '。' + stringifyActorSortDiagFlags(snapshot.flags) + (reason ? '。' + reason : '。');
+  }
+  return snapshot;
+}
+
+function setActorSortDiagFromUi(enabled, opts) {
+  var options = opts || {};
+  var next = !!enabled;
+  var snapshot = writeActorSortDiagStorageProfile(next);
+  updateActorSortDiagUiStatus(next ? '已写入诊断开关。' : '已移除诊断开关。');
   try {
     if (typeof pushLog === 'function') {
-      pushLog('[actor-sort-diag][ui-toggle] enabled=' + next);
+      pushLog('[actor-sort-diag][ui-toggle] enabled=' + next + ' flags=' + stringifyActorSortDiagFlags(snapshot.flags));
     }
   } catch (_) {}
+  if (options.reload === true) {
+    try {
+      if (ui.actorSortDiagStatus) ui.actorSortDiagStatus.textContent += ' 即将刷新页面……';
+      if (typeof pushLog === 'function') pushLog('[actor-sort-diag][ui-toggle-reload] enabled=' + next);
+    } catch (_) {}
+    setTimeout(function () {
+      try { window.location.reload(); } catch (_) { location.reload(); }
+    }, 120);
+  }
 }
-syncActorSortDiagUiFromStorage();
+
+updateActorSortDiagUiStatus('可点击“启动排序诊断并刷新”。');
 safeListen(ui.actorSortDiagEnabled, 'change', () => {
   setActorSortDiagFromUi(!!(ui.actorSortDiagEnabled && ui.actorSortDiagEnabled.checked));
+});
+safeListen(ui.enableActorSortDiagAndReload, 'click', () => {
+  setActorSortDiagFromUi(true, { reload: true });
+});
+safeListen(ui.disableActorSortDiagAndReload, 'click', () => {
+  setActorSortDiagFromUi(false, { reload: true });
 });
 if (ui.shadowDebugDetailed) ui.shadowDebugDetailed.checked = false;
 if (typeof shadowDebugDetailed !== 'undefined') shadowDebugDetailed = false;

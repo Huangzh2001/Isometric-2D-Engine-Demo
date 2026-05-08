@@ -38,4 +38,7 @@ assert.strictEqual(api.buildStableLocalDemergeInteractionCellKey({ x: 1.2, y: 2.
 assert.strictEqual(api.isActorInteractionDescriptorNearPlayerForLocalDemerge({ cell: { x: 1, y: 2, z: 3, w: 1, d: 1, h: 1 } }, { x: 1.2, y: 2.7, z: 3.1 }, 2, {}), true, 'near descriptor should be classified as local');
 const noPlayer = api.applyStableActorSortDemergeToStaticRenderables([{ kind: 'static-world-face-packet' }], 0, null, {}, { getStableActorSortApiForRender() { return { shouldDemergeStaticPacket() { return false; } }; }, isStableActorSortModeEnabledForRender() { return true; } });
 assert.strictEqual(noPlayer.mode, 'stable-local-demerge-no-player', 'no-player path should remain explicit');
+const disabled = api.applyStableActorSortDemergeToStaticRenderables([{ kind: 'static-world-face-packet', actorInteractionMemberDescriptors: [{ cell: { x: 1, y: 2, z: 3, w: 1, d: 1, h: 1 } }, { cell: { x: 2, y: 2, z: 3, w: 1, d: 1, h: 1 } }] }], 0, { x: 1.2, y: 2.7, z: 3.1 }, {}, { getStableActorSortApiForRender() { return { shouldDemergeStaticPacket() { return true; } }; }, isStableActorSortModeEnabledForRender() { return true; } });
+assert.strictEqual(disabled.mode, 'stable-local-demerge-disabled-by-default', 'local demerge should be disabled by default to preserve static terrain order');
+assert.strictEqual(disabled.outputCount, 1, 'disabled local demerge must not split static packets');
 console.log('PASS stable-local-demerge-boundary');

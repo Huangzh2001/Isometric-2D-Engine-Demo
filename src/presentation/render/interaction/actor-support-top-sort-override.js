@@ -45,6 +45,17 @@
     var list = Array.isArray(staticRenderables) ? staticRenderables : [];
     var stableActorSortApi = getStableActorSortApiForRender();
     if (stableActorSortApi && typeof stableActorSortApi.applyStablePlayerFaceSort === 'function' && isStableActorSortModeEnabledForRender()) {
+      if (isActorInteractionOrderDiagEnabled()) {
+        emitActorInteractionOrderDiag('support-top-sort-entry', {
+          version: 'support-top-sort-entry-diag-v1-20260508',
+          functionPath: 'actor-support-top-sort-override.applyPlayerSupportTopSortOverrideToRenderables -> stableActorSortApi.applyStablePlayerFaceSort',
+          behaviorNote: 'diagnostic-only payload; support sort behavior is unchanged by this log',
+          stableActorSortApiVersion: stableActorSortApi.version != null ? String(stableActorSortApi.version) : null,
+          viewRotation: normalizeMainEditorViewRotationValue(viewRotation),
+          staticRenderableCount: list.length,
+          player: summarizeActorDiagPlayer(playerRef)
+        }, { maxCount: 6000 });
+      }
       return stableActorSortApi.applyStablePlayerFaceSort({
         staticRenderables: list,
         player: playerRef,

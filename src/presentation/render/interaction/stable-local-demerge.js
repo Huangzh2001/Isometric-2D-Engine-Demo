@@ -36,6 +36,30 @@
   function summarizeActorDiagPlayer(value) { return callDep('summarizeActorDiagPlayer', [value], value || null); }
   function emitActorInteractionOrderDiag(tag, payload, options) { return callDep('emitActorInteractionOrderDiag', [tag, payload, options], false); }
   function isActorInteractionOrderDiagEnabled() { return callDep('isActorInteractionOrderDiagEnabled', [], false) === true; }
+
+  function isStableLocalDemergeExplicitlyEnabled() {
+    return callDep('isStableLocalDemergeExplicitlyEnabledForRender', [], false) === true;
+  }
+
+  function buildStableLocalDemergeDisabledResult(list, playerObj, normalizedViewRotation, reason) {
+  return {
+    staticRenderables: list,
+    inputCount: list.length,
+    outputCount: list.length,
+    splitPacketCount: 0,
+    createdFaceCount: 0,
+    residualMergedPacketCount: 0,
+    playerInteractionCellKey: buildStableLocalDemergeInteractionCellKey(playerObj),
+    checkedPacketCount: 0,
+    skippedFarPacketCount: 0,
+    cacheHit: false,
+    cacheHitCount: __stableLocalDemergeCache ? __stableLocalDemergeCache.hitCount : 0,
+    cacheMissCount: __stableLocalDemergeCache ? __stableLocalDemergeCache.missCount : 0,
+    mode: 'stable-local-demerge-disabled-by-default',
+    reason: String(reason || 'requires-explicit-stableActorSortDemerge-1')
+    };
+  }
+
   function isActorDiagTerrainCell(cell) { return callDep('isActorDiagTerrainCell', [cell], false) === true; }
   function roundActorDiagNumber(value) { return callDep('roundActorDiagNumber', [value], function () { return Number(value || 0); }); }
   function buildActorInteractionCellFaceKey(cell, semanticFace, viewRotation) { return callDep('buildActorInteractionCellFaceKey', [cell, semanticFace, viewRotation], null); }
@@ -425,6 +449,25 @@ function applyStableActorSortDemergeToStaticRenderables(staticRenderables, viewR
   }
 
   var normalizedViewRotation = normalizeMainEditorViewRotationValue(viewRotation);
+  if (!isStableLocalDemergeExplicitlyEnabled()) {
+    var disabledResult = buildStableLocalDemergeDisabledResult(list, playerObj, normalizedViewRotation, 'disabled-to-preserve-static-terrain-order');
+    if (isActorInteractionOrderDiagEnabled()) {
+      emitActorInteractionOrderDiag('stable-local-demerge-disabled', {
+        mode: disabledResult.mode,
+        reason: disabledResult.reason,
+        viewRotation: normalizedViewRotation,
+        playerInteractionCellKey: disabledResult.playerInteractionCellKey,
+        inputStaticRenderableCount: Number(list.length || 0),
+        outputStaticRenderableCount: Number(list.length || 0),
+        splitPacketCount: 0,
+        createdFaceCount: 0,
+        residualMergedPacketCount: 0,
+        player: summarizeActorDiagPlayer(playerObj)
+      }, { maxCount: 6000 });
+    }
+    return disabledResult;
+  }
+
   var cacheKey = buildStableLocalDemergeCacheKey(list, normalizedViewRotation, playerObj, radius);
   if (__stableLocalDemergeCache && __stableLocalDemergeCache.key === cacheKey && __stableLocalDemergeCache.result) {
     __stableLocalDemergeCache.hitCount += 1;
@@ -564,6 +607,7 @@ function applyStableActorSortDemergeToStaticRenderables(staticRenderables, viewR
     isActorInteractionDescriptorNearPlayerForLocalDemerge: function (descriptor, playerRef, radius, deps) { return withDeps(deps, function () { return isActorInteractionDescriptorNearPlayerForLocalDemerge(descriptor, playerRef, radius); }); },
     buildStaticWorldFacePacketFromDescriptorForActorDemerge: function (descriptor, sourcePacket, viewRotation, mode, localIndex, deps) { return withDeps(deps, function () { return buildStaticWorldFacePacketFromDescriptorForActorDemerge(descriptor, sourcePacket, viewRotation, mode, localIndex); }); },
     mergeActorInteractionResidualDescriptorsForPacket: function (sourcePacket, residualMembers, deps) { return withDeps(deps, function () { return mergeActorInteractionResidualDescriptorsForPacket(sourcePacket, residualMembers); }); },
+    isStableLocalDemergeExplicitlyEnabled: function () { return isStableLocalDemergeExplicitlyEnabled(); },
     applyStableActorSortDemergeToStaticRenderables: function (staticRenderables, viewRotation, playerRef, options, deps) { return withDeps(deps, function () { return applyStableActorSortDemergeToStaticRenderables(staticRenderables, viewRotation, playerRef, options); }); },
     resetStableLocalDemergeCacheForTests: function () { __stableLocalDemergeCache = { key: '', result: null, hitCount: 0, missCount: 0 }; return true; }
   };

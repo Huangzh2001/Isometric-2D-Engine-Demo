@@ -326,3 +326,82 @@ select{width:100%;background:#101726;border:1px solid #55617f;color:#eef3ff;bord
     max-height: 48vh;
   }
 }
+
+/* Render panel Face Merge controls */
+.renderFeatureToggle{
+  display:flex!important;
+  align-items:center!important;
+  gap:10px!important;
+  padding:10px 12px;
+  border:1px solid #40527f;
+  border-radius:12px;
+  background:#101726;
+  cursor:pointer;
+}
+.renderFeatureToggle input{
+  width:auto!important;
+  flex:0 0 auto;
+}
+.renderFeatureToggleText{
+  display:grid;
+  gap:2px;
+}
+.renderFeatureToggleText strong{
+  font-size:13px;
+  color:#eef3ff;
+}
+.renderFeatureToggleText small{
+  font-size:12px;
+  color:#aebbd8;
+  line-height:1.35;
+}
+.renderControlSubPage{
+  display:grid;
+  gap:8px;
+  margin:0;
+  padding:10px 12px 12px;
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:12px;
+  background:rgba(255,255,255,.03);
+}
+.renderControlSubPage legend{
+  padding:0 6px;
+  color:#dfe7ff;
+  font-size:12px;
+  font-weight:700;
+}
+.renderControlSubPage[disabled]{
+  opacity:.45;
+  filter:grayscale(.35);
+  cursor:not-allowed;
+}
+.renderControlSubPage[disabled] label,
+.renderControlSubPage[disabled] input{
+  cursor:not-allowed;
+}
+.renderControlSubPage[disabled] .hintBox{
+  color:#aeb7ca;
+}
+
+
+/* Actor sort diagnostic controls */
+.renderDiagnosticBox{
+  display:grid;
+  gap:8px;
+  margin-top:10px;
+  padding:10px;
+  border:1px solid #40527f;
+  border-radius:12px;
+  background:#11192a;
+}
+.renderDiagnosticBox h3{
+  margin:0;
+  font-size:14px;
+  color:#eef3ff;
+}
+.diagButtonDanger{
+  background:#73343c;
+}
+.diagButtonDanger:hover{
+  background:#8a414b;
+}

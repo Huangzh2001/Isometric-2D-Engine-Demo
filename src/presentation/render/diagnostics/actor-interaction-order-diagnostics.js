@@ -166,6 +166,7 @@
       y: roundActorDiagNumber(p && p.y, 3),
       z: roundActorDiagNumber(p && p.z, 3),
       visualZ: roundActorDiagNumber(p && p.visualZ, 3),
+      renderSortZ: roundActorDiagNumber(p && p.renderSortZ, 3),
       moving: !!(p && p.moving),
       dir: p && p.dir != null ? String(p.dir) : null,
       jumpActive: !!(p && p.jump && p.jump.active),
@@ -195,9 +196,35 @@
     };
   }
 
+  function summarizeActorDiagPoint(point) {
+    if (!point || typeof point !== 'object') return null;
+    return {
+      x: roundActorDiagNumber(point.x, 3),
+      y: roundActorDiagNumber(point.y, 3),
+      z: point.z != null ? roundActorDiagNumber(point.z, 3) : null
+    };
+  }
+
+  function getRenderableDiagCells(renderable) {
+    var out = [];
+    if (!renderable || typeof renderable !== 'object') return out;
+    var members = Array.isArray(renderable.actorInteractionMemberDescriptors) && renderable.actorInteractionMemberDescriptors.length
+      ? renderable.actorInteractionMemberDescriptors
+      : (Array.isArray(renderable.members) && renderable.members.length ? renderable.members : []);
+    for (var i = 0; i < members.length; i++) {
+      var m = members[i];
+      var cell = m && (m.cell || m.box || m);
+      if (cell && typeof cell === 'object') out.push(cell);
+    }
+    var direct = renderable.box || renderable.cell || null;
+    if (direct && typeof direct === 'object' && out.indexOf(direct) < 0) out.push(direct);
+    return out;
+  }
+
   function summarizeActorDiagRenderable(renderable) {
     if (!renderable || typeof renderable !== 'object') return null;
-    var cell = renderable.box || renderable.cell || null;
+    var cells = getRenderableDiagCells(renderable);
+    var cell = cells.length ? cells[0] : null;
     return {
       id: renderable.id != null ? String(renderable.id).slice(0, 180) : null,
       kind: renderable.kind != null ? String(renderable.kind) : null,
@@ -208,15 +235,25 @@
       sortKey: roundActorDiagNumber(renderable.sortKey, 6),
       tie: roundActorDiagNumber(renderable.tie, 6),
       depthKey: roundActorDiagNumber(renderable.depthKey, 6),
+      worldZ: roundActorDiagNumber(renderable.worldZ, 3),
+      depthAnchorZ: roundActorDiagNumber(renderable.depthAnchor && renderable.depthAnchor.z, 3),
       mergedFace: renderable.mergedFace === true,
       mergedFaceCount: roundActorDiagNumber(renderable.mergedFaceCount, 0),
       mergeWidth: roundActorDiagNumber(renderable.mergeWidth, 0),
       mergeHeight: roundActorDiagNumber(renderable.mergeHeight, 0),
       actorReplacement: renderable.actorInteractionReplacement === true,
+      actorStableSortOverride: renderable.actorStableSortOverride === true,
+      actorStableSortRelation: renderable.actorStableSortRelation != null ? String(renderable.actorStableSortRelation) : null,
       actorSupportFloor: renderable.actorInteractionSupportFloor === true,
+      actorSupportTopSortOverride: renderable.actorInteractionSupportTopSortOverride === true,
       actorRelation: renderable.actorInteractionGroupSortRelation != null ? String(renderable.actorInteractionGroupSortRelation) : null,
       actorFootprintMode: renderable.actorInteractionGroupFootprintMode != null ? String(renderable.actorInteractionGroupFootprintMode) : null,
       memberKeyCount: Array.isArray(renderable.actorInteractionMemberFaceKeys) ? renderable.actorInteractionMemberFaceKeys.length : 0,
+      memberCellCount: cells.length,
+      memberCells: cells.slice(0, 6).map(summarizeActorDiagCell),
+      sortViewRotation: renderable.sortViewRotation != null ? roundActorDiagNumber(renderable.sortViewRotation, 3) : null,
+      sortWorldAnchor: summarizeActorDiagPoint(renderable.sortWorldAnchor),
+      sortRotatedPoint: summarizeActorDiagPoint(renderable.sortRotatedPoint),
       renderPath: renderable.renderPath != null ? String(renderable.renderPath) : null,
       cell: summarizeActorDiagCell(cell)
     };
@@ -325,21 +362,28 @@
     for (var ri = 0; ri < list.length; ri++) {
       var r = list[ri];
       if (!r || r.kind === 'player-avatar') continue;
-      var c = r.box || r.cell || null;
-      if (!c) continue;
-      var cx = Number(c.x || 0);
-      var cy = Number(c.y || 0);
-      var cw = Math.max(1, Number(c.w || 1));
-      var cd = Math.max(1, Number(c.d || 1));
-      var cz = Number(c.z || 0);
-      var ch = Math.max(1, Number(c.h || 1));
-      var centerX = cx + cw * 0.5;
-      var centerY = cy + cd * 0.5;
-      var nearXY = Math.abs(centerX - px) <= 2.75 && Math.abs(centerY - py) <= 2.75;
+      var cells = getRenderableDiagCells(r);
+      if (!cells.length) continue;
+      var nearXY = false;
+      var supportTopCandidate = false;
+      for (var ci = 0; ci < cells.length; ci++) {
+        var c = cells[ci];
+        if (!c) continue;
+        var cx = Number(c.x || 0);
+        var cy = Number(c.y || 0);
+        var cw = Math.max(1, Number(c.w || 1));
+        var cd = Math.max(1, Number(c.d || 1));
+        var cz = Number(c.z || 0);
+        var ch = Math.max(1, Number(c.h || 1));
+        var centerX = cx + cw * 0.5;
+        var centerY = cy + cd * 0.5;
+        if (Math.abs(centerX - px) <= 2.75 && Math.abs(centerY - py) <= 2.75) nearXY = true;
+        if (String(r.semanticFace || '') === 'top' && Math.abs((cz + ch) - pz) <= 0.001) supportTopCandidate = true;
+      }
       if (!nearXY) continue;
       var item = Object.assign({ index: ri, relativeToPlayer: playerIndex >= 0 ? ri - playerIndex : null }, summarizeActorDiagRenderable(r) || {});
-      if (nearbyFaces.length < 36) nearbyFaces.push(item);
-      if (String(r.semanticFace || '') === 'top' && Math.abs((cz + ch) - pz) <= 0.001 && supportTopFaces.length < 16) supportTopFaces.push(item);
+      if (nearbyFaces.length < 48) nearbyFaces.push(item);
+      if (supportTopCandidate && supportTopFaces.length < 20) supportTopFaces.push(item);
     }
     var signature = [framePlanId, playerIndex, roundActorDiagNumber(px, 2), roundActorDiagNumber(py, 2), roundActorDiagNumber(pz, 2), list.length, supportTopFaces.map(function (it) { return [it.index, it.relativeToPlayer, it.id].join(':'); }).join(';')].join('|');
     if (!shouldEmitActorInteractionDiagSignature('final-order', signature)) return;
@@ -370,6 +414,7 @@
     summarizeActorDiagPlayer: summarizeActorDiagPlayer,
     summarizeActorDiagCell: summarizeActorDiagCell,
     summarizeActorDiagRenderable: summarizeActorDiagRenderable,
+    getRenderableDiagCells: getRenderableDiagCells,
     summarizeActorDiagFaceKeySet: summarizeActorDiagFaceKeySet,
     getActorDiagFaceKeyCountsByFace: getActorDiagFaceKeyCountsByFace,
     summarizeActorDiagNearbyBoxes: summarizeActorDiagNearbyBoxes,

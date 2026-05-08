@@ -77,6 +77,58 @@ function emitPlayerMoveFastPathEligibilityDiagnostic(payload) {
   } catch (_) {}
 }
 
+function getActorSortDiagnosticsApiForFastPath() {
+  try {
+    var globalObj = (typeof window !== 'undefined') ? window : globalThis;
+    return globalObj && (globalObj.__ACTOR_INTERACTION_ORDER_DIAGNOSTICS__
+      || globalObj.__APP_PRESENTATION_ACTOR_INTERACTION_ORDER_DIAGNOSTICS__
+      || globalObj.IsometricActorInteractionOrderDiagnostics) || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function emitActorSortDiagFromPlayerMoveFastPath(tag, payload) {
+  var api = getActorSortDiagnosticsApiForFastPath();
+  try {
+    if (!api || typeof api.emitActorInteractionOrderDiag !== 'function') return;
+    if (typeof api.isActorInteractionOrderDiagEnabled === 'function' && api.isActorInteractionOrderDiagEnabled() !== true) return;
+    api.emitActorInteractionOrderDiag(tag, payload || {}, { maxCount: 6000 });
+  } catch (_) {}
+}
+
+function summarizeActorSortRenderableForFastPath(renderable) {
+  var api = getActorSortDiagnosticsApiForFastPath();
+  try {
+    if (api && typeof api.summarizeActorDiagRenderable === 'function') return api.summarizeActorDiagRenderable(renderable);
+  } catch (_) {}
+  return renderable && typeof renderable === 'object' ? {
+    id: renderable.id != null ? String(renderable.id) : null,
+    kind: renderable.kind != null ? String(renderable.kind) : null,
+    semanticFace: renderable.semanticFace != null ? String(renderable.semanticFace) : null,
+    sortKey: Number(renderable.sortKey || 0),
+    tie: Number(renderable.tie || 0)
+  } : null;
+}
+
+function summarizePlayerMoveFastPathOrderWindow(order) {
+  var list = Array.isArray(order) ? order : [];
+  var playerIndex = -1;
+  for (var i = 0; i < list.length; i++) {
+    if (list[i] && list[i].id === 'player-avatar') { playerIndex = i; break; }
+  }
+  var start = playerIndex >= 0 ? Math.max(0, playerIndex - 8) : 0;
+  var end = playerIndex >= 0 ? Math.min(list.length, playerIndex + 9) : Math.min(list.length, 18);
+  var windowItems = [];
+  for (var wi = start; wi < end; wi++) {
+    windowItems.push(Object.assign({
+      index: wi,
+      relativeToPlayer: playerIndex >= 0 ? wi - playerIndex : null
+    }, summarizeActorSortRenderableForFastPath(list[wi]) || {}));
+  }
+  return { playerIndex: playerIndex, window: windowItems };
+}
+
 function evaluatePlayerMoveFastPathEligibilityForRender(framePlanId, order, currentViewRotation, interactionState) {
   var stats = __lastMainRenderableBuildStats || {};
   var rejectReasons = [];
@@ -208,16 +260,18 @@ function buildPlayerAvatarRenderableForFastPath(viewRotation, cameraScope) {
   var playerSortMeta = (domainApi && typeof domainApi.computePlayerActorRenderableSort === 'function')
     ? domainApi.computePlayerActorRenderableSort({ player: playerObj, viewRotation: normalizedViewRotation })
     : Object.assign({ tie: 700000 }, computeViewAwareSortMeta({ x: playerObj.x, y: playerObj.y, z: playerZ }, 0, normalizedViewRotation));
+  var playerRenderZ = Number(playerSortMeta && playerSortMeta.depthAnchor && playerSortMeta.depthAnchor.z != null ? playerSortMeta.depthAnchor.z : playerZ);
+  if (!Number.isFinite(playerRenderZ)) playerRenderZ = playerZ;
   return {
     id: 'player-avatar',
     kind: 'player-avatar',
     sortMode: 'player-foot-anchor',
     sortKey: Number(playerSortMeta.sortKey || 0),
     tie: Number(playerSortMeta.tie || 0),
-    depthAnchor: playerSortMeta.depthAnchor || { x: Number(playerObj.x || 0), y: Number(playerObj.y || 0), z: playerZ },
+    depthAnchor: playerSortMeta.depthAnchor || { x: Number(playerObj.x || 0), y: Number(playerObj.y || 0), z: playerRenderZ },
     worldX: Number(playerObj.x || 0),
     worldY: Number(playerObj.y || 0),
-    worldZ: playerZ,
+    worldZ: playerRenderZ,
     playerMoveFastPathDynamic: true,
     draw: () => drawPlayerAvatar(),
   };
@@ -373,6 +427,23 @@ function tryBuildPlayerMoveFastPathFrameOrderForRender(framePlanId, currentViewR
   var insertStartAt = perfNow();
   var order = insertSingleDynamicRenderableIntoSortedOrder(staticRenderables, playerRenderable);
   var insertMs = Math.max(0, perfNow() - insertStartAt);
+  var fastPathOrderWindow = summarizePlayerMoveFastPathOrderWindow(order);
+  emitActorSortDiagFromPlayerMoveFastPath('player-fast-path-order-build', {
+    version: 'player-move-fast-path-actor-sort-diag-v1-20260508',
+    functionPath: 'tryBuildPlayerMoveFastPathFrameOrderForRender -> applyPlayerSupportTopSortOverrideToRenderables -> insertSingleDynamicRenderableIntoSortedOrder',
+    behaviorNote: 'diagnostic-only payload; fast path ordering behavior is unchanged by this log',
+    framePlanId: String(framePlanId || ''),
+    viewRotation: normalizedViewRotation,
+    playerInteractionCellKey: String(playerInteractionCellKey || ''),
+    staticRenderableCountBeforeSupportSort: Number(cache.staticRenderablesForSupportTop && cache.staticRenderablesForSupportTop.length || 0),
+    staticRenderableCountAfterSupportSort: Number(staticRenderables.length || 0),
+    supportTopSortMode: String(supportTopSortResult && supportTopSortResult.mode || ''),
+    supportTopSortOverrideCount: Number(supportTopSortResult && supportTopSortResult.overrideCount || 0),
+    supportTopSortOverrideSamples: supportTopSortResult && Array.isArray(supportTopSortResult.overrideSamples) ? supportTopSortResult.overrideSamples.slice(0, 12) : [],
+    playerRenderable: summarizeActorSortRenderableForFastPath(playerRenderable),
+    playerIndex: fastPathOrderWindow.playerIndex,
+    orderWindow: fastPathOrderWindow.window
+  });
   var totalMs = Math.max(0, perfNow() - startAt);
   cache.hitCount += 1;
   cache.lastRejectReasons = [];

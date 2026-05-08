@@ -432,6 +432,37 @@
     return { mode: updates.length ? 'incremental' : 'cached', summary: summary, appliedUpdateCount: updates.length };
   }
 
+
+  function parseRenderSignature(signature) {
+    var text = String(signature || '');
+    if (!text) return null;
+    try {
+      var parsed = JSON.parse(text);
+      return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function readSignatureField(signature, field) {
+    var parsed = parseRenderSignature(signature);
+    if (!parsed || typeof parsed !== 'object') return null;
+    return parsed[field] != null ? parsed[field] : null;
+  }
+
+  function hasStructuralStaticPacketSignatureChange(previousSignature, nextSignature) {
+    if (!previousSignature || !nextSignature || String(previousSignature) === String(nextSignature)) return false;
+    var prev = parseRenderSignature(previousSignature);
+    var next = parseRenderSignature(nextSignature);
+    if (!prev || !next) return false;
+    var fields = ['packetViewRotation', 'faceMergeEffectiveMode', 'cacheContentType', 'cameraIndependent', 'usesScreenSpaceCache'];
+    for (var i = 0; i < fields.length; i++) {
+      var key = fields[i];
+      if (String(prev[key]) !== String(next[key])) return true;
+    }
+    return false;
+  }
+
   function mergeSortedPacketLists(packetLists, comparePackets) {
     var lists = Array.isArray(packetLists) ? packetLists : [];
     var comparator = typeof comparePackets === 'function' ? comparePackets : function (a, b) {
@@ -473,7 +504,13 @@
     var deferVisibleRebuild = opts.deferVisibleRebuild === true;
     var startAt = perfNow();
     var requestedVisibleChunkKeys = sortVisibleChunkKeys(computeVisibleChunkKeys(scope), scope);
-    var renderSignatureChanged = state.lastRenderSignature !== renderSignature;
+    var previousRenderSignature = state.lastRenderSignature;
+    var renderSignatureChanged = previousRenderSignature !== renderSignature;
+    var structuralRenderSignatureChanged = hasStructuralStaticPacketSignatureChange(previousRenderSignature, renderSignature);
+    var previousPacketViewRotation = readSignatureField(previousRenderSignature, 'packetViewRotation');
+    var nextPacketViewRotation = readSignatureField(renderSignature, 'packetViewRotation');
+    var previousFaceMergeEffectiveMode = readSignatureField(previousRenderSignature, 'faceMergeEffectiveMode');
+    var nextFaceMergeEffectiveMode = readSignatureField(renderSignature, 'faceMergeEffectiveMode');
     if (renderSignatureChanged && !deferVisibleRebuild) {
       state.chunks.forEach(function (chunk, key) {
         if (!chunk) return;
@@ -498,9 +535,14 @@
       if (!deferVisibleRebuild && state.dirtyChunkKeys.has(visibleKey)) visibleDirtyChunkCount += 1;
     }
     var rebuildBudgetMode = String(opts.rebuildBudgetMode || state.rebuildBudgetMode || 'count');
-    var rebuildBudgetValue = Math.max(1, Math.round(Number(opts.rebuildBudgetValue || state.rebuildBudgetValue || 1) || 1));
+    var requestedRebuildBudgetValue = Math.max(1, Math.round(Number(opts.rebuildBudgetValue || state.rebuildBudgetValue || 1) || 1));
+    var rebuildBudgetValue = requestedRebuildBudgetValue;
+    var forcedVisibleStructuralRebuild = structuralRenderSignatureChanged === true && !deferVisibleRebuild;
+    if (forcedVisibleStructuralRebuild && rebuildBudgetMode === 'count') {
+      rebuildBudgetValue = Math.max(requestedRebuildBudgetValue, queuedChunkKeys.length || visibleChunkKeys.length || 1);
+    }
     state.rebuildBudgetMode = rebuildBudgetMode;
-    state.rebuildBudgetValue = rebuildBudgetValue;
+    state.rebuildBudgetValue = requestedRebuildBudgetValue;
     var queuedChunkCountBefore = queuedChunkKeys.length;
     var rebuiltChunkCountThisFrame = 0;
     var reusedChunkCountThisFrame = 0;
@@ -613,6 +655,13 @@
       deferredChunkCountAfter: deferredChunkCountAfter,
       rebuildBudgetMode: rebuildBudgetMode,
       rebuildBudgetValue: rebuildBudgetValue,
+      requestedRebuildBudgetValue: requestedRebuildBudgetValue,
+      forcedVisibleStructuralRebuild: forcedVisibleStructuralRebuild === true,
+      structuralRenderSignatureChanged: structuralRenderSignatureChanged === true,
+      previousPacketViewRotation: previousPacketViewRotation,
+      nextPacketViewRotation: nextPacketViewRotation,
+      previousFaceMergeEffectiveMode: previousFaceMergeEffectiveMode,
+      nextFaceMergeEffectiveMode: nextFaceMergeEffectiveMode,
       rebuildMsThisFrame: Number(rebuildMsThisFrame.toFixed ? rebuildMsThisFrame.toFixed(3) : rebuildMsThisFrame),
       renderSignatureChanged: renderSignatureChanged === true,
       deferVisibleRebuild: deferVisibleRebuild === true
@@ -664,6 +713,13 @@
       renderSourceCountAfterVisibility: renderSourceCountAfterVisibility,
       rebuildBudgetMode: rebuildBudgetMode,
       rebuildBudgetValue: rebuildBudgetValue,
+      requestedRebuildBudgetValue: requestedRebuildBudgetValue,
+      forcedVisibleStructuralRebuild: forcedVisibleStructuralRebuild === true,
+      structuralRenderSignatureChanged: structuralRenderSignatureChanged === true,
+      previousPacketViewRotation: previousPacketViewRotation,
+      nextPacketViewRotation: nextPacketViewRotation,
+      previousFaceMergeEffectiveMode: previousFaceMergeEffectiveMode,
+      nextFaceMergeEffectiveMode: nextFaceMergeEffectiveMode,
       rebuildMsThisFrame: Number(rebuildMsThisFrame.toFixed ? rebuildMsThisFrame.toFixed(3) : rebuildMsThisFrame),
       renderSignatureChanged: renderSignatureChanged === true,
       buildMs: Number(Math.max(0, perfNow() - startAt).toFixed ? Math.max(0, perfNow() - startAt).toFixed(3) : Math.max(0, perfNow() - startAt))
