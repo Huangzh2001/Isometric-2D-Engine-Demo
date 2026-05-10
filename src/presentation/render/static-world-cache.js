@@ -613,6 +613,13 @@
     var renderSourceCountBeforeVisibility = 0;
     var renderSourceCountAfterVisibility = 0;
     var visibleStaticPacketCount = 0;
+    var colorCacheHitCount = 0;
+    var colorCacheMissCount = 0;
+    var shadowOverlayCacheHitCount = 0;
+    var shadowOverlayCacheMissCount = 0;
+    var shadowOverlayTotalCount = 0;
+    var step4BuildColorMs = 0;
+    var step4ShadowOverlayTotalMs = 0;
     for (var i = 0; i < visibleChunkKeys.length; i++) {
       var key = visibleChunkKeys[i];
       var chunk = state.chunks.get(key);
@@ -630,6 +637,13 @@
         voxelFurnitureProcessedCount += Math.max(0, Math.round(Number(stats.voxelFurnitureProcessedCount) || 0));
         renderSourceCountBeforeVisibility += Math.max(0, Math.round(Number(stats.renderSourceCountBeforeVisibility) || 0));
         renderSourceCountAfterVisibility += Math.max(0, Math.round(Number(stats.renderSourceCountAfterVisibility) || 0));
+        colorCacheHitCount += Math.max(0, Math.round(Number(stats.colorCacheHitCount) || 0));
+        colorCacheMissCount += Math.max(0, Math.round(Number(stats.colorCacheMissCount) || 0));
+        shadowOverlayCacheHitCount += Math.max(0, Math.round(Number(stats.shadowOverlayCacheHitCount) || 0));
+        shadowOverlayCacheMissCount += Math.max(0, Math.round(Number(stats.shadowOverlayCacheMissCount) || 0));
+        shadowOverlayTotalCount += Math.max(0, Math.round(Number(stats.shadowOverlayTotalCount) || 0));
+        step4BuildColorMs += Math.max(0, Number(stats.step4_buildColorMs || stats.step4BuildColorMs || 0));
+        step4ShadowOverlayTotalMs += Math.max(0, Number(stats.step4d_shadowOverlayTotalMs || 0));
       }
     }
     var mergeStartAt = perfNow();
@@ -709,6 +723,13 @@
       logicalVoxelCountEstimated: logicalVoxelCountEstimated,
       hiddenInternalSurfaceSkippedCount: hiddenInternalSurfaceSkippedCount,
       voxelFurnitureProcessedCount: voxelFurnitureProcessedCount,
+      colorCacheHitCount: colorCacheHitCount,
+      colorCacheMissCount: colorCacheMissCount,
+      shadowOverlayCacheHitCount: shadowOverlayCacheHitCount,
+      shadowOverlayCacheMissCount: shadowOverlayCacheMissCount,
+      shadowOverlayTotalCount: shadowOverlayTotalCount,
+      step4_buildColorMs: Number(step4BuildColorMs.toFixed ? step4BuildColorMs.toFixed(3) : step4BuildColorMs),
+      step4d_shadowOverlayTotalMs: Number(step4ShadowOverlayTotalMs.toFixed ? step4ShadowOverlayTotalMs.toFixed(3) : step4ShadowOverlayTotalMs),
       renderSourceCountBeforeVisibility: renderSourceCountBeforeVisibility,
       renderSourceCountAfterVisibility: renderSourceCountAfterVisibility,
       rebuildBudgetMode: rebuildBudgetMode,

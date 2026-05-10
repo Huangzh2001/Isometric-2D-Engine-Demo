@@ -4,6 +4,8 @@ var ctx = canvas ? canvas.getContext('2d') : null;
 var ui = {
   tabWorld: document.getElementById('tabWorld'),
   tabWorldPage: document.getElementById('tabWorldPage'),
+  tabTest: document.getElementById('tabTest'),
+  tabTestPage: document.getElementById('tabTestPage'),
   worldResolution: document.getElementById('worldResolution'),
   applyWorld: document.getElementById('applyWorld'),
   worldInspectorSummary: document.getElementById('worldInspectorSummary'),

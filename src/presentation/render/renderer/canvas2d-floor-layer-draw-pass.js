@@ -5,12 +5,27 @@
 // runtime state and adjacent helpers; this file must not own scene/prefab
 // protocols, application renderable assembly, or domain sorting rules.
 (function registerCanvas2dFloorLayerDrawPass(global) {
+  var OWNER = 'src/presentation/render/renderer/canvas2d-floor-layer-draw-pass.js';
   function asNumber(value, fallback) {
     var n = Number(value);
     return Number.isFinite(n) ? n : Number(fallback || 0);
   }
 
   function noop() {}
+
+  function noteCanvas2dSharedOptimizationUse(id, payload) {
+    try {
+      var consumer = global.__SHARED_RENDER_OPTIMIZATION_CANVAS2D_SHARED_CONSUMER__ || null;
+      if (consumer && typeof consumer.noteConsumerUse === 'function') {
+        return consumer.noteConsumerUse(id, Object.assign({
+          caller: OWNER,
+          activeBackend: 'canvas2d',
+          canvas2dConsumerNormalized: true
+        }, payload || {}));
+      }
+    } catch (_) {}
+    return null;
+  }
 
   function getSettings(deps) {
     return deps && deps.settings ? deps.settings : {};
@@ -19,6 +34,70 @@
   function getViewW(deps) { return Math.max(0, asNumber(deps && deps.VIEW_W, 0)); }
   function getViewH(deps) { return Math.max(0, asNumber(deps && deps.VIEW_H, 0)); }
   function getDpr(deps) { return Math.max(0.01, asNumber(deps && deps.dpr, 1)); }
+
+
+  // Shared floor cache blit transform contract.
+  // This is deliberately not Canvas2D-specific: Canvas2D consumes it as a
+  // drawImage transform stack, while PixiJS consumes the same result as a
+  // sprite position/size transform. The formula preserves the legacy cached
+  // floor behavior during pan/zoom reuse:
+  //   p' = anchor + delta + scale * (p - anchor)
+  //      = delta + scale * p + (1 - scale) * anchor
+  function buildFloorLayerCacheBlitTransformFromBreakdown(deps, breakdown) {
+    var settings = getSettings(deps);
+    var cssWidth = getViewW(deps);
+    var cssHeight = getViewH(deps);
+    var reuseDX = asNumber(breakdown && breakdown.floorLayerReuseCameraDX, 0);
+    var reuseDY = asNumber(breakdown && breakdown.floorLayerReuseCameraDY, 0);
+    var reuseScale = asNumber(breakdown && breakdown.floorLayerReuseScale, 1);
+    if (!Number.isFinite(reuseScale) || Math.abs(reuseScale) < 0.0001) reuseScale = 1;
+    var builtCameraX = asNumber(breakdown && breakdown.floorLayerBuiltCameraX, 0);
+    var builtCameraY = asNumber(breakdown && breakdown.floorLayerBuiltCameraY, 0);
+    var anchorX = asNumber(settings && settings.originX, 0) + builtCameraX;
+    var anchorY = asNumber(settings && settings.originY, 0) + builtCameraY;
+    var shouldReuse = !!(breakdown && (breakdown.skippedByInteractionBudget || breakdown.cameraTransformOnly));
+    var scaled = shouldReuse && Math.abs(reuseScale - 1) > 0.001;
+    var spriteX = scaled ? reuseDX + (1 - reuseScale) * anchorX : (shouldReuse ? reuseDX : 0);
+    var spriteY = scaled ? reuseDY + (1 - reuseScale) * anchorY : (shouldReuse ? reuseDY : 0);
+    return {
+      id: 'floor-layer-cache-blit-transform',
+      contract: 'shared-floor-cache-reuse-transform/v1',
+      owner: OWNER,
+      cssWidth: cssWidth,
+      cssHeight: cssHeight,
+      dx: reuseDX,
+      dy: reuseDY,
+      scale: reuseScale,
+      builtCameraX: builtCameraX,
+      builtCameraY: builtCameraY,
+      builtZoom: asNumber(breakdown && breakdown.floorLayerBuiltZoom, 1),
+      originX: asNumber(settings && settings.originX, 0),
+      originY: asNumber(settings && settings.originY, 0),
+      anchorX: anchorX,
+      anchorY: anchorY,
+      shouldReuse: shouldReuse,
+      scaled: scaled,
+      canvas2d: {
+        drawX: shouldReuse && !scaled ? reuseDX : 0,
+        drawY: shouldReuse && !scaled ? reuseDY : 0,
+        drawWidth: cssWidth,
+        drawHeight: cssHeight,
+        translateX: scaled ? anchorX + reuseDX : 0,
+        translateY: scaled ? anchorY + reuseDY : 0,
+        scaleX: scaled ? reuseScale : 1,
+        scaleY: scaled ? reuseScale : 1,
+        postTranslateX: scaled ? -anchorX : 0,
+        postTranslateY: scaled ? -anchorY : 0
+      },
+      pixi: {
+        spriteX: spriteX,
+        spriteY: spriteY,
+        spriteWidth: Math.max(1, cssWidth * (scaled ? reuseScale : 1)),
+        spriteHeight: Math.max(1, cssHeight * (scaled ? reuseScale : 1)),
+        eventMode: 'none'
+      }
+    };
+  }
 
   function getFloorLayerCanvas(deps) {
     return deps && typeof deps.getFloorLayerCanvas === 'function' ? deps.getFloorLayerCanvas() : null;
@@ -246,6 +325,27 @@
     return keys.map(function (entry) { return entry.key; });
   }
 
+  function normalizeFloorChunkKeyListForLayer(keys) {
+    return (Array.isArray(keys) ? keys.slice() : []).map(function (key) { return String(key); }).sort();
+  }
+
+  function areFloorChunkKeyListsEqual(left, right) {
+    var a = normalizeFloorChunkKeyListForLayer(left);
+    var b = normalizeFloorChunkKeyListForLayer(right);
+    if (a.length !== b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] !== b[i]) return false;
+    }
+    return true;
+  }
+
+  function buildFloorLayerContentViewSignatureForLayer(visibleChunkKeys, currentViewRotation) {
+    return JSON.stringify({
+      viewRotation: Number(currentViewRotation || 0),
+      visibleChunkKeys: normalizeFloorChunkKeyListForLayer(visibleChunkKeys)
+    });
+  }
+
   function buildFloorLayerViewSignatureForLayer(currentCameraX, currentCameraY, visibleChunkKeys, currentViewRotation) {
     return JSON.stringify({
       cameraX: Number((currentCameraX || 0).toFixed(3)),
@@ -409,8 +509,12 @@
     cache = ensureFloorChunkCacheState(chunkSize, deps);
     var preSetupStartAt = perfNow();
     var targetCtx = ensureFloorLayerCanvas(deps);
+    var previousViewSignatureForSharedSurface = String(cache.viewSignature || '');
+    var previousContentViewSignatureForSharedSurface = String(cache.contentViewSignature || '');
+    var previousSharedSurfaceRevision = Math.max(0, Math.round(Number(cache.sharedSurfaceRevision || 0) || 0));
     var visibleChunkKeys = computeVisibleFloorChunkKeysForLayer(scope, chunkSize, deps);
     var viewSignature = buildFloorLayerViewSignatureForLayer(currentCameraXForLayer, currentCameraYForLayer, visibleChunkKeys, currentViewRotation);
+    var contentViewSignature = buildFloorLayerContentViewSignatureForLayer(visibleChunkKeys, currentViewRotation);
     var contentChanged = force || cache.dirty || cache.signature !== contentSignature || Number(cache.viewRotation || currentViewRotation) !== Number(currentViewRotation || 0);
     if (contentChanged) {
       cache.chunks = new Map();
@@ -467,11 +571,18 @@
     var floorLoopWallMs = Math.max(0, floorLoopEndAt - floorLoopStartAt);
 
     var postFinalizeStartAt = perfNow();
+    // PXM-07.8E: shared floor texture invalidation must be content-driven,
+    // not camera-pan-driven. viewSignature remains diagnostic and can include
+    // cameraX/cameraY, while contentViewSignature excludes camera pan so PixiJS
+    // can keep the same texture and move the sprite transform during drag/pan.
+    var sharedSurfaceChangedForConsumers = contentChanged || builtChunkCountThisFrame > 0 || previousContentViewSignatureForSharedSurface !== String(contentViewSignature || '');
     cache.signature = contentSignature;
     cache.contentSignature = contentSignature;
     cache.cacheSignature = contentSignature;
     cache.viewSignature = viewSignature;
+    cache.contentViewSignature = contentViewSignature;
     cache.viewRotation = currentViewRotation;
+    cache.sharedSurfaceRevision = sharedSurfaceChangedForConsumers ? previousSharedSurfaceRevision + 1 : previousSharedSurfaceRevision;
     cache.lastBuiltAt = perfNow();
     cache.dirty = false;
     cache.buildCameraX = currentCameraXForLayer;
@@ -530,6 +641,154 @@
     }, deps);
   }
 
+
+  function tryBuildFloorLayerCameraTransformReuseBreakdown(deps, options) {
+    options = options || {};
+    if (options.preferCameraTransformReuse !== true && options.cameraTransformReuse !== true) return null;
+    var canvas = getFloorLayerCanvas(deps);
+    var cache = getFloorLayerCache(deps);
+    if (!canvas || !cache || !cache.signature || cache.dirty === true) return null;
+    var camera = deps && deps.camera ? deps.camera : {};
+    var currentViewRotation = getCurrentViewRotation(deps);
+    var currentZoomForLayer = deps && typeof deps.getMainEditorZoomValueForRender === 'function' ? Number(deps.getMainEditorZoomValueForRender()) || 1 : 1;
+    var currentCameraXForLayer = Number(camera && camera.x || 0);
+    var currentCameraYForLayer = Number(camera && camera.y || 0);
+    var contentSignature = deps && typeof deps.floorLayerSignature === 'function' ? deps.floorLayerSignature() : '';
+    if (String(cache.signature || '') !== String(contentSignature || '')) return null;
+    if (Number(cache.viewRotation || currentViewRotation) !== Number(currentViewRotation || 0)) return null;
+    var chunkSize = getFloorChunkSizeForLayer(deps);
+    ensureFloorChunkCacheState(chunkSize, deps);
+    var scope = deps && typeof deps.getMainCameraRenderScope === 'function' ? deps.getMainCameraRenderScope(currentViewRotation) : null;
+    var visibleChunkKeys = computeVisibleFloorChunkKeysForLayer(scope, chunkSize, deps);
+    if (!areFloorChunkKeyListsEqual(visibleChunkKeys, cache.visibleChunkKeys || [])) return null;
+    var builtZoomForReuse = Number(cache.buildZoom || currentZoomForLayer) || 1;
+    var reuseScale = Number((currentZoomForLayer / builtZoomForReuse).toFixed(4));
+    var dx = Number((currentCameraXForLayer - Number(cache.buildCameraX || 0)).toFixed(3));
+    var dy = Number((currentCameraYForLayer - Number(cache.buildCameraY || 0)).toFixed(3));
+    var cameraMoveOnly = Math.abs(dx) > 0.001 || Math.abs(dy) > 0.001;
+    var zoomMoveOnly = Math.abs(reuseScale - 1) > 0.001;
+    return completeFloorLayerBreakdown({
+      rebuilt: false,
+      skippedByInteractionBudget: true,
+      cameraTransformOnly: cameraMoveOnly || zoomMoveOnly,
+      floorLayerReuseCameraDX: dx,
+      floorLayerReuseCameraDY: dy,
+      floorLayerReuseScale: reuseScale,
+      floorLayerBuiltCameraX: Number(cache.buildCameraX || 0),
+      floorLayerBuiltCameraY: Number(cache.buildCameraY || 0),
+      floorLayerBuiltZoom: builtZoomForReuse,
+      floorLayerActualBranch: cameraMoveOnly || zoomMoveOnly
+        ? 'floor-layer-cache-reuse-camera-transform'
+        : 'floor-layer-cache-reuse-stable-transform',
+      floorVisibleChunkCount: visibleChunkKeys.length,
+      floorBuiltChunkCountThisFrame: 0,
+      floorMissingChunkCountBefore: 0,
+      floorMissingChunkCountAfter: 0,
+      floorBuiltTileCountThisFrame: 0,
+      floorChunkSize: chunkSize,
+      floorVersionTag: 'floor-static-chunk-v1'
+    }, deps);
+  }
+
+
+
+  function buildSharedFloorLayerCacheSnapshot(deps, breakdown, options) {
+    options = options || {};
+    var canvas = getFloorLayerCanvas(deps);
+    var cache = getFloorLayerCache(deps);
+    var currentViewRotation = getCurrentViewRotation(deps);
+    var surfaceReady = !!(canvas && canvas.width > 0 && canvas.height > 0 && cache && cache.signature);
+    var signature = String(cache && (cache.cacheSignature || cache.signature || '') || '');
+    var sharedSurfaceRevision = Math.max(0, Math.round(Number(cache && cache.sharedSurfaceRevision || 0) || 0));
+    // PXM-07.8A-fix: texture version must describe the visible shared
+    // floor surface, not the time at which the source was sampled. Including
+    // cache.lastBuiltAt/perfNow here made PixiJS upload the same canvas every
+    // frame and prevented stable-frame sprite reuse. The revision is updated
+    // only when the surface contents/view signature actually change.
+    var versionParts = [
+      signature,
+      String(cache && (cache.contentViewSignature || cache.viewSignature) || ''),
+      String(cache && cache.viewRotation != null ? cache.viewRotation : currentViewRotation),
+      String(sharedSurfaceRevision),
+      String(canvas && canvas.width || 0),
+      String(canvas && canvas.height || 0)
+    ];
+    var version = versionParts.join('|');
+    return {
+      id: 'floor-layer-cache',
+      sourceLayerMode: 'shared-floor-layer-cache-source',
+      ready: surfaceReady,
+      observed: surfaceReady || !!(cache && cache.signature),
+      dirty: !!(cache && cache.dirty),
+      surfaceType: 'canvas',
+      surfaceCanvas: canvas || null,
+      surfaceWidth: Number(canvas && canvas.width || 0),
+      surfaceHeight: Number(canvas && canvas.height || 0),
+      cssWidth: getViewW(deps),
+      cssHeight: getViewH(deps),
+      dpr: getDpr(deps),
+      signature: signature,
+      version: version,
+      textureVersion: version,
+      sharedSurfaceRevision: sharedSurfaceRevision,
+      lastBuiltAt: Number(cache && cache.lastBuiltAt || 0),
+      viewSignature: String(cache && cache.viewSignature || ''),
+      contentViewSignature: String(cache && cache.contentViewSignature || ''),
+      viewRotation: Number(cache && cache.viewRotation != null ? cache.viewRotation : currentViewRotation),
+      buildCameraX: Number(cache && cache.buildCameraX || 0),
+      buildCameraY: Number(cache && cache.buildCameraY || 0),
+      buildZoom: Number(cache && cache.buildZoom || 1),
+      visibleChunkKeys: cache && Array.isArray(cache.visibleChunkKeys) ? cache.visibleChunkKeys.slice() : [],
+      chunkSize: Number(cache && cache.chunkSize || 0),
+      chunkCount: cache && cache.chunks && typeof cache.chunks.size === 'number' ? Number(cache.chunks.size || 0) : 0,
+      currentCameraX: Number(deps && deps.camera && deps.camera.x || 0),
+      currentCameraY: Number(deps && deps.camera && deps.camera.y || 0),
+      currentZoom: deps && typeof deps.getMainEditorZoomValueForRender === 'function' ? Number(deps.getMainEditorZoomValueForRender()) || 1 : 1,
+      floorCacheBlitTransform: buildFloorLayerCacheBlitTransformFromBreakdown(deps, breakdown),
+      reuseTransform: {
+        dx: Number(breakdown && breakdown.floorLayerReuseCameraDX || 0),
+        dy: Number(breakdown && breakdown.floorLayerReuseCameraDY || 0),
+        scale: Number(breakdown && breakdown.floorLayerReuseScale || 1),
+        builtCameraX: Number(breakdown && breakdown.floorLayerBuiltCameraX || cache && cache.buildCameraX || 0),
+        builtCameraY: Number(breakdown && breakdown.floorLayerBuiltCameraY || cache && cache.buildCameraY || 0),
+        builtZoom: Number(breakdown && breakdown.floorLayerBuiltZoom || cache && cache.buildZoom || 1),
+        skippedByInteractionBudget: !!(breakdown && breakdown.skippedByInteractionBudget),
+        cameraTransformOnly: !!(breakdown && breakdown.cameraTransformOnly),
+        branch: String(breakdown && breakdown.floorLayerActualBranch || '')
+      },
+      stats: {
+        rebuilt: !!(breakdown && breakdown.rebuilt),
+        floorLayerRebuildWallMs: Number(breakdown && breakdown.floorLayerRebuildWallMs || 0),
+        floorLayerBlitWallMs: Number(breakdown && breakdown.floorLayerBlitWallMs || 0),
+        floorVisibleChunkCount: Number(breakdown && breakdown.floorVisibleChunkCount || (cache && cache.visibleChunkKeys && cache.visibleChunkKeys.length) || 0),
+        floorBuiltChunkCountThisFrame: Number(breakdown && breakdown.floorBuiltChunkCountThisFrame || 0),
+        floorMissingChunkCountBefore: Number(breakdown && breakdown.floorMissingChunkCountBefore || 0),
+        floorMissingChunkCountAfter: Number(breakdown && breakdown.floorMissingChunkCountAfter || 0),
+        floorBuiltTileCountThisFrame: Number(breakdown && breakdown.floorBuiltTileCountThisFrame || 0),
+        floorLayerActualBranch: String(breakdown && breakdown.floorLayerActualBranch || 'floor-layer-cache-shared-source')
+      },
+      canvas2dConsumer: 'existing-canvas2d-drawImage',
+      pixiConsumer: 'eligible-texture-from-shared-canvas',
+      fallbackPolicy: 'If this snapshot is not ready, PixiJS must fall back to the existing first-pass floor renderer while Canvas2D fallback remains enabled.',
+      modifiesRendering: false,
+      canvas2dBehaviorChanged: false,
+      pixiBehaviorChanged: false,
+      source: options.source || 'buildSharedFloorLayerCacheSnapshot'
+    };
+  }
+
+  function ensureSharedFloorLayerCacheSnapshot(force, deps, options) {
+    options = options || {};
+    var breakdown = null;
+    try {
+      breakdown = force === true ? null : tryBuildFloorLayerCameraTransformReuseBreakdown(deps, options);
+      if (!breakdown) breakdown = rebuildFloorLayerIfNeeded(force === true, deps) || null;
+    } catch (_) {
+      breakdown = null;
+    }
+    return buildSharedFloorLayerCacheSnapshot(deps, breakdown, options || {});
+  }
+
   function drawFloor(deps) {
     var perfNow = deps && typeof deps.perfNow === 'function' ? deps.perfNow : function () { return Date.now(); };
     var ctx = deps && deps.ctx;
@@ -538,30 +797,38 @@
     var rebuildBreakdown = rebuildFloorLayerIfNeeded(false, deps) || null;
     var blitStartAt = perfNow();
     var blitWallMs = 0;
-    var reuseDX = Number(rebuildBreakdown && rebuildBreakdown.floorLayerReuseCameraDX || 0);
-    var reuseDY = Number(rebuildBreakdown && rebuildBreakdown.floorLayerReuseCameraDY || 0);
-    var reuseScale = Number(rebuildBreakdown && rebuildBreakdown.floorLayerReuseScale || 1);
-    var builtCameraX = Number(rebuildBreakdown && rebuildBreakdown.floorLayerBuiltCameraX || 0);
-    var builtCameraY = Number(rebuildBreakdown && rebuildBreakdown.floorLayerBuiltCameraY || 0);
+    var blitTransform = buildFloorLayerCacheBlitTransformFromBreakdown(deps, rebuildBreakdown);
+    var reuseDX = Number(blitTransform.dx || 0);
+    var reuseDY = Number(blitTransform.dy || 0);
+    var reuseScale = Number(blitTransform.scale || 1);
     var canvas = getFloorLayerCanvas(deps);
     if (canvas && ctx && typeof ctx.drawImage === 'function') {
-      if (rebuildBreakdown && rebuildBreakdown.skippedByInteractionBudget) {
+      if (blitTransform.shouldReuse) {
         ctx.save();
-        if (Math.abs(reuseScale - 1) > 0.001) {
-          var anchorX = Number(settings && settings.originX || 0) + builtCameraX;
-          var anchorY = Number(settings && settings.originY || 0) + builtCameraY;
-          ctx.translate(anchorX + reuseDX, anchorY + reuseDY);
-          ctx.scale(reuseScale, reuseScale);
-          ctx.translate(-anchorX, -anchorY);
-          ctx.drawImage(canvas, 0, 0, getViewW(deps), getViewH(deps));
+        if (blitTransform.scaled) {
+          ctx.translate(Number(blitTransform.canvas2d.translateX || 0), Number(blitTransform.canvas2d.translateY || 0));
+          ctx.scale(Number(blitTransform.canvas2d.scaleX || 1), Number(blitTransform.canvas2d.scaleY || 1));
+          ctx.translate(Number(blitTransform.canvas2d.postTranslateX || 0), Number(blitTransform.canvas2d.postTranslateY || 0));
+          ctx.drawImage(canvas, 0, 0, Number(blitTransform.canvas2d.drawWidth || getViewW(deps)), Number(blitTransform.canvas2d.drawHeight || getViewH(deps)));
         } else {
-          ctx.drawImage(canvas, reuseDX, reuseDY, getViewW(deps), getViewH(deps));
+          ctx.drawImage(canvas, Number(blitTransform.canvas2d.drawX || 0), Number(blitTransform.canvas2d.drawY || 0), Number(blitTransform.canvas2d.drawWidth || getViewW(deps)), Number(blitTransform.canvas2d.drawHeight || getViewH(deps)));
         }
         ctx.restore();
       } else {
-        ctx.drawImage(canvas, 0, 0, getViewW(deps), getViewH(deps));
+        ctx.drawImage(canvas, 0, 0, Number(blitTransform.canvas2d.drawWidth || getViewW(deps)), Number(blitTransform.canvas2d.drawHeight || getViewH(deps)));
       }
       blitWallMs = Math.max(0, perfNow() - blitStartAt);
+      noteCanvas2dSharedOptimizationUse('floor-layer-cache', {
+        stage: 'drawFloor.blit',
+        canvas2dConsumerPath: 'shared-floor-layer-cache-source-plus-existing-canvas2d-drawImage',
+        statsSummary: 'floorLayerBlitWallMs=' + String(Number(blitWallMs || 0).toFixed ? Number(blitWallMs || 0).toFixed(3) : blitWallMs),
+        runtimeDetail: {
+          floorLayerRebuilt: !!(rebuildBreakdown && rebuildBreakdown.rebuilt),
+          floorLayerReusedDuringInteraction: !!(rebuildBreakdown && rebuildBreakdown.skippedByInteractionBudget),
+          floorVisibleChunkCount: Number(rebuildBreakdown && rebuildBreakdown.floorVisibleChunkCount || 0),
+          floorBuiltChunkCountThisFrame: Number(rebuildBreakdown && rebuildBreakdown.floorBuiltChunkCountThisFrame || 0)
+        }
+      });
       var cache = getFloorLayerCache(deps);
       var currentViewRotation = getCurrentViewRotation(deps);
       if (deps && typeof deps.logItemRotationPrototype === 'function') deps.logItemRotationPrototype('main-floor-draw-hit', {
@@ -644,6 +911,10 @@
     buildFloorChunkEntryForLayer: buildFloorChunkEntryForLayer,
     drawFloorOutlineToLayer: drawFloorOutlineToLayer,
     rebuildFloorLayerIfNeeded: rebuildFloorLayerIfNeeded,
+    buildFloorLayerCacheBlitTransformFromBreakdown: buildFloorLayerCacheBlitTransformFromBreakdown,
+    buildSharedFloorLayerCacheSnapshot: buildSharedFloorLayerCacheSnapshot,
+    tryBuildFloorLayerCameraTransformReuseBreakdown: tryBuildFloorLayerCameraTransformReuseBreakdown,
+    ensureSharedFloorLayerCacheSnapshot: ensureSharedFloorLayerCacheSnapshot,
     drawFloor: drawFloor
   };
 

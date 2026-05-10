@@ -123,11 +123,41 @@
     }
   }
 
+  function getPreparedPlayerSpriteFrameSnapshot() {
+    var prepared = preparePlayerSpriteFrame();
+    if (!prepared) return null;
+    return {
+      ready: true,
+      surfaceCanvas: playerSpriteFrameBuffer,
+      sourceX: 0,
+      sourceY: 0,
+      sourceWidth: SPRITE.frameW,
+      sourceHeight: SPRITE.frameH,
+      xLeft: prepared.xLeft,
+      yTop: prepared.yTop,
+      scaledFrameW: prepared.scaledFrameW,
+      scaledFrameH: prepared.scaledFrameH,
+      spriteScale: prepared.spriteScale,
+      frame: prepared.frame,
+      row: prepared.row,
+      cacheKey: playerSpriteFrameCache.key || '',
+      worldX: Number(player && player.x || 0),
+      worldY: Number(player && player.y || 0),
+      worldZ: Number(player && (player.visualZ != null ? player.visualZ : player.z) || 0),
+      dir: player && player.dir != null ? player.dir : null,
+      moving: !!(player && player.moving),
+      walk: Number(player && player.walk || 0),
+      visibleHeight: prepared.visibleHeight,
+      totalH: prepared.totalH
+    };
+  }
+
   var api = {
     getPlayerVisualScale: getPlayerVisualScale,
     currentAnimFrame: currentAnimFrame,
     getPlayerUnifiedLightCenter: getPlayerUnifiedLightCenter,
     preparePlayerSpriteFrame: preparePlayerSpriteFrame,
+    getPreparedPlayerSpriteFrameSnapshot: getPreparedPlayerSpriteFrameSnapshot,
     drawPlayerAvatar: drawPlayerAvatar,
   };
   global.__APP_PRESENTATION_PLAYER_SPRITE_FRAME__ = api;

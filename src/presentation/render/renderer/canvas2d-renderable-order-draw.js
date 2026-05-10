@@ -16,6 +16,20 @@
     return Number(n.toFixed ? n.toFixed(3) : n);
   }
 
+  function noteCanvas2dSharedOptimizationUse(id, payload) {
+    try {
+      var consumer = window.__SHARED_RENDER_OPTIMIZATION_CANVAS2D_SHARED_CONSUMER__ || null;
+      if (consumer && typeof consumer.noteConsumerUse === 'function') {
+        return consumer.noteConsumerUse(id, Object.assign({
+          caller: OWNER,
+          activeBackend: 'canvas2d',
+          canvas2dConsumerNormalized: true
+        }, payload || {}));
+      }
+    } catch (_) {}
+    return null;
+  }
+
   function getRenderableKind(renderable) {
     if (!renderable) return 'unknown';
     return String(renderable.kind || renderable.renderPath || 'unknown');
@@ -181,7 +195,113 @@
     stats.staticPacketDrawLoopMs += Number(staticRunStats.staticPacketDrawLoopMs || 0) + (usedBitmapRun ? Math.max(0, nowMs(deps) - staticRunStartAt) : 0);
   }
 
+  function getActiveRendererBackend() {
+    try {
+      var selection = window.__WORLD_RENDERER_BACKEND_SELECTION__ || null;
+      var snapshot = selection && typeof selection.getSnapshot === 'function' ? selection.getSnapshot() : null;
+      if (snapshot && snapshot.activeBackend) return String(snapshot.activeBackend);
+    } catch (_) {}
+    return 'canvas2d';
+  }
+
+  function isPixiBackendActive() {
+    return getActiveRendererBackend() === 'pixi';
+  }
+
+  function getPixiStaticWorldPacketConsumer() {
+    try { return window.__SHARED_RENDER_OPTIMIZATION_PIXI_STATIC_WORLD_PACKET_CONSUMER__ || null; } catch (_) {}
+    return null;
+  }
+
+
+  function getPixiInterleavedWorldContainer() {
+    try {
+      var renderer = window.__PIXI_MIGRATION_PIXI_WORLD_RENDERER__ || window.__PIXI_WORLD_RENDERER_SKELETON__ || null;
+      if (renderer && typeof renderer.getStaticWorldPacketContainer === 'function') return renderer.getStaticWorldPacketContainer('canvas2d-renderable-order-draw.frameplan-interleaved-player');
+      if (renderer && typeof renderer.getStaticRunContainer === 'function') return renderer.getStaticRunContainer('canvas2d-renderable-order-draw.frameplan-interleaved-player');
+    } catch (_) {}
+    return null;
+  }
+
+  function consumePixiPlayerForFramePlanOrder(renderable, meta, orderIndex) {
+    if (!isPixiBackendActive()) return null;
+    if (!(renderable && (renderable.id === 'player-avatar' || renderable.kind === 'player-avatar'))) return null;
+    try {
+      var consumer = window.__SHARED_RENDER_OPTIMIZATION_PIXI_PLAYER_CONSUMER__ || null;
+      if (!consumer || typeof consumer.consume !== 'function') return null;
+      var container = getPixiInterleavedWorldContainer();
+      if (!container) return null;
+      return consumer.consume({
+        source: 'canvas2d-renderable-order-draw.frameplan-interleaved-player',
+        container: container,
+        framePlanId: meta && meta.framePlanId || '',
+        visualAdoption: true,
+        interleavedWorldContainer: true,
+        orderIndex: orderIndex,
+        zIndex: orderIndex,
+        renderableKind: renderable.kind || renderable.id || 'player-avatar'
+      }) || null;
+    } catch (_) {}
+    return null;
+  }
+
+  function beginPixiStaticWorldPacketFrame(order, meta, deps) {
+    if (!isPixiBackendActive()) return null;
+    try {
+      var consumer = getPixiStaticWorldPacketConsumer();
+      if (consumer && typeof consumer.beginFrame === 'function') return consumer.beginFrame(order || [], meta || {}, deps || {}) || null;
+    } catch (_) {}
+    return null;
+  }
+
+  function shouldSkipStaticPacketRunForPixiVisualAdoption(staticPackets, meta, runStartIndex) {
+    if (!isPixiBackendActive()) return false;
+    try {
+      var consumer = getPixiStaticWorldPacketConsumer();
+      if (consumer && typeof consumer.shouldSkipCanvas2dStaticRun === 'function') {
+        return consumer.shouldSkipCanvas2dStaticRun(staticPackets, meta || {}, runStartIndex) === true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  function shouldSkipDynamicRenderableForPixiVisualAdoption(renderable, meta) {
+    try {
+      if (renderable && (renderable.id === 'player-avatar' || renderable.kind === 'player-avatar')) {
+        var playerConsumer = window.__SHARED_RENDER_OPTIMIZATION_PIXI_PLAYER_CONSUMER__ || null;
+        if (playerConsumer && typeof playerConsumer.shouldSkipCanvas2dPlayerAvatar === 'function') {
+          return playerConsumer.shouldSkipCanvas2dPlayerAvatar(renderable, meta || {}) === true;
+        }
+      }
+    } catch (_) {}
+    try {
+      var dynamicConsumer = window.__SHARED_RENDER_OPTIMIZATION_PIXI_DYNAMIC_RENDERABLE_CONSUMER__ || null;
+      if (dynamicConsumer && typeof dynamicConsumer.shouldSkipCanvas2dDynamicRenderable === 'function') {
+        return dynamicConsumer.shouldSkipCanvas2dDynamicRenderable(renderable, meta || {}) === true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
   function drawStaticPacketRun(deps, stats, staticPackets, meta, runStartIndex) {
+    noteCanvas2dSharedOptimizationUse('static-packet-run-cache', {
+      stage: 'drawStaticPacketRun.start',
+      canvas2dConsumerPath: 'shared-static-packet-run-source-plus-renderer-neutral-packet-consumer',
+      statsSummary: 'packetCount=' + String(Array.isArray(staticPackets) ? staticPackets.length : 0),
+      runtimeDetail: {
+        packetCount: Array.isArray(staticPackets) ? staticPackets.length : 0,
+        runStartIndex: runStartIndex
+      }
+    });
+    if (shouldSkipStaticPacketRunForPixiVisualAdoption(staticPackets, meta, runStartIndex)) {
+      trackSlowRenderable(stats, {
+        index: runStartIndex,
+        id: staticPackets.length ? (staticPackets[0].id || null) : null,
+        kind: 'pixi-static-world-packet-category-adopted',
+        ms: 0
+      });
+      return;
+    }
     var staticRunStartAt = nowMs(deps);
     var staticRunStats = createStaticRunStats();
     var usedBitmapRun = false;
@@ -190,7 +310,8 @@
         source: meta.source || 'unknown',
         framePlanId: meta.framePlanId || null,
         currentViewRotation: meta.currentViewRotation != null ? meta.currentViewRotation : 0,
-        runStartIndex: runStartIndex
+        runStartIndex: runStartIndex,
+        firstDynamicIndex: meta.firstDynamicIndex != null ? meta.firstDynamicIndex : -1
       }, staticRunStats) === true;
     }
     if (!usedBitmapRun) {
@@ -199,7 +320,8 @@
           source: meta.source || 'unknown',
           framePlanId: meta.framePlanId || null,
           currentViewRotation: meta.currentViewRotation != null ? meta.currentViewRotation : 0,
-          runStartIndex: runStartIndex
+          runStartIndex: runStartIndex,
+          firstDynamicIndex: meta.firstDynamicIndex != null ? meta.firstDynamicIndex : -1
         }, staticRunStats, function (payload) { trackSlowRenderable(stats, payload); });
       }
     } else {
@@ -227,7 +349,22 @@
         renderable.framePlanId = renderable.framePlanId || meta.framePlanId || null;
         renderable.__drawIndex = index;
       }
-      if (renderable && typeof renderable.draw === 'function') renderable.draw();
+      var interleavedPlayerSummary = consumePixiPlayerForFramePlanOrder(renderable, meta, index);
+      if (interleavedPlayerSummary && interleavedPlayerSummary.pixiDrawsPlayerAvatar === true) {
+        trackSlowRenderable(stats, {
+          index: index,
+          id: renderable && (renderable.id || renderable.instanceId || null),
+          kind: 'pixi-player-avatar-frameplan-interleaved',
+          ms: 0
+        });
+      } else if (shouldSkipDynamicRenderableForPixiVisualAdoption(renderable, meta)) {
+        trackSlowRenderable(stats, {
+          index: index,
+          id: renderable && (renderable.id || renderable.instanceId || null),
+          kind: renderable && renderable.kind === 'player-avatar' ? 'pixi-player-avatar-adopted' : 'pixi-dynamic-renderable-adopted',
+          ms: 0
+        });
+      } else if (renderable && typeof renderable.draw === 'function') renderable.draw();
       else if (renderable && renderable.kind === 'voxel' && deps && typeof deps.drawCachedVoxelRenderable === 'function') deps.drawCachedVoxelRenderable(renderable);
       else throw new Error('missing draw for renderable ' + String(renderable && renderable.id));
       if (renderable && deps && typeof deps.drawFaceDebugOverlayRenderable === 'function') deps.drawFaceDebugOverlayRenderable(renderable, index);
@@ -325,6 +462,11 @@
 
   function emitDrawLoopBreakdown(adapterApi, deps, loopBreakdown) {
     if (adapterApi) adapterApi.__lastDrawLoopBreakdown = loopBreakdown;
+    try {
+      if (window.__PIXI_MIGRATION_OPTIMIZATION_AUDIT_DIAGNOSTICS__ && typeof window.__PIXI_MIGRATION_OPTIMIZATION_AUDIT_DIAGNOSTICS__.noteDrawLoopBreakdown === 'function') {
+        window.__PIXI_MIGRATION_OPTIMIZATION_AUDIT_DIAGNOSTICS__.noteDrawLoopBreakdown(loopBreakdown, { source: 'canvas2d-renderable-order-draw' });
+      }
+    } catch (_) {}
     var signature = [
       Number(loopBreakdown.renderableCount || 0),
       Number(loopBreakdown.staticPacketCount || 0),
@@ -380,6 +522,7 @@
     meta = meta || {};
     order = Array.isArray(order) ? order : [];
     var seenDrawHits = Object.create(null);
+    var pixiStaticWorldPacketSummary = beginPixiStaticWorldPacketFrame(order, meta, deps);
     var drawStartAt = nowMs(deps);
     var stats = createDrawStats();
     var canvasTiming = createCanvasTiming();
@@ -388,6 +531,15 @@
     if (adapterApi) adapterApi.__inDrawRenderableOrder = true;
     try {
       if (debugState) debugState.renderStep = 'draw-renderables';
+      var firstDynamicIndex = -1;
+      for (var firstDynamicScanIndex = 0; firstDynamicScanIndex < order.length; firstDynamicScanIndex += 1) {
+        var firstDynamicCandidate = order[firstDynamicScanIndex];
+        if (!(firstDynamicCandidate && firstDynamicCandidate.kind === 'static-world-face-packet')) {
+          firstDynamicIndex = firstDynamicScanIndex;
+          break;
+        }
+      }
+      meta.firstDynamicIndex = firstDynamicIndex;
       var i = 0;
       while (i < order.length) {
         var renderable = order[i];
@@ -413,6 +565,42 @@
       var drawMsRaw = Math.max(0, nowMs(deps) - drawStartAt);
       var drawMs = safeFixed(deps, drawMsRaw);
       var loopBreakdown = buildLoopBreakdown(deps, order, meta, stats, canvasTiming, drawMs);
+      loopBreakdown.pixiStaticWorldPacketSummary = pixiStaticWorldPacketSummary || null;
+      noteCanvas2dSharedOptimizationUse('projected-geometry-cache', {
+        stage: 'drawRenderableOrder.after-loop',
+        canvas2dConsumerPath: 'shared-projected-geometry-source-plus-existing-canvas2d-path2d-consumer',
+        statsSummary: 'geometryHits=' + String(stats.staticPacketGeometryCacheHitCount || 0) + ',geometryMisses=' + String(stats.staticPacketGeometryCacheMissCount || 0),
+        runtimeDetail: {
+          staticPacketGeometryCacheHitCount: Number(stats.staticPacketGeometryCacheHitCount || 0),
+          staticPacketGeometryCacheMissCount: Number(stats.staticPacketGeometryCacheMissCount || 0),
+          staticPacketOverlayCacheHitCount: Number(stats.staticPacketOverlayCacheHitCount || 0),
+          staticPacketOverlayCacheMissCount: Number(stats.staticPacketOverlayCacheMissCount || 0)
+        }
+      });
+      noteCanvas2dSharedOptimizationUse('static-world-chunk-cache', {
+        stage: 'drawRenderableOrder.after-loop',
+        canvas2dConsumerPath: 'shared-static-world-chunk-source-plus-existing-framePlan-order-consumer',
+        statsSummary: 'staticPacketCount=' + String(stats.staticPacketCount || 0) + ',renderableCount=' + String(order.length || 0),
+        runtimeDetail: {
+          staticPacketCount: Number(stats.staticPacketCount || 0),
+          renderableCount: Number(order.length || 0)
+        }
+      });
+      noteCanvas2dSharedOptimizationUse('material-color-cache', {
+        stage: 'drawRenderableOrder.after-loop',
+        canvas2dConsumerPath: 'shared-packet-material-color-source-plus-existing-canvas2d-fill-stroke-consumer',
+        statsSummary: 'staticPacketCount=' + String(stats.staticPacketCount || 0),
+        runtimeDetail: { staticPacketCount: Number(stats.staticPacketCount || 0) }
+      });
+      noteCanvas2dSharedOptimizationUse('shadow-overlay-cache', {
+        stage: 'drawRenderableOrder.after-loop',
+        canvas2dConsumerPath: 'shared-shadow-overlay-source-plus-existing-canvas2d-overlay-consumer',
+        statsSummary: 'overlayHits=' + String(stats.staticPacketOverlayCacheHitCount || 0) + ',overlayMisses=' + String(stats.staticPacketOverlayCacheMissCount || 0),
+        runtimeDetail: {
+          staticPacketOverlayCacheHitCount: Number(stats.staticPacketOverlayCacheHitCount || 0),
+          staticPacketOverlayCacheMissCount: Number(stats.staticPacketOverlayCacheMissCount || 0)
+        }
+      });
       emitDrawLoopBreakdown(adapterApi, deps, loopBreakdown);
       publishFrameDrawStats(deps, order, stats, drawMs);
       return order;

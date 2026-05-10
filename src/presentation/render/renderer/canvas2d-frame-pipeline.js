@@ -21,6 +21,20 @@
     return undefined;
   }
 
+  function noteCanvas2dSharedOptimizationUse(id, payload) {
+    try {
+      var consumer = window.__SHARED_RENDER_OPTIMIZATION_CANVAS2D_SHARED_CONSUMER__ || null;
+      if (consumer && typeof consumer.noteConsumerUse === 'function') {
+        return consumer.noteConsumerUse(id, Object.assign({
+          caller: OWNER,
+          activeBackend: 'canvas2d',
+          canvas2dConsumerNormalized: true
+        }, payload || {}));
+      }
+    } catch (_) {}
+    return null;
+  }
+
   function runFramePipeline(adapterApi, deps, passApi, renderablesApi) {
     var pipelineCallStartAt = nowMs(deps);
     var pipelineStartAt = pipelineCallStartAt;
@@ -62,6 +76,15 @@
     var adapterGlueMs = 0;
     var framePlan = null;
     var zoomPreviewFastPathPayload = call(deps, 'drawZoomPreviewFastPath', { source: 'renderer.canvas2d:runFramePipeline' });
+    noteCanvas2dSharedOptimizationUse('interaction-fast-path-contract', {
+      stage: 'runFramePipeline.zoomPreviewFastPath',
+      canvas2dConsumerPath: 'shared-interaction-fast-path-source-plus-existing-canvas2d-preview-or-frame-pipeline',
+      statsSummary: 'zoomPreviewFastPathUsed=' + String(!!zoomPreviewFastPathPayload),
+      runtimeDetail: {
+        zoomPreviewFastPathUsed: !!zoomPreviewFastPathPayload,
+        zoomPreviewDrawMs: Number(zoomPreviewFastPathPayload && zoomPreviewFastPathPayload.drawMs || 0)
+      }
+    });
     var functionBreakdown = call(deps, 'getFunctionBreakdownFrame');
     if (zoomPreviewFastPathPayload) {
       clearAndBackgroundMs = Number(zoomPreviewFastPathPayload.drawMs || 0);
@@ -129,10 +152,34 @@
         functionBreakdown.extras.framePlanId = framePlan && framePlan.id ? framePlan.id : null;
         functionBreakdown.extras.frameRenderableCount = Number(framePlan && framePlan.order ? framePlan.order.length : 0);
       }
+      noteCanvas2dSharedOptimizationUse('visibility-culling-contract', {
+        stage: 'runFramePipeline.after-buildFramePlan',
+        canvas2dConsumerPath: 'shared-visibility-culling-source-plus-existing-framePlan-order-consumer',
+        statsSummary: 'renderableCount=' + String(framePlan && framePlan.order ? framePlan.order.length : 0),
+        runtimeDetail: {
+          framePlanId: framePlan && framePlan.id || null,
+          renderableCount: Number(framePlan && framePlan.order ? framePlan.order.length : 0)
+        }
+      });
+      noteCanvas2dSharedOptimizationUse('occupancy-cache-contract', {
+        stage: 'runFramePipeline.after-buildFramePlan',
+        canvas2dConsumerPath: 'shared-occupancy-source-plus-existing-static-world-build-consumer',
+        statsSummary: 'framePlanId=' + String(framePlan && framePlan.id || 'none'),
+        runtimeDetail: { framePlanId: framePlan && framePlan.id || null }
+      });
       var drawLoopStartAt = nowMs(deps);
       call(deps, 'drawRenderableOrder', framePlan.order || [], { source: 'renderer.canvas2d:drawRenderableOrder', framePlanId: framePlan.id || null, currentViewRotation: framePlan.currentViewRotation != null ? framePlan.currentViewRotation : 0 });
       drawRenderableOrderWallMs = Math.max(0, (nowMs(deps)) - drawLoopStartAt);
       drawRenderableOrderMs = drawRenderableOrderWallMs;
+      try {
+        if (window.__PIXI_MIGRATION_CANVAS2D_FRAMEPLAN_CONSUMPTION_DIAGNOSTICS__ && typeof window.__PIXI_MIGRATION_CANVAS2D_FRAMEPLAN_CONSUMPTION_DIAGNOSTICS__.noteCanvas2dFramePlanConsumption === 'function') {
+          window.__PIXI_MIGRATION_CANVAS2D_FRAMEPLAN_CONSUMPTION_DIAGNOSTICS__.noteCanvas2dFramePlanConsumption(framePlan, {
+            source: 'canvas2d-frame-pipeline',
+            stage: 'after-drawRenderableOrder',
+            drawRenderableOrderMs: drawRenderableOrderMs
+          });
+        }
+      } catch (_) {}
       if (functionBreakdown) functionBreakdown.timings['adapter.runFramePipeline.drawRenderableOrder'] = safeFixed(deps, drawRenderableOrderMs);
       var overlayStartAt = nowMs(deps);
       call(deps, 'drawOverlayPasses', { source: 'renderer.canvas2d:drawOverlayPasses' });
@@ -197,6 +244,16 @@
       zoomPreviewDrawMs: safeFixed(deps, zoomPreviewFastPathPayload && zoomPreviewFastPathPayload.drawMs || 0),
       zoomPreviewScaleRatio: safeFixed(deps, zoomPreviewFastPathPayload && zoomPreviewFastPathPayload.scaleRatio || 1)
     };
+    noteCanvas2dSharedOptimizationUse('performance-audit-contract', {
+      stage: 'runFramePipeline.pipelineBreakdown',
+      canvas2dConsumerPath: 'shared-performance-audit-source-plus-existing-canvas2d-pipeline-breakdown',
+      statsSummary: 'totalPipelineMs=' + String(safeFixed(deps, totalPipelineMs)) + ',renderableCount=' + String(pipelineBreakdown.renderableCount || 0),
+      runtimeDetail: {
+        totalPipelineMs: safeFixed(deps, totalPipelineMs),
+        renderableCount: Number(pipelineBreakdown.renderableCount || 0),
+        framePlanId: pipelineBreakdown.framePlanId || null
+      }
+    });
     var debugStartAt = nowMs(deps);
     if (functionBreakdown) functionBreakdown.timings['adapter.runFramePipeline.total'] = safeFixed(deps, totalPipelineMs);
     adapterApi.__lastPipelineBreakdown = Object.assign({}, pipelineBreakdown, { totalPipelineMs: safeFixed(deps, totalPipelineMs), adapterGlueMs: 0, debugHookMs: 0, knownAccountedMs: 0, unaccountedMs: 0 });
@@ -241,6 +298,59 @@
       unaccountedMs: safeFixed(deps, unaccountedMs)
     });
     adapterApi.__lastPipelineBreakdown = pipelineBreakdown;
+    try {
+      if (window.__PIXI_MIGRATION_BASELINE_DIAGNOSTICS__ && typeof window.__PIXI_MIGRATION_BASELINE_DIAGNOSTICS__.noteRenderPipelineSummary === 'function') {
+        window.__PIXI_MIGRATION_BASELINE_DIAGNOSTICS__.noteRenderPipelineSummary(pipelineBreakdown);
+      }
+    } catch (_) {}
+    try {
+      if (window.__WORLD_RENDERER_BACKEND_SELECTION__ && typeof window.__WORLD_RENDERER_BACKEND_SELECTION__.noteRenderSummary === 'function') {
+        window.__WORLD_RENDERER_BACKEND_SELECTION__.noteRenderSummary(Object.assign({}, pipelineBreakdown, {
+          renderer: 'canvas2d',
+          source: 'canvas2d-frame-pipeline'
+        }));
+      }
+    } catch (_) {}
+    try {
+      if (window.__PIXI_MIGRATION_RENDERABLE_KIND_DIAGNOSTICS__ && typeof window.__PIXI_MIGRATION_RENDERABLE_KIND_DIAGNOSTICS__.noteRenderSummary === 'function') {
+        window.__PIXI_MIGRATION_RENDERABLE_KIND_DIAGNOSTICS__.noteRenderSummary(Object.assign({}, pipelineBreakdown, {
+          renderer: 'canvas2d',
+          source: 'canvas2d-frame-pipeline'
+        }));
+      }
+    } catch (_) {}
+    try {
+      if (window.__PIXI_MIGRATION_CANVAS2D_FRAMEPLAN_CONSUMPTION_DIAGNOSTICS__ && typeof window.__PIXI_MIGRATION_CANVAS2D_FRAMEPLAN_CONSUMPTION_DIAGNOSTICS__.noteRenderSummary === 'function') {
+        window.__PIXI_MIGRATION_CANVAS2D_FRAMEPLAN_CONSUMPTION_DIAGNOSTICS__.noteRenderSummary(Object.assign({}, pipelineBreakdown, {
+          renderer: 'canvas2d',
+          source: 'canvas2d-frame-pipeline'
+        }));
+      }
+    } catch (_) {}
+    try {
+      if (window.__PIXI_WORLD_RENDERER_SKELETON__ && typeof window.__PIXI_WORLD_RENDERER_SKELETON__.noteRenderSummary === 'function') {
+        window.__PIXI_WORLD_RENDERER_SKELETON__.noteRenderSummary(Object.assign({}, pipelineBreakdown, {
+          renderer: 'canvas2d',
+          source: 'canvas2d-frame-pipeline'
+        }));
+      }
+    } catch (_) {}
+    try {
+      if (window.__PIXI_MIGRATION_PERFORMANCE_COMPARISON_DIAGNOSTICS__ && typeof window.__PIXI_MIGRATION_PERFORMANCE_COMPARISON_DIAGNOSTICS__.noteCanvas2dPipeline === 'function') {
+        window.__PIXI_MIGRATION_PERFORMANCE_COMPARISON_DIAGNOSTICS__.noteCanvas2dPipeline(Object.assign({}, pipelineBreakdown, {
+          renderer: 'canvas2d',
+          source: 'canvas2d-frame-pipeline'
+        }));
+      }
+    } catch (_) {}
+    try {
+      if (window.__PIXI_MIGRATION_OPTIMIZATION_AUDIT_DIAGNOSTICS__ && typeof window.__PIXI_MIGRATION_OPTIMIZATION_AUDIT_DIAGNOSTICS__.noteCanvas2dPipeline === 'function') {
+        window.__PIXI_MIGRATION_OPTIMIZATION_AUDIT_DIAGNOSTICS__.noteCanvas2dPipeline(Object.assign({}, pipelineBreakdown, {
+          renderer: 'canvas2d',
+          source: 'canvas2d-frame-pipeline'
+        }), { source: 'canvas2d-frame-pipeline' });
+      }
+    } catch (_) {}
     call(deps, 'recordInteractionPipelineCall', pipelineBreakdown);
     return framePlan || { order: [] };
   }

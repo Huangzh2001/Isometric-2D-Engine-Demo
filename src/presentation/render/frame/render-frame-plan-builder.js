@@ -115,7 +115,7 @@ function buildRendererFramePlan() {
     playerMoveFastPathRejectReasons: playerMoveFastPathEligibility && Array.isArray(playerMoveFastPathEligibility.rejectReasons) ? playerMoveFastPathEligibility.rejectReasons.slice(0, 8) : [],
     playerMoveFastPathCellKey: playerMoveFastPathEligibility ? String(playerMoveFastPathEligibility.playerInteractionCellKey || '') : ''
   });
-  return {
+  var framePlan = {
     id: framePlanId,
     signature: framePlanSignature,
     currentViewRotation: currentViewRotation,
@@ -130,6 +130,50 @@ function buildRendererFramePlan() {
       dynamicRenderableCount: __lastMainRenderableBuildStats.dynamicRenderableCount
     }
   };
+  try {
+    if (typeof window !== 'undefined' && window.__PIXI_MIGRATION_BASELINE_DIAGNOSTICS__ && typeof window.__PIXI_MIGRATION_BASELINE_DIAGNOSTICS__.noteFramePlan === 'function') {
+      window.__PIXI_MIGRATION_BASELINE_DIAGNOSTICS__.noteFramePlan(framePlan, { source: 'buildRendererFramePlan' });
+    }
+  } catch (_) {}
+  try {
+    if (typeof window !== 'undefined' && window.__WORLD_RENDERER_BACKEND_SELECTION__ && typeof window.__WORLD_RENDERER_BACKEND_SELECTION__.noteFrameSummary === 'function') {
+      window.__WORLD_RENDERER_BACKEND_SELECTION__.noteFrameSummary({
+        framePlanId: framePlan.id,
+        order: order.length,
+        source: 'buildRendererFramePlan'
+      });
+    }
+  } catch (_) {}
+  try {
+    if (typeof window !== 'undefined' && window.__PIXI_MIGRATION_RENDERABLE_KIND_DIAGNOSTICS__ && typeof window.__PIXI_MIGRATION_RENDERABLE_KIND_DIAGNOSTICS__.noteFramePlan === 'function') {
+      window.__PIXI_MIGRATION_RENDERABLE_KIND_DIAGNOSTICS__.noteFramePlan(framePlan, { source: 'buildRendererFramePlan' });
+    }
+  } catch (_) {}
+  try {
+    if (typeof window !== 'undefined' && window.__PIXI_MIGRATION_CANVAS2D_FRAMEPLAN_CONSUMPTION_DIAGNOSTICS__ && typeof window.__PIXI_MIGRATION_CANVAS2D_FRAMEPLAN_CONSUMPTION_DIAGNOSTICS__.noteFramePlanReady === 'function') {
+      window.__PIXI_MIGRATION_CANVAS2D_FRAMEPLAN_CONSUMPTION_DIAGNOSTICS__.noteFramePlanReady(framePlan, { source: 'buildRendererFramePlan' });
+    }
+  } catch (_) {}
+  try {
+    if (typeof window !== 'undefined' && window.__PIXI_WORLD_RENDERER_SKELETON__ && typeof window.__PIXI_WORLD_RENDERER_SKELETON__.noteFramePlan === 'function') {
+      window.__PIXI_WORLD_RENDERER_SKELETON__.noteFramePlan(framePlan, { source: 'buildRendererFramePlan' });
+    }
+  } catch (_) {}
+  try {
+    if (typeof window !== 'undefined' && window.__PIXI_INTERLEAVED_FRAMEPLAN_RENDERER__ && typeof window.__PIXI_INTERLEAVED_FRAMEPLAN_RENDERER__.noteFramePlan === 'function') {
+      window.__PIXI_INTERLEAVED_FRAMEPLAN_RENDERER__.noteFramePlan(framePlan, { source: 'buildRendererFramePlan' });
+    }
+  } catch (_) {}
+  try {
+    if (typeof window !== 'undefined' && window.__PIXI_MIGRATION_OPTIMIZATION_AUDIT_DIAGNOSTICS__ && typeof window.__PIXI_MIGRATION_OPTIMIZATION_AUDIT_DIAGNOSTICS__.noteFramePlan === 'function') {
+      window.__PIXI_MIGRATION_OPTIMIZATION_AUDIT_DIAGNOSTICS__.noteFramePlan(framePlan, {
+        source: 'buildRendererFramePlan',
+        mainStats: (typeof __lastMainRenderableBuildStats !== 'undefined') ? __lastMainRenderableBuildStats : null,
+        renderVisibilityStats: (typeof __lastRenderVisibilityStats !== 'undefined') ? __lastRenderVisibilityStats : null
+      });
+    }
+  } catch (_) {}
+  return framePlan;
 }
 
 function drawRendererFramePlan(framePlan) {

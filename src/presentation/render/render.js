@@ -3654,9 +3654,23 @@ function update(dt) {
   debugState.updateStep = 'done';
 }
 
+function getPixiMigrationCanvas2dBaseWorldOverrideForRender() {
+  try {
+    if (typeof window !== 'undefined' && window.__PIXI_MIGRATION_CANVAS2D_BASEWORLD_OVERRIDE__ && window.__PIXI_MIGRATION_CANVAS2D_BASEWORLD_OVERRIDE__.active) {
+      return window.__PIXI_MIGRATION_CANVAS2D_BASEWORLD_OVERRIDE__;
+    }
+  } catch (_) {}
+  return null;
+}
+
 function clearAndPaintMainBackground() {
   debugState.renderStep = 'clear';
   ctx.clearRect(0, 0, VIEW_W, VIEW_H);
+  var pixiBaseWorldOverride = getPixiMigrationCanvas2dBaseWorldOverrideForRender();
+  if (pixiBaseWorldOverride && pixiBaseWorldOverride.skipBackground) {
+    debugState.renderStep = 'background-pixi-delegated';
+    return;
+  }
   debugState.renderStep = 'background';
   const bg = ctx.createLinearGradient(0, 0, 0, VIEW_H);
   bg.addColorStop(0, '#0e1320');
@@ -3691,7 +3705,38 @@ function renderBaseWorldPasses() {
   var baseWorldPassesPreSetupKnownWallMs = Number(baseWorldPassesPreSetupViewRotationWallMs || 0) + Number(baseWorldPassesPreSetupScopeWallMs || 0) + Number(baseWorldPassesPreSetupVisibleLightsWallMs || 0) + Number(baseWorldPassesPreSetupOverrideWallMs || 0);
   var baseWorldPassesPreSetupResidualWallMs = Math.max(0, baseWorldPassesPreSetupWallMs - baseWorldPassesPreSetupKnownWallMs);
   debugState.renderStep = 'floor';
-  drawFloor(scope);
+  var pixiBaseWorldOverride = getPixiMigrationCanvas2dBaseWorldOverrideForRender();
+  if (pixiBaseWorldOverride && pixiBaseWorldOverride.skipFloor) {
+    debugState.renderStep = 'floor-pixi-delegated';
+    var pixiFloorSummary = pixiBaseWorldOverride.floorSummary || (typeof window !== 'undefined' ? window.__PIXI_MIGRATION_LAST_PIXI_FLOOR_SUMMARY__ : null) || {};
+    try {
+      if (typeof window !== 'undefined') {
+        window.__LAST_DRAW_FLOOR_BREAKDOWN__ = {
+          floorTotalWallMs: 0,
+          floorLoopWallMs: 0,
+          floorProjectionWallMs: 0,
+          floorColorMaterialWallMs: 0,
+          floorCanvasDrawWallMs: 0,
+          floorLayerReusedDuringInteraction: false,
+          floorLayerRebuildWallMs: 0,
+          floorLayerBlitWallMs: 0,
+          floorVisibleChunkCount: 0,
+          floorBuiltChunkCountThisFrame: 0,
+          floorMissingChunkCountBefore: 0,
+          floorMissingChunkCountAfter: 0,
+          floorBuiltTileCountThisFrame: Number(pixiFloorSummary.drawnTiles || 0),
+          floorChunkSize: 0,
+          floorVersionTag: 'pixi-floor-first-pass-v1',
+          baseWorldActualBranch: 'pixi-floor-delegated-to-pixi',
+          pixiFloorDelegated: true,
+          pixiFloorVisibleTiles: Number(pixiFloorSummary.visibleTiles || 0),
+          pixiFloorDrawnTiles: Number(pixiFloorSummary.drawnTiles || 0)
+        };
+      }
+    } catch (_) {}
+  } else {
+    drawFloor(scope);
+  }
   var drawFloorWallMs = Math.max(0, perfNow() - drawFloorStartAt);
   var drawFloorBreakdown = getLastDrawFloorBreakdown() || getActiveBaseWorldActualPathProfile() || null;
   recordRenderFunctionTiming('render.renderBaseWorldPasses.drawFloor', drawFloorWallMs, { visibleLights: Number(Array.isArray(visibleLights) ? visibleLights.length : 0) });
@@ -4300,6 +4345,54 @@ function rebuildFloorLayerIfNeeded(force = false) {
     createCanvas2dFloorLayerDrawPassDepsForRender()
   );
 }
+
+function getSharedFloorLayerCacheSnapshotForRender(options) {
+  var api = requireCanvas2dFloorLayerDrawPassForRender();
+  var deps = createCanvas2dFloorLayerDrawPassDepsForRender();
+  var safeOptions = options && typeof options === 'object' ? options : {};
+  if (typeof api.ensureSharedFloorLayerCacheSnapshot === 'function') {
+    return api.ensureSharedFloorLayerCacheSnapshot(safeOptions.force === true, deps, Object.assign({
+      source: safeOptions.source || 'src/presentation/render/render.js:getSharedFloorLayerCacheSnapshotForRender',
+      preferCameraTransformReuse: safeOptions.preferCameraTransformReuse === true || safeOptions.consumer === 'pixi-floor-layer-cache-shared-consumer'
+    }, safeOptions));
+  }
+  if (typeof api.buildSharedFloorLayerCacheSnapshot === 'function') {
+    return api.buildSharedFloorLayerCacheSnapshot(deps, null, Object.assign({
+      source: safeOptions.source || 'src/presentation/render/render.js:getSharedFloorLayerCacheSnapshotForRender'
+    }, safeOptions));
+  }
+  return null;
+}
+
+function bindSharedFloorLayerCacheSourceForRender() {
+  if (typeof window === 'undefined') return null;
+  var api = {
+    owner: 'src/presentation/render/render.js',
+    phase: 'shared-floor-layer-cache-source-render-wrapper',
+    getSnapshot: function getSnapshot(options) {
+      return getSharedFloorLayerCacheSnapshotForRender(options || {});
+    }
+  };
+  try {
+    window.__SHARED_FLOOR_LAYER_CACHE_SOURCE_FOR_RENDER__ = api;
+    if (window.__APP_NAMESPACE && typeof window.__APP_NAMESPACE.bind === 'function') {
+      window.__APP_NAMESPACE.bind('renderer.optimization.floorLayerCacheSource', api, {
+        owner: api.owner,
+        phase: api.phase
+      });
+    } else {
+      window.App = window.App || {};
+      window.App.renderer = window.App.renderer || {};
+      window.App.renderer.optimization = window.App.renderer.optimization || {};
+      window.App.renderer.optimization.floorLayerCacheSource = api;
+    }
+  } catch (_) {
+    window.__SHARED_FLOOR_LAYER_CACHE_SOURCE_FOR_RENDER__ = api;
+  }
+  return api;
+}
+
+bindSharedFloorLayerCacheSourceForRender();
 
 function drawFloor() {
   return requireCanvas2dFloorLayerDrawPassForRender().drawFloor(

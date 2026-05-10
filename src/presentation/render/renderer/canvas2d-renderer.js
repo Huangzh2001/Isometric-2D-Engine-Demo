@@ -433,6 +433,16 @@
       getContext: function () { return (typeof ctx !== 'undefined' && ctx) ? ctx : null; },
       getDebugState: function () { return (typeof debugState !== 'undefined' && debugState) ? debugState : null; },
       getCamera: function () { return (typeof camera !== 'undefined' && camera) ? camera : null; },
+      getSettings: function () { return (typeof settings !== 'undefined' && settings) ? settings : {}; },
+      screenPointsFromWorldFaceNoCamera: function (worldPts, viewRotation) {
+        return (typeof screenPointsFromWorldFaceNoCamera === 'function') ? screenPointsFromWorldFaceNoCamera(worldPts || [], viewRotation) : [];
+      },
+      worldShadowOverlaysToNoCamera: function (overlays, viewRotation) {
+        return (typeof worldShadowOverlaysToNoCamera === 'function') ? worldShadowOverlaysToNoCamera(overlays || [], viewRotation) : [];
+      },
+      getTerrainTopBoundaryRenderDebugSignature: function () {
+        return (typeof getTerrainTopBoundaryRenderDebugSignature === 'function') ? getTerrainTopBoundaryRenderDebugSignature() : '';
+      },
       now: function () { return (typeof perfNow === 'function') ? perfNow() : Date.now(); },
       safeFixed: safeFixed,
       averageScreenPoint: function (points) { return (typeof averageScreenPoint === 'function') ? averageScreenPoint(points) : null; },
@@ -448,7 +458,10 @@
       setLastFrameDrawMs: function (value) { if (typeof __lastFrameDrawMs !== 'undefined') __lastFrameDrawMs = value; },
       setLastFrameDrawStats: function (value) { if (typeof __lastFrameDrawStats !== 'undefined') __lastFrameDrawStats = value; },
       maybeLogFrameWorkBreakdown: function (payload) { if (typeof maybeLogFrameWorkBreakdown === 'function') return maybeLogFrameWorkBreakdown(payload); return undefined; },
-      getMainEditorZoomValueForRender: function () { return (typeof getMainEditorZoomValueForRender === 'function') ? getMainEditorZoomValueForRender() : 1; }
+      getMainEditorZoomValueForRender: function () { return (typeof getMainEditorZoomValueForRender === 'function') ? getMainEditorZoomValueForRender() : 1; },
+      getActiveCameraInteractionType: function () { return getActiveCameraInteractionType(); },
+      getCameraSettleReuseState: function () { return getCameraSettleReuseState(); },
+      shouldUseDeferredZoomSettleReuse: function () { return shouldUseDeferredZoomSettleReuse(); }
     };
   }
 
@@ -616,8 +629,19 @@
     summarizeCoverage: summarizeCoverage
   };
 
+  var activeBackendApi = adapterApi;
   try {
-    if (window.__APP_NAMESPACE && typeof window.__APP_NAMESPACE.bind === 'function') {
+    var backendSelection = (typeof window !== 'undefined') ? window.__WORLD_RENDERER_BACKEND_SELECTION__ : null;
+    if (backendSelection && typeof backendSelection.registerBackend === 'function' && typeof backendSelection.selectActiveBackend === 'function') {
+      backendSelection.registerBackend('canvas2d', adapterApi, {
+        owner: 'src/presentation/render/renderer/canvas2d-renderer.js',
+        phase: 'PXM-02',
+        source: 'canvas2d-renderer-adapter-ready'
+      });
+      activeBackendApi = backendSelection.selectActiveBackend({
+        source: 'canvas2d-renderer-adapter-ready'
+      }) || adapterApi;
+    } else if (window.__APP_NAMESPACE && typeof window.__APP_NAMESPACE.bind === 'function') {
       window.__APP_NAMESPACE.bind('renderer.canvas2d', adapterApi, { owner: 'src/presentation/render/renderer/canvas2d-renderer.js', phase: 'P5-C' });
       window.__APP_NAMESPACE.bind('renderer.active', adapterApi, { owner: 'src/presentation/render/renderer/canvas2d-renderer.js', phase: 'P5-C' });
     } else {
@@ -626,7 +650,39 @@
       window.App.renderer.canvas2d = adapterApi;
       window.App.renderer.active = adapterApi;
     }
-  } catch (err) {}
+  } catch (err) {
+    try {
+      if (window.__APP_NAMESPACE && typeof window.__APP_NAMESPACE.bind === 'function') {
+        window.__APP_NAMESPACE.bind('renderer.canvas2d', adapterApi, { owner: 'src/presentation/render/renderer/canvas2d-renderer.js', phase: 'P5-C-fallback' });
+        window.__APP_NAMESPACE.bind('renderer.active', adapterApi, { owner: 'src/presentation/render/renderer/canvas2d-renderer.js', phase: 'P5-C-fallback' });
+      } else {
+        window.App = window.App || {};
+        window.App.renderer = window.App.renderer || {};
+        window.App.renderer.canvas2d = adapterApi;
+        window.App.renderer.active = adapterApi;
+      }
+    } catch (_) {}
+  }
+
+  try {
+    if (typeof window !== 'undefined' && window.__PIXI_MIGRATION_BASELINE_DIAGNOSTICS__ && typeof window.__PIXI_MIGRATION_BASELINE_DIAGNOSTICS__.noteBackendStatus === 'function') {
+      var pixiMigrationBackendSnapshot = null;
+      try {
+        if (window.__WORLD_RENDERER_BACKEND_SELECTION__ && typeof window.__WORLD_RENDERER_BACKEND_SELECTION__.getSnapshot === 'function') {
+          pixiMigrationBackendSnapshot = window.__WORLD_RENDERER_BACKEND_SELECTION__.getSnapshot() || null;
+        }
+      } catch (_) {}
+      window.__PIXI_MIGRATION_BASELINE_DIAGNOSTICS__.noteBackendStatus({
+        source: 'canvas2d-renderer-adapter-ready',
+        active: activeBackendApi && activeBackendApi.backend ? activeBackendApi.backend : 'canvas2d',
+        activeApi: activeBackendApi || adapterApi,
+        canvas2dRegistered: true,
+        pixiRegistered: pixiMigrationBackendSnapshot && pixiMigrationBackendSnapshot.pixiRegistered === true,
+        pixiEnabled: pixiMigrationBackendSnapshot && pixiMigrationBackendSnapshot.pixiEnabled === true,
+        fallback: 'canvas2d'
+      });
+    }
+  } catch (_) {}
 
   emitP5('BOOT', 'renderer-adapter-ready', {
     phase: 'P5-D',

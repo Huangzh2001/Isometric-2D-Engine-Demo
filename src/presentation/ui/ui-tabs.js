@@ -21,6 +21,7 @@ function setActivePanelTab(tab) {
   if (ui.tabRender) ui.tabRender.classList.toggle('active', tab === 'render');
   if (ui.tabTerrain) ui.tabTerrain.classList.toggle('active', tab === 'terrain');
   if (ui.tabPlayer) ui.tabPlayer.classList.toggle('active', tab === 'player');
+  if (ui.tabTest) ui.tabTest.classList.toggle('active', tab === 'test');
   if (ui.tabWorldPage) ui.tabWorldPage.classList.toggle('active', tab === 'world');
   if (ui.tabItemsPage) ui.tabItemsPage.classList.toggle('active', tab === 'items');
   if (ui.tabLightsPage) ui.tabLightsPage.classList.toggle('active', tab === 'lights');
@@ -28,6 +29,7 @@ function setActivePanelTab(tab) {
   if (ui.tabRenderPage) ui.tabRenderPage.classList.toggle('active', tab === 'render');
   if (ui.tabTerrainPage) ui.tabTerrainPage.classList.toggle('active', tab === 'terrain');
   if (ui.tabPlayerPage) ui.tabPlayerPage.classList.toggle('active', tab === 'player');
+  if (ui.tabTestPage) ui.tabTestPage.classList.toggle('active', tab === 'test');
 }
 
 function bindPanelTabs() {
@@ -43,6 +45,7 @@ function bindPanelTabs() {
   safeListen(ui.tabRender, 'click', () => setActivePanelTab('render'));
   safeListen(ui.tabTerrain, 'click', () => setActivePanelTab('terrain'));
   safeListen(ui.tabPlayer, 'click', () => setActivePanelTab('player'));
+  safeListen(ui.tabTest, 'click', () => setActivePanelTab('test'));
   __panelTabsBound = true;
   uiTabsRoute('bind-ok', 'active=' + String(inspectorState && inspectorState.activeTab || 'world'));
   return true;
@@ -59,6 +62,7 @@ if (typeof markRefactorCheckpoint === 'function') {
     owner: UI_TABS_OWNER,
     hasWorldTab: !!(ui && ui.tabWorld),
     hasPlayerTab: !!(ui && ui.tabPlayer),
+    hasTestTab: !!(ui && ui.tabTest),
   });
 }
 
