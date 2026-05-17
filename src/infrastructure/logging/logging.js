@@ -20,6 +20,147 @@ var habboDebugMax = 800;
 var __loggingBootSeq = 0;
 var __loggingUi = null;
 
+
+var PIXI_PERFORMANCE_MODE_STORAGE_KEY = 'pixiPerformanceMode';
+var PIXI_PERFORMANCE_MODE_LOG_VERSION = 'PXM-07.18O6A-RTDIAG';
+var PIXI_PERFORMANCE_MODE_DEFAULT_ENABLED = true;
+var __pixiPerformanceLogModeState = {
+  enabled: false,
+  suppressionCount: 0,
+  keptCount: 0,
+  lastSuppressedAt: 0,
+  lastSuppressedPrefix: '',
+  maxExportLines: 12000,
+  previewLines: 500
+};
+
+function applyPixiPerformanceLogBudgets(enabled) {
+  if (enabled !== true) return;
+  MAX_LOG_LINES = Math.min(MAX_LOG_LINES, Number(__pixiPerformanceLogModeState.maxExportLines || 12000));
+  LOG_UI_PREVIEW_LINES = Math.min(LOG_UI_PREVIEW_LINES, Number(__pixiPerformanceLogModeState.previewLines || 500));
+}
+
+function readPixiPerformanceModeFlag() {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      var value = localStorage.getItem(PIXI_PERFORMANCE_MODE_STORAGE_KEY);
+      if (value === '1' || value === 'true') return true;
+      if (value === '0' || value === 'false') return false;
+    }
+  } catch (_) {}
+  try {
+    if (typeof window !== 'undefined' && window.__PIXI_PERFORMANCE_MODE__ === true) return true;
+    if (typeof window !== 'undefined' && window.__PIXI_PERFORMANCE_MODE__ === false) return false;
+  } catch (_) {}
+  if (__pixiPerformanceLogModeState.enabled === true) return true;
+  return PIXI_PERFORMANCE_MODE_DEFAULT_ENABLED;
+}
+
+function isPixiPerformanceModeEnabled() {
+  __pixiPerformanceLogModeState.enabled = readPixiPerformanceModeFlag();
+  applyPixiPerformanceLogBudgets(__pixiPerformanceLogModeState.enabled === true);
+  return __pixiPerformanceLogModeState.enabled === true;
+}
+
+function isPixiPerformanceCriticalLine(text) {
+  text = String(text || '');
+  if (!text) return false;
+  if (text.indexOf('[pixi-perf-mode]') >= 0) return true;
+  if (text.indexOf('step=PXM-07.18O5H') >= 0) return true;
+  if (text.indexOf('step=PXM-07.18O5') >= 0) return true;
+  if (text.indexOf('step=PXM-07.18O4') >= 0) return true;
+  if (text.indexOf('step=PXM-07.18O3') >= 0) return true;
+  if (text.indexOf('step=PXM-07.17A') >= 0) return true;
+  if (text.indexOf('step=PXM-07.5') >= 0) return true;
+  if (text.indexOf('[perf-summary]') >= 0) return true;
+  if (text.indexOf('[comparison]') >= 0) return true;
+  if (text.indexOf('[perf-sample-') >= 0) return true;
+  if (text.indexOf('[performance-hotspot]') >= 0) return true;
+  // PXM-07.18O5: keep the compact forensics needed to verify Pixi cache gates
+  // and frame-cost deltas while suppressing high-volume ownership/session noise.
+  if (text.indexOf('forensics-frame') >= 0) return true;
+  if (text.indexOf('forensics-static-world') >= 0) return true;
+  if (text.indexOf('static-world-performance-assessment') >= 0) return true;
+  if (text.indexOf('rendertexture-churn-diagnostics') >= 0) return true;
+  if (text.indexOf('begin-frame-phase-diagnostics') >= 0) return true;
+  if (text.indexOf('PIXI-RESIDUAL-CANVAS2D-FORENSICS') >= 0) return true;
+  if (text.indexOf('DRAW-LOOP-BREAKDOWN') >= 0) return true;
+  if (text.indexOf('staticStableItemPlanCacheGate') >= 0) return true;
+  if (text.indexOf('stablePlanKeyDiff') >= 0) return true;
+  if (text.indexOf('player-chunk-debug-overlay') >= 0) return true;
+  if (text.indexOf('playerChunkDebugOverlay') >= 0) return true;
+  if (text.indexOf('staticMaterializedPlanCache') >= 0 && text.indexOf('forensics') >= 0) return true;
+  if (text.indexOf('optimization-placement-audit') >= 0) return true;
+  if (text.indexOf('order-run-cache-evidence') >= 0) return true;
+  if (text.indexOf('[log-channel-diag]') >= 0) return true;
+  if (text.indexOf('[ERROR') >= 0 || text.indexOf('[WARN') >= 0 || text.indexOf('[FAIL') >= 0) return true;
+  if (text.indexOf('error') >= 0 || text.indexOf('failed') >= 0 || text.indexOf('exception') >= 0) return true;
+  if (text.indexOf('ui-control') >= 0 && text.indexOf('performance') >= 0) return true;
+  return false;
+}
+
+function shouldSuppressLogLineForPixiPerformanceMode(text) {
+  if (!isPixiPerformanceModeEnabled()) return false;
+  text = String(text == null ? '' : text);
+  if (!text) return false;
+  if (isPixiPerformanceCriticalLine(text)) return false;
+  if (text.indexOf('[P3][BOUNDARY]') >= 0) return true;
+  if (text.indexOf('[SCENE-SESSION][WRITE]') >= 0) return true;
+  if (text.indexOf('[pixi-migration]') >= 0) return true;
+  if (text.indexOf('[camera-interaction-profile]') >= 0) return true;
+  if (text.indexOf('[camera-interaction-pipeline') >= 0) return true;
+  if (text.indexOf('[camera-interaction-baseworld') >= 0) return true;
+  if (text.indexOf('[camera-interaction-debughook') >= 0) return true;
+  if (text.indexOf('[full-frame-walltime]') >= 0) return true;
+  if (text.indexOf('[render-order-diag]') >= 0) return true;
+  if (text.indexOf('[terrain-sort-diag]') >= 0) return true;
+  if (text.indexOf('[actor-sort-diag]') >= 0) return true;
+  if (text.indexOf('[terrain-player-diag]') >= 0) return true;
+  return false;
+}
+
+function notePixiPerformanceSuppressedLine(text) {
+  __pixiPerformanceLogModeState.suppressionCount += 1;
+  __pixiPerformanceLogModeState.lastSuppressedAt = Date.now();
+  var raw = String(text || '');
+  __pixiPerformanceLogModeState.lastSuppressedPrefix = raw.slice(0, 96);
+}
+
+function getPixiPerformanceModeSnapshot() {
+  return {
+    version: PIXI_PERFORMANCE_MODE_LOG_VERSION,
+    enabled: isPixiPerformanceModeEnabled(),
+    suppressionCount: __pixiPerformanceLogModeState.suppressionCount,
+    keptCount: __pixiPerformanceLogModeState.keptCount,
+    lastSuppressedAt: __pixiPerformanceLogModeState.lastSuppressedAt || 0,
+    lastSuppressedPrefix: __pixiPerformanceLogModeState.lastSuppressedPrefix || '',
+    maxLogLines: MAX_LOG_LINES,
+    previewLines: LOG_UI_PREVIEW_LINES,
+    defaultEnabled: PIXI_PERFORMANCE_MODE_DEFAULT_ENABLED === true,
+    storageKey: PIXI_PERFORMANCE_MODE_STORAGE_KEY
+  };
+}
+
+function setPixiPerformanceModeEnabled(enabled, options) {
+  options = options || {};
+  var next = enabled === true;
+  __pixiPerformanceLogModeState.enabled = next;
+  try { if (typeof window !== 'undefined') window.__PIXI_PERFORMANCE_MODE__ = next; } catch (_) {}
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.setItem(PIXI_PERFORMANCE_MODE_STORAGE_KEY, next ? '1' : '0');
+  } catch (_) {}
+  if (next) {
+    MAX_LOG_LINES = Math.min(MAX_LOG_LINES, Number(options.maxLogLines || __pixiPerformanceLogModeState.maxExportLines || 12000));
+    LOG_UI_PREVIEW_LINES = Math.min(LOG_UI_PREVIEW_LINES, Number(options.previewLines || __pixiPerformanceLogModeState.previewLines || 500));
+  }
+  if (options.clear === true && typeof clearLogs === 'function') {
+    try { clearLogs(); } catch (_) {}
+  }
+  var msg = '[pixi-perf-mode][step=' + PIXI_PERFORMANCE_MODE_LOG_VERSION + '] enabled=' + String(next) + ' clear=' + String(options.clear === true) + ' source=' + String(options.source || 'api');
+  try { pushLog(msg); } catch (_) {}
+  return getPixiPerformanceModeSnapshot();
+}
+
 function bindLoggingUi(nextUi) {
   __loggingUi = nextUi || null;
   if (typeof window !== 'undefined' && nextUi) window.__loggingUi = nextUi;
@@ -408,6 +549,7 @@ function buildLogExportHeader() {
   if (APP_ENTRY_INFO.title) parts.push('# title=' + APP_ENTRY_INFO.title);
   if (APP_ENTRY_INFO.href) parts.push('# href=' + APP_ENTRY_INFO.href);
   try { parts.push('# exportDiagnostics=' + JSON.stringify(getExportLogDiagnosticsSnapshot())); } catch (_) {}
+  try { parts.push('# pixiPerformanceMode=' + JSON.stringify(getPixiPerformanceModeSnapshot())); } catch (_) {}
   if (typeof window !== 'undefined' && window.__FUNCTION_TRACE_INFO) parts.push('# functionTrace=' + JSON.stringify(window.__FUNCTION_TRACE_INFO));
   if (typeof window !== 'undefined' && window.__REFACTOR_LOG_STATE) parts.push('# refactor=' + JSON.stringify({ step: window.__REFACTOR_LOG_STATE.step || 'unknown', startedAt: window.__REFACTOR_LOG_STATE.startedAt || '', checkpoints: (window.__REFACTOR_LOG_STATE.checkpoints || []).length, compatMappings: (window.__REFACTOR_LOG_STATE.compatMappings || []).length, fallbacks: (window.__REFACTOR_LOG_STATE.fallbacks || []).length }));
   try {
@@ -459,7 +601,13 @@ function scheduleDebugLogUIFlush() {
 }
 
 function pushLog(msg) {
-  var line = '[' + String(++logSeq).padStart(5, '0') + '] [' + new Date().toLocaleTimeString('zh-CN', { hour12:false }) + '] ' + msg;
+  var rawText = String(msg == null ? '' : msg);
+  if (shouldSuppressLogLineForPixiPerformanceMode(rawText)) {
+    notePixiPerformanceSuppressedLine(rawText);
+    return;
+  }
+  __pixiPerformanceLogModeState.keptCount += 1;
+  var line = '[' + String(++logSeq).padStart(5, '0') + '] [' + new Date().toLocaleTimeString('zh-CN', { hour12:false }) + '] ' + rawText;
   logs.push(line);
   if (logs.length > MAX_LOG_LINES) logs.shift();
   scheduleDebugLogUIFlush();
@@ -470,9 +618,21 @@ if (typeof window !== 'undefined') {
     try { pushLog('[force-export-log] ' + String(msg || 'manual')); return true; } catch (_) { return false; }
   };
   window.__getExportLogDiagnostics = getExportLogDiagnosticsSnapshot;
+  window.__PIXI_PERFORMANCE_LOG_MODE__ = {
+    version: PIXI_PERFORMANCE_MODE_LOG_VERSION,
+    isEnabled: isPixiPerformanceModeEnabled,
+    setEnabled: setPixiPerformanceModeEnabled,
+    getSnapshot: getPixiPerformanceModeSnapshot
+  };
+  try { window.__PIXI_PERFORMANCE_MODE__ = readPixiPerformanceModeFlag(); } catch (_) {}
 }
 
 installConsoleExportBridge();
+try {
+  if (isPixiPerformanceModeEnabled()) {
+    pushLog('[pixi-perf-mode][step=' + PIXI_PERFORMANCE_MODE_LOG_VERSION + '] enabled=true default=' + String(PIXI_PERFORMANCE_MODE_DEFAULT_ENABLED === true) + ' source=boot');
+  }
+} catch (_) {}
 pushLogChannelDiagnostic('boot');
 
 function clearLogs() {
@@ -480,6 +640,10 @@ function clearLogs() {
   logSeq = 0;
   logFlushScheduled = false;
   lastLogUiFlushAt = 0;
+  __pixiPerformanceLogModeState.suppressionCount = 0;
+  __pixiPerformanceLogModeState.keptCount = 0;
+  __pixiPerformanceLogModeState.lastSuppressedAt = 0;
+  __pixiPerformanceLogModeState.lastSuppressedPrefix = '';
   var localUi = getLoggingUi();
   if (localUi && localUi.debugLog) localUi.debugLog.value = '';
 }

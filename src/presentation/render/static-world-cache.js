@@ -20,6 +20,16 @@
     catch (_) { return value; }
   }
 
+  function makeStableHash(value) {
+    var text = String(value == null ? '' : value);
+    var hash = 2166136261;
+    for (var i = 0; i < text.length; i++) {
+      hash ^= text.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(16);
+  }
+
   function getRuntimeStateApi() {
     try {
       if (window.__APP_NAMESPACE && typeof window.__APP_NAMESPACE.getPath === 'function') {
@@ -450,6 +460,34 @@
     return parsed[field] != null ? parsed[field] : null;
   }
 
+  function buildRenderSignatureChangeDiagnostics(previousSignature, nextSignature) {
+    var prev = parseRenderSignature(previousSignature) || {};
+    var next = parseRenderSignature(nextSignature) || {};
+    var keys = Object.create(null);
+    Object.keys(prev).forEach(function (key) { keys[key] = true; });
+    Object.keys(next).forEach(function (key) { keys[key] = true; });
+    var changed = [];
+    var previousValues = {};
+    var nextValues = {};
+    Object.keys(keys).sort().forEach(function (key) {
+      var pv = prev[key];
+      var nv = next[key];
+      if (String(pv) !== String(nv)) {
+        changed.push(key);
+        previousValues[key] = pv == null ? null : pv;
+        nextValues[key] = nv == null ? null : nv;
+      }
+    });
+    return {
+      previousRenderSignatureHash: makeStableHash(String(previousSignature || '')),
+      nextRenderSignatureHash: makeStableHash(String(nextSignature || '')),
+      renderSignatureChangedFieldNames: changed,
+      renderSignatureChangedFieldCount: changed.length,
+      renderSignaturePreviousValues: previousValues,
+      renderSignatureNextValues: nextValues
+    };
+  }
+
   function hasStructuralStaticPacketSignatureChange(previousSignature, nextSignature) {
     if (!previousSignature || !nextSignature || String(previousSignature) === String(nextSignature)) return false;
     var prev = parseRenderSignature(previousSignature);
@@ -511,6 +549,7 @@
     var nextPacketViewRotation = readSignatureField(renderSignature, 'packetViewRotation');
     var previousFaceMergeEffectiveMode = readSignatureField(previousRenderSignature, 'faceMergeEffectiveMode');
     var nextFaceMergeEffectiveMode = readSignatureField(renderSignature, 'faceMergeEffectiveMode');
+    var renderSignatureChangeDiagnostics = buildRenderSignatureChangeDiagnostics(previousRenderSignature, renderSignature);
     if (renderSignatureChanged && !deferVisibleRebuild) {
       state.chunks.forEach(function (chunk, key) {
         if (!chunk) return;
@@ -678,6 +717,12 @@
       nextFaceMergeEffectiveMode: nextFaceMergeEffectiveMode,
       rebuildMsThisFrame: Number(rebuildMsThisFrame.toFixed ? rebuildMsThisFrame.toFixed(3) : rebuildMsThisFrame),
       renderSignatureChanged: renderSignatureChanged === true,
+      renderSignaturePreviousHash: renderSignatureChangeDiagnostics.previousRenderSignatureHash,
+      renderSignatureNextHash: renderSignatureChangeDiagnostics.nextRenderSignatureHash,
+      renderSignatureChangedFieldNames: renderSignatureChangeDiagnostics.renderSignatureChangedFieldNames.slice(),
+      renderSignatureChangedFieldCount: Number(renderSignatureChangeDiagnostics.renderSignatureChangedFieldCount || 0),
+      renderSignaturePreviousValues: cloneJsonSafe(renderSignatureChangeDiagnostics.renderSignaturePreviousValues || {}),
+      renderSignatureNextValues: cloneJsonSafe(renderSignatureChangeDiagnostics.renderSignatureNextValues || {}),
       deferVisibleRebuild: deferVisibleRebuild === true
     };
     if (totalDirtyChunkCount > 0 || queuedChunkCountBefore > 0 || rebuiltChunkCountThisFrame > 0) {
@@ -743,6 +788,12 @@
       nextFaceMergeEffectiveMode: nextFaceMergeEffectiveMode,
       rebuildMsThisFrame: Number(rebuildMsThisFrame.toFixed ? rebuildMsThisFrame.toFixed(3) : rebuildMsThisFrame),
       renderSignatureChanged: renderSignatureChanged === true,
+      renderSignaturePreviousHash: renderSignatureChangeDiagnostics.previousRenderSignatureHash,
+      renderSignatureNextHash: renderSignatureChangeDiagnostics.nextRenderSignatureHash,
+      renderSignatureChangedFieldNames: renderSignatureChangeDiagnostics.renderSignatureChangedFieldNames.slice(),
+      renderSignatureChangedFieldCount: Number(renderSignatureChangeDiagnostics.renderSignatureChangedFieldCount || 0),
+      renderSignaturePreviousValues: cloneJsonSafe(renderSignatureChangeDiagnostics.renderSignaturePreviousValues || {}),
+      renderSignatureNextValues: cloneJsonSafe(renderSignatureChangeDiagnostics.renderSignatureNextValues || {}),
       buildMs: Number(Math.max(0, perfNow() - startAt).toFixed ? Math.max(0, perfNow() - startAt).toFixed(3) : Math.max(0, perfNow() - startAt))
     };
     return {

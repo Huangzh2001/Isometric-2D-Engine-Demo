@@ -41,6 +41,21 @@
     return callDep('isStableLocalDemergeExplicitlyEnabledForRender', [], false) === true;
   }
 
+function publishStableLocalDemergeLastState(result, playerObj, enabled) {
+  try {
+    global.__STABLE_LOCAL_DEMERGE_LAST_STATE__ = {
+      active: enabled === true && !!(result && String(result.mode || '').indexOf('disabled') < 0),
+      mode: result && result.mode ? String(result.mode) : '',
+      playerInteractionCellKey: result && result.playerInteractionCellKey ? String(result.playerInteractionCellKey) : buildStableLocalDemergeInteractionCellKey(playerObj),
+      playerInteractionChunkKey: result && result.playerInteractionChunkKey ? String(result.playerInteractionChunkKey) : buildStableLocalDemergeInteractionChunkKey(playerObj),
+      splitPacketCount: Number(result && result.splitPacketCount || 0),
+      createdFaceCount: Number(result && result.createdFaceCount || 0),
+      cacheHit: result && result.cacheHit === true,
+      source: 'stable-local-demerge'
+    };
+  } catch (_) {}
+}
+
   function buildStableLocalDemergeDisabledResult(list, playerObj, normalizedViewRotation, reason) {
   return {
     staticRenderables: list,
@@ -50,6 +65,7 @@
     createdFaceCount: 0,
     residualMergedPacketCount: 0,
     playerInteractionCellKey: buildStableLocalDemergeInteractionCellKey(playerObj),
+    playerInteractionChunkKey: buildStableLocalDemergeInteractionChunkKey(playerObj),
     checkedPacketCount: 0,
     skippedFarPacketCount: 0,
     cacheHit: false,
@@ -246,16 +262,47 @@ function buildStableLocalDemergeInteractionCellKey(playerRef) {
   return [cell.x, cell.y, cell.z].join(',');
 }
 
+function getStaticWorldChunkCacheApiForStableLocalDemerge() {
+  try { return global.__STATIC_WORLD_CHUNK_CACHE__ || null; } catch (_) {}
+  return null;
+}
+
+function getStableLocalDemergeChunkSize() {
+  try {
+    var api = getStaticWorldChunkCacheApiForStableLocalDemerge();
+    if (api && typeof api.getChunkSize === 'function') return Math.max(1, Math.round(Number(api.getChunkSize() || 16) || 16));
+  } catch (_) {}
+  try {
+    var settings = getSettingsForStableLocalDemerge() || {};
+    if (Number(settings.chunkSize) > 0) return Math.max(1, Math.round(Number(settings.chunkSize) || 16));
+  } catch (_) {}
+  return 16;
+}
+
+function buildStableLocalDemergeChunkKeyFromXY(x, y) {
+  var size = getStableLocalDemergeChunkSize();
+  var cx = Math.floor((Number(x) || 0) / size);
+  var cy = Math.floor((Number(y) || 0) / size);
+  return String(cx) + ',' + String(cy);
+}
+
+function buildStableLocalDemergeInteractionChunkKey(playerRef) {
+  if (!playerRef || typeof playerRef !== 'object') return 'none';
+  return buildStableLocalDemergeChunkKeyFromXY(playerRef.x, playerRef.y);
+}
+
 function buildStableLocalDemergeCacheKey(staticRenderables, viewRotation, playerRef, radius) {
   var list = Array.isArray(staticRenderables) ? staticRenderables : [];
   var surfaceStats = typeof __lastSurfaceCacheStats !== 'undefined' && __lastSurfaceCacheStats ? __lastSurfaceCacheStats : {};
   var staticCache = typeof staticBoxRenderCache !== 'undefined' && staticBoxRenderCache ? staticBoxRenderCache : {};
-  var interactionCellKey = buildStableLocalDemergeInteractionCellKey(playerRef);
+  var interactionChunkKey = buildStableLocalDemergeInteractionChunkKey(playerRef);
   return [
-    'v3-interaction-cell',
+    'v5-interaction-chunk-wide',
     normalizeMainEditorViewRotationValue(viewRotation),
-    Number(radius || 0).toFixed(2),
-    interactionCellKey,
+    // PXM-07.14H: chunk-wide local demerge is keyed by the active player chunk,
+    // not by player cell or height. Walking or climbing inside the same chunk must
+    // not reshuffle/rebuild the local demerge set.
+    'chunk=' + interactionChunkKey,
     String(staticCache.geometrySignature || ''),
     String(staticCache.cacheSignature || ''),
     Number(surfaceStats.visibleChunkCount || 0),
@@ -266,43 +313,23 @@ function buildStableLocalDemergeCacheKey(staticRenderables, viewRotation, player
   ].join('|');
 }
 
-function isActorInteractionDescriptorNearPlayerForLocalDemerge(descriptor, playerRef, radius) {
+function getActorInteractionDescriptorChunkKeyForLocalDemerge(descriptor) {
   var cell = descriptor && (descriptor.cell || descriptor.box) ? (descriptor.cell || descriptor.box) : null;
-  if (!cell || !playerRef) return false;
-  var interactionCell = getStableLocalDemergeInteractionCell(playerRef);
-  if (!interactionCell) return false;
-  // The local demerge set is intentionally keyed by the actor interaction tile,
-  // not by sub-tile coordinates. Test against the whole tile AABB so walking
-  // inside one tile updates only the player sprite position, not static splits.
-  var px0 = Number(interactionCell.x || 0);
-  var py0 = Number(interactionCell.y || 0);
-  var px1 = px0 + 1;
-  var py1 = py0 + 1;
-  var pz = Number(interactionCell.z || 0);
-  if (!Number.isFinite(px0) || !Number.isFinite(py0) || !Number.isFinite(pz)) return false;
-  var bx = Math.floor(Number(cell.x || 0));
-  var by = Math.floor(Number(cell.y || 0));
-  var bz = Number(cell.z || 0);
-  var bw = Math.max(1, Number(cell.w != null ? cell.w : 1));
-  var bd = Math.max(1, Number(cell.d != null ? cell.d : 1));
-  var bh = Math.max(1, Number(cell.h != null ? cell.h : 1));
-  var r = Math.max(0.25, Number(radius || getActorInteractionSortRadiusForRender() || 2));
-  var cellMinX = bx;
-  var cellMaxX = bx + bw;
-  var cellMinY = by;
-  var cellMaxY = by + bd;
-  var dx = Math.max(0, Math.max(cellMinX - px1, px0 - cellMaxX));
-  var dy = Math.max(0, Math.max(cellMinY - py1, py0 - cellMaxY));
-  var distXY = Math.hypot(dx, dy);
-  if (distXY > r + 0.75) return false;
+  if (!cell) return 'none';
+  return buildStableLocalDemergeChunkKeyFromXY(cell.x, cell.y);
+}
 
-  // Keep local demerge around the actor's usable vertical interaction band only.
-  // This includes the support floor under the feet and nearby side/top faces, but
-  // avoids splitting distant merged terrain on other height levels.
-  var playerHeight = Math.max(0.2, Number((getSettingsForStableLocalDemerge() && getSettingsForStableLocalDemerge().playerHeightCells != null) ? getSettingsForStableLocalDemerge().playerHeightCells : 1.7));
-  var bottomZ = bz;
-  var topZ = bz + bh;
-  return topZ >= pz - 0.75 && bottomZ <= pz + playerHeight + 0.75;
+function isActorInteractionDescriptorNearPlayerForLocalDemerge(descriptor, playerRef, radius) {
+  if (!descriptor || !playerRef) return false;
+
+  // PXM-07.14H: true chunk-wide local demerge.
+  // If a descriptor belongs to the same XY static chunk as the player, it is
+  // included regardless of height. This keeps the demerge/cache boundary fixed
+  // for the whole chunk until the player crosses into another chunk.
+  var playerChunkKey = buildStableLocalDemergeInteractionChunkKey(playerRef);
+  var descriptorChunkKey = getActorInteractionDescriptorChunkKeyForLocalDemerge(descriptor);
+  if (playerChunkKey === 'none') return false;
+  return descriptorChunkKey === playerChunkKey;
 }
 
 function buildStaticWorldFacePacketFromDescriptorForActorDemerge(descriptor, sourcePacket, viewRotation, mode, localIndex) {
@@ -374,6 +401,8 @@ function buildStaticWorldFacePacketFromDescriptorForActorDemerge(descriptor, sou
     cellY: Number(cell.y || 0),
     cellZ: Number(cell.z || 0),
     faceKey: faceKey,
+    chunkKey: descriptor.chunkKey || sourcePacket.chunkKey || getActorInteractionDescriptorChunkKeyForLocalDemerge(descriptor),
+    actorInteractionStableDemergeChunkKey: descriptor.chunkKey || sourcePacket.chunkKey || getActorInteractionDescriptorChunkKeyForLocalDemerge(descriptor),
     actorInteractionMemberFaceKeys: buildActorInteractionMemberFaceKeysFromFaceDescriptor(descriptor, viewRotation),
     actorInteractionMemberDescriptors: getActorInteractionMemberDescriptorsFromFaceDescriptor(descriptor),
     packetNormal: normal,
@@ -457,6 +486,7 @@ function applyStableActorSortDemergeToStaticRenderables(staticRenderables, viewR
         reason: disabledResult.reason,
         viewRotation: normalizedViewRotation,
         playerInteractionCellKey: disabledResult.playerInteractionCellKey,
+        playerInteractionChunkKey: disabledResult.playerInteractionChunkKey,
         inputStaticRenderableCount: Number(list.length || 0),
         outputStaticRenderableCount: Number(list.length || 0),
         splitPacketCount: 0,
@@ -465,17 +495,20 @@ function applyStableActorSortDemergeToStaticRenderables(staticRenderables, viewR
         player: summarizeActorDiagPlayer(playerObj)
       }, { maxCount: 6000 });
     }
+    publishStableLocalDemergeLastState(disabledResult, playerObj, false);
     return disabledResult;
   }
 
   var cacheKey = buildStableLocalDemergeCacheKey(list, normalizedViewRotation, playerObj, radius);
   if (__stableLocalDemergeCache && __stableLocalDemergeCache.key === cacheKey && __stableLocalDemergeCache.result) {
     __stableLocalDemergeCache.hitCount += 1;
-    return Object.assign({}, __stableLocalDemergeCache.result, {
+    var cachedResult = Object.assign({}, __stableLocalDemergeCache.result, {
       cacheHit: true,
       cacheHitCount: __stableLocalDemergeCache.hitCount,
       cacheMissCount: __stableLocalDemergeCache.missCount
     });
+    publishStableLocalDemergeLastState(cachedResult, playerObj, true);
+    return cachedResult;
   }
   if (__stableLocalDemergeCache) __stableLocalDemergeCache.missCount += 1;
 
@@ -547,10 +580,11 @@ function applyStableActorSortDemergeToStaticRenderables(staticRenderables, viewR
   if (splitPacketCount > 0) out.sort(compareRenderablesByDomain);
   if (splitPacketCount > 0 && isActorInteractionOrderDiagEnabled()) {
     emitActorInteractionOrderDiag('stable-local-demerge-static-packets', {
-      mode: 'stable-local-player-radius-demerge',
+      mode: 'stable-local-player-chunk-wide-demerge',
       viewRotation: normalizedViewRotation,
       radius: radius,
       playerInteractionCellKey: buildStableLocalDemergeInteractionCellKey(playerObj),
+      playerInteractionChunkKey: buildStableLocalDemergeInteractionChunkKey(playerObj),
       player: summarizeActorDiagPlayer(playerObj),
       inputStaticRenderableCount: Number(list.length || 0),
       outputStaticRenderableCount: Number(out.length || 0),
@@ -574,17 +608,19 @@ function applyStableActorSortDemergeToStaticRenderables(staticRenderables, viewR
     createdFaceCount: createdFaceCount,
     residualMergedPacketCount: residualMergedPacketCount,
     playerInteractionCellKey: buildStableLocalDemergeInteractionCellKey(playerObj),
+    playerInteractionChunkKey: buildStableLocalDemergeInteractionChunkKey(playerObj),
     checkedPacketCount: checkedPacketCount,
     skippedFarPacketCount: skippedFarPacketCount,
     cacheHit: false,
     cacheHitCount: __stableLocalDemergeCache ? __stableLocalDemergeCache.hitCount : 0,
     cacheMissCount: __stableLocalDemergeCache ? __stableLocalDemergeCache.missCount : 0,
-    mode: 'stable-local-player-radius-demerge'
+    mode: 'stable-local-player-chunk-wide-demerge'
   };
   if (__stableLocalDemergeCache) {
     __stableLocalDemergeCache.key = cacheKey;
     __stableLocalDemergeCache.result = result;
   }
+  publishStableLocalDemergeLastState(result, playerObj, true);
   return result;
 }
 
@@ -603,6 +639,7 @@ function applyStableActorSortDemergeToStaticRenderables(staticRenderables, viewR
     floorStableLocalDemergeCoord: function (value, deps) { return withDeps(deps, function () { return floorStableLocalDemergeCoord(value); }); },
     getStableLocalDemergeInteractionCell: function (playerRef, deps) { return withDeps(deps, function () { return getStableLocalDemergeInteractionCell(playerRef); }); },
     buildStableLocalDemergeInteractionCellKey: function (playerRef, deps) { return withDeps(deps, function () { return buildStableLocalDemergeInteractionCellKey(playerRef); }); },
+    buildStableLocalDemergeInteractionChunkKey: function (playerRef, deps) { return withDeps(deps, function () { return buildStableLocalDemergeInteractionChunkKey(playerRef); }); },
     buildStableLocalDemergeCacheKey: function (staticRenderables, viewRotation, playerRef, radius, deps) { return withDeps(deps, function () { return buildStableLocalDemergeCacheKey(staticRenderables, viewRotation, playerRef, radius); }); },
     isActorInteractionDescriptorNearPlayerForLocalDemerge: function (descriptor, playerRef, radius, deps) { return withDeps(deps, function () { return isActorInteractionDescriptorNearPlayerForLocalDemerge(descriptor, playerRef, radius); }); },
     buildStaticWorldFacePacketFromDescriptorForActorDemerge: function (descriptor, sourcePacket, viewRotation, mode, localIndex, deps) { return withDeps(deps, function () { return buildStaticWorldFacePacketFromDescriptorForActorDemerge(descriptor, sourcePacket, viewRotation, mode, localIndex); }); },

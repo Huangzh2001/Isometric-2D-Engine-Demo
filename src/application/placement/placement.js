@@ -19,6 +19,10 @@ var PLACEMENT_CRITICAL_EXPORTS = [
   'legacyBoxesToInstances',
   'startDragging',
   'movePlacedInstance',
+  'enterTerrainBlockPlacement',
+  'exitTerrainBlockPlacement',
+  'isTerrainBlockPlacementActive',
+  'addManualTerrainFaceMergeStressPreset',
   'placeCurrentPrefab',
   'commitPreview',
   'commitPlacementPreview',
@@ -28,6 +32,17 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
 
 (function () {
   var PLACEMENT_BOUNDARY_AUDIT_LIMIT = 80;
+  var manualTerrainBlockPlacementState = {
+    active: false,
+    prefabId: 'cube_1x1',
+    shapeLabel: '1×1×1',
+    columnHeight: 1,
+    materialId: '__terrain_default__',
+    label: 'Manual Terrain Block',
+    base: '#79b35a',
+    batchId: 'manual-terrain-placement'
+  };
+
   var placementBoundaryAudit = {
     owner: PLACEMENT_MODULE_OWNER,
     phase: 'P20-PLACEMENT',
@@ -306,6 +321,15 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
     return null;
   }
 
+  function getStateActionsApi() {
+    var api = placementPath('state.actions') || null;
+    if (api) {
+      recordPlacementBoundaryEvent('owner-api', 'state.actions', { source: 'placement:getStateActionsApi' });
+      return api;
+    }
+    return null;
+  }
+
   function getSelectorsApi() {
     var api = placementPath('state.selectors') || null;
     if (api) {
@@ -519,6 +543,9 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
         terrainMaterialId: instance.terrainMaterialId != null ? instance.terrainMaterialId : null,
         materialType: instance.materialType != null ? instance.materialType : null,
         terrainMaterialLabel: instance.terrainMaterialLabel != null ? instance.terrainMaterialLabel : null,
+        terrainManualShapePrefabId: instance.terrainManualShapePrefabId != null ? instance.terrainManualShapePrefabId : null,
+        terrainManualShapeLabel: instance.terrainManualShapeLabel != null ? instance.terrainManualShapeLabel : null,
+        terrainManualColumnHeight: instance.terrainManualColumnHeight != null ? instance.terrainManualColumnHeight : null,
         semanticTextureMap: instance.semanticTextureMap || null,
         semanticTextures: instance.semanticTextures || null,
         semanticFaceColors: instance.semanticFaceColors || null,
@@ -829,6 +856,344 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
     return evaluated;
   }
 
+
+  function isTerrainBlockPlacementActive() {
+    return !!(manualTerrainBlockPlacementState && manualTerrainBlockPlacementState.active === true);
+  }
+
+  function getManualTerrainBlockPlacementState() {
+    return placementSafeClone(manualTerrainBlockPlacementState || {});
+  }
+
+  function getManualTerrainBlockShapeCatalog() {
+    return {
+      cube_1x1: { prefabId: 'cube_1x1', label: '1×1×1', columnHeight: 1, name: 'Terrain Block · 1×1×1 Manual Placement' },
+      cabinet_1x1x2: { prefabId: 'cabinet_1x1x2', label: '1×1×2', columnHeight: 2, name: 'Terrain Block · 1×1×2 Manual Placement' },
+      terrain_column_1x1x3: { prefabId: 'terrain_column_1x1x3', label: '1×1×3', columnHeight: 3, name: 'Terrain Column · 1×1×3 Manual Placement' },
+      terrain_column_1x1x4: { prefabId: 'terrain_column_1x1x4', label: '1×1×4', columnHeight: 4, name: 'Terrain Column · 1×1×4 Manual Placement' },
+      terrain_column_1x1x5: { prefabId: 'terrain_column_1x1x5', label: '1×1×5', columnHeight: 5, name: 'Terrain Column · 1×1×5 Manual Placement' },
+      terrain_column_1x1x6: { prefabId: 'terrain_column_1x1x6', label: '1×1×6', columnHeight: 6, name: 'Terrain Column · 1×1×6 Manual Placement' }
+    };
+  }
+
+  function normalizeManualTerrainBlockPrefabId(prefabId) {
+    var id = String(prefabId || '').trim();
+    var catalog = getManualTerrainBlockShapeCatalog();
+    if (catalog[id]) return id;
+    return 'cube_1x1';
+  }
+
+  function getManualTerrainBlockShapeDefinition(prefabId) {
+    var catalog = getManualTerrainBlockShapeCatalog();
+    var id = normalizeManualTerrainBlockPrefabId(prefabId || manualTerrainBlockPlacementState.prefabId);
+    return catalog[id] || catalog.cube_1x1;
+  }
+
+  function setManualTerrainBlockShape(prefabId, meta) {
+    var shape = getManualTerrainBlockShapeDefinition(prefabId);
+    manualTerrainBlockPlacementState.prefabId = shape.prefabId;
+    manualTerrainBlockPlacementState.shapeLabel = shape.label;
+    manualTerrainBlockPlacementState.columnHeight = Math.max(1, Math.round(Number(shape.columnHeight) || 1));
+    placementRoute('terrainBlockPlacement:set-shape', {
+      prefabId: shape.prefabId,
+      shapeLabel: shape.label,
+      columnHeight: manualTerrainBlockPlacementState.columnHeight,
+      source: meta && meta.source ? String(meta.source) : 'placement:setManualTerrainBlockShape'
+    });
+    return shape;
+  }
+
+  function setTerrainBlockPlacementStatusText(message) {
+    try {
+      if (typeof document === 'undefined') return;
+      var el = document.getElementById('terrainPlaceBlockStatus');
+      if (el) el.textContent = String(message || '');
+    } catch (_) {}
+  }
+
+  function syncTerrainBlockPlacementUi(source) {
+    var active = isTerrainBlockPlacementActive();
+    var shape = getManualTerrainBlockShapeDefinition(manualTerrainBlockPlacementState.prefabId);
+    var message = active
+      ? '地形方块放置：已启用。左键放置的 ' + shape.label + ' 方块会以 generatedBy=terrain-generator 进入 terrain face merge path。'
+      : '地形方块放置：未启用。点击“放置地形方块”后，左键会放置进入 terrain merge path 的 ' + shape.label + ' 方块。';
+    setTerrainBlockPlacementStatusText(message);
+    placementRoute('terrainBlockPlacement:ui-sync', { active: active, prefabId: shape.prefabId, shapeLabel: shape.label, columnHeight: shape.columnHeight || null, source: String(source || 'placement:terrain-block-ui-sync') });
+    return { active: active, prefabId: shape.prefabId, shapeLabel: shape.label, columnHeight: shape.columnHeight || null, message: message };
+  }
+
+  function setTerrainBlockPlacementActive(active, meta) {
+    manualTerrainBlockPlacementState.active = !!active;
+    placementRoute('terrainBlockPlacement:set-active', {
+      active: manualTerrainBlockPlacementState.active,
+      source: meta && meta.source ? String(meta.source) : 'placement:setTerrainBlockPlacementActive'
+    });
+    syncTerrainBlockPlacementUi(meta && meta.source ? String(meta.source) : 'placement:setTerrainBlockPlacementActive');
+    return getManualTerrainBlockPlacementState();
+  }
+
+  function enterTerrainBlockPlacement(meta) {
+    var source = meta && meta.source ? String(meta.source) : 'placement:enterTerrainBlockPlacement';
+    var shape = setManualTerrainBlockShape(meta && meta.prefabId ? meta.prefabId : manualTerrainBlockPlacementState.prefabId, { source: source + ':shape' });
+    manualTerrainBlockPlacementState.active = true;
+    var stateActions = getStateActionsApi();
+    var selected = null;
+    if (stateActions && typeof stateActions.selectPrefabById === 'function') selected = stateActions.selectPrefabById(shape.prefabId, { source: source + ':select-' + shape.prefabId });
+    else {
+      try {
+        if (Array.isArray(prototypes) && typeof editor !== 'undefined' && editor) {
+          var idx = prototypes.findIndex(function (p) { return p && p.id === shape.prefabId; });
+          if (idx >= 0) { editor.prototypeIndex = idx; selected = idx; }
+        }
+      } catch (_) {}
+    }
+    try { if (typeof refreshPrefabSelectOptions === 'function') refreshPrefabSelectOptions(source + ':refresh-prefab-select'); } catch (_) {}
+    if (stateActions && typeof stateActions.requestModeChange === 'function') stateActions.requestModeChange('place', { source: source + ':mode-place' });
+    else {
+      try {
+        if (typeof requestEditorModeChange === 'function') requestEditorModeChange('place', { source: source + ':mode-place' });
+        else if (typeof editor !== 'undefined' && editor) editor.mode = 'place';
+      } catch (_) {}
+    }
+    try { if (typeof updatePreview === 'function') updatePreview(); } catch (_) {}
+    var uiSync = syncTerrainBlockPlacementUi(source);
+    placementRoute('terrainBlockPlacement:enter', { active: true, selectedPrefabId: shape.prefabId, shapeLabel: shape.label, columnHeight: shape.columnHeight || null, selectedResult: selected, ui: uiSync, source: source });
+    return Object.assign({ ok: true, selectedPrefabId: shape.prefabId, shapeLabel: shape.label, columnHeight: shape.columnHeight || null }, getManualTerrainBlockPlacementState());
+  }
+
+  function exitTerrainBlockPlacement(meta) {
+    var source = meta && meta.source ? String(meta.source) : 'placement:exitTerrainBlockPlacement';
+    manualTerrainBlockPlacementState.active = false;
+    var uiSync = syncTerrainBlockPlacementUi(source);
+    placementRoute('terrainBlockPlacement:exit', { active: false, ui: uiSync, source: source });
+    return Object.assign({ ok: true }, getManualTerrainBlockPlacementState());
+  }
+
+
+  function getManualTerrainColumnPrefabIdForHeight(height) {
+    var h = Math.max(1, Math.round(Number(height) || 1));
+    if (h <= 1) return 'cube_1x1';
+    if (h === 2) return 'cabinet_1x1x2';
+    if (h === 3) return 'terrain_column_1x1x3';
+    if (h === 4) return 'terrain_column_1x1x4';
+    if (h === 5) return 'terrain_column_1x1x5';
+    return 'terrain_column_1x1x6';
+  }
+
+  function getManualTerrainFaceMergeStressPresetCatalog() {
+    return {
+      side_merged_column_row: {
+        id: 'side_merged_column_row',
+        label: 'Side-merged 1×1×N column row',
+        description: '相邻同高地形柱行：用于强制触发 vertical side face merge。',
+        placements: [
+          { dx: 0, dy: 0, h: 4 },
+          { dx: 1, dy: 0, h: 4 },
+          { dx: 2, dy: 0, h: 4 },
+          { dx: 3, dy: 0, h: 4 }
+        ]
+      },
+      side_merged_column_block: {
+        id: 'side_merged_column_block',
+        label: 'Side-merged 2×2 high column block',
+        description: '2×2 同高高柱块：同时触发 top merge 与四侧 side merge。',
+        placements: [
+          { dx: 0, dy: 0, h: 4 },
+          { dx: 1, dy: 0, h: 4 },
+          { dx: 0, dy: 1, h: 4 },
+          { dx: 1, dy: 1, h: 4 }
+        ]
+      },
+      step_adjacent_column_cluster: {
+        id: 'step_adjacent_column_cluster',
+        label: 'Step-adjacent mixed-height column cluster',
+        description: '高低相邻柱簇：用于复现 merged side wall 与 lower top 面的邻接关系。',
+        placements: [
+          { dx: 0, dy: 0, h: 1 },
+          { dx: 1, dy: 0, h: 2 },
+          { dx: 2, dy: 0, h: 3 },
+          { dx: 3, dy: 0, h: 4 },
+          { dx: 0, dy: 1, h: 1 },
+          { dx: 1, dy: 1, h: 2 },
+          { dx: 2, dy: 1, h: 3 },
+          { dx: 3, dy: 1, h: 4 }
+        ]
+      },
+      l_shaped_column_wall: {
+        id: 'l_shaped_column_wall',
+        label: 'L-shaped merged column wall',
+        description: 'L 型同高柱墙：用于检查拐角处 side merge / top merge 是否跨边界。',
+        placements: [
+          { dx: 0, dy: 0, h: 4 },
+          { dx: 1, dy: 0, h: 4 },
+          { dx: 2, dy: 0, h: 4 },
+          { dx: 0, dy: 1, h: 4 },
+          { dx: 0, dy: 2, h: 4 }
+        ]
+      }
+    };
+  }
+
+  function normalizeManualTerrainFaceMergeStressPresetId(presetId) {
+    var id = String(presetId || '').trim();
+    var catalog = getManualTerrainFaceMergeStressPresetCatalog();
+    if (catalog[id]) return id;
+    return 'side_merged_column_row';
+  }
+
+  function getManualTerrainFaceMergeStressPreset(presetId) {
+    var catalog = getManualTerrainFaceMergeStressPresetCatalog();
+    var id = normalizeManualTerrainFaceMergeStressPresetId(presetId);
+    return catalog[id] || catalog.side_merged_column_row;
+  }
+
+  function getManualTerrainFaceMergeStressBaseOrigin(preset) {
+    var gridW = getPlacementSettings().gridW || 12;
+    var gridH = getPlacementSettings().gridH || 12;
+    var placements = preset && Array.isArray(preset.placements) ? preset.placements : [];
+    var maxDx = 0;
+    var maxDy = 0;
+    for (var i = 0; i < placements.length; i++) {
+      maxDx = Math.max(maxDx, Math.round(Number(placements[i].dx) || 0));
+      maxDy = Math.max(maxDy, Math.round(Number(placements[i].dy) || 0));
+    }
+    return {
+      x: Math.max(0, Math.min(Math.max(0, gridW - maxDx - 1), Math.floor((gridW - maxDx - 1) / 2))),
+      y: Math.max(0, Math.min(Math.max(0, gridH - maxDy - 1), Math.floor((gridH - maxDy - 1) / 2))),
+      z: 0
+    };
+  }
+
+  function buildManualTerrainFaceMergeStressExtras(origin, preset, placement, index, meta) {
+    var material = resolveManualTerrainMaterialForPlacement();
+    var h = Math.max(1, Math.min(6, Math.round(Number(placement && placement.h) || 1)));
+    var prefabId = getManualTerrainColumnPrefabIdForHeight(h);
+    return {
+      source: meta && meta.source ? String(meta.source) : 'placement:manualTerrainFaceMergeStressPreset',
+      name: 'Terrain Face-Merge Stress · ' + String(preset.label || preset.id || 'preset') + ' · h' + h,
+      generatedBy: 'terrain-generator',
+      terrainBatchId: 'manual-terrain-face-merge-stress',
+      terrainManualShapePrefabId: prefabId,
+      terrainManualShapeLabel: '1×1×' + h,
+      terrainManualColumnHeight: h,
+      terrainStressPresetId: String(preset.id || ''),
+      terrainStressPresetLabel: String(preset.label || preset.id || ''),
+      terrainStressPlacementIndex: index,
+      terrainCellX: Math.round(Number(origin.x) || 0),
+      terrainCellY: Math.round(Number(origin.y) || 0),
+      terrainMaterialId: material.terrainMaterialId,
+      terrainMaterialMergeKey: material.terrainMaterialMergeKey,
+      materialType: material.materialType,
+      terrainMaterialLabel: material.terrainMaterialLabel,
+      base: material.base,
+      renderUpdateMode: 'static'
+    };
+  }
+
+  function addManualTerrainFaceMergeStressPreset(presetId, meta) {
+    var source = meta && meta.source ? String(meta.source) : 'placement:addManualTerrainFaceMergeStressPreset';
+    var preset = getManualTerrainFaceMergeStressPreset(presetId);
+    var base = getManualTerrainFaceMergeStressBaseOrigin(preset);
+    var placements = Array.isArray(preset.placements) ? preset.placements : [];
+    var created = [];
+    var sceneGraphApi = getSceneGraphOwnerApi();
+    for (var i = 0; i < placements.length; i++) {
+      var placement = placements[i] || {};
+      var origin = {
+        x: base.x + Math.round(Number(placement.dx) || 0),
+        y: base.y + Math.round(Number(placement.dy) || 0),
+        z: base.z + Math.round(Number(placement.z) || 0)
+      };
+      var h = Math.max(1, Math.min(6, Math.round(Number(placement.h) || 1)));
+      var prefabId = getManualTerrainColumnPrefabIdForHeight(h);
+      var extras = buildManualTerrainFaceMergeStressExtras(origin, preset, placement, i, { source: source });
+      var instance = makeInstance(prefabId, origin.x, origin.y, origin.z, 0, extras);
+      created.push(instance);
+      if (sceneGraphApi && typeof sceneGraphApi.addInstance === 'function') sceneGraphApi.addInstance(instance, { source: source + ':addInstance' });
+      else instances.push(instance);
+    }
+    if (!(sceneGraphApi && typeof sceneGraphApi.addInstance === 'function')) {
+      rebuildBoxesFromInstances({ source: source + ':rebuildBoxes' });
+      placementStateWrite('addManualTerrainFaceMergeStressPreset', { source: source, presetId: preset.id, instances: instances.length, created: created.length, fallback: true });
+    }
+    var payload = {
+      ok: true,
+      presetId: preset.id,
+      presetLabel: preset.label,
+      description: preset.description || '',
+      baseOrigin: base,
+      createdCount: created.length,
+      created: created.map(function (inst) {
+        return {
+          instanceId: inst.instanceId || null,
+          prefabId: inst.prefabId || null,
+          x: inst.x,
+          y: inst.y,
+          z: inst.z,
+          terrainManualColumnHeight: inst.terrainManualColumnHeight || null
+        };
+      })
+    };
+    placementRoute('manual-terrain-face-merge-stress-preset', Object.assign({ source: source }, payload));
+    if (typeof pushLog === 'function') {
+      try { pushLog('[MANUAL-TERRAIN-FACE-MERGE-STRESS] ' + JSON.stringify(payload)); } catch (_) {}
+    }
+    try { if (typeof invalidateShadowGeometryCache === 'function') invalidateShadowGeometryCache(source); } catch (_) {}
+    return payload;
+  }
+
+  function resolveManualTerrainMaterialForPlacement() {
+    var materialId = String(manualTerrainBlockPlacementState.materialId || '__terrain_default__');
+    var out = {
+      terrainMaterialId: materialId,
+      terrainMaterialMergeKey: '__terrain_default__',
+      materialType: materialId,
+      terrainMaterialLabel: manualTerrainBlockPlacementState.label || 'Manual Terrain Block',
+      base: manualTerrainBlockPlacementState.base || '#79b35a'
+    };
+    try {
+      var materialCore = getTerrainMaterialCoreForPlacement();
+      if (materialCore && typeof materialCore.getTerrainMaterialDefinition === 'function') {
+        var def = materialCore.getTerrainMaterialDefinition(materialId);
+        if (def) {
+          out.terrainMaterialLabel = def.label || out.terrainMaterialLabel;
+          if (def.colors && def.colors.top) out.base = def.colors.top;
+        }
+      }
+    } catch (_) {}
+    return out;
+  }
+
+  function buildManualTerrainBlockPlacementExtras(origin, meta) {
+    var o = origin || {};
+    var material = resolveManualTerrainMaterialForPlacement();
+    var shape = getManualTerrainBlockShapeDefinition(manualTerrainBlockPlacementState.prefabId);
+    return {
+      source: meta && meta.source ? String(meta.source) : 'placement:manualTerrainBlock',
+      name: shape.name,
+      generatedBy: 'terrain-generator',
+      terrainBatchId: manualTerrainBlockPlacementState.batchId || 'manual-terrain-placement',
+      terrainManualShapePrefabId: shape.prefabId,
+      terrainManualShapeLabel: shape.label,
+      terrainManualColumnHeight: Math.max(1, Math.round(Number(shape.columnHeight) || Number(manualTerrainBlockPlacementState.columnHeight) || 1)),
+      terrainCellX: Math.round(Number(o.x) || 0),
+      terrainCellY: Math.round(Number(o.y) || 0),
+      terrainMaterialId: material.terrainMaterialId,
+      terrainMaterialMergeKey: material.terrainMaterialMergeKey,
+      materialType: material.materialType,
+      terrainMaterialLabel: material.terrainMaterialLabel,
+      base: material.base,
+      renderUpdateMode: 'static'
+    };
+  }
+
+  function shouldCommitAsManualTerrainBlock(prefabId, sourcePreview) {
+    if (!isTerrainBlockPlacementActive()) return false;
+    var id = String(prefabId || (sourcePreview && sourcePreview.prefabId) || '');
+    var normalized = normalizeManualTerrainBlockPrefabId(id);
+    return normalized === id && normalized === normalizeManualTerrainBlockPrefabId(manualTerrainBlockPlacementState.prefabId);
+  }
+
   function placeCurrentPrefab(preview) {
     var editorRef = getPlacementEditorRef();
     var sourcePreview = preview || (editorRef && editorRef.preview) || null;
@@ -850,7 +1215,11 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
       recordPlacementBoundaryFallback('currentPrefab', { source: 'placement:placeCurrentPrefab', reason: 'missing-selector-selected-prefab' });
     }
     var committedRotation = authoritative.rotation != null ? authoritative.rotation : (sourcePreview.rotation != null ? sourcePreview.rotation : 0);
-    var instance = makeInstance(authoritative.prefabId || sourcePreview.prefabId || selectedPrefabId || fallbackPrefabId, authoritative.origin.x, authoritative.origin.y, authoritative.origin.z, committedRotation);
+    var committedPrefabId = authoritative.prefabId || sourcePreview.prefabId || selectedPrefabId || fallbackPrefabId;
+    var terrainBlockExtras = shouldCommitAsManualTerrainBlock(committedPrefabId, sourcePreview)
+      ? buildManualTerrainBlockPlacementExtras(authoritative.origin, { source: 'placement:placeCurrentPrefab.manual-terrain-block' })
+      : null;
+    var instance = makeInstance(committedPrefabId, authoritative.origin.x, authoritative.origin.y, authoritative.origin.z, committedRotation, terrainBlockExtras || undefined);
     var commitPayload = {
       instanceId: instance.instanceId || null,
       prefabId: instance.prefabId || null,
@@ -858,9 +1227,19 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
       origin: { x: instance.x, y: instance.y, z: instance.z },
       footprint: authoritative.bbox ? { w: authoritative.bbox.w, d: authoritative.bbox.d, h: authoritative.bbox.h } : null,
       previewFacing: sourcePreview.rotation != null ? sourcePreview.rotation : null,
-      selectedInstanceUnchanged: true
+      selectedInstanceUnchanged: true,
+      terrainBlockPlacementActive: isTerrainBlockPlacementActive(),
+      committedAsTerrainBlock: !!terrainBlockExtras,
+      generatedBy: terrainBlockExtras ? terrainBlockExtras.generatedBy : null,
+      terrainMaterialMergeKey: terrainBlockExtras ? terrainBlockExtras.terrainMaterialMergeKey : null,
+      terrainManualShapePrefabId: terrainBlockExtras ? terrainBlockExtras.terrainManualShapePrefabId : null,
+      terrainManualShapeLabel: terrainBlockExtras ? terrainBlockExtras.terrainManualShapeLabel : null,
+      terrainManualColumnHeight: terrainBlockExtras ? terrainBlockExtras.terrainManualColumnHeight : null
     };
     placementRoute('placement-commit', commitPayload);
+    if (terrainBlockExtras && typeof pushLog === 'function') {
+      try { pushLog('[MANUAL-TERRAIN-PLACE] ' + JSON.stringify(commitPayload)); } catch (_) {}
+    }
     recordItemRotationDiagnostic('placement-commit', commitPayload);
     var sceneGraphApi = getSceneGraphOwnerApi();
     if (sceneGraphApi && typeof sceneGraphApi.addInstance === 'function') sceneGraphApi.addInstance(instance, { source: 'placement:placeCurrentPrefab' });
@@ -1065,6 +1444,11 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
     legacyBoxesToInstances: legacyBoxesToInstances,
     startDragging: startDragging,
     movePlacedInstance: movePlacedInstance,
+    enterTerrainBlockPlacement: enterTerrainBlockPlacement,
+    exitTerrainBlockPlacement: exitTerrainBlockPlacement,
+    isTerrainBlockPlacementActive: isTerrainBlockPlacementActive,
+    getManualTerrainBlockPlacementState: getManualTerrainBlockPlacementState,
+    addManualTerrainFaceMergeStressPreset: addManualTerrainFaceMergeStressPreset,
     updateInstanceRotation: updateInstanceRotation,
     rotatePlacedInstance: rotatePlacedInstance,
     placeCurrentPrefab: placeCurrentPrefab,
@@ -1099,6 +1483,11 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
   installCompatExport('legacyBoxesToInstances', legacyBoxesToInstances);
   installCompatExport('startDragging', startDragging);
   installCompatExport('movePlacedInstance', movePlacedInstance);
+  installCompatExport('enterTerrainBlockPlacement', enterTerrainBlockPlacement);
+  installCompatExport('exitTerrainBlockPlacement', exitTerrainBlockPlacement);
+  installCompatExport('isTerrainBlockPlacementActive', isTerrainBlockPlacementActive);
+  installCompatExport('getManualTerrainBlockPlacementState', getManualTerrainBlockPlacementState);
+  installCompatExport('addManualTerrainFaceMergeStressPreset', addManualTerrainFaceMergeStressPreset);
   installCompatExport('updateInstanceRotation', updateInstanceRotation);
   installCompatExport('rotatePlacedInstance', rotatePlacedInstance);
   installCompatExport('placeCurrentPrefab', placeCurrentPrefab);
@@ -1115,7 +1504,7 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
 
   placementRoute('module-loaded', {
     exported: [
-      'makeInstance','rebuildBoxesFromInstances','removeInstanceById','startDragging','commitPreview','cancelDrag'
+      'makeInstance','rebuildBoxesFromInstances','removeInstanceById','startDragging','commitPreview','cancelDrag','enterTerrainBlockPlacement','addManualTerrainFaceMergeStressPreset'
     ],
     owner: PLACEMENT_MODULE_OWNER,
     criticalExports: PLACEMENT_CRITICAL_EXPORTS.length

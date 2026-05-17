@@ -12,7 +12,7 @@
   if (!global) return;
 
   var OWNER = 'src/presentation/render/renderer/pixi-world-renderer.js';
-  var STEP = 'PXM-07';
+  var STEP = 'PXM-07.18K0F';
   var PREFIX = '[pixi-migration][step=' + STEP + ']';
   var PHASE = 'pixi-tile-floor-first-pass';
   var DEFAULT_PIXI_CDN = 'https://cdn.jsdelivr.net/npm/pixi.js@8/dist/pixi.min.js';
@@ -92,7 +92,10 @@
     lastPlayerConsumerSummary: null,
     lastDynamicRenderableConsumerSummary: null,
     lastGpuDiagnosticsSignature: '',
-    lastGpuDiagnosticsLogAt: 0
+    lastGpuDiagnosticsLogAt: 0,
+    // PXM-07.18L: frame-level forensic summary for Pixi + residual Canvas2D work.
+    lastFrameForensicsSignature: '',
+    lastFrameForensicsEmitAt: 0
   };
 
   function nowMs() {
@@ -100,6 +103,26 @@
       if (global.performance && typeof global.performance.now === 'function') return global.performance.now();
     } catch (_) {}
     return Date.now();
+  }
+
+
+  function isPixiPerformanceModeEnabled() {
+    try {
+      var mode = global.__PIXI_PERFORMANCE_LOG_MODE__ || null;
+      if (mode && typeof mode.isEnabled === 'function') return mode.isEnabled() === true;
+      if (global.__PIXI_PERFORMANCE_MODE__ === true) return true;
+      if (global.localStorage) {
+        var value = global.localStorage.getItem('pixiPerformanceMode');
+        return value === '1' || value === 'true';
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  function shouldEmitDiagnosticsSection(section) {
+    if (!isPixiPerformanceModeEnabled()) return true;
+    section = String(section || '');
+    return section === 'ready' || section === 'init' || section === 'init-error' || section === 'gpu-diagnostics' || section === 'performance-hotspot' || section === 'forensics-frame';
   }
 
   function stringifyValue(value) {
@@ -117,6 +140,7 @@
   }
 
   function emit(section, payload) {
+    if (!shouldEmitDiagnosticsSection(section)) return '';
     var line = PREFIX + '[' + String(section || 'event') + ']';
     var extra = formatPayload(payload);
     if (extra) line += ' ' + extra;
@@ -126,6 +150,28 @@
       else if (global.console && typeof global.console.log === 'function') global.console.log(line);
     } catch (_) {}
     return line;
+  }
+
+  function toFiniteNumber(value, fallback) {
+    var n = Number(value);
+    return Number.isFinite(n) ? n : Number(fallback || 0);
+  }
+
+  function roundDiag(value, digits) {
+    var n = Number(value);
+    if (!Number.isFinite(n)) return 0;
+    var factor = Math.pow(10, digits == null ? 3 : digits);
+    return Math.round(n * factor) / factor;
+  }
+
+  function countVisibleChildrenForensics(container) {
+    try {
+      var children = container && Array.isArray(container.children) ? container.children : [];
+      var visible = 0;
+      for (var i = 0; i < children.length; i += 1) if (children[i] && children[i].visible !== false) visible += 1;
+      return { total: children.length, visible: visible };
+    } catch (_) {}
+    return { total: 0, visible: 0 };
   }
 
   function getNamespace() {
@@ -661,21 +707,32 @@
     var floorSnapshot = getSharedFloorLayerCacheSnapshot(reason || 'pixi-shared-render-frame-snapshot');
     var transform = floorSnapshot && floorSnapshot.floorCacheBlitTransform || null;
     var reuse = floorSnapshot && floorSnapshot.reuseTransform || null;
+    var visualViewRotation = normalizeStaticRotationModulo4ForPixi(meta && meta.currentViewRotation != null ? meta.currentViewRotation : (floorSnapshot && floorSnapshot.viewRotation != null ? floorSnapshot.viewRotation : 0));
+    var staticPacketViewRotation = resolveStaticPacketViewRotationForPixi(visualViewRotation);
+    var rawFloorTextureVersion = String(floorSnapshot && (floorSnapshot.textureVersion || floorSnapshot.version) || '');
+    var staticFloorTextureVersion = sanitizeStaticFloorTextureVersionForPixi(rawFloorTextureVersion, staticPacketViewRotation);
     var snapshot = {
-      step: 'PXM-07.12N',
-      phase: 'pixi-shared-render-frame-snapshot',
+      step: 'PXM-07.18J',
+      phase: 'pixi-shared-render-frame-snapshot-visual-rotation-restored',
       source: reason || 'pixi-renderFrame',
       framePlanId: String(meta && meta.framePlanId || ''),
       createdAtMs: nowMs(),
       cameraX: Number(camera && camera.x || 0),
       cameraY: Number(camera && camera.y || 0),
+      visualViewRotation: visualViewRotation,
+      staticPacketViewRotation: staticPacketViewRotation,
+      staticCacheViewRotation: staticPacketViewRotation,
+      fractionalRotationInStaticCacheKey: hasFractionalStaticRotationInCacheKeyForPixi(staticPacketViewRotation),
       floorSnapshot: floorSnapshot || null,
       floorCacheBlitTransform: transform || null,
       floorReuseTransform: reuse || null,
       floorReady: !!(floorSnapshot && floorSnapshot.ready === true && floorSnapshot.surfaceCanvas),
       floorSharedSurfaceRevision: Number(floorSnapshot && floorSnapshot.sharedSurfaceRevision || 0),
-      floorTextureVersion: String(floorSnapshot && (floorSnapshot.textureVersion || floorSnapshot.version) || ''),
+      floorTextureVersion: rawFloorTextureVersion,
+      staticFloorTextureVersion: staticFloorTextureVersion,
+      floorStaticTextureVersion: staticFloorTextureVersion,
       floorTextureSignature: makeSharedFloorTextureSignature(floorSnapshot),
+      staticFloorTextureSignature: sanitizeStaticFloorTextureVersionForPixi(makeSharedFloorTextureSignature(floorSnapshot), staticPacketViewRotation),
       floorBuildCameraX: Number(floorSnapshot && floorSnapshot.buildCameraX || reuse && reuse.builtCameraX || 0),
       floorBuildCameraY: Number(floorSnapshot && floorSnapshot.buildCameraY || reuse && reuse.builtCameraY || 0),
       floorBuildZoom: Number(floorSnapshot && floorSnapshot.buildZoom || reuse && reuse.builtZoom || 0),
@@ -697,6 +754,10 @@
         cameraY: snapshot.cameraY,
         floorSharedSurfaceRevision: snapshot.floorSharedSurfaceRevision,
         floorTextureVersion: snapshot.floorTextureVersion,
+        staticFloorTextureVersion: snapshot.staticFloorTextureVersion,
+        visualViewRotation: snapshot.visualViewRotation,
+        staticPacketViewRotation: snapshot.staticPacketViewRotation,
+        fractionalRotationInStaticCacheKey: hasFractionalStaticRotationInCacheKeyForPixi(staticPacketViewRotation),
         floorReuseScale: snapshot.floorReuseScale,
         floorReuseDx: snapshot.floorReuseDx,
         floorReuseDy: snapshot.floorReuseDy,
@@ -718,10 +779,14 @@
       if (snapshot) {
         emit('shared-frame-snapshot-release', {
           ok: true,
-          step: snapshot.step || 'PXM-07.12N',
+          step: snapshot.step || 'PXM-07.18J',
           framePlanId: snapshot.framePlanId || '',
           floorSharedSurfaceRevision: snapshot.floorSharedSurfaceRevision,
           floorTextureVersion: snapshot.floorTextureVersion,
+          staticFloorTextureVersion: snapshot.staticFloorTextureVersion || snapshot.floorStaticTextureVersion || '',
+          visualViewRotation: snapshot.visualViewRotation,
+          staticPacketViewRotation: snapshot.staticPacketViewRotation,
+          fractionalRotationInStaticCacheKey: hasFractionalStaticRotationInCacheKeyForPixi(staticPacketViewRotation),
           source: reason || 'pixi-renderFrame-after-fallback'
         });
       }
@@ -779,6 +844,61 @@
         if (!preserveChild) state.floorContainer.children.length = 0;
       } catch (__) {}
     }
+  }
+
+  function normalizeStaticRotationModulo4ForPixi(value) {
+    var n = Number(value);
+    if (!Number.isFinite(n)) n = 0;
+    n = n % 4;
+    if (n < 0) n += 4;
+    return n;
+  }
+
+  function getStaticRotationSnapEpsilonForPixi() {
+    var raw = null;
+    try { if (global.localStorage) raw = global.localStorage.getItem('pixiStaticRotationSnapEpsilon'); } catch (_) {}
+    var n = Number(raw);
+    if (!Number.isFinite(n) || n < 0) n = 0.001;
+    return Math.max(0, Math.min(0.05, n));
+  }
+
+  function resolveStaticPacketViewRotationForPixi(value) {
+    try {
+      if (typeof global.resolveStaticPacketViewRotationForRender === 'function') {
+        return normalizeStaticRotationModulo4ForPixi(global.resolveStaticPacketViewRotationForRender(value));
+      }
+    } catch (_) {}
+    var visual = normalizeStaticRotationModulo4ForPixi(value);
+    var snapped = Math.round(visual) % 4;
+    if (snapped < 0) snapped += 4;
+    var direct = Math.abs(visual - snapped);
+    var wrapped = Math.min(direct, Math.abs(visual + 4 - snapped), Math.abs(visual - 4 - snapped));
+    return wrapped <= getStaticRotationSnapEpsilonForPixi() ? snapped : visual;
+  }
+
+  function hasFractionalStaticRotationInCacheKeyForPixi(value) {
+    var visual = normalizeStaticRotationModulo4ForPixi(value);
+    var snapped = Math.round(visual) % 4;
+    if (snapped < 0) snapped += 4;
+    var direct = Math.abs(visual - snapped);
+    var wrapped = Math.min(direct, Math.abs(visual + 4 - snapped), Math.abs(visual - 4 - snapped));
+    return wrapped > getStaticRotationSnapEpsilonForPixi();
+  }
+
+  function sanitizeStaticFloorTextureVersionForPixi(version, staticRotation) {
+    var raw = version == null ? '' : String(version);
+    if (!raw) return '';
+    var snapped = Number(staticRotation || 0);
+    var out = raw;
+    try { out = out.replace(/(\"viewRotation\"\s*:\s*)-?\d+(?:\.\d+)?(?:e[+-]?\d+)?/ig, '$1' + String(snapped)); } catch (_) { out = raw; }
+    try {
+      var parts = out.split('|');
+      if (parts.length >= 6 && /^-?\d+(?:\.\d+)?(?:e[+-]?\d+)?$/i.test(parts[2])) {
+        parts[2] = String(snapped);
+        out = parts.join('|');
+      }
+    } catch (_) {}
+    return out;
   }
 
   function makeSharedFloorTextureSignature(snapshot) {
@@ -1577,6 +1697,78 @@
     } catch (_) {}
   }
 
+  function emitPixiFrameForensics(payload) {
+    payload = payload || {};
+    var floorChildren = countVisibleChildrenForensics(state.floorContainer);
+    var staticChildren = countVisibleChildrenForensics(state.staticRunContainer);
+    var playerChildren = countVisibleChildrenForensics(state.playerContainer);
+    var dynamicChildren = countVisibleChildrenForensics(state.dynamicRenderableContainer);
+    var canvas2dShare = toFiniteNumber(payload.frameTotalMs, 0) > 0 ? roundDiag(toFiniteNumber(payload.canvas2dFallbackFrameMs, 0) / toFiniteNumber(payload.frameTotalMs, 1), 4) : 0;
+    var frame = Object.assign({
+      source: 'pixi-world-renderer-frame-forensics',
+      step: STEP,
+      framePlanId: payload.framePlanId || '',
+      frameTotalMs: roundDiag(payload.frameTotalMs, 3),
+      pixiFloorDrawMs: roundDiag(payload.pixiFloorDrawMs, 3),
+      pixiStaticWorldDrawMs: roundDiag(payload.pixiStaticWorldDrawMs, 3),
+      pixiPlayerDrawMs: roundDiag(payload.pixiPlayerDrawMs, 3),
+      canvas2dFallbackFrameMs: roundDiag(payload.canvas2dFallbackFrameMs, 3),
+      canvas2dFallbackShare: canvas2dShare,
+      pixiDrawsFloor: payload.pixiDrawsFloor === true,
+      pixiDrawsStaticWorldPackets: payload.pixiDrawsStaticWorldPackets === true,
+      pixiDrawsPlayerAvatar: payload.pixiDrawsPlayerAvatar === true,
+      pixiDrawsDynamicRenderables: payload.pixiDrawsDynamicRenderables === true,
+      canvas2dStaticWorldSkipped: payload.canvas2dStaticWorldSkipped === true,
+      canvas2dSkipsPlayerAvatar: payload.canvas2dSkipsPlayerAvatar === true,
+      canvas2dSkipsAdoptedDynamicRenderables: payload.canvas2dSkipsAdoptedDynamicRenderables === true,
+      staticPacketCount: toFiniteNumber(payload.staticPacketCount, 0),
+      staticPacketDrawCount: toFiniteNumber(payload.staticPacketDrawCount, 0),
+      actualStaticDrawUnitCount: toFiniteNumber(payload.actualStaticDrawUnitCount, 0),
+      actualStaticCacheSpriteDrawCount: toFiniteNumber(payload.actualStaticCacheSpriteDrawCount, 0),
+      actualStaticGraphicsPacketDrawCount: toFiniteNumber(payload.actualStaticGraphicsPacketDrawCount, 0),
+      chunkRenderTextureHitRate: roundDiag(payload.chunkRenderTextureHitRate, 4),
+      chunkRenderTextureMissCount: toFiniteNumber(payload.chunkRenderTextureMissCount, 0),
+      chunkRenderTextureUploadCount: toFiniteNumber(payload.chunkRenderTextureUploadCount, 0),
+      orderRunRenderTextureHitRate: roundDiag(payload.orderRunRenderTextureHitRate, 4),
+      orderRunRenderTextureMissCount: toFiniteNumber(payload.orderRunRenderTextureMissCount, 0),
+      staticPacketItemCacheHitRate: roundDiag(payload.staticPacketItemCacheHitRate, 4),
+      staticChunkDrawDataCacheHitRate: roundDiag(payload.staticChunkDrawDataCacheHitRate, 4),
+      usesSharedFloorLayerCache: payload.usesSharedFloorLayerCache === true,
+      floorTextureUpdateCount: toFiniteNumber(payload.floorTextureUpdateCount, 0),
+      floorSpriteReuseCount: toFiniteNumber(payload.floorSpriteReuseCount, 0),
+      gpuAccelerated: payload.gpuAccelerated === true,
+      gpuBackendFamily: payload.gpuBackendFamily || 'unknown',
+      pixiRendererType: payload.pixiRendererType || state.pixiRendererType || 'unknown',
+      rendererSize: [toFiniteNumber(state.pixiRendererWidth, 0), toFiniteNumber(state.pixiRendererHeight, 0)].join('x'),
+      floorContainerChildren: floorChildren,
+      staticContainerChildren: staticChildren,
+      playerContainerChildren: playerChildren,
+      dynamicContainerChildren: dynamicChildren,
+      residualCanvas2dDominates: canvas2dShare >= 0.5,
+      cacheMissStorm: (toFiniteNumber(payload.chunkRenderTextureCount, 0) > 0 && roundDiag(payload.chunkRenderTextureHitRate, 4) < 0.85) || toFiniteNumber(payload.chunkRenderTextureUploadCount, 0) > 0 || toFiniteNumber(payload.orderRunRenderTextureMissCount, 0) > 0,
+      pixiOwnershipIncomplete: !(payload.pixiDrawsStaticWorldPackets === true && payload.canvas2dStaticWorldSkipped === true)
+    }, payload.extra || {});
+    var signature = '';
+    try {
+      signature = JSON.stringify({
+        plan: frame.framePlanId,
+        totalBucket: Math.floor(toFiniteNumber(frame.frameTotalMs, 0) / 4),
+        fallbackBucket: Math.floor(toFiniteNumber(frame.canvas2dFallbackFrameMs, 0) / 4),
+        staticBucket: Math.floor(toFiniteNumber(frame.pixiStaticWorldDrawMs, 0) / 4),
+        chunkHit: frame.chunkRenderTextureHitRate,
+        miss: frame.chunkRenderTextureMissCount,
+        ownership: frame.pixiOwnershipIncomplete,
+        residual: frame.residualCanvas2dDominates
+      });
+    } catch (_) { signature = String(frame.framePlanId || '') + '|' + String(frame.frameTotalMs || 0); }
+    var t = nowMs();
+    var force = toFiniteNumber(frame.frameTotalMs, 0) >= 16 || toFiniteNumber(frame.canvas2dFallbackFrameMs, 0) >= 8 || frame.cacheMissStorm || frame.pixiOwnershipIncomplete;
+    if (!force && signature === state.lastFrameForensicsSignature && (t - Number(state.lastFrameForensicsEmitAt || 0)) < 1200) return;
+    state.lastFrameForensicsSignature = signature;
+    state.lastFrameForensicsEmitAt = t;
+    emit('forensics-frame', frame);
+  }
+
 
   function getPixiDynamicRenderableConsumer() {
     try { return global.__SHARED_RENDER_OPTIMIZATION_PIXI_DYNAMIC_RENDERABLE_CONSUMER__ || null; } catch (_) {}
@@ -1853,6 +2045,187 @@
     };
   }
 
+  function getDisplayObjectGlobalBoundsProbe(target) {
+    if (!target) return { exists: false };
+    var out = { exists: true, ok: false };
+    try {
+      var b = typeof target.getBounds === 'function' ? target.getBounds() : null;
+      if (b) {
+        out.ok = true;
+        out.x = finalProbeRound(b.x);
+        out.y = finalProbeRound(b.y);
+        out.width = finalProbeRound(b.width);
+        out.height = finalProbeRound(b.height);
+        out.minX = finalProbeRound(b.x);
+        out.minY = finalProbeRound(b.y);
+        out.maxX = finalProbeRound(Number(b.x || 0) + Number(b.width || 0));
+        out.maxY = finalProbeRound(Number(b.y || 0) + Number(b.height || 0));
+        out.centerX = finalProbeRound(Number(b.x || 0) + Number(b.width || 0) / 2);
+        out.centerY = finalProbeRound(Number(b.y || 0) + Number(b.height || 0) / 2);
+      }
+    } catch (err) {
+      out.error = err && err.message ? String(err.message) : 'getBounds-failed';
+    }
+    if (!out.ok) {
+      out.x = finalProbeRound(target.x);
+      out.y = finalProbeRound(target.y);
+      out.width = finalProbeRound(target.width);
+      out.height = finalProbeRound(target.height);
+    }
+    return out;
+  }
+
+  function getPointBoundsProbe(points) {
+    points = Array.isArray(points) ? points : [];
+    if (!points.length) return { exists: false, pointCount: 0 };
+    var minX = Infinity;
+    var minY = Infinity;
+    var maxX = -Infinity;
+    var maxY = -Infinity;
+    for (var i = 0; i < points.length; i += 1) {
+      var x = finalProbeNumber(points[i] && points[i].x, 0);
+      var y = finalProbeNumber(points[i] && points[i].y, 0);
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+    }
+    return {
+      exists: true,
+      pointCount: points.length,
+      minX: finalProbeRound(minX),
+      minY: finalProbeRound(minY),
+      maxX: finalProbeRound(maxX),
+      maxY: finalProbeRound(maxY),
+      width: finalProbeRound(maxX - minX),
+      height: finalProbeRound(maxY - minY),
+      centerX: finalProbeRound((minX + maxX) / 2),
+      centerY: finalProbeRound((minY + maxY) / 2)
+    };
+  }
+
+  function mapCurrentNoCameraPointToFloorFinal(pointNoCamera, snapshot, settings) {
+    snapshot = snapshot || {};
+    settings = settings || {};
+    var transform = snapshot.floorCacheBlitTransform || null;
+    var pixiTransform = transform && transform.pixi || null;
+    var reuse = snapshot.reuseTransform || null;
+    var originX = finalProbeNumber(settings.originX, finalProbeNumber(transform && transform.originX, 0));
+    var originY = finalProbeNumber(settings.originY, finalProbeNumber(transform && transform.originY, 0));
+    var currentZoom = finalProbeNumber(snapshot.currentZoom, 1);
+    var builtZoom = finalProbeNumber(snapshot.buildZoom, finalProbeNumber(reuse && reuse.builtZoom, currentZoom || 1));
+    var zoomRatio = currentZoom ? builtZoom / currentZoom : 1;
+    var builtNoCameraX = originX + (finalProbeNumber(pointNoCamera && pointNoCamera.x, 0) - originX) * zoomRatio;
+    var builtNoCameraY = originY + (finalProbeNumber(pointNoCamera && pointNoCamera.y, 0) - originY) * zoomRatio;
+    var buildCameraX = finalProbeNumber(snapshot.buildCameraX, finalProbeNumber(reuse && reuse.builtCameraX, 0));
+    var buildCameraY = finalProbeNumber(snapshot.buildCameraY, finalProbeNumber(reuse && reuse.builtCameraY, 0));
+    var scale = finalProbeNumber(transform && transform.scale, finalProbeNumber(reuse && reuse.scale, 1));
+    var spriteX = finalProbeNumber(pixiTransform && pixiTransform.spriteX, finalProbeNumber(state.sharedFloorSprite && state.sharedFloorSprite.x, 0));
+    var spriteY = finalProbeNumber(pixiTransform && pixiTransform.spriteY, finalProbeNumber(state.sharedFloorSprite && state.sharedFloorSprite.y, 0));
+    return {
+      x: spriteX + scale * (builtNoCameraX + buildCameraX),
+      y: spriteY + scale * (builtNoCameraY + buildCameraY),
+      builtNoCameraX: builtNoCameraX,
+      builtNoCameraY: builtNoCameraY,
+      zoomRatio: zoomRatio
+    };
+  }
+
+  function buildFloorWorldRegistrationProbe(meta, staticSummary, playerSummary) {
+    var snapshot = getFinalProbeFloorSnapshot();
+    var settings = getRuntimeSettings();
+    var camera = getRuntimeCamera();
+    var viewRotation = getCurrentViewRotation();
+    var gridW = Math.max(0, Math.round(finalProbeNumber(settings.gridW || settings.worldCols, 0)));
+    var gridH = Math.max(0, Math.round(finalProbeNumber(settings.gridH || settings.worldRows, 0)));
+    var floorQuadWorld = [
+      { x: 0, y: 0, z: 0 },
+      { x: gridW, y: 0, z: 0 },
+      { x: gridW, y: gridH, z: 0 },
+      { x: 0, y: gridH, z: 0 }
+    ];
+    var floorQuadNoCamera = projectWorldFaceNoCamera(floorQuadWorld, viewRotation, settings);
+    var directCurrent = addCamera(floorQuadNoCamera, camera);
+    var floorFinal = [];
+    for (var i = 0; i < floorQuadNoCamera.length; i += 1) floorFinal.push(mapCurrentNoCameraPointToFloorFinal(floorQuadNoCamera[i], snapshot, settings));
+    var directBounds = getPointBoundsProbe(directCurrent);
+    var finalBounds = getPointBoundsProbe(floorFinal);
+    var centerDx = directBounds.exists && finalBounds.exists ? finalProbeRound(finalProbeNumber(finalBounds.centerX, 0) - finalProbeNumber(directBounds.centerX, 0)) : null;
+    var centerDy = directBounds.exists && finalBounds.exists ? finalProbeRound(finalProbeNumber(finalBounds.centerY, 0) - finalProbeNumber(directBounds.centerY, 0)) : null;
+    var transform = snapshot && snapshot.floorCacheBlitTransform || null;
+    var pixiTransform = transform && transform.pixi || null;
+    var floorSpriteProbe = getDisplayObjectProbe(state.sharedFloorSprite);
+    var floorSpriteBounds = getDisplayObjectGlobalBoundsProbe(state.sharedFloorSprite);
+    var floorContainerBounds = getDisplayObjectGlobalBoundsProbe(state.floorContainer);
+    var staticContainerBounds = getDisplayObjectGlobalBoundsProbe(state.staticRunContainer);
+    var playerContainerBounds = getDisplayObjectGlobalBoundsProbe(state.playerContainer);
+    var pixiCanvas = state.pixiCanvas || null;
+    var canvasStyleWidth = 0;
+    var canvasStyleHeight = 0;
+    try {
+      canvasStyleWidth = pixiCanvas && pixiCanvas.getBoundingClientRect ? Number(pixiCanvas.getBoundingClientRect().width || 0) : 0;
+      canvasStyleHeight = pixiCanvas && pixiCanvas.getBoundingClientRect ? Number(pixiCanvas.getBoundingClientRect().height || 0) : 0;
+    } catch (_) {}
+    var registrationError = Math.max(Math.abs(finalProbeNumber(centerDx, 0)), Math.abs(finalProbeNumber(centerDy, 0)));
+    var suspectedFloorWorldRegistrationDivergence = registrationError > 1.25;
+    return {
+      diagnosticStep: 'PXM-07.14L',
+      diagnosticOnly: true,
+      activeBackend: detectActiveBackend(),
+      framePlanId: meta && meta.framePlanId || '',
+      source: meta && meta.source || 'pixi-renderFrame-floor-world-registration-probe',
+      floorRenderer: state.lastFloorSummary && state.lastFloorSummary.floorRenderer || '',
+      pixiDrawsFloor: !!(state.lastFloorSummary && state.lastFloorSummary.ok === true),
+      canvas2dFloorSkipped: !!(state.lastFloorSummary && state.lastFloorSummary.canvas2dFloorSkipped === true),
+      usesSharedFloorLayerCache: !!(state.lastFloorSummary && state.lastFloorSummary.usesSharedFloorLayerCache === true),
+      gridW: gridW,
+      gridH: gridH,
+      viewRotation: viewRotation,
+      currentCameraX: finalProbeRound(camera && camera.x),
+      currentCameraY: finalProbeRound(camera && camera.y),
+      floorBuildCameraX: finalProbeRound(snapshot && snapshot.buildCameraX),
+      floorBuildCameraY: finalProbeRound(snapshot && snapshot.buildCameraY),
+      floorCurrentZoom: finalProbeRound(snapshot && snapshot.currentZoom),
+      floorBuildZoom: finalProbeRound(snapshot && snapshot.buildZoom),
+      floorSharedSurfaceRevision: finalProbeNumber(snapshot && snapshot.sharedSurfaceRevision, 0),
+      floorTextureVersion: String(snapshot && (snapshot.textureVersion || snapshot.version) || ''),
+      floorSurfaceWidth: finalProbeNumber(snapshot && snapshot.surfaceWidth, 0),
+      floorSurfaceHeight: finalProbeNumber(snapshot && snapshot.surfaceHeight, 0),
+      floorCssWidth: finalProbeNumber(snapshot && snapshot.cssWidth, 0),
+      floorCssHeight: finalProbeNumber(snapshot && snapshot.cssHeight, 0),
+      floorSpriteX: finalProbeRound(state.sharedFloorSprite && state.sharedFloorSprite.x),
+      floorSpriteY: finalProbeRound(state.sharedFloorSprite && state.sharedFloorSprite.y),
+      floorSpriteWidth: finalProbeRound(state.sharedFloorSprite && state.sharedFloorSprite.width),
+      floorSpriteHeight: finalProbeRound(state.sharedFloorSprite && state.sharedFloorSprite.height),
+      floorPixiTransformSpriteX: finalProbeRound(pixiTransform && pixiTransform.spriteX),
+      floorPixiTransformSpriteY: finalProbeRound(pixiTransform && pixiTransform.spriteY),
+      floorPixiTransformSpriteWidth: finalProbeRound(pixiTransform && pixiTransform.spriteWidth),
+      floorPixiTransformSpriteHeight: finalProbeRound(pixiTransform && pixiTransform.spriteHeight),
+      floorMapCurrentDirectBounds: directBounds,
+      floorMapFinalReuseBounds: finalBounds,
+      floorMapFinalVsCurrentCenterDx: centerDx,
+      floorMapFinalVsCurrentCenterDy: centerDy,
+      floorMapRegistrationMaxAbsCenterError: finalProbeRound(registrationError),
+      suspectedFloorWorldRegistrationDivergence: suspectedFloorWorldRegistrationDivergence,
+      suspectedReason: suspectedFloorWorldRegistrationDivergence ? 'floor-final-reuse-bounds-differ-from-current-world-projection' : '',
+      floorSprite: floorSpriteProbe,
+      floorSpriteGlobalBounds: floorSpriteBounds,
+      floorContainerGlobalBounds: floorContainerBounds,
+      staticContainerGlobalBounds: staticContainerBounds,
+      playerContainerGlobalBounds: playerContainerBounds,
+      staticSummaryPacketCount: staticSummary && staticSummary.staticPacketCount != null ? staticSummary.staticPacketCount : null,
+      staticSummaryChunkRenderTextureCount: staticSummary && staticSummary.chunkRenderTextureCount != null ? staticSummary.chunkRenderTextureCount : null,
+      staticSummaryDynamicStaticGraphicsCount: staticSummary && staticSummary.dynamicStaticGraphicsCount != null ? staticSummary.dynamicStaticGraphicsCount : null,
+      pixiCanvasWidth: finalProbeNumber(state.pixiCanvasWidth, 0),
+      pixiCanvasHeight: finalProbeNumber(state.pixiCanvasHeight, 0),
+      pixiRendererWidth: finalProbeNumber(state.pixiRendererWidth, 0),
+      pixiRendererHeight: finalProbeNumber(state.pixiRendererHeight, 0),
+      pixiCanvasClientWidth: finalProbeRound(canvasStyleWidth),
+      pixiCanvasClientHeight: finalProbeRound(canvasStyleHeight),
+      playerSummaryPixiDrawsPlayerAvatar: !!(playerSummary && playerSummary.pixiDrawsPlayerAvatar === true)
+    };
+  }
+
   function getLastPixiPlayerConsumerSummary() {
     try {
       var consumer = global.__SHARED_RENDER_OPTIMIZATION_PIXI_PLAYER_CONSUMER__ || null;
@@ -1921,6 +2294,10 @@
       floorSharedSurfaceRevision: finalProbeNumber(snapshot && snapshot.sharedSurfaceRevision, 0),
       sharedRenderFrameSurfaceRevision: global.__PIXI_MIGRATION_ACTIVE_SHARED_RENDER_FRAME_SNAPSHOT__ ? finalProbeNumber(global.__PIXI_MIGRATION_ACTIVE_SHARED_RENDER_FRAME_SNAPSHOT__.floorSharedSurfaceRevision, 0) : null,
       sharedRenderFrameTextureVersion: global.__PIXI_MIGRATION_ACTIVE_SHARED_RENDER_FRAME_SNAPSHOT__ ? String(global.__PIXI_MIGRATION_ACTIVE_SHARED_RENDER_FRAME_SNAPSHOT__.floorTextureVersion || '') : '',
+      staticSharedRenderFrameTextureVersion: global.__PIXI_MIGRATION_ACTIVE_SHARED_RENDER_FRAME_SNAPSHOT__ ? String(global.__PIXI_MIGRATION_ACTIVE_SHARED_RENDER_FRAME_SNAPSHOT__.staticFloorTextureVersion || global.__PIXI_MIGRATION_ACTIVE_SHARED_RENDER_FRAME_SNAPSHOT__.floorStaticTextureVersion || '') : '',
+      visualViewRotation: global.__PIXI_MIGRATION_ACTIVE_SHARED_RENDER_FRAME_SNAPSHOT__ ? finalProbeRound(global.__PIXI_MIGRATION_ACTIVE_SHARED_RENDER_FRAME_SNAPSHOT__.visualViewRotation) : null,
+      staticPacketViewRotation: global.__PIXI_MIGRATION_ACTIVE_SHARED_RENDER_FRAME_SNAPSHOT__ ? finalProbeRound(global.__PIXI_MIGRATION_ACTIVE_SHARED_RENDER_FRAME_SNAPSHOT__.staticPacketViewRotation) : null,
+      fractionalRotationInStaticCacheKey: global.__PIXI_MIGRATION_ACTIVE_SHARED_RENDER_FRAME_SNAPSHOT__ ? hasFractionalStaticRotationInCacheKeyForPixi(global.__PIXI_MIGRATION_ACTIVE_SHARED_RENDER_FRAME_SNAPSHOT__.staticPacketViewRotation) : false,
       floorSpriteX: finalProbeRound(state.sharedFloorSprite && state.sharedFloorSprite.x),
       floorSpriteY: finalProbeRound(state.sharedFloorSprite && state.sharedFloorSprite.y),
       floorSpriteWidth: finalProbeRound(state.sharedFloorSprite && state.sharedFloorSprite.width),
@@ -1952,6 +2329,20 @@
     };
     emit('final-composition-transform-probe', payload);
     try { global.__PIXI_MIGRATION_LAST_FINAL_COMPOSITION_TRANSFORM_PROBE__ = payload; } catch (_) {}
+    try {
+      var floorRegistrationProbe = buildFloorWorldRegistrationProbe(meta, staticSummary, playerSummary);
+      emit('floor-world-registration-probe', floorRegistrationProbe);
+      global.__PIXI_MIGRATION_LAST_FLOOR_WORLD_REGISTRATION_PROBE__ = floorRegistrationProbe;
+    } catch (err) {
+      emit('floor-world-registration-probe', {
+        diagnosticStep: 'PXM-07.14L',
+        diagnosticOnly: true,
+        ok: false,
+        reason: 'probe-exception',
+        error: err && err.message ? String(err.message) : 'unknown',
+        framePlanId: meta && meta.framePlanId || ''
+      });
+    }
     return payload;
   }
 
@@ -1961,6 +2352,36 @@
     var zoomOwnerSnapshot = getZoomInteractionSnapshotForStaticAdoption();
     var zoomSingleWorldOwnerActive = isZoomSingleWorldOwnerGuardActive(zoomOwnerSnapshot);
     ensurePixiTileFloorLayer(meta && meta.source || 'pixi-renderFrame');
+    // PXM-07.18K0F: strict Pixi backend must not enter the Canvas2D fallback
+    // before the Pixi library/application is ready. K0E correctly failed fast,
+    // but it exposed a first-frame race: activeBackend=pixi while the async
+    // Pixi loader had not populated window.PIXI yet. In that state we skip this
+    // frame instead of drawing static world with Canvas2D. If initialization has
+    // actually failed, throw with the real reason.
+    if (!state.initialized) {
+      var waitingReason = state.initFailed || state.pixiLoadFailed
+        ? (state.initFailureReason || state.pixiLoadFailureReason || 'pixi-init-failed')
+        : (state.initializing ? 'pixi-initializing' : (!detectPixiGlobal() ? 'pixi-global-loading' : 'pixi-application-not-initialized'));
+      var waitingPayload = {
+        step: STEP,
+        source: meta && meta.source || 'pixi-renderFrame',
+        activeBackend: 'pixi',
+        pixiInitialized: false,
+        pixiGlobalAvailable: detectPixiGlobal(),
+        pixiLoadRequested: state.pixiLoadRequested === true,
+        pixiLoadFailed: state.pixiLoadFailed === true,
+        pixiInitializing: state.initializing === true,
+        pixiInitFailed: state.initFailed === true,
+        reason: waitingReason,
+        noCanvas2dFallbackBeforePixiReady: true,
+        framePlanId: meta && meta.framePlanId || ''
+      };
+      emit('pixi-strict-wait', waitingPayload);
+      if (state.initFailed || state.pixiLoadFailed) {
+        throw new Error('[PXM][Pixi strict mode] Pixi backend is active but Pixi renderer could not initialize. reason=' + waitingReason);
+      }
+      return Object.assign({ ok: false, renderer: 'pixi', pixiWaitingForInitialization: true }, waitingPayload);
+    }
     var sharedFrameSnapshot = null;
     if (state.initialized) {
       syncPixiLayerMetrics('pixi-renderFrame');
@@ -2014,7 +2435,7 @@
     var staticRunConsumerSummary = getLastPixiStaticWorldPacketSummary() || staticRunVisualPlanSummary;
     var finalPlayerConsumerSummary = getLastPixiPlayerConsumerSummary() || playerConsumerSummary;
     setZoomSingleWorldOwnerGuardActive(false, zoomOwnerSnapshot, 'pixi-renderFrame-after-canvas2d-fallback');
-    emitFinalCompositionTransformProbe(meta, staticRunConsumerSummary, finalPlayerConsumerSummary, dynamicRenderableConsumerSummary, fallbackResult);
+    if (!isPixiPerformanceModeEnabled()) emitFinalCompositionTransformProbe(meta, staticRunConsumerSummary, finalPlayerConsumerSummary, dynamicRenderableConsumerSummary, fallbackResult);
     clearPixiSharedRenderFrameSnapshot(sharedFrameSnapshot, 'pixi-renderFrame-after-final-probe');
     emitPixiZoomOwnershipCorrection(zoomOwnerSnapshot, staticRunConsumerSummary, finalPlayerConsumerSummary, dynamicRenderableConsumerSummary, 'pixi-renderFrame-after-canvas2d-fallback');
     try {
@@ -2060,6 +2481,24 @@
       floorTextureUpdateCount: Number(state.sharedFloorTextureUpdateCount || 0),
       frameTotalMs: Number(frameTotalMs.toFixed ? frameTotalMs.toFixed(3) : frameTotalMs),
       pixiFloorDrawMs: Number(state.lastFloorSummary && state.lastFloorSummary.drawWallMs || 0),
+      pixiStaticWorldDrawMs: Number(staticRunConsumerSummary && staticRunConsumerSummary.drawWallMs || 0),
+      pixiPlayerDrawMs: Number(finalPlayerConsumerSummary && finalPlayerConsumerSummary.wallMs || 0),
+      staticPacketCount: Number(staticRunConsumerSummary && staticRunConsumerSummary.staticPacketCount || 0),
+      staticPacketDrawCount: Number(staticRunConsumerSummary && staticRunConsumerSummary.packetDrawCount || 0),
+      chunkRenderTextureWallMs: Number(staticRunConsumerSummary && staticRunConsumerSummary.chunkRenderTextureWallMs || 0),
+      chunkRenderTextureCount: Number(staticRunConsumerSummary && staticRunConsumerSummary.chunkRenderTextureCount || 0),
+      chunkRenderTextureHitCount: Number(staticRunConsumerSummary && staticRunConsumerSummary.chunkRenderTextureHitCount || 0),
+      chunkRenderTextureMissCount: Number(staticRunConsumerSummary && staticRunConsumerSummary.chunkRenderTextureMissCount || 0),
+      chunkRenderTextureHitRate: Number(staticRunConsumerSummary && staticRunConsumerSummary.chunkRenderTextureHitRate || 0),
+      chunkRenderTextureReusablePacketCount: Number(staticRunConsumerSummary && staticRunConsumerSummary.chunkRenderTextureReusablePacketCount || 0),
+      chunkRenderTextureRebuildPacketCount: Number(staticRunConsumerSummary && staticRunConsumerSummary.chunkRenderTextureRebuildPacketCount || 0),
+      staticGraphicsReuseRate: Number(staticRunConsumerSummary && staticRunConsumerSummary.staticGraphicsReuseRate || 0),
+      staticGraphicsReusedCount: Number(staticRunConsumerSummary && staticRunConsumerSummary.staticGraphicsReusedCount || 0),
+      staticGraphicsRebuiltCount: Number(staticRunConsumerSummary && staticRunConsumerSummary.staticGraphicsRebuiltCount || 0),
+      staticGpuChunkCacheDiagnosticOnly: !!(staticRunConsumerSummary && staticRunConsumerSummary.staticGpuChunkCacheDiagnosticOnly === true),
+      staticGpuChunkCacheHitRate: Number(staticRunConsumerSummary && staticRunConsumerSummary.staticGpuChunkCacheHitRate || 0),
+      staticGpuChunkCacheHitCount: Number(staticRunConsumerSummary && staticRunConsumerSummary.staticGpuChunkCacheHitCount || 0),
+      staticGpuChunkCacheMissCount: Number(staticRunConsumerSummary && staticRunConsumerSummary.staticGpuChunkCacheMissCount || 0),
       canvas2dFallbackFrameMs: Number(fallbackWallMs.toFixed ? fallbackWallMs.toFixed(3) : fallbackWallMs),
       visibleTiles: Number(state.lastFloorSummary && state.lastFloorSummary.visibleTiles || 0),
       drawnTiles: Number(state.lastFloorSummary && state.lastFloorSummary.drawnTiles || 0),
@@ -2083,6 +2522,40 @@
       pixiDrawsFloor: floorReady,
       canvas2dFallback: fallbackUsed ? 'enabled' : 'missing',
       source: meta && meta.source || 'pixi-tile-floor-renderFrame'
+    });
+    emitPixiFrameForensics({
+      framePlanId: meta && meta.framePlanId || '',
+      frameTotalMs: Number(frameTotalMs.toFixed ? frameTotalMs.toFixed(3) : frameTotalMs),
+      pixiFloorDrawMs: Number(state.lastFloorSummary && state.lastFloorSummary.drawWallMs || 0),
+      pixiStaticWorldDrawMs: Number(staticRunConsumerSummary && staticRunConsumerSummary.drawWallMs || 0),
+      pixiPlayerDrawMs: Number(finalPlayerConsumerSummary && finalPlayerConsumerSummary.wallMs || 0),
+      canvas2dFallbackFrameMs: Number(fallbackWallMs.toFixed ? fallbackWallMs.toFixed(3) : fallbackWallMs),
+      pixiDrawsFloor: floorReady,
+      pixiDrawsStaticWorldPackets: !!(staticRunConsumerSummary && staticRunConsumerSummary.pixiDrawsStaticWorldPackets),
+      pixiDrawsPlayerAvatar: !!(finalPlayerConsumerSummary && finalPlayerConsumerSummary.pixiDrawsPlayerAvatar),
+      pixiDrawsDynamicRenderables: !!(dynamicRenderableConsumerSummary && dynamicRenderableConsumerSummary.pixiDrawsDynamicRenderables),
+      canvas2dStaticWorldSkipped: !!(staticRunConsumerSummary && staticRunConsumerSummary.canvas2dSkipsStaticWorldPackets),
+      canvas2dSkipsPlayerAvatar: !!(finalPlayerConsumerSummary && finalPlayerConsumerSummary.canvas2dSkipsPlayerAvatar),
+      canvas2dSkipsAdoptedDynamicRenderables: !!(dynamicRenderableConsumerSummary && dynamicRenderableConsumerSummary.canvas2dSkipsAdoptedDynamicRenderables),
+      staticPacketCount: Number(staticRunConsumerSummary && staticRunConsumerSummary.staticPacketCount || 0),
+      staticPacketDrawCount: Number(staticRunConsumerSummary && staticRunConsumerSummary.packetDrawCount || 0),
+      actualStaticDrawUnitCount: Number(staticRunConsumerSummary && staticRunConsumerSummary.actualDrawUnitCount || 0),
+      actualStaticCacheSpriteDrawCount: Number(staticRunConsumerSummary && staticRunConsumerSummary.actualCacheSpriteDrawCount || 0),
+      actualStaticGraphicsPacketDrawCount: Number(staticRunConsumerSummary && staticRunConsumerSummary.actualGraphicsPacketDrawCount || 0),
+      chunkRenderTextureCount: Number(staticRunConsumerSummary && staticRunConsumerSummary.chunkRenderTextureCount || 0),
+      chunkRenderTextureHitRate: Number(staticRunConsumerSummary && staticRunConsumerSummary.chunkRenderTextureHitRate || 0),
+      chunkRenderTextureMissCount: Number(staticRunConsumerSummary && staticRunConsumerSummary.chunkRenderTextureMissCount || 0),
+      chunkRenderTextureUploadCount: Number(staticRunConsumerSummary && staticRunConsumerSummary.chunkRenderTextureUploadCount || 0),
+      orderRunRenderTextureHitRate: Number(staticRunConsumerSummary && staticRunConsumerSummary.orderRunRenderTextureHitRate || 0),
+      orderRunRenderTextureMissCount: Number(staticRunConsumerSummary && staticRunConsumerSummary.orderRunRenderTextureMissCount || 0),
+      staticPacketItemCacheHitRate: Number(staticRunConsumerSummary && staticRunConsumerSummary.staticPacketItemCacheHitRate || 0),
+      staticChunkDrawDataCacheHitRate: Number(staticRunConsumerSummary && staticRunConsumerSummary.staticChunkDrawDataCacheHitRate || 0),
+      floorTextureUpdateCount: Number(state.sharedFloorTextureUpdateCount || 0),
+      floorSpriteReuseCount: Number(state.sharedFloorSpriteReuseCount || 0),
+      usesSharedFloorLayerCache: !!(state.lastFloorSummary && state.lastFloorSummary.usesSharedFloorLayerCache),
+      gpuAccelerated: !!(gpuDiagnostics && gpuDiagnostics.gpuAccelerated),
+      gpuBackendFamily: gpuDiagnostics && gpuDiagnostics.backendFamily || 'unknown',
+      pixiRendererType: gpuDiagnostics && gpuDiagnostics.rendererType || state.pixiRendererType || 'unknown'
     });
     return fallbackResult;
   }
@@ -2140,6 +2613,10 @@
       pixiOwnsBusinessObjects: false,
       pixiSortChildren: false,
       pixiZIndexUsed: false,
+      gpuAccelerated: !!(global.__PIXI_MIGRATION_LAST_GPU_DIAGNOSTICS__ && global.__PIXI_MIGRATION_LAST_GPU_DIAGNOSTICS__.gpuAccelerated),
+      gpuBackendFamily: String(global.__PIXI_MIGRATION_LAST_GPU_DIAGNOSTICS__ && global.__PIXI_MIGRATION_LAST_GPU_DIAGNOSTICS__.backendFamily || 'unknown'),
+      gpuRenderer: String(global.__PIXI_MIGRATION_LAST_GPU_DIAGNOSTICS__ && global.__PIXI_MIGRATION_LAST_GPU_DIAGNOSTICS__.gpuRenderer || ''),
+      gpuVendor: String(global.__PIXI_MIGRATION_LAST_GPU_DIAGNOSTICS__ && global.__PIXI_MIGRATION_LAST_GPU_DIAGNOSTICS__.gpuVendor || ''),
       canvas2dFallback: 'enabled'
     };
   }
@@ -2157,6 +2634,9 @@
     drawPixiFloorLayer: drawPixiFloorLayer,
     getStaticWorldPacketContainer: getStaticWorldPacketContainer,
     getStaticRunContainer: getStaticWorldPacketContainer,
+    getPixiApplication: function getPixiApplication() { return state.pixiApp || null; },
+    getPixiRenderer: function getPixiRenderer() { return state.pixiApp && state.pixiApp.renderer || null; },
+    getLastGpuDiagnostics: function getLastGpuDiagnostics() { return global.__PIXI_MIGRATION_LAST_GPU_DIAGNOSTICS__ || null; },
     getLastPixiStaticWorldPacketSummary: getLastPixiStaticWorldPacketSummary,
     getStatus: getStatus,
     summarizeCoverage: function summarizeCoverage() {

@@ -257,6 +257,10 @@ var prototypes = [
   normalizePrefab({ key: '2', id: 'bench_2x1', name: 'Bench', base: '#d4bb90', renderUpdateMode: 'static', voxels: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }] }),
   normalizePrefab({ key: '3', id: 'sofa_2x1', name: 'Sofa', base: '#9eb6dd', renderUpdateMode: 'static', voxels: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }] }),
   normalizePrefab({ key: '4', id: 'cabinet_1x1x2', name: 'Cabinet', base: '#a8c46d', renderUpdateMode: 'static', voxels: [{ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }] }),
+  normalizePrefab({ key: '4a', id: 'terrain_column_1x1x3', name: 'Terrain Column 1×1×3', base: '#79b35a', renderUpdateMode: 'static', voxels: [{ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }, { x: 0, y: 0, z: 2 }] }),
+  normalizePrefab({ key: '4b', id: 'terrain_column_1x1x4', name: 'Terrain Column 1×1×4', base: '#79b35a', renderUpdateMode: 'static', voxels: [{ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }, { x: 0, y: 0, z: 2 }, { x: 0, y: 0, z: 3 }] }),
+  normalizePrefab({ key: '4c', id: 'terrain_column_1x1x5', name: 'Terrain Column 1×1×5', base: '#79b35a', renderUpdateMode: 'static', voxels: [{ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }, { x: 0, y: 0, z: 2 }, { x: 0, y: 0, z: 3 }, { x: 0, y: 0, z: 4 }] }),
+  normalizePrefab({ key: '4d', id: 'terrain_column_1x1x6', name: 'Terrain Column 1×1×6', base: '#79b35a', renderUpdateMode: 'static', voxels: [{ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }, { x: 0, y: 0, z: 2 }, { x: 0, y: 0, z: 3 }, { x: 0, y: 0, z: 4 }, { x: 0, y: 0, z: 5 }] }),
   normalizePrefab({ key: '5', id: 'stair_3step', name: 'Stair', base: '#c99568', renderUpdateMode: 'static', voxels: [
     { x: 0, y: 0, z: 0 },
     { x: 1, y: 0, z: 0 }, { x: 1, y: 0, z: 1 },

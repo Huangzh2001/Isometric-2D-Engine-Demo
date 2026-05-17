@@ -168,8 +168,31 @@
     return false;
   }
 
+  function getActiveWorldRendererBackendForStableDemerge() {
+    try {
+      var selection = window.__WORLD_RENDERER_BACKEND_SELECTION__ || null;
+      var snapshot = selection && typeof selection.getSnapshot === 'function' ? selection.getSnapshot() : null;
+      if (snapshot && snapshot.activeBackend) return String(snapshot.activeBackend);
+    } catch (_) {}
+    try {
+      var api = window.App && window.App.renderer && window.App.renderer.active;
+      if (api && api.backend) return String(api.backend);
+    } catch (_) {}
+    return '';
+  }
+
   function isStableDemergeEnabled() {
-    return readLocalStorageFlag('stableActorSortDemerge') === '1' || readLocalStorageFlag('experimentalStableLocalDemerge') === '1';
+    try {
+      if (typeof global.getStaticWorldFaceMergeControlStateSnapshotForRender === 'function') {
+        var faceMergeState = global.getStaticWorldFaceMergeControlStateSnapshotForRender() || null;
+        if (faceMergeState && String(faceMergeState.effectiveFaceMergeMode || 'merge') === 'no-merge') return false;
+      }
+    } catch (_) {}
+    if (readLocalStorageFlag('pixiAutoStableActorSortDemerge') === '0') return false;
+    if (readLocalStorageFlag('stableActorSortDemerge') === '1' || readLocalStorageFlag('experimentalStableLocalDemerge') === '1') return true;
+    // PXM-07.14G: restore old local demerge only while global face merge is active.
+    // The active region is chunk-stable; it must not follow every player cell.
+    return getActiveWorldRendererBackendForStableDemerge() === 'pixi';
   }
 
   function shouldDemergeStaticPacket(packet) {

@@ -317,6 +317,7 @@ function buildRenderablesForMainFrameAssembler() {
   const staticCacheFrameState = getCurrentRenderFrameStaticCacheState();
   const staticCacheRebuiltThisFrame = staticCacheFrameState && staticCacheFrameState.rebuilt === true;
   const staticCacheBuildMs = Number(staticCacheFrameState && staticCacheFrameState.buildMs || 0);
+  const staticCacheFrameProfile = staticCacheFrameState && staticCacheFrameState.profile && typeof staticCacheFrameState.profile === 'object' ? staticCacheFrameState.profile : {};
   const terrainStats = terrainBuild && terrainBuild.stats ? terrainBuild.stats : { visibleColumnCount: 0, culledColumnCount: 0, visibleChunkCount: 0, culledChunkCount: 0, terrainColumnCount: 0, logicalVoxelCountEstimated: 0, visibleTopFaceCount: 0, visibleSideFaceCount: 0, internalVoxelSkippedCount: 0, hiddenInternalSurfaceSkippedCount: 0, terrainBuildWasScoped: true, terrainCellCount: 0, terrainExpandedVoxelInstanceCount: 0, terrainUsesColumnModel: false };
   __lastMainRenderableBuildStats = {
     currentViewRotation: normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation),
@@ -385,6 +386,24 @@ function buildRenderablesForMainFrameAssembler() {
     occupancyRebuiltThisFrame: occupancyRebuiltThisFrame,
     staticCacheRebuiltThisFrame: staticCacheRebuiltThisFrame,
     staticCacheBuildMs: staticCacheBuildMs,
+    staticCacheInvalidationReason: String(staticCacheFrameState && staticCacheFrameState.invalidationReason || staticCacheFrameProfile.invalidationReason || 'none'),
+    staticCacheProfileTotalMs: Number(staticCacheFrameProfile.totalMs || 0),
+    staticCacheRenderSignatureChanged: staticCacheFrameProfile.renderSignatureChanged === true,
+    staticCacheRenderSignatureChangedFieldNames: Array.isArray(staticCacheFrameProfile.renderSignatureChangedFieldNames) ? staticCacheFrameProfile.renderSignatureChangedFieldNames.slice() : [],
+    staticCacheRenderSignatureChangedFieldCount: Number(staticCacheFrameProfile.renderSignatureChangedFieldCount || 0),
+    staticCacheRenderSignaturePreviousValues: staticCacheFrameProfile.renderSignaturePreviousValues || {},
+    staticCacheRenderSignatureNextValues: staticCacheFrameProfile.renderSignatureNextValues || {},
+    staticCacheForcedVisibleStructuralRebuild: staticCacheFrameProfile.forcedVisibleStructuralRebuild === true,
+    staticCacheStructuralRenderSignatureChanged: staticCacheFrameProfile.structuralRenderSignatureChanged === true,
+    staticCacheRebuiltChunkKeysThisFrame: Array.isArray(staticCacheFrameProfile.rebuiltChunkKeysThisFrame) ? staticCacheFrameProfile.rebuiltChunkKeysThisFrame.slice() : [],
+    activeRendererBackend: String(staticCacheFrameProfile.activeRendererBackend || 'unknown'),
+    activeRendererType: String(staticCacheFrameProfile.activeRendererType || 'unknown'),
+    gpuAccelerated: staticCacheFrameProfile.gpuAccelerated === true,
+    gpuBackendFamily: String(staticCacheFrameProfile.gpuBackendFamily || 'unknown'),
+    gpuRenderer: String(staticCacheFrameProfile.gpuRenderer || ''),
+    gpuVendor: String(staticCacheFrameProfile.gpuVendor || ''),
+    pixiInitialized: staticCacheFrameProfile.pixiInitialized === true,
+    pixiRendererCreated: staticCacheFrameProfile.pixiRendererCreated === true,
     visibleChunkCount: Number(surfaceStats.visibleChunkCount || 0),
     rebuiltChunkCountThisFrame: Number(surfaceStats.rebuiltChunkCountThisFrame || 0),
     reusedChunkCountThisFrame: Number(surfaceStats.reusedChunkCountThisFrame || 0),

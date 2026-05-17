@@ -14,6 +14,24 @@
     try { if (global && global.performance && typeof global.performance.now === 'function') return global.performance.now(); } catch (_) {}
     return Date.now();
   }
+
+  function getLastGpuDiagnostics() {
+    try {
+      return global && global.__PIXI_MIGRATION_LAST_GPU_DIAGNOSTICS__ && typeof global.__PIXI_MIGRATION_LAST_GPU_DIAGNOSTICS__ === 'object'
+        ? global.__PIXI_MIGRATION_LAST_GPU_DIAGNOSTICS__
+        : null;
+    } catch (_) {}
+    return null;
+  }
+
+  function getActiveRendererStatus() {
+    try {
+      var api = global && global.App && global.App.renderer ? global.App.renderer.active || null : null;
+      if (api && typeof api.getStatus === 'function') return api.getStatus() || null;
+    } catch (_) {}
+    return null;
+  }
+
   function resolveFunction(deps, name, fallback) {
     return deps && typeof deps[name] === 'function' ? deps[name] : (fallback || nullFn);
   }
@@ -30,6 +48,29 @@
     var getStaticWorldFaceMergeControlStateSnapshotForRender = resolveFunction(__deps, 'getStaticWorldFaceMergeControlStateSnapshotForRender');
     var getSafeMainEditorViewRotation = resolveFunction(__deps, 'getSafeMainEditorViewRotation');
     var normalizeMainEditorViewRotationValue = resolveFunction(__deps, 'normalizeMainEditorViewRotationValue', function (value) { return Number(value || 0); });
+    var resolveStaticPacketViewRotationForRender = resolveFunction(__deps, 'resolveStaticPacketViewRotationForRender', function (value) {
+      var visual = normalizeMainEditorViewRotationValue(value);
+      var snapped = Math.round(Number(visual || 0)) % 4;
+      if (snapped < 0) snapped += 4;
+      var delta = Math.min(Math.abs(visual - snapped), Math.abs(visual + 4 - snapped), Math.abs(visual - 4 - snapped));
+      return delta <= 0.001 ? snapped : visual;
+    });
+    var getStaticPacketViewRotationDiagnosticsForRender = resolveFunction(__deps, 'getStaticPacketViewRotationDiagnosticsForRender', function (value) {
+      var visual = normalizeMainEditorViewRotationValue(value);
+      var snapped = Math.round(Number(visual || 0)) % 4;
+      if (snapped < 0) snapped += 4;
+      var delta = Math.min(Math.abs(visual - snapped), Math.abs(visual + 4 - snapped), Math.abs(visual - 4 - snapped));
+      var settled = delta <= 0.001;
+      var packet = settled ? snapped : visual;
+      return {
+        visualViewRotation: Number(visual || 0),
+        staticPacketViewRotation: Number(packet || 0),
+        staticPacketViewRotationMode: settled ? 'settled-discrete-snap' : 'visual-interpolation',
+        staticPacketViewRotationDelta: Number(delta || 0),
+        staticPacketRotationSnapEpsilon: 0.001,
+        staticPacketRotationWasFractional: settled !== true
+      };
+    });
     var buildStaticWorldRenderSignature = resolveFunction(__deps, 'buildStaticWorldRenderSignature', function () { return '0'; });
     var getRenderVisibilityCoreApi = resolveFunction(__deps, 'getRenderVisibilityCoreApi');
     var getMainCameraRenderScope = resolveFunction(__deps, 'getMainCameraRenderScope');
@@ -56,11 +97,15 @@
   const faceMergeControlState = getStaticWorldFaceMergeControlStateSnapshotForRender();
   const viewRotationInfo = getSafeMainEditorViewRotation(null);
   const currentViewRotation = normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation);
+  const staticPacketRotationDiagnostics = getStaticPacketViewRotationDiagnosticsForRender(currentViewRotation) || {};
+  const staticPacketViewRotation = normalizeMainEditorViewRotationValue(staticPacketRotationDiagnostics.staticPacketViewRotation != null
+    ? staticPacketRotationDiagnostics.staticPacketViewRotation
+    : resolveStaticPacketViewRotationForRender(currentViewRotation));
   const signatureStartAt = perfNow();
-  const renderSignature = buildStaticWorldRenderSignature(currentViewRotation);
+  const renderSignature = buildStaticWorldRenderSignature(staticPacketViewRotation);
   const signatureCheckMs = Math.max(0, perfNow() - signatureStartAt);
   const visibilityCore = getRenderVisibilityCoreApi();
-  const cameraScope = getMainCameraRenderScope(currentViewRotation);
+  const cameraScope = getMainCameraRenderScope(staticPacketViewRotation);
   const semanticLogSeen = Object.create(null);
   const occupancyStartAt = perfNow();
   const occupancySnapshot = getSceneOccupancySnapshotForRender('render:static-world-chunk-cache');
@@ -83,6 +128,12 @@
       zoomSettlePending: faceMergeControlState.zoomSettlePending === true,
       effectiveFaceMergeMode: String(faceMergeControlState.effectiveFaceMergeMode || 'merge'),
       pendingFaceMergeMode: String(faceMergeControlState.pendingFaceMergeMode || faceMergeControlState.effectiveFaceMergeMode || 'merge'),
+      visualViewRotation: Number(currentViewRotation || 0),
+      staticPacketViewRotation: Number(staticPacketViewRotation || 0),
+      staticPacketViewRotationMode: String(staticPacketRotationDiagnostics.staticPacketViewRotationMode || 'discrete-snap'),
+      staticPacketViewRotationDelta: Number(staticPacketRotationDiagnostics.staticPacketViewRotationDelta || 0),
+      staticPacketRotationWasFractional: staticPacketRotationDiagnostics.staticPacketRotationWasFractional === true,
+      packetViewRotationInvalidationControlActive: true,
       invalidationReason: 'missing-static-world-chunk-cache',
       totalBoxes: Number(boxes.length || 0),
       structuredBoxCount: 0,
@@ -140,11 +191,12 @@
     renderSignature: renderSignature,
     comparePackets: compareRenderablesByDomain,
     profileContext: terrainFrameLogContext,
+    deferVisibleRebuild: deferVisibleRebuild === true,
     rebuildChunk: function (chunk) {
       return buildStaticWorldChunkRenderables(chunk, {
         visibilityCore: visibilityCore,
         occupancy: occ,
-        currentViewRotation: currentViewRotation,
+        currentViewRotation: staticPacketViewRotation,
         cameraScope: cameraScope,
         semanticLogSeen: semanticLogSeen,
         profileContext: terrainFrameLogContext
@@ -171,6 +223,10 @@
     buildMs: 0
   };
 
+  var schedulerSummary = chunkResult.schedulerSummary && typeof chunkResult.schedulerSummary === 'object' ? chunkResult.schedulerSummary : {};
+  var activeRendererStatus = getActiveRendererStatus() || {};
+  var lastGpuDiagnostics = getLastGpuDiagnostics() || {};
+
   var staticWorldPackets = Array.isArray(chunkResult.packets)
     ? chunkResult.packets
     : (Array.isArray(chunkResult.renderables) ? chunkResult.renderables : []);
@@ -182,7 +238,10 @@
   staticBoxRenderCache.renderables = frameStaticRenderables;
   staticBoxRenderCache.geometrySignature = String(sceneSnapshot && sceneSnapshot.cacheVersion != null ? sceneSnapshot.cacheVersion : '0');
   staticBoxRenderCache.lightingSignature = renderSignature;
-  staticBoxRenderCache.viewRotation = currentViewRotation;
+  staticBoxRenderCache.viewRotation = staticPacketViewRotation;
+  staticBoxRenderCache.visualViewRotation = currentViewRotation;
+  staticBoxRenderCache.staticPacketViewRotation = staticPacketViewRotation;
+  staticBoxRenderCache.staticPacketViewRotationMode = String(staticPacketRotationDiagnostics.staticPacketViewRotationMode || 'discrete-snap');
   staticBoxRenderCache.cacheSignature = renderSignature;
   staticBoxRenderCache.lastBuiltAt = perfNow();
   staticBoxRenderCache.dirtyGeometry = false;
@@ -213,6 +272,12 @@
     cacheContentType: String(chunkSummary.cacheContentType || 'world-face-packets'),
     cameraIndependent: chunkSummary.cameraIndependent !== false,
     usesScreenSpaceCache: chunkSummary.usesScreenSpaceCache === true,
+    visualViewRotation: Number(currentViewRotation || 0),
+    staticPacketViewRotation: Number(staticPacketViewRotation || 0),
+    staticPacketViewRotationMode: String(staticPacketRotationDiagnostics.staticPacketViewRotationMode || 'discrete-snap'),
+    staticPacketViewRotationDelta: Number(staticPacketRotationDiagnostics.staticPacketViewRotationDelta || 0),
+    staticPacketRotationWasFractional: staticPacketRotationDiagnostics.staticPacketRotationWasFractional === true,
+    packetViewRotationInvalidationControlActive: true,
     visibleChunkCount: Number(chunkSummary.visibleChunkCount || 0),
     rebuiltChunkCountThisFrame: Number(chunkSummary.rebuiltChunkCountThisFrame || 0),
     rebuiltChunkKeysThisFrame: Array.isArray(chunkSummary.rebuiltChunkKeysThisFrame) ? chunkSummary.rebuiltChunkKeysThisFrame.slice() : [],
@@ -225,6 +290,23 @@
     dirtyChunkCount: Number(chunkSummary.dirtyChunkCount || 0),
     totalStaticBoxes: Number(chunkSummary.totalStaticBoxes || 0),
     totalStaticRenderables: Number(chunkSummary.totalStaticRenderables || staticWorldPackets.length || 0),
+    renderSignatureChanged: chunkSummary.renderSignatureChanged === true,
+    renderSignatureChangedFieldNames: Array.isArray(chunkSummary.renderSignatureChangedFieldNames) ? chunkSummary.renderSignatureChangedFieldNames.slice() : [],
+    renderSignatureChangedFieldCount: Number(chunkSummary.renderSignatureChangedFieldCount || 0),
+    renderSignaturePreviousValues: chunkSummary.renderSignaturePreviousValues || {},
+    renderSignatureNextValues: chunkSummary.renderSignatureNextValues || {},
+    forcedVisibleStructuralRebuild: chunkSummary.forcedVisibleStructuralRebuild === true,
+    structuralRenderSignatureChanged: chunkSummary.structuralRenderSignatureChanged === true,
+    previousPacketViewRotation: chunkSummary.previousPacketViewRotation == null ? null : chunkSummary.previousPacketViewRotation,
+    nextPacketViewRotation: chunkSummary.nextPacketViewRotation == null ? null : chunkSummary.nextPacketViewRotation,
+    visualViewRotation: Number(currentViewRotation || 0),
+    staticPacketViewRotation: Number(staticPacketViewRotation || 0),
+    staticPacketViewRotationMode: String(staticPacketRotationDiagnostics.staticPacketViewRotationMode || 'discrete-snap'),
+    staticPacketViewRotationDelta: Number(staticPacketRotationDiagnostics.staticPacketViewRotationDelta || 0),
+    staticPacketRotationWasFractional: staticPacketRotationDiagnostics.staticPacketRotationWasFractional === true,
+    packetViewRotationInvalidationControlActive: true,
+    previousFaceMergeEffectiveMode: chunkSummary.previousFaceMergeEffectiveMode == null ? null : chunkSummary.previousFaceMergeEffectiveMode,
+    nextFaceMergeEffectiveMode: chunkSummary.nextFaceMergeEffectiveMode == null ? null : chunkSummary.nextFaceMergeEffectiveMode,
     buildMs: Number(chunkBuildMs.toFixed(3))
   };
 
@@ -252,7 +334,24 @@
     includesZoom: invalidationSignatureFields.indexOf('zoom') >= 0,
     includesScreenTransform: invalidationSignatureFields.indexOf('screenTransform') >= 0 || invalidationSignatureFields.indexOf('projectionZoom') >= 0,
     includesViewportOffset: invalidationSignatureFields.indexOf('viewportOffset') >= 0 || invalidationSignatureFields.indexOf('cameraOffset') >= 0,
-    shouldInvalidateStaticCache: invalidationReason !== 'none'
+    shouldInvalidateStaticCache: invalidationReason !== 'none',
+    renderSignatureChanged: chunkSummary.renderSignatureChanged === true,
+    renderSignatureChangedFieldNames: Array.isArray(chunkSummary.renderSignatureChangedFieldNames) ? chunkSummary.renderSignatureChangedFieldNames.slice() : [],
+    renderSignatureChangedFieldCount: Number(chunkSummary.renderSignatureChangedFieldCount || 0),
+    renderSignaturePreviousValues: chunkSummary.renderSignaturePreviousValues || {},
+    renderSignatureNextValues: chunkSummary.renderSignatureNextValues || {},
+    forcedVisibleStructuralRebuild: chunkSummary.forcedVisibleStructuralRebuild === true,
+    structuralRenderSignatureChanged: chunkSummary.structuralRenderSignatureChanged === true,
+    previousPacketViewRotation: chunkSummary.previousPacketViewRotation == null ? null : chunkSummary.previousPacketViewRotation,
+    nextPacketViewRotation: chunkSummary.nextPacketViewRotation == null ? null : chunkSummary.nextPacketViewRotation,
+    visualViewRotation: Number(currentViewRotation || 0),
+    staticPacketViewRotation: Number(staticPacketViewRotation || 0),
+    staticPacketViewRotationMode: String(staticPacketRotationDiagnostics.staticPacketViewRotationMode || 'discrete-snap'),
+    staticPacketViewRotationDelta: Number(staticPacketRotationDiagnostics.staticPacketViewRotationDelta || 0),
+    staticPacketRotationWasFractional: staticPacketRotationDiagnostics.staticPacketRotationWasFractional === true,
+    packetViewRotationInvalidationControlActive: true,
+    previousFaceMergeEffectiveMode: chunkSummary.previousFaceMergeEffectiveMode == null ? null : chunkSummary.previousFaceMergeEffectiveMode,
+    nextFaceMergeEffectiveMode: chunkSummary.nextFaceMergeEffectiveMode == null ? null : chunkSummary.nextFaceMergeEffectiveMode
   });
   const staticCacheProfile = {
     reason: 'rebuildStaticBoxRenderCacheIfNeeded',
@@ -274,6 +373,37 @@
     cacheContentType: String(chunkSummary.cacheContentType || 'world-face-packets'),
     cameraIndependent: chunkSummary.cameraIndependent !== false,
     usesScreenSpaceCache: chunkSummary.usesScreenSpaceCache === true,
+    renderSignatureChanged: chunkSummary.renderSignatureChanged === true,
+    renderSignatureChangedFieldNames: Array.isArray(chunkSummary.renderSignatureChangedFieldNames) ? chunkSummary.renderSignatureChangedFieldNames.slice() : [],
+    renderSignatureChangedFieldCount: Number(chunkSummary.renderSignatureChangedFieldCount || 0),
+    renderSignaturePreviousValues: chunkSummary.renderSignaturePreviousValues || {},
+    renderSignatureNextValues: chunkSummary.renderSignatureNextValues || {},
+    forcedVisibleStructuralRebuild: chunkSummary.forcedVisibleStructuralRebuild === true,
+    structuralRenderSignatureChanged: chunkSummary.structuralRenderSignatureChanged === true,
+    previousPacketViewRotation: chunkSummary.previousPacketViewRotation == null ? null : chunkSummary.previousPacketViewRotation,
+    nextPacketViewRotation: chunkSummary.nextPacketViewRotation == null ? null : chunkSummary.nextPacketViewRotation,
+    visualViewRotation: Number(currentViewRotation || 0),
+    staticPacketViewRotation: Number(staticPacketViewRotation || 0),
+    staticPacketViewRotationMode: String(staticPacketRotationDiagnostics.staticPacketViewRotationMode || 'discrete-snap'),
+    staticPacketViewRotationDelta: Number(staticPacketRotationDiagnostics.staticPacketViewRotationDelta || 0),
+    staticPacketRotationWasFractional: staticPacketRotationDiagnostics.staticPacketRotationWasFractional === true,
+    packetViewRotationInvalidationControlActive: true,
+    previousFaceMergeEffectiveMode: chunkSummary.previousFaceMergeEffectiveMode == null ? null : chunkSummary.previousFaceMergeEffectiveMode,
+    nextFaceMergeEffectiveMode: chunkSummary.nextFaceMergeEffectiveMode == null ? null : chunkSummary.nextFaceMergeEffectiveMode,
+    rebuiltChunkKeysThisFrame: Array.isArray(chunkSummary.rebuiltChunkKeysThisFrame) ? chunkSummary.rebuiltChunkKeysThisFrame.slice() : [],
+    queuedChunkCountBefore: Number(schedulerSummary.queuedChunkCountBefore || 0),
+    pickedChunkKeysThisFrame: Array.isArray(schedulerSummary.pickedChunkKeysThisFrame) ? schedulerSummary.pickedChunkKeysThisFrame.slice() : [],
+    deferredChunkCountAfter: Number(schedulerSummary.deferredChunkCountAfter || 0),
+    rebuildBudgetMode: String(schedulerSummary.rebuildBudgetMode || chunkSummary.rebuildBudgetMode || ''),
+    rebuildBudgetValue: Number(schedulerSummary.rebuildBudgetValue || chunkSummary.rebuildBudgetValue || 0),
+    activeRendererBackend: String(activeRendererStatus.activeBackend || activeRendererStatus.backend || 'unknown'),
+    activeRendererType: String(activeRendererStatus.rendererType || lastGpuDiagnostics.rendererType || 'unknown'),
+    gpuAccelerated: lastGpuDiagnostics.gpuAccelerated === true,
+    gpuBackendFamily: String(lastGpuDiagnostics.backendFamily || 'unknown'),
+    gpuRenderer: String(lastGpuDiagnostics.gpuRenderer || ''),
+    gpuVendor: String(lastGpuDiagnostics.gpuVendor || ''),
+    pixiInitialized: activeRendererStatus.initialized === true,
+    pixiRendererCreated: activeRendererStatus.rendererCreated === true,
     totalMs: Number(Math.max(0, perfNow() - profileStartAt).toFixed(3))
   };
   staticBoxRenderCache.lastProfile = staticCacheProfile;

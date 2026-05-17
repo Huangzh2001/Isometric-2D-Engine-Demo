@@ -811,12 +811,16 @@ function isStaticWorldBoxForRender(box, instanceRenderUpdateModes) {
 
 function buildStaticWorldRenderSignature(currentViewRotation) {
   var faceMergeControlState = getStaticWorldFaceMergeControlStateSnapshotForRender();
+  var packetDiagnostics = getStaticPacketViewRotationDiagnosticsForRender(currentViewRotation);
+  var packetViewRotation = packetDiagnostics.staticPacketViewRotation;
   return JSON.stringify({
     lightingSignature: staticBoxLightingSignature(),
     xrayFaces: !!xrayFaces,
     showDebug: !!showDebug,
     surfaceOnlyRenderingEnabled: getMainEditorCameraSettingsForRender().surfaceOnlyRenderingEnabled !== false,
-    packetViewRotation: Number(currentViewRotation || 0),
+    packetViewRotation: Number(packetViewRotation || 0),
+    packetViewRotationMode: String(packetDiagnostics.staticPacketViewRotationMode || ''),
+    packetViewRotationDelta: Number(packetDiagnostics.staticPacketViewRotationDelta || 0),
     cacheContentType: 'world-face-packets',
     cameraIndependent: true,
     usesScreenSpaceCache: false,
@@ -1851,6 +1855,54 @@ function normalizeMainEditorViewRotationValue(value) {
   n = n % 4;
   if (n < 0) n += 4;
   return n;
+}
+
+// PXM-07.18H: static world chunk geometry is built only for discrete
+// view rotations. Visual camera rotation may animate through fractional
+// PXM-07.18J: keep rotation tween frames visually honest.
+// Tiny numeric drift near 0/1/2/3 is snapped for static cache stability, but
+// true interpolation values must remain fractional and enter the render/cache
+// path. Otherwise the visual rotation animation is effectively deleted.
+function getStaticPacketRotationSnapEpsilonForRender() {
+  var raw = null;
+  try { if (window && window.localStorage) raw = window.localStorage.getItem('pixiStaticRotationSnapEpsilon'); } catch (_) {}
+  var n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) n = 0.001;
+  return Math.max(0, Math.min(0.05, n));
+}
+
+function getStaticPacketRotationNearestIntegerInfoForRender(value) {
+  var visual = normalizeMainEditorViewRotationValue(value);
+  var snapped = Math.round(visual) % 4;
+  if (snapped < 0) snapped += 4;
+  var directDistance = Math.abs(visual - snapped);
+  var wrapDistance = Math.min(directDistance, Math.abs(visual + 4 - snapped), Math.abs(visual - 4 - snapped));
+  var epsilon = getStaticPacketRotationSnapEpsilonForRender();
+  return {
+    visual: visual,
+    snapped: snapped,
+    wrapDistance: wrapDistance,
+    epsilon: epsilon,
+    settled: wrapDistance <= epsilon
+  };
+}
+
+function resolveStaticPacketViewRotationForRender(value) {
+  var info = getStaticPacketRotationNearestIntegerInfoForRender(value);
+  return info.settled ? info.snapped : info.visual;
+}
+
+function getStaticPacketViewRotationDiagnosticsForRender(value) {
+  var info = getStaticPacketRotationNearestIntegerInfoForRender(value);
+  var packet = info.settled ? info.snapped : info.visual;
+  return {
+    visualViewRotation: Number(info.visual.toFixed ? info.visual.toFixed(6) : info.visual),
+    staticPacketViewRotation: Number(packet.toFixed ? packet.toFixed(6) : packet),
+    staticPacketViewRotationMode: info.settled ? 'settled-discrete-snap' : 'visual-interpolation',
+    staticPacketViewRotationDelta: Number(info.wrapDistance.toFixed ? info.wrapDistance.toFixed(6) : info.wrapDistance),
+    staticPacketRotationSnapEpsilon: Number(info.epsilon || 0),
+    staticPacketRotationWasFractional: info.settled !== true
+  };
 }
 
 function readRuntimeMainEditorViewRotation() {
@@ -3460,11 +3512,25 @@ function isStableActorSortModeEnabledForRender() {
 
 function isStableLocalDemergeExplicitlyEnabledForRender() {
   try {
-    if (typeof localStorage === 'undefined') return false;
-    return localStorage.getItem('stableActorSortDemerge') === '1' || localStorage.getItem('experimentalStableLocalDemerge') === '1';
-  } catch (_) {
-    return false;
-  }
+    var faceMergeState = getStaticWorldFaceMergeControlStateSnapshotForRender();
+    if (faceMergeState && String(faceMergeState.effectiveFaceMergeMode || 'merge') === 'no-merge') return false;
+  } catch (_) {}
+  try {
+    if (typeof localStorage !== 'undefined') {
+      if (localStorage.getItem('pixiAutoStableActorSortDemerge') === '0') return false;
+      if (localStorage.getItem('stableActorSortDemerge') === '1' || localStorage.getItem('experimentalStableLocalDemerge') === '1') return true;
+    }
+  } catch (_) {}
+  try {
+    var selection = window.__WORLD_RENDERER_BACKEND_SELECTION__ || null;
+    var snapshot = selection && typeof selection.getSnapshot === 'function' ? selection.getSnapshot() : null;
+    if (snapshot && String(snapshot.activeBackend || '') === 'pixi') return true;
+  } catch (_) {}
+  try {
+    var api = window.App && window.App.renderer && window.App.renderer.active;
+    if (api && String(api.backend || '') === 'pixi') return true;
+  } catch (_) {}
+  return false;
 }
 
 

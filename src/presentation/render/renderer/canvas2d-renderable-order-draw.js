@@ -3,6 +3,9 @@
 
   var OWNER = 'src/presentation/render/renderer/canvas2d-renderable-order-draw.js';
   var PHASE = 'P11c-5';
+  var STEP = 'PXM-07.18K0G';
+  var lastResidualCanvas2dForensicsSignature = '';
+  var lastResidualCanvas2dForensicsEmitAt = 0;
 
   function nowMs(deps) {
     if (deps && typeof deps.now === 'function') return deps.now();
@@ -121,6 +124,14 @@
       staticBitmapRunGeometryMs: 0,
       staticBitmapRunInteractionReuseCount: 0,
       staticBitmapRunInteractionReuseDrawMs: 0,
+      staticRunCount: 0,
+      largestStaticRunPacketCount: 0,
+      staticPacketSkipCheckMs: 0,
+      staticPacketSkipCheckCount: 0,
+      staticPacketAdoptedRunCount: 0,
+      staticPacketSkippedByPixiCount: 0,
+      staticPacketCanvasFallbackRunCount: 0,
+      staticPacketCanvasFallbackPacketCount: 0,
       topSlowRenderables: []
     };
   }
@@ -226,6 +237,7 @@
   function consumePixiPlayerForFramePlanOrder(renderable, meta, orderIndex) {
     if (!isPixiBackendActive()) return null;
     if (!(renderable && (renderable.id === 'player-avatar' || renderable.kind === 'player-avatar'))) return null;
+    if (!(meta && meta.__pixiStaticWorldFrameOk === true)) return null;
     try {
       var consumer = window.__SHARED_RENDER_OPTIMIZATION_PIXI_PLAYER_CONSUMER__ || null;
       if (!consumer || typeof consumer.consume !== 'function') return null;
@@ -247,11 +259,198 @@
 
   function beginPixiStaticWorldPacketFrame(order, meta, deps) {
     if (!isPixiBackendActive()) return null;
+    var consumer = null;
     try {
-      var consumer = getPixiStaticWorldPacketConsumer();
+      consumer = getPixiStaticWorldPacketConsumer();
       if (consumer && typeof consumer.beginFrame === 'function') return consumer.beginFrame(order || [], meta || {}, deps || {}) || null;
-    } catch (_) {}
+    } catch (err) {
+      var phaseDiagnostics = null;
+      try {
+        if (consumer && typeof consumer.getLastBeginFramePhaseDiagnostics === 'function') phaseDiagnostics = consumer.getLastBeginFramePhaseDiagnostics() || null;
+      } catch (_) { phaseDiagnostics = null; }
+      try {
+        if (consumer && typeof consumer.reset === 'function') consumer.reset('beginFrame-exception-reset-from-draw-loop');
+      } catch (_) {}
+      try {
+        if (deps && typeof deps.emitRendererProfile === 'function') {
+          deps.emitRendererProfile('PIXI-STATIC-BEGINFRAME-EXCEPTION', {
+            step: STEP,
+            source: 'canvas2d-renderable-order-draw.beginPixiStaticWorldPacketFrame',
+            framePlanId: meta && meta.framePlanId || null,
+            renderableCount: Array.isArray(order) ? order.length : 0,
+            errorName: err && err.name ? String(err.name) : 'Error',
+            errorMessage: err && err.message ? String(err.message) : String(err),
+            errorStack: err && err.stack ? String(err.stack).slice(0, 4000) : '',
+            phaseDiagnostics: phaseDiagnostics
+          });
+        }
+      } catch (_) {}
+      return {
+        ok: false,
+        renderer: 'pixi-static-world-packet-consumer',
+        step: STEP,
+        source: 'beginPixiStaticWorldPacketFrame.catch',
+        pixiDrawsStaticWorldPackets: false,
+        canvas2dSkipsStaticWorldPackets: false,
+        fallbackReason: 'beginFrame-exception:' + (err && err.message ? String(err.message) : String(err)),
+        phaseDiagnostics: phaseDiagnostics
+      };
+    }
     return null;
+  }
+
+  function buildLargeSceneFrameplanDiagnostics(order, meta, deps, pixiSummary, pixiBeginFrameWallMs) {
+    order = Array.isArray(order) ? order : [];
+    var out = {
+      step: STEP,
+      source: 'canvas2d-renderable-order-draw.before-main-loop',
+      framePlanId: meta && meta.framePlanId || null,
+      currentViewRotation: meta && meta.currentViewRotation != null ? Number(meta.currentViewRotation) : 0,
+      activeRendererBackend: getActiveRendererBackend(),
+      isPixiBackendActive: isPixiBackendActive(),
+      renderableCount: order.length,
+      staticWorldFacePacketCount: 0,
+      dynamicRenderableCount: 0,
+      playerRenderableCount: 0,
+      staticRunCount: 0,
+      largestStaticRunPacketCount: 0,
+      firstDynamicIndex: -1,
+      playerIndex: -1,
+      kindCounts: Object.create(null),
+      staticPacketSampleIds: [],
+      dynamicSampleKinds: [],
+      pixiStaticWorldConsumerExists: !!getPixiStaticWorldPacketConsumer(),
+      pixiStaticWorldBeginFrameWallMs: safeFixed(deps, pixiBeginFrameWallMs),
+      pixiStaticWorldBeginFrameReturnedSummary: !!pixiSummary,
+      pixiStaticWorldBeginFrameOk: !!(pixiSummary && pixiSummary.ok === true),
+      pixiDrawsStaticWorldPackets: !!(pixiSummary && pixiSummary.pixiDrawsStaticWorldPackets === true),
+      pixiStaticWorldFallbackReason: pixiSummary && pixiSummary.fallbackReason ? String(pixiSummary.fallbackReason) : '',
+      pixiStaticWorldSummarySource: pixiSummary && pixiSummary.source ? String(pixiSummary.source) : '',
+      pixiStaticWorldBeginFramePhaseDiagnostics: pixiSummary && pixiSummary.phaseDiagnostics ? pixiSummary.phaseDiagnostics : null,
+      pixiStaticWorldSummaryStaticPacketCount: pixiSummary && pixiSummary.staticPacketCount != null ? Number(pixiSummary.staticPacketCount) : 0,
+      pixiStaticWorldActualDrawUnitCount: pixiSummary && pixiSummary.actualDrawUnitCount != null ? Number(pixiSummary.actualDrawUnitCount) : 0,
+      pixiStaticWorldActualCacheSpriteDrawCount: pixiSummary && pixiSummary.actualCacheSpriteDrawCount != null ? Number(pixiSummary.actualCacheSpriteDrawCount) : 0,
+      pixiStaticWorldActualGraphicsPacketDrawCount: pixiSummary && pixiSummary.actualGraphicsPacketDrawCount != null ? Number(pixiSummary.actualGraphicsPacketDrawCount) : 0,
+      optimizationAuditVisibleChunkCount: pixiSummary && pixiSummary.optimizationAuditVisibleChunkCount != null ? Number(pixiSummary.optimizationAuditVisibleChunkCount) : null,
+      optimizationAuditChunkKeyOnlyGroupCount: pixiSummary && pixiSummary.optimizationAuditChunkKeyOnlyGroupCount != null ? Number(pixiSummary.optimizationAuditChunkKeyOnlyGroupCount) : null,
+      optimizationAuditStableDepthBandGroupCount: pixiSummary && pixiSummary.optimizationAuditStableDepthBandGroupCount != null ? Number(pixiSummary.optimizationAuditStableDepthBandGroupCount) : null,
+      optimizationAuditStableDepthBandFragmentationFactor: pixiSummary && pixiSummary.optimizationAuditStableDepthBandFragmentationFactor != null ? Number(pixiSummary.optimizationAuditStableDepthBandFragmentationFactor) : null,
+      optimizationAuditEstimatedExcessChunkSpritesFromBanding: pixiSummary && pixiSummary.optimizationAuditEstimatedExcessChunkSpritesFromBanding != null ? Number(pixiSummary.optimizationAuditEstimatedExcessChunkSpritesFromBanding) : null,
+      optimizationAuditVerdict: pixiSummary && pixiSummary.optimizationAuditVerdict ? String(pixiSummary.optimizationAuditVerdict) : '',
+      pixiStaticWorldChunkRenderTextureHitRate: pixiSummary && pixiSummary.chunkRenderTextureHitRate != null ? Number(pixiSummary.chunkRenderTextureHitRate) : null,
+      pixiStaticWorldOrderRunRenderTextureHitRate: pixiSummary && pixiSummary.orderRunRenderTextureHitRate != null ? Number(pixiSummary.orderRunRenderTextureHitRate) : null,
+      pixiStaticWorldStaticPacketItemCacheHitRate: pixiSummary && pixiSummary.staticPacketItemCacheHitRate != null ? Number(pixiSummary.staticPacketItemCacheHitRate) : null,
+      pixiStaticWorldDrawWallMs: pixiSummary && pixiSummary.drawWallMs != null ? Number(pixiSummary.drawWallMs) : null,
+      pixiStaticWorldStaticPacketItemBuildMs: pixiSummary && pixiSummary.staticPacketItemBuildMs != null ? Number(pixiSummary.staticPacketItemBuildMs) : null,
+      pixiStaticWorldChunkEligibilitySplitMs: pixiSummary && pixiSummary.chunkEligibilitySplitMs != null ? Number(pixiSummary.chunkEligibilitySplitMs) : null
+    };
+    var inStaticRun = false;
+    var currentStaticRunCount = 0;
+    for (var i = 0; i < order.length; i += 1) {
+      var item = order[i];
+      var kind = getRenderableKind(item);
+      out.kindCounts[kind] = Number(out.kindCounts[kind] || 0) + 1;
+      if (item && item.kind === 'static-world-face-packet') {
+        out.staticWorldFacePacketCount += 1;
+        if (out.staticPacketSampleIds.length < 6) out.staticPacketSampleIds.push(item.id || item.instanceId || null);
+        if (!inStaticRun) {
+          inStaticRun = true;
+          currentStaticRunCount = 0;
+          out.staticRunCount += 1;
+        }
+        currentStaticRunCount += 1;
+        if (currentStaticRunCount > out.largestStaticRunPacketCount) out.largestStaticRunPacketCount = currentStaticRunCount;
+      } else {
+        if (out.firstDynamicIndex < 0) out.firstDynamicIndex = i;
+        inStaticRun = false;
+        currentStaticRunCount = 0;
+        out.dynamicRenderableCount += 1;
+        if (item && (item.kind === 'player-avatar' || item.id === 'player-avatar')) {
+          out.playerRenderableCount += 1;
+          if (out.playerIndex < 0) out.playerIndex = i;
+        }
+        if (out.dynamicSampleKinds.length < 6) out.dynamicSampleKinds.push(kind);
+      }
+    }
+    out.staticPacketFramePlanRatio = out.renderableCount ? Number((out.staticWorldFacePacketCount / out.renderableCount).toFixed(4)) : 0;
+    out.framePlanStillCarriesLargeStaticPacketList = out.staticWorldFacePacketCount >= 1024;
+    out.pixiAdoptionTooLateCandidate = out.framePlanStillCarriesLargeStaticPacketList && out.pixiDrawsStaticWorldPackets === true;
+    out.pixiConsumerMissingOrRejectedCandidate = out.staticWorldFacePacketCount > 0 && out.pixiDrawsStaticWorldPackets !== true;
+    return out;
+  }
+
+  function buildPixiStaticWorldHardFailReason(diagnostics, pixiSummary) {
+    diagnostics = diagnostics || {};
+    var reasons = [];
+    if (!diagnostics.isPixiBackendActive) reasons.push('active-renderer-backend-is-not-pixi');
+    if (!diagnostics.pixiStaticWorldConsumerExists) reasons.push('missing-pixi-static-world-consumer');
+    if (diagnostics.staticWorldFacePacketCount <= 0) reasons.push('no-static-world-face-packets');
+    if (!diagnostics.pixiStaticWorldBeginFrameReturnedSummary) reasons.push('beginFrame-returned-no-summary');
+    if (!diagnostics.pixiStaticWorldBeginFrameOk) reasons.push('beginFrame-ok-false');
+    if (!diagnostics.pixiDrawsStaticWorldPackets) reasons.push('pixiDrawsStaticWorldPackets-false');
+    if (diagnostics.pixiStaticWorldFallbackReason) reasons.push('fallbackReason=' + diagnostics.pixiStaticWorldFallbackReason);
+    if (pixiSummary && pixiSummary.errorMessage) reasons.push('summaryError=' + String(pixiSummary.errorMessage));
+    if (pixiSummary && pixiSummary.phaseDiagnostics && pixiSummary.phaseDiagnostics.lastPhase) reasons.push('lastPhase=' + String(pixiSummary.phaseDiagnostics.lastPhase));
+    return reasons.join('; ');
+  }
+
+  function assertPixiStaticWorldDrawsOrThrow(deps, diagnostics, pixiSummary) {
+    if (!diagnostics || diagnostics.isPixiBackendActive !== true) return;
+    if (Number(diagnostics.staticWorldFacePacketCount || 0) <= 0) return;
+    if (diagnostics.pixiStaticWorldBeginFrameOk === true && diagnostics.pixiDrawsStaticWorldPackets === true) return;
+
+    var reason = buildPixiStaticWorldHardFailReason(diagnostics, pixiSummary);
+    var payload = {
+      step: STEP,
+      source: 'canvas2d-renderable-order-draw.assertPixiStaticWorldDrawsOrThrow',
+      hardFail: true,
+      reason: reason,
+      framePlanId: diagnostics.framePlanId || null,
+      activeRendererBackend: diagnostics.activeRendererBackend || getActiveRendererBackend(),
+      renderableCount: Number(diagnostics.renderableCount || 0),
+      staticWorldFacePacketCount: Number(diagnostics.staticWorldFacePacketCount || 0),
+      pixiStaticWorldConsumerExists: diagnostics.pixiStaticWorldConsumerExists === true,
+      pixiStaticWorldBeginFrameWallMs: Number(diagnostics.pixiStaticWorldBeginFrameWallMs || 0),
+      pixiStaticWorldBeginFrameReturnedSummary: diagnostics.pixiStaticWorldBeginFrameReturnedSummary === true,
+      pixiStaticWorldBeginFrameOk: diagnostics.pixiStaticWorldBeginFrameOk === true,
+      pixiDrawsStaticWorldPackets: diagnostics.pixiDrawsStaticWorldPackets === true,
+      pixiStaticWorldFallbackReason: diagnostics.pixiStaticWorldFallbackReason || '',
+      pixiStaticWorldSummarySource: diagnostics.pixiStaticWorldSummarySource || '',
+      pixiStaticWorldBeginFramePhaseDiagnostics: diagnostics.pixiStaticWorldBeginFramePhaseDiagnostics || null,
+      pixiStaticWorldSummary: pixiSummary || null
+    };
+    try {
+      if (deps && typeof deps.emitRendererProfile === 'function') {
+        deps.emitRendererProfile('PIXI-STATIC-WORLD-HARD-FAIL', payload);
+      }
+    } catch (_) {}
+    try {
+      window.__LAST_PIXI_STATIC_WORLD_HARD_FAIL__ = payload;
+    } catch (_) {}
+    throw new Error('[PXM][Pixi strict mode] Static world is not rendered by Pixi in pixi backend. ' + reason);
+  }
+
+  function maybeEmitLargeSceneFrameplanDiagnostics(deps, diagnostics) {
+    if (!diagnostics) return;
+    try {
+      var slowPixiBegin = Number(diagnostics.pixiStaticWorldBeginFrameWallMs || 0) >= 16;
+      var largeStatic = Number(diagnostics.staticWorldFacePacketCount || 0) >= 1024;
+      var rejected = diagnostics.pixiConsumerMissingOrRejectedCandidate === true;
+      var signature = [
+        diagnostics.framePlanId || 'none',
+        diagnostics.renderableCount || 0,
+        diagnostics.staticWorldFacePacketCount || 0,
+        diagnostics.pixiDrawsStaticWorldPackets ? 1 : 0,
+        Math.floor(Number(diagnostics.pixiStaticWorldBeginFrameWallMs || 0) / 16)
+      ].join('|');
+      var shouldEmit = true;
+      if (deps && typeof deps.shouldEmitProfile === 'function') {
+        shouldEmit = deps.shouldEmitProfile('largeSceneFrameplanDiagnostics', signature, largeStatic || slowPixiBegin || rejected ? 250 : 1500, { slow: slowPixiBegin || rejected });
+      }
+      if (shouldEmit && deps && typeof deps.emitRendererProfile === 'function') {
+        deps.emitRendererProfile('LARGE-SCENE-FRAMEPLAN-DIAGNOSTICS', diagnostics);
+      }
+    } catch (_) {}
   }
 
   function shouldSkipStaticPacketRunForPixiVisualAdoption(staticPackets, meta, runStartIndex) {
@@ -268,6 +467,7 @@
   function shouldSkipDynamicRenderableForPixiVisualAdoption(renderable, meta) {
     try {
       if (renderable && (renderable.id === 'player-avatar' || renderable.kind === 'player-avatar')) {
+        if (!(meta && meta.__pixiStaticWorldFrameOk === true)) return false;
         var playerConsumer = window.__SHARED_RENDER_OPTIMIZATION_PIXI_PLAYER_CONSUMER__ || null;
         if (playerConsumer && typeof playerConsumer.shouldSkipCanvas2dPlayerAvatar === 'function') {
           return playerConsumer.shouldSkipCanvas2dPlayerAvatar(renderable, meta || {}) === true;
@@ -284,6 +484,7 @@
   }
 
   function drawStaticPacketRun(deps, stats, staticPackets, meta, runStartIndex) {
+    var staticRunStartAt = nowMs(deps);
     noteCanvas2dSharedOptimizationUse('static-packet-run-cache', {
       stage: 'drawStaticPacketRun.start',
       canvas2dConsumerPath: 'shared-static-packet-run-source-plus-renderer-neutral-packet-consumer',
@@ -293,7 +494,16 @@
         runStartIndex: runStartIndex
       }
     });
-    if (shouldSkipStaticPacketRunForPixiVisualAdoption(staticPackets, meta, runStartIndex)) {
+    stats.staticRunCount += 1;
+    if (Array.isArray(staticPackets) && staticPackets.length > stats.largestStaticRunPacketCount) stats.largestStaticRunPacketCount = staticPackets.length;
+    var skipCheckStartAt = nowMs(deps);
+    var skipForPixi = shouldSkipStaticPacketRunForPixiVisualAdoption(staticPackets, meta, runStartIndex);
+    stats.staticPacketSkipCheckMs += Math.max(0, nowMs(deps) - skipCheckStartAt);
+    stats.staticPacketSkipCheckCount += 1;
+    if (skipForPixi) {
+      stats.staticPacketAdoptedRunCount += 1;
+      stats.staticPacketSkippedByPixiCount += Array.isArray(staticPackets) ? staticPackets.length : 0;
+      stats.staticPacketDrawLoopMs += Math.max(0, nowMs(deps) - staticRunStartAt);
       trackSlowRenderable(stats, {
         index: runStartIndex,
         id: staticPackets.length ? (staticPackets[0].id || null) : null,
@@ -302,7 +512,8 @@
       });
       return;
     }
-    var staticRunStartAt = nowMs(deps);
+    stats.staticPacketCanvasFallbackRunCount += 1;
+    stats.staticPacketCanvasFallbackPacketCount += Array.isArray(staticPackets) ? staticPackets.length : 0;
     var staticRunStats = createStaticRunStats();
     var usedBitmapRun = false;
     if (staticPackets.length >= 24 && deps && typeof deps.drawStaticPacketRunBitmap === 'function') {
@@ -453,6 +664,14 @@
       canvasStrokeRectCount: Number(canvasTiming.strokeRectCount || 0),
       canvasClearRectMs: safeFixed(deps, canvasTiming.clearRectMs),
       canvasClearRectCount: Number(canvasTiming.clearRectCount || 0),
+      staticRunCount: Number(stats.staticRunCount || 0),
+      largestStaticRunPacketCount: Number(stats.largestStaticRunPacketCount || 0),
+      staticPacketSkipCheckMs: safeFixed(deps, stats.staticPacketSkipCheckMs),
+      staticPacketSkipCheckCount: Number(stats.staticPacketSkipCheckCount || 0),
+      staticPacketAdoptedRunCount: Number(stats.staticPacketAdoptedRunCount || 0),
+      staticPacketSkippedByPixiCount: Number(stats.staticPacketSkippedByPixiCount || 0),
+      staticPacketCanvasFallbackRunCount: Number(stats.staticPacketCanvasFallbackRunCount || 0),
+      staticPacketCanvasFallbackPacketCount: Number(stats.staticPacketCanvasFallbackPacketCount || 0),
       topSlowRenderables: stats.topSlowRenderables.slice(0),
       staticPacketKindCounts: stats.staticPacketKindCounts,
       dynamicKindCounts: stats.dynamicKindCounts,
@@ -477,6 +696,79 @@
     if (deps && typeof deps.shouldEmitProfile === 'function' && deps.shouldEmitProfile('drawLoopBreakdown', signature, 250)) {
       if (typeof deps.emitRendererProfile === 'function') deps.emitRendererProfile('DRAW-LOOP-BREAKDOWN', loopBreakdown);
     }
+  }
+
+  function emitPixiResidualCanvas2dForensics(adapterApi, deps, loopBreakdown) {
+    if (!isPixiBackendActive()) return;
+    loopBreakdown = loopBreakdown || {};
+    var pixiSummary = loopBreakdown.pixiStaticWorldPacketSummary || null;
+    if (!pixiSummary) {
+      try {
+        var consumer = getPixiStaticWorldPacketConsumer();
+        if (consumer && typeof consumer.getLastSummary === 'function') pixiSummary = consumer.getLastSummary() || null;
+      } catch (_) {}
+    }
+    var staticFallbackPacketCount = Number(loopBreakdown.staticPacketCanvasFallbackPacketCount || 0);
+    var dynamicCount = Number(loopBreakdown.dynamicRenderableCount || 0);
+    var drawMs = Number(loopBreakdown.drawRenderableOrderMs || 0);
+    var residualVerdict = 'mostly-static-skipped';
+    if (staticFallbackPacketCount > 0) residualVerdict = 'static-still-on-canvas2d';
+    else if (dynamicCount > 0) residualVerdict = 'dynamic-player-hud-left-on-canvas2d';
+    if (pixiSummary && pixiSummary.ok !== true) residualVerdict = 'pixi-static-world-not-adopted';
+    var payload = {
+      source: 'canvas2d-residual-forensics-under-pixi',
+      step: STEP,
+      framePlanId: loopBreakdown.framePlanId || '',
+      renderableCount: Number(loopBreakdown.renderableCount || 0),
+      staticPacketCount: Number(loopBreakdown.staticPacketCount || 0),
+      dynamicRenderableCount: dynamicCount,
+      drawRenderableOrderMs: safeFixed(deps, drawMs),
+      dynamicRenderableDrawLoopMs: safeFixed(deps, loopBreakdown.dynamicRenderableDrawLoopMs || 0),
+      staticPacketDrawLoopMs: safeFixed(deps, loopBreakdown.staticPacketDrawLoopMs || 0),
+      staticPacketSkippedByPixiCount: Number(loopBreakdown.staticPacketSkippedByPixiCount || 0),
+      staticPacketCanvasFallbackRunCount: Number(loopBreakdown.staticPacketCanvasFallbackRunCount || 0),
+      staticPacketCanvasFallbackPacketCount: staticFallbackPacketCount,
+      canvasDrawImageMs: safeFixed(deps, loopBreakdown.canvasDrawImageMs || 0),
+      canvasDrawImageCount: Number(loopBreakdown.canvasDrawImageCount || 0),
+      canvasFillMs: safeFixed(deps, loopBreakdown.canvasFillMs || 0),
+      canvasFillCount: Number(loopBreakdown.canvasFillCount || 0),
+      canvasStrokeMs: safeFixed(deps, loopBreakdown.canvasStrokeMs || 0),
+      canvasStrokeCount: Number(loopBreakdown.canvasStrokeCount || 0),
+      canvasLineToMs: safeFixed(deps, loopBreakdown.canvasLineToMs || 0),
+      canvasLineToCount: Number(loopBreakdown.canvasLineToCount || 0),
+      pixiStaticWorldBeginFrameWallMs: safeFixed(deps, loopBreakdown.pixiStaticWorldBeginFrameWallMs || 0),
+      pixiStaticWorldBeginFrameOk: loopBreakdown.pixiStaticWorldBeginFrameOk === true,
+      pixiDrawsStaticWorldPackets: loopBreakdown.pixiDrawsStaticWorldPackets === true,
+      pixiStaticWorldFallbackReason: loopBreakdown.pixiStaticWorldFallbackReason || '',
+      pixiStaticWorldActualDrawUnitCount: loopBreakdown.pixiStaticWorldActualDrawUnitCount,
+      pixiStaticWorldActualCacheSpriteDrawCount: loopBreakdown.pixiStaticWorldActualCacheSpriteDrawCount,
+      pixiStaticWorldActualGraphicsPacketDrawCount: loopBreakdown.pixiStaticWorldActualGraphicsPacketDrawCount,
+      pixiChunkRenderTextureHitRate: pixiSummary && pixiSummary.chunkRenderTextureHitRate != null ? Number(pixiSummary.chunkRenderTextureHitRate) : null,
+      pixiChunkRenderTextureMissCount: pixiSummary && pixiSummary.chunkRenderTextureMissCount != null ? Number(pixiSummary.chunkRenderTextureMissCount) : null,
+      pixiChunkRenderTextureUploadCount: pixiSummary && pixiSummary.chunkRenderTextureUploadCount != null ? Number(pixiSummary.chunkRenderTextureUploadCount) : null,
+      pixiStaticPacketItemCacheHitRate: pixiSummary && pixiSummary.staticPacketItemCacheHitRate != null ? Number(pixiSummary.staticPacketItemCacheHitRate) : null,
+      pixiStaticChunkDrawDataCacheHitRate: pixiSummary && pixiSummary.staticChunkDrawDataCacheHitRate != null ? Number(pixiSummary.staticChunkDrawDataCacheHitRate) : null,
+      residualWorkVerdict: residualVerdict,
+      residualCanvas2dStillHeavy: drawMs >= 8 || dynamicCount > 128 || staticFallbackPacketCount > 0
+    };
+    var signature = [
+      payload.framePlanId,
+      Math.floor(Number(payload.drawRenderableOrderMs || 0) / 4),
+      payload.staticPacketCanvasFallbackPacketCount,
+      payload.dynamicRenderableCount,
+      payload.residualWorkVerdict,
+      payload.pixiChunkRenderTextureMissCount
+    ].join('|');
+    var t = nowMs(deps);
+    var force = payload.residualCanvas2dStillHeavy || staticFallbackPacketCount > 0 || Number(loopBreakdown.pixiStaticWorldBeginFrameWallMs || 0) >= 8;
+    if (!force && signature === lastResidualCanvas2dForensicsSignature && (t - Number(lastResidualCanvas2dForensicsEmitAt || 0)) < 1200) return;
+    lastResidualCanvas2dForensicsSignature = signature;
+    lastResidualCanvas2dForensicsEmitAt = t;
+    try {
+      if (adapterApi) adapterApi.__lastPixiResidualCanvas2dForensics = payload;
+      if (deps && typeof deps.emitRendererProfile === 'function') deps.emitRendererProfile('PIXI-RESIDUAL-CANVAS2D-FORENSICS', payload);
+      else if (window.console && typeof window.console.log === 'function') window.console.log('[pixi-migration][step=' + STEP + '][PIXI-RESIDUAL-CANVAS2D-FORENSICS]', payload);
+    } catch (_) {}
   }
 
   function publishFrameDrawStats(deps, order, stats, drawMs) {
@@ -522,7 +814,13 @@
     meta = meta || {};
     order = Array.isArray(order) ? order : [];
     var seenDrawHits = Object.create(null);
+    var pixiStaticBeginFrameStartAt = nowMs(deps);
     var pixiStaticWorldPacketSummary = beginPixiStaticWorldPacketFrame(order, meta, deps);
+    meta.__pixiStaticWorldFrameOk = !!(pixiStaticWorldPacketSummary && pixiStaticWorldPacketSummary.ok === true && pixiStaticWorldPacketSummary.pixiDrawsStaticWorldPackets === true);
+    var pixiStaticWorldBeginFrameWallMs = Math.max(0, nowMs(deps) - pixiStaticBeginFrameStartAt);
+    var largeSceneFrameplanDiagnostics = buildLargeSceneFrameplanDiagnostics(order, meta, deps, pixiStaticWorldPacketSummary, pixiStaticWorldBeginFrameWallMs);
+    maybeEmitLargeSceneFrameplanDiagnostics(deps, largeSceneFrameplanDiagnostics);
+    assertPixiStaticWorldDrawsOrThrow(deps, largeSceneFrameplanDiagnostics, pixiStaticWorldPacketSummary);
     var drawStartAt = nowMs(deps);
     var stats = createDrawStats();
     var canvasTiming = createCanvasTiming();
@@ -565,7 +863,17 @@
       var drawMsRaw = Math.max(0, nowMs(deps) - drawStartAt);
       var drawMs = safeFixed(deps, drawMsRaw);
       var loopBreakdown = buildLoopBreakdown(deps, order, meta, stats, canvasTiming, drawMs);
+      loopBreakdown.step = 'PXM-07.18K0G-optimization-placement-audit';
       loopBreakdown.pixiStaticWorldPacketSummary = pixiStaticWorldPacketSummary || null;
+      loopBreakdown.pixiStaticWorldBeginFrameWallMs = safeFixed(deps, pixiStaticWorldBeginFrameWallMs);
+      loopBreakdown.pixiStaticWorldBeginFrameOk = !!(pixiStaticWorldPacketSummary && pixiStaticWorldPacketSummary.ok === true);
+      loopBreakdown.pixiDrawsStaticWorldPackets = !!(pixiStaticWorldPacketSummary && pixiStaticWorldPacketSummary.pixiDrawsStaticWorldPackets === true);
+      loopBreakdown.pixiStaticWorldFrameOkForPlayerAdoption = meta.__pixiStaticWorldFrameOk === true;
+      loopBreakdown.pixiStaticWorldFallbackReason = pixiStaticWorldPacketSummary && pixiStaticWorldPacketSummary.fallbackReason ? String(pixiStaticWorldPacketSummary.fallbackReason) : '';
+      loopBreakdown.pixiStaticWorldActualDrawUnitCount = pixiStaticWorldPacketSummary && pixiStaticWorldPacketSummary.actualDrawUnitCount != null ? Number(pixiStaticWorldPacketSummary.actualDrawUnitCount) : null;
+      loopBreakdown.pixiStaticWorldActualCacheSpriteDrawCount = pixiStaticWorldPacketSummary && pixiStaticWorldPacketSummary.actualCacheSpriteDrawCount != null ? Number(pixiStaticWorldPacketSummary.actualCacheSpriteDrawCount) : null;
+      loopBreakdown.pixiStaticWorldActualGraphicsPacketDrawCount = pixiStaticWorldPacketSummary && pixiStaticWorldPacketSummary.actualGraphicsPacketDrawCount != null ? Number(pixiStaticWorldPacketSummary.actualGraphicsPacketDrawCount) : null;
+      loopBreakdown.largeSceneFrameplanDiagnostics = largeSceneFrameplanDiagnostics || null;
       noteCanvas2dSharedOptimizationUse('projected-geometry-cache', {
         stage: 'drawRenderableOrder.after-loop',
         canvas2dConsumerPath: 'shared-projected-geometry-source-plus-existing-canvas2d-path2d-consumer',
@@ -602,6 +910,7 @@
         }
       });
       emitDrawLoopBreakdown(adapterApi, deps, loopBreakdown);
+      emitPixiResidualCanvas2dForensics(adapterApi, deps, loopBreakdown);
       publishFrameDrawStats(deps, order, stats, drawMs);
       return order;
     } finally {

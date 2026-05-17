@@ -168,6 +168,60 @@
     ].join('|');
   }
 
+
+  function getTerrainTopNeighborHeightRelation(cell, direction, occupancyReader) {
+    var safeCell = cell && typeof cell === 'object' ? cell : null;
+    if (!safeCell) return 'none';
+    var dir = String(direction || '');
+    var x = Math.round(Number(safeCell.x || 0));
+    var y = Math.round(Number(safeCell.y || 0));
+    var z = Math.round(Number(safeCell.z || 0));
+    var dx = 0;
+    var dy = 0;
+    if (dir === 'east') dx = 1;
+    else if (dir === 'west') dx = -1;
+    else if (dir === 'south') dy = 1;
+    else if (dir === 'north') dy = -1;
+    else return 'none';
+    var nx = x + dx;
+    var ny = y + dy;
+    // A higher neighbor is the important step-wall boundary case: the neighbor
+    // column contains a block above this top plane, so this top cell must not be
+    // blindly merged across that edge in the future boundary-aware mesher.
+    if (occupancyReaderHasSolid(occupancyReader, nx, ny, z + 1)) return 'higher-neighbor';
+    if (occupancyReaderHasSolid(occupancyReader, nx, ny, z)) {
+      return !occupancyReaderHasSolid(occupancyReader, nx, ny, z + 1) ? 'same-height' : 'higher-neighbor';
+    }
+    if (occupancyReaderHasSolid(occupancyReader, nx, ny, z - 1)) return 'lower-neighbor';
+    // Keep the scan shallow and deterministic.  This is diagnostic metadata,
+    // not a new renderer path; deeper terrain columns can be handled by the
+    // follow-up active meshing step if needed.
+    if (occupancyReaderHasSolid(occupancyReader, nx, ny, z - 2)) return 'lower-neighbor';
+    return 'empty';
+  }
+
+  function getTerrainTopStepBoundaryRelations(cell, occupancyReader) {
+    return {
+      north: getTerrainTopNeighborHeightRelation(cell, 'north', occupancyReader),
+      east: getTerrainTopNeighborHeightRelation(cell, 'east', occupancyReader),
+      south: getTerrainTopNeighborHeightRelation(cell, 'south', occupancyReader),
+      west: getTerrainTopNeighborHeightRelation(cell, 'west', occupancyReader)
+    };
+  }
+
+  function getTerrainTopStepBoundarySignature(cell, occupancyReader) {
+    var safeCell = cell && typeof cell === 'object' ? cell : null;
+    if (!safeCell) return null;
+    var rel = getTerrainTopStepBoundaryRelations(safeCell, occupancyReader);
+    return [
+      'top-step-boundary',
+      'N:' + String(rel.north || 'none'),
+      'E:' + String(rel.east || 'none'),
+      'S:' + String(rel.south || 'none'),
+      'W:' + String(rel.west || 'none')
+    ].join('|');
+  }
+
   function worldPointFromMergeUV(semanticFace, plane, u, v) {
     var face = String(semanticFace || 'top');
     var p = Number(plane || 0);
@@ -298,6 +352,9 @@
     occupancyReaderHasSolid: occupancyReaderHasSolid,
     getTerrainSideTangentNeighbor: getTerrainSideTangentNeighbor,
     getTerrainSideStepBreakSignature: getTerrainSideStepBreakSignature,
+    getTerrainTopNeighborHeightRelation: getTerrainTopNeighborHeightRelation,
+    getTerrainTopStepBoundaryRelations: getTerrainTopStepBoundaryRelations,
+    getTerrainTopStepBoundarySignature: getTerrainTopStepBoundarySignature,
     worldPointFromMergeUV: worldPointFromMergeUV,
     buildTerrainPolygonLoopSignature: buildTerrainPolygonLoopSignature,
     buildTerrainTopBoundarySegmentsWorldFromDescriptor: buildTerrainTopBoundarySegmentsWorldFromDescriptor,

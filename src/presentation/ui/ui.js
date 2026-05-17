@@ -959,6 +959,61 @@ function uiHandleTerrainReset(source) {
   return result;
 }
 
+function getUiPlacementCoreApi() {
+  try {
+    if (window.__APP_NAMESPACE && typeof window.__APP_NAMESPACE.getPath === 'function') {
+      var api = window.__APP_NAMESPACE.getPath('application.placementCore');
+      if (api) return api;
+    }
+  } catch (_) {}
+  try { return window.__PLACEMENT_CORE_API__ || null; } catch (_) { return null; }
+}
+
+function uiGetTerrainBlockPlacementShapeId() {
+  try {
+    if (ui && ui.terrainPlaceBlockShape && ui.terrainPlaceBlockShape.value) return String(ui.terrainPlaceBlockShape.value);
+  } catch (_) {}
+  return 'cube_1x1';
+}
+
+function uiHandleTerrainBlockPlacement(active, source) {
+  var placementCore = getUiPlacementCoreApi();
+  var result = null;
+  if (placementCore && active && typeof placementCore.enterTerrainBlockPlacement === 'function') {
+    result = placementCore.enterTerrainBlockPlacement({ source: source || 'ui.terrainPlaceBlock.click', prefabId: uiGetTerrainBlockPlacementShapeId() });
+  } else if (placementCore && !active && typeof placementCore.exitTerrainBlockPlacement === 'function') {
+    result = placementCore.exitTerrainBlockPlacement({ source: source || 'ui.terrainPlaceBlockOff.click' });
+  } else {
+    result = { ok: false, reason: 'missing-placement-core-terrain-block-api', active: !!active };
+    if (typeof pushLog === 'function') pushLog('[manual-terrain-place] missing placement core terrain block API');
+  }
+  try { if (ui.terrainPlaceBlockStatus && result && result.message) ui.terrainPlaceBlockStatus.textContent = result.message; } catch (_) {}
+  if (typeof updateModeButtons === 'function') updateModeButtons();
+  if (typeof updatePreview === 'function') updatePreview();
+  return result;
+}
+
+
+function uiHandleTerrainFaceMergeStressPreset(presetId, source) {
+  var placementCore = getUiPlacementCoreApi();
+  var result = null;
+  if (placementCore && typeof placementCore.addManualTerrainFaceMergeStressPreset === 'function') {
+    result = placementCore.addManualTerrainFaceMergeStressPreset(presetId, { source: source || 'ui.terrainFaceMergeStress.click' });
+  } else {
+    result = { ok: false, reason: 'missing-placement-core-face-merge-stress-api', presetId: String(presetId || '') };
+    if (typeof pushLog === 'function') pushLog('[manual-terrain-face-merge-stress] missing placement core API');
+  }
+  try {
+    if (ui.terrainPlaceBlockStatus && result) {
+      ui.terrainPlaceBlockStatus.textContent = result.ok
+        ? ('已生成 face-merge 地形测试：' + String(result.presetLabel || result.presetId || presetId) + '，数量=' + String(result.createdCount || 0))
+        : ('生成 face-merge 地形测试失败：' + String(result.reason || 'unknown'));
+    }
+  } catch (_) {}
+  if (typeof updatePreview === 'function') updatePreview();
+  return result;
+}
+
 safeListen(ui.applyWorld, 'click', applyWorldToNewScene);
 safeListen(ui.modeView, 'click', () => uiHandleModeButton('view', 'ui.modeView.click'));
 safeListen(ui.modePlace, 'click', () => uiHandleModeButton('place', 'ui.modePlace.click'));
@@ -998,6 +1053,18 @@ if (typeof document !== 'undefined' && document.querySelectorAll) {
 safeListen(ui.terrainGenerate, 'click', () => uiHandleTerrainGenerate('terrain-panel:generate'));
 safeListen(ui.terrainClear, 'click', () => uiHandleTerrainClear('terrain-panel:clear'));
 safeListen(ui.terrainResetParams, 'click', () => uiHandleTerrainReset('terrain-panel:reset'));
+safeListen(ui.terrainPlaceBlock, 'click', () => uiHandleTerrainBlockPlacement(true, 'ui.terrainPlaceBlock.click'));
+safeListen(ui.terrainPlaceBlockShape, 'change', () => {
+  var placementCore = getUiPlacementCoreApi();
+  var active = false;
+  try { active = !!(placementCore && typeof placementCore.isTerrainBlockPlacementActive === 'function' && placementCore.isTerrainBlockPlacementActive()); } catch (_) {}
+  if (active) uiHandleTerrainBlockPlacement(true, 'ui.terrainPlaceBlockShape.change');
+});
+safeListen(ui.terrainPlaceBlockOff, 'click', () => uiHandleTerrainBlockPlacement(false, 'ui.terrainPlaceBlockOff.click'));
+safeListen(ui.terrainAddFaceMergeColumnRow, 'click', () => uiHandleTerrainFaceMergeStressPreset('side_merged_column_row', 'ui.terrainAddFaceMergeColumnRow.click'));
+safeListen(ui.terrainAddFaceMergeStepCluster, 'click', () => uiHandleTerrainFaceMergeStressPreset('step_adjacent_column_cluster', 'ui.terrainAddFaceMergeStepCluster.click'));
+safeListen(ui.terrainAddFaceMergeColumnBlock, 'click', () => uiHandleTerrainFaceMergeStressPreset('side_merged_column_block', 'ui.terrainAddFaceMergeColumnBlock.click'));
+safeListen(ui.terrainAddFaceMergeLWall, 'click', () => uiHandleTerrainFaceMergeStressPreset('l_shaped_column_wall', 'ui.terrainAddFaceMergeLWall.click'));
 safeListen(ui.terrainMapToggle, 'click', () => uiHandleTerrainMapToggle('terrain-panel:map-toggle'));
 safeListen(ui.terrainMapRefresh, 'click', () => uiRenderTerrainMapWindow('terrain-panel:map-refresh'));
 safeListen(ui.terrainMapClose, 'click', () => uiHandleTerrainMapClose('terrain-panel:map-close'));
@@ -1020,6 +1087,10 @@ safeListen(ui.selectedRotateLeft, 'click', () => uiHandleSelectedFacingRotate(-1
 safeListen(ui.selectedRotateRight, 'click', () => uiHandleSelectedFacingRotate(1, 'ui.selectedRotateRight.click'));
 safeListen(ui.showItemFacingDebug, 'change', () => { if (typeof refreshInspectorPanels === 'function') refreshInspectorPanels(); });
 safeListen(ui.prefabSelect, 'change', () => {
+  var placementCoreForTerrainBlock = getUiPlacementCoreApi();
+  if (placementCoreForTerrainBlock && typeof placementCoreForTerrainBlock.isTerrainBlockPlacementActive === 'function' && placementCoreForTerrainBlock.isTerrainBlockPlacementActive()) {
+    placementCoreForTerrainBlock.exitTerrainBlockPlacement({ source: 'ui.prefabSelect.change' });
+  }
   var placementController = getUiPlacementController();
   var registryApi = (window.App && window.App.state && window.App.state.prefabRegistry) ? window.App.state.prefabRegistry : null;
   var nextIndex = clamp(parseInt(ui.prefabSelect.value || '0', 10), 0, prototypes.length - 1);

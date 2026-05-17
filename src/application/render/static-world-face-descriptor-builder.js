@@ -6,7 +6,7 @@
   'use strict';
 
   var OWNER = 'src/application/render/static-world-face-descriptor-builder.js';
-  var PHASE = 'P12C-STATIC-WORLD-FACE-DESCRIPTOR-BUILDER';
+  var PHASE = 'P12D-STATIC-WORLD-FACE-DESCRIPTOR-BUILDER-TOP-BOUNDARY-DIAGNOSTICS';
   var FACE_TIE_PRIORITY = { lowerRight: 1, lowerLeft: 2, top: 3, east: 1, south: 2, north: 0, west: 0 };
 
   function noop() {}
@@ -29,6 +29,66 @@
     if (Array.isArray(entry && entry.visibleFaces) && entry.visibleFaces.length) return entry.visibleFaces.slice();
     return ['top', 'east', 'south'];
   }
+
+  function getItemFacingCoreApiForStaticFaceVisibility() {
+    try {
+      if (global && global.App && global.App.domain && global.App.domain.itemFacingCore) return global.App.domain.itemFacingCore;
+    } catch (_) {}
+    try { if (global && global.__ITEM_FACING_CORE__) return global.__ITEM_FACING_CORE__; } catch (_) {}
+    return null;
+  }
+
+  function isTerrainGeneratedCell(cell) {
+    return !!(cell && cell.generatedBy === 'terrain-generator');
+  }
+
+  function getCellItemFacing(cell) {
+    if (cell && cell.rotation != null) return Number(cell.rotation || 0) || 0;
+    if (cell && cell.itemRotation != null) return Number(cell.itemRotation || 0) || 0;
+    if (cell && cell.facing != null) return Number(cell.facing || 0) || 0;
+    return 0;
+  }
+
+  function resolveCameraVisibleSemanticFaceSet(cell, currentViewRotation) {
+    // Camera-facing visibility is renderer-neutral and must be applied before
+    // both regular static objects and terrain face-merge candidates emit
+    // descriptors.  Terrain still owns its boundary/exposure rules, but exposed
+    // side faces that are not camera-visible for the current viewRotation must
+    // not enter merge/render packets, otherwise face merge bakes hidden sides
+    // into visible terrain slabs.
+    var facingApi = getItemFacingCoreApiForStaticFaceVisibility();
+    if (!facingApi || typeof facingApi.getVisibleSemanticFaceMapping !== 'function') return null;
+    var mapping = null;
+    try {
+      mapping = facingApi.getVisibleSemanticFaceMapping({
+        itemFacing: getCellItemFacing(cell),
+        viewRotation: currentViewRotation
+      });
+    } catch (_) { mapping = null; }
+    var visible = mapping && Array.isArray(mapping.visibleFaces) ? mapping.visibleFaces : null;
+    if (!visible || !visible.length) return null;
+    var set = Object.create(null);
+    for (var i = 0; i < visible.length; i++) set[String(visible[i])] = true;
+    return set;
+  }
+
+  function filterVisibleFacesForCamera(cell, visibleFaces, currentViewRotation, stats) {
+    var list = Array.isArray(visibleFaces) ? visibleFaces.slice() : [];
+    var cameraVisible = resolveCameraVisibleSemanticFaceSet(cell, currentViewRotation);
+    if (!cameraVisible) return list;
+    var out = [];
+    for (var i = 0; i < list.length; i++) {
+      var face = String(list[i] || 'top');
+      if (cameraVisible[face]) out.push(face);
+      else if (stats) stats.cameraHiddenFaceSkippedCount = Number(stats.cameraHiddenFaceSkippedCount || 0) + 1;
+    }
+    if (stats) {
+      stats.cameraFaceFilterAppliedCount = Number(stats.cameraFaceFilterAppliedCount || 0) + 1;
+      if (out.length !== list.length) stats.cameraFaceFilterChangedCellCount = Number(stats.cameraFaceFilterChangedCellCount || 0) + 1;
+    }
+    return out;
+  }
+
   function buildFaceDescriptor(cell, semanticFace, depthKey, context, deps) {
     var getScreenFaceForSemanticFace = resolveFunction(deps, 'getScreenFaceForSemanticFace', function (face) { return String(face || 'top'); });
     var getSemanticFaceNormal = resolveFunction(deps, 'getSemanticFaceNormal', nullFn);
@@ -37,6 +97,7 @@
     var getTerrainSortBandKeyForRenderFace = resolveFunction(deps, 'getTerrainSortBandKeyForRenderFace', nullFn);
     var getTerrainSideEdgeVisibilitySignature = resolveFunction(deps, 'getTerrainSideEdgeVisibilitySignature', nullFn);
     var getTerrainSideStepBreakSignature = resolveFunction(deps, 'getTerrainSideStepBreakSignature', nullFn);
+    var getTerrainTopStepBoundarySignature = resolveFunction(deps, 'getTerrainTopStepBoundarySignature', nullFn);
     var getTerrainMaterialMergeKeyForRenderCell = resolveFunction(deps, 'getTerrainMaterialMergeKeyForRenderCell', nullFn);
     var getTerrainFaceMergeSignature = resolveFunction(deps, 'getTerrainFaceMergeSignature', nullFn);
     var getStaticWorldFaceMergeSignature = resolveFunction(deps, 'getStaticWorldFaceMergeSignature', nullFn);
@@ -59,6 +120,9 @@
     var isTerrainSide = !!(cell && cell.generatedBy === 'terrain-generator' && (semanticFace === 'east' || semanticFace === 'south'));
     var edgeVisibilitySignature = isTerrainSide ? getTerrainSideEdgeVisibilitySignature(context.visibleFaces || [], semanticFace) : null;
     var sideStepBreakSignature = isTerrainSide ? getTerrainSideStepBreakSignature(cell, semanticFace, chunkOcc) : null;
+    var topStepBoundarySignature = cell && cell.generatedBy === 'terrain-generator' && semanticFace === 'top'
+      ? getTerrainTopStepBoundarySignature(cell, chunkOcc)
+      : null;
     var isTerrainFaceMergeCandidate = !!(cell && cell.generatedBy === 'terrain-generator');
     var terrainMaterialMergeKey = getTerrainMaterialMergeKeyForRenderCell(cell);
     var terrainMergeSignature = isTerrainFaceMergeCandidate
@@ -92,6 +156,7 @@
       terrainSortBandKey: terrainSortBandKey,
       edgeVisibilitySignature: edgeVisibilitySignature,
       sideStepBreakSignature: sideStepBreakSignature,
+      topStepBoundarySignature: topStepBoundarySignature,
       isTerrainFaceMergeCandidate: isTerrainFaceMergeCandidate,
       memberCount: 1,
       merged: false
@@ -107,12 +172,25 @@
     var inputFaceDescriptorCount = 0;
     var step1PrepareFaceInputsMs = 0;
     var step5ComputeSortKeyMs = 0;
+    var faceVisibilityFilterStats = {
+      cameraFaceFilterAppliedCount: 0,
+      cameraFaceFilterChangedCellCount: 0,
+      cameraHiddenFaceSkippedCount: 0,
+      cameraTerrainFaceFilterAppliedCount: 0,
+      cameraTerrainHiddenFaceSkippedCount: 0
+    };
 
     for (var i = 0; i < surfaceCells.length; i++) {
       var entry = surfaceCells[i];
       var cell = entry && entry.box ? entry.box : entry;
       if (!cell) continue;
       var visibleFaces = normalizeVisibleFaces(entry);
+      var beforeCameraFilterFaceCount = visibleFaces.length;
+      visibleFaces = filterVisibleFacesForCamera(cell, visibleFaces, opts.currentViewRotation, faceVisibilityFilterStats);
+      if (isTerrainGeneratedCell(cell)) {
+        faceVisibilityFilterStats.cameraTerrainFaceFilterAppliedCount = Number(faceVisibilityFilterStats.cameraTerrainFaceFilterAppliedCount || 0) + 1;
+        faceVisibilityFilterStats.cameraTerrainHiddenFaceSkippedCount = Number(faceVisibilityFilterStats.cameraTerrainHiddenFaceSkippedCount || 0) + Math.max(0, beforeCameraFilterFaceCount - visibleFaces.length);
+      }
       for (var vf = 0; vf < visibleFaces.length; vf++) {
         scannedFaceCount += 1;
         var prepareFaceInputsStartAt = perfNow();
@@ -135,6 +213,11 @@
       faceDescriptors: faceDescriptors,
       scannedFaceCount: scannedFaceCount,
       inputFaceDescriptorCount: inputFaceDescriptorCount,
+      cameraFaceFilterAppliedCount: Number(faceVisibilityFilterStats.cameraFaceFilterAppliedCount || 0),
+      cameraFaceFilterChangedCellCount: Number(faceVisibilityFilterStats.cameraFaceFilterChangedCellCount || 0),
+      cameraHiddenFaceSkippedCount: Number(faceVisibilityFilterStats.cameraHiddenFaceSkippedCount || 0),
+      cameraTerrainFaceFilterAppliedCount: Number(faceVisibilityFilterStats.cameraTerrainFaceFilterAppliedCount || 0),
+      cameraTerrainHiddenFaceSkippedCount: Number(faceVisibilityFilterStats.cameraTerrainHiddenFaceSkippedCount || 0),
       step1PrepareFaceInputsMs: step1PrepareFaceInputsMs,
       step5ComputeSortKeyMs: step5ComputeSortKeyMs
     };

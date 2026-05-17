@@ -110,6 +110,8 @@
       getStaticWorldFaceMergeControlStateSnapshotForRender: resolveRenderFunctionDependency('getStaticWorldFaceMergeControlStateSnapshotForRender'),
       getSafeMainEditorViewRotation: resolveRenderFunctionDependency('getSafeMainEditorViewRotation'),
       normalizeMainEditorViewRotationValue: resolveRenderFunctionDependency('normalizeMainEditorViewRotationValue'),
+      resolveStaticPacketViewRotationForRender: resolveRenderFunctionDependency('resolveStaticPacketViewRotationForRender'),
+      getStaticPacketViewRotationDiagnosticsForRender: resolveRenderFunctionDependency('getStaticPacketViewRotationDiagnosticsForRender'),
       buildStaticWorldRenderSignature: resolveRenderFunctionDependency('buildStaticWorldRenderSignature'),
       getRenderVisibilityCoreApi: resolveRenderFunctionDependency('getRenderVisibilityCoreApi'),
       getMainCameraRenderScope: resolveRenderFunctionDependency('getMainCameraRenderScope'),

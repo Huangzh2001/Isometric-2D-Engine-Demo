@@ -34,6 +34,165 @@
     }
     return api;
   }
+
+  function safeJson(value) {
+    try { return JSON.stringify(value); } catch (_) { return 'null'; }
+  }
+
+  function emitStaticFaceRotationDiagnostic(section, payload) {
+    try {
+      var prefix = '[pixi-migration][step=PXM-07.14M][static-face-rotation-' + String(section || 'event') + ']';
+      var parts = [prefix];
+      payload = payload || {};
+      Object.keys(payload).forEach(function (key) {
+        var value = payload[key];
+        if (value && typeof value === 'object') value = safeJson(value);
+        parts.push(String(key) + '=' + String(value));
+      });
+      var line = parts.join(' ');
+      if (typeof global.logInfo === 'function') global.logInfo(line);
+      else if (typeof global.pushLog === 'function') global.pushLog(line);
+      else if (global.console && typeof global.console.log === 'function') global.console.log(line);
+    } catch (_) {}
+  }
+
+  function getItemFacingCoreApiForStaticRotationDiagnostics() {
+    try {
+      if (global && global.App && global.App.domain && global.App.domain.itemFacingCore) return global.App.domain.itemFacingCore;
+    } catch (_) {}
+    try { if (global && global.__ITEM_FACING_CORE__) return global.__ITEM_FACING_CORE__; } catch (_) {}
+    return null;
+  }
+
+  function inferWorldPlaneFromFacePoints(points) {
+    var pts = Array.isArray(points) ? points : [];
+    if (!pts.length) return 'empty';
+    var first = pts[0] || {};
+    var sameX = true;
+    var sameY = true;
+    var sameZ = true;
+    var eps = 1e-6;
+    for (var i = 1; i < pts.length; i++) {
+      var p = pts[i] || {};
+      if (Math.abs(Number(p.x || 0) - Number(first.x || 0)) > eps) sameX = false;
+      if (Math.abs(Number(p.y || 0) - Number(first.y || 0)) > eps) sameY = false;
+      if (Math.abs(Number(p.z || 0) - Number(first.z || 0)) > eps) sameZ = false;
+    }
+    if (sameZ) return 'z=' + String(Number(first.z || 0));
+    if (sameX) return 'x=' + String(Number(first.x || 0));
+    if (sameY) return 'y=' + String(Number(first.y || 0));
+    return 'non-planar-or-merged';
+  }
+
+  function signedArea2d(points) {
+    var pts = Array.isArray(points) ? points : [];
+    if (pts.length < 3) return 0;
+    var area = 0;
+    for (var i = 0; i < pts.length; i++) {
+      var a = pts[i] || {};
+      var b = pts[(i + 1) % pts.length] || {};
+      area += (Number(a.x || 0) * Number(b.y || 0)) - (Number(b.x || 0) * Number(a.y || 0));
+    }
+    return area * 0.5;
+  }
+
+  function summarizeCountsBy(items, getter) {
+    var out = Object.create(null);
+    var list = Array.isArray(items) ? items : [];
+    for (var i = 0; i < list.length; i++) {
+      var key = 'unknown';
+      try { key = String(getter(list[i]) || 'unknown'); } catch (_) {}
+      out[key] = Number(out[key] || 0) + 1;
+    }
+    return out;
+  }
+
+  function shouldEmitStaticFaceRotationDiagnostics(currentViewRotation) {
+    var rot = ((Math.round(Number(currentViewRotation || 0)) % 4) + 4) % 4;
+    if (rot === 2 || rot === 3) return true;
+    try { return global.localStorage && global.localStorage.getItem('pixiFaceRotationDiagnosticVerbose') === '1'; } catch (_) {}
+    return false;
+  }
+
+  function buildVisibleMappingForPacketRotation(packet, currentViewRotation) {
+    var facingApi = getItemFacingCoreApiForStaticRotationDiagnostics();
+    var itemFacing = Number(packet && packet.itemRotation != null ? packet.itemRotation : (packet && packet.box && packet.box.rotation != null ? packet.box.rotation : 0)) || 0;
+    if (facingApi && typeof facingApi.getVisibleSemanticFaceMapping === 'function') {
+      try { return facingApi.getVisibleSemanticFaceMapping({ itemFacing: itemFacing, viewRotation: currentViewRotation }); } catch (_) {}
+    }
+    return null;
+  }
+
+  function emitStaticFaceRotationPacketDiagnostics(args) {
+    var src = args && typeof args === 'object' ? args : {};
+    var packets = Array.isArray(src.packets) ? src.packets : [];
+    var currentViewRotation = Number(src.currentViewRotation || 0);
+    if (!packets.length || !shouldEmitStaticFaceRotationDiagnostics(currentViewRotation)) return;
+    var screenPointsFromWorldFaceNoCamera = src.screenPointsFromWorldFaceNoCamera;
+    var faceCountsBySemantic = summarizeCountsBy(packets, function (p) { return p.semanticFace; });
+    var faceCountsByScreen = summarizeCountsBy(packets, function (p) { return p.screenFace; });
+    var faceCountsByPlane = summarizeCountsBy(packets, function (p) { return inferWorldPlaneFromFacePoints(p.worldPts); });
+    var mergedCount = 0;
+    var areaNegativeCount = 0;
+    var areaPositiveCount = 0;
+    var areaZeroCount = 0;
+    var samples = [];
+    var sampleLimit = 12;
+    for (var i = 0; i < packets.length; i++) {
+      var packet = packets[i] || {};
+      if (packet.mergedFace === true) mergedCount += 1;
+      var projected = [];
+      var area = 0;
+      var areaSign = 'n/a';
+      if (typeof screenPointsFromWorldFaceNoCamera === 'function') {
+        try { projected = screenPointsFromWorldFaceNoCamera(packet.worldPts || [], currentViewRotation) || []; } catch (_) { projected = []; }
+        area = signedArea2d(projected);
+        if (area > 1e-6) { areaSign = 'positive'; areaPositiveCount += 1; }
+        else if (area < -1e-6) { areaSign = 'negative'; areaNegativeCount += 1; }
+        else { areaSign = 'zero'; areaZeroCount += 1; }
+      }
+      if (samples.length < sampleLimit) {
+        var mapping = buildVisibleMappingForPacketRotation(packet, currentViewRotation);
+        samples.push({
+          id: packet.id || null,
+          chunkKey: packet.chunkKey || null,
+          instanceId: packet.instanceId || null,
+          prefabId: packet.prefabId || null,
+          itemRotation: packet.itemRotation != null ? Number(packet.itemRotation) : null,
+          viewRotation: currentViewRotation,
+          semanticFace: packet.semanticFace || null,
+          screenFace: packet.screenFace || null,
+          visibleFaces: mapping && Array.isArray(mapping.visibleFaces) ? mapping.visibleFaces.slice() : null,
+          screenFaces: mapping && mapping.visibleFacesByScreenPosition ? mapping.visibleFacesByScreenPosition : null,
+          effectiveFacing: mapping && mapping.effectiveFacing != null ? mapping.effectiveFacing : null,
+          mergedFace: packet.mergedFace === true,
+          mergedFaceCount: Number(packet.mergedFaceCount || 1),
+          cell: { x: Number(packet.cellX || 0), y: Number(packet.cellY || 0), z: Number(packet.cellZ || 0) },
+          actualWorldPlane: inferWorldPlaneFromFacePoints(packet.worldPts || []),
+          projectedAreaSign: areaSign,
+          projectedArea: Number(Number(area || 0).toFixed(3)),
+          fill: packet.fill || null,
+          stroke: packet.stroke || null
+        });
+      }
+    }
+    emitStaticFaceRotationDiagnostic('summary', {
+      chunkKey: src.chunkKey || null,
+      viewRotation: currentViewRotation,
+      packetCount: packets.length,
+      mergedPacketCount: mergedCount,
+      faceMergeMode: src.faceMergeMode || null,
+      faceCountsBySemantic: faceCountsBySemantic,
+      faceCountsByScreen: faceCountsByScreen,
+      faceCountsByPlane: faceCountsByPlane,
+      projectedAreaPositiveCount: areaPositiveCount,
+      projectedAreaNegativeCount: areaNegativeCount,
+      projectedAreaZeroCount: areaZeroCount,
+      sampleCount: samples.length,
+      samples: samples
+    });
+  }
+
   function requireStaticWorldPacketOrdering(deps) {
     var api = deps && deps.staticWorldPacketOrdering ? deps.staticWorldPacketOrdering : null;
     try { api = api || (global && (global.__STATIC_WORLD_PACKET_ORDERING__ || global.__APP_APPLICATION_STATIC_WORLD_PACKET_ORDERING__)); } catch (_) {}
@@ -41,6 +200,186 @@
       throw new Error('Missing static world packet ordering owner');
     }
     return api;
+  }
+
+
+  function emitTerrainMergeStackDiagnostic(section, payload) {
+    try {
+      var prefix = '[pixi-migration][step=PXM-07.14P][terrain-merge-stack-' + String(section || 'event') + ']';
+      var parts = [prefix];
+      payload = payload || {};
+      Object.keys(payload).forEach(function (key) {
+        var value = payload[key];
+        if (value && typeof value === 'object') value = safeJson(value);
+        parts.push(String(key) + '=' + String(value));
+      });
+      var line = parts.join(' ');
+      if (typeof global.logInfo === 'function') global.logInfo(line);
+      else if (typeof global.pushLog === 'function') global.pushLog(line);
+      else if (global.console && typeof global.console.log === 'function') global.console.log(line);
+    } catch (_) {}
+  }
+
+  function isTerrainStaticPacketForStackDiagnostics(packet) {
+    if (!packet || typeof packet !== 'object') return false;
+    if (packet.terrainMaterialId != null || packet.terrainMaterialLabel != null || packet.terrainMaterialMergeKey != null) return true;
+    var iid = String(packet.instanceId || '');
+    if (iid.indexOf('terrain-') === 0) return true;
+    var id = String(packet.id || '');
+    return id.indexOf('voxel-merge-terrain-') === 0 || (id.indexOf('voxel-') === 0 && iid.indexOf('terrain-') === 0);
+  }
+
+  function summarizePacketMembersForStackDiagnostics(packet) {
+    var members = Array.isArray(packet && packet.actorInteractionMemberDescriptors) && packet.actorInteractionMemberDescriptors.length
+      ? packet.actorInteractionMemberDescriptors
+      : [];
+    var baseX = Number(packet && packet.cellX || 0);
+    var baseY = Number(packet && packet.cellY || 0);
+    var baseZ = Number(packet && packet.cellZ || 0);
+    var out = {
+      memberCount: members.length || Number(packet && packet.mergedFaceCount || 1),
+      minX: baseX, maxX: baseX,
+      minY: baseY, maxY: baseY,
+      minZ: baseZ, maxZ: baseZ,
+      minSortKey: Number(packet && packet.sortKey || 0), maxSortKey: Number(packet && packet.sortKey || 0),
+      minTie: Number(packet && packet.tie || 0), maxTie: Number(packet && packet.tie || 0),
+      semanticFaceCounts: Object.create(null)
+    };
+    if (!members.length) {
+      out.semanticFaceCounts[String(packet && packet.semanticFace || 'unknown')] = 1;
+      out.xSpan = out.ySpan = out.zSpan = out.sortSpan = out.tieSpan = 0;
+      return out;
+    }
+    for (var i = 0; i < members.length; i++) {
+      var m = members[i] || {};
+      var cell = m.cell || m.box || {};
+      var x = Number(cell.x || 0), y = Number(cell.y || 0), z = Number(cell.z || 0);
+      var sk = Number(m.sortKey != null ? m.sortKey : (packet && packet.sortKey || 0));
+      var tie = Number(m.tie != null ? m.tie : (packet && packet.tie || 0));
+      if (i === 0) {
+        out.minX = out.maxX = x; out.minY = out.maxY = y; out.minZ = out.maxZ = z;
+        out.minSortKey = out.maxSortKey = sk; out.minTie = out.maxTie = tie;
+      } else {
+        out.minX = Math.min(out.minX, x); out.maxX = Math.max(out.maxX, x);
+        out.minY = Math.min(out.minY, y); out.maxY = Math.max(out.maxY, y);
+        out.minZ = Math.min(out.minZ, z); out.maxZ = Math.max(out.maxZ, z);
+        out.minSortKey = Math.min(out.minSortKey, sk); out.maxSortKey = Math.max(out.maxSortKey, sk);
+        out.minTie = Math.min(out.minTie, tie); out.maxTie = Math.max(out.maxTie, tie);
+      }
+      var sf = String(m.semanticFace || (packet && packet.semanticFace) || 'unknown');
+      out.semanticFaceCounts[sf] = Number(out.semanticFaceCounts[sf] || 0) + 1;
+    }
+    out.xSpan = Number((out.maxX - out.minX).toFixed(3));
+    out.ySpan = Number((out.maxY - out.minY).toFixed(3));
+    out.zSpan = Number((out.maxZ - out.minZ).toFixed(3));
+    out.sortSpan = Number((out.maxSortKey - out.minSortKey).toFixed(3));
+    out.tieSpan = Number((out.maxTie - out.minTie).toFixed(3));
+    return out;
+  }
+
+  function projectPacketBoundsForStackDiagnostics(packet, screenPointsFromWorldFaceNoCamera, currentViewRotation) {
+    var points = [];
+    try {
+      if (typeof screenPointsFromWorldFaceNoCamera === 'function') points = screenPointsFromWorldFaceNoCamera(packet && packet.worldPts || [], currentViewRotation) || [];
+    } catch (_) { points = []; }
+    if (!Array.isArray(points) || points.length <= 0) return { exists: false };
+    var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (var i = 0; i < points.length; i++) {
+      var pt = points[i] || {};
+      var x = Number(pt.x || 0), y = Number(pt.y || 0);
+      minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+    }
+    return { exists: true, minX: Number(minX.toFixed(3)), minY: Number(minY.toFixed(3)), maxX: Number(maxX.toFixed(3)), maxY: Number(maxY.toFixed(3)), width: Number(Math.max(0, maxX - minX).toFixed(3)), height: Number(Math.max(0, maxY - minY).toFixed(3)), centerX: Number(((minX + maxX) / 2).toFixed(3)), centerY: Number(((minY + maxY) / 2).toFixed(3)) };
+  }
+
+  function computeBoundsOverlapAreaForStackDiagnostics(a, b) {
+    if (!a || !b || a.exists === false || b.exists === false) return 0;
+    var ix = Math.max(0, Math.min(Number(a.maxX || 0), Number(b.maxX || 0)) - Math.max(Number(a.minX || 0), Number(b.minX || 0)));
+    var iy = Math.max(0, Math.min(Number(a.maxY || 0), Number(b.maxY || 0)) - Math.max(Number(a.minY || 0), Number(b.minY || 0)));
+    return ix * iy;
+  }
+
+  function emitTerrainMergeStackPacketDiagnostics(args) {
+    var src = args && typeof args === 'object' ? args : {};
+    var packets = Array.isArray(src.packets) ? src.packets : [];
+    var currentViewRotation = Number(src.currentViewRotation || 0);
+    var chunkKey = src.chunkKey || null;
+    var screenPointsFromWorldFaceNoCamera = src.screenPointsFromWorldFaceNoCamera;
+    if (!packets.length) return;
+    var terrain = [];
+    for (var i = 0; i < packets.length; i++) {
+      var p = packets[i] || {};
+      if (!isTerrainStaticPacketForStackDiagnostics(p)) continue;
+      terrain.push({ packet: p, orderIndex: i, bounds: projectPacketBoundsForStackDiagnostics(p, screenPointsFromWorldFaceNoCamera, currentViewRotation), members: summarizePacketMembersForStackDiagnostics(p) });
+    }
+    if (!terrain.length) return;
+    var merged = terrain.filter(function (entry) { return entry.packet && entry.packet.mergedFace === true; });
+    var mergedTop = merged.filter(function (entry) { return String(entry.packet && entry.packet.semanticFace || '') === 'top'; });
+    var side = terrain.filter(function (entry) {
+      var sf = String(entry.packet && entry.packet.semanticFace || '');
+      return sf === 'north' || sf === 'south' || sf === 'east' || sf === 'west';
+    });
+    var overlapRisks = [];
+    var riskLimit = 18;
+    for (var a = 0; a < mergedTop.length; a++) {
+      var top = mergedTop[a];
+      for (var b = 0; b < side.length; b++) {
+        var s = side[b];
+        var overlap = computeBoundsOverlapAreaForStackDiagnostics(top.bounds, s.bounds);
+        if (overlap <= 1) continue;
+        var orderDelta = Number(s.orderIndex || 0) - Number(top.orderIndex || 0);
+        overlapRisks.push({
+          overlapArea: Number(overlap.toFixed(3)),
+          orderDelta: orderDelta,
+          topOrderIndex: top.orderIndex,
+          sideOrderIndex: s.orderIndex,
+          topId: top.packet.id || null,
+          sideId: s.packet.id || null,
+          topFace: top.packet.semanticFace || null,
+          sideFace: s.packet.semanticFace || null,
+          topSortKey: Number(top.packet.sortKey || 0),
+          sideSortKey: Number(s.packet.sortKey || 0),
+          topTie: Number(top.packet.tie || 0),
+          sideTie: Number(s.packet.tie || 0),
+          topMembers: top.members,
+          sideMembers: s.members,
+          topBounds: top.bounds,
+          sideBounds: s.bounds
+        });
+      }
+    }
+    overlapRisks.sort(function (a, b) { return Number(b.overlapArea || 0) - Number(a.overlapArea || 0); });
+    var largeMerged = merged.slice().sort(function (a, b) { return Number(b.packet.mergedFaceCount || 1) - Number(a.packet.mergedFaceCount || 1); }).slice(0, 12).map(function (entry) {
+      return {
+        id: entry.packet.id || null,
+        semanticFace: entry.packet.semanticFace || null,
+        orderIndex: entry.orderIndex,
+        sortKey: Number(entry.packet.sortKey || 0),
+        tie: Number(entry.packet.tie || 0),
+        mergedFaceCount: Number(entry.packet.mergedFaceCount || 1),
+        mergeWidth: Number(entry.packet.mergeWidth || 1),
+        mergeHeight: Number(entry.packet.mergeHeight || 1),
+        cell: { x: Number(entry.packet.cellX || 0), y: Number(entry.packet.cellY || 0), z: Number(entry.packet.cellZ || 0) },
+        plane: inferWorldPlaneFromFacePoints(entry.packet.worldPts || []),
+        bounds: entry.bounds,
+        members: entry.members
+      };
+    });
+    emitTerrainMergeStackDiagnostic('summary', {
+      diagnosticOnly: true,
+      chunkKey: chunkKey,
+      viewRotation: currentViewRotation,
+      faceMergeMode: src.faceMergeMode || null,
+      terrainPacketCount: terrain.length,
+      mergedTerrainPacketCount: merged.length,
+      mergedTerrainTopPacketCount: mergedTop.length,
+      terrainSidePacketCount: side.length,
+      topSideOverlapRiskCount: overlapRisks.length,
+      maxTopSideOverlapArea: overlapRisks.length ? overlapRisks[0].overlapArea : 0,
+      sampleTopSideOverlapRisks: overlapRisks.slice(0, riskLimit),
+      sampleLargeMergedTerrainPackets: largeMerged
+    });
   }
 
   function buildStaticWorldChunkRenderables(chunk, options, deps) {
@@ -81,6 +420,7 @@
     var getActorInteractionMemberDescriptorsFromFaceDescriptor = resolveFunction(__deps, 'getActorInteractionMemberDescriptorsFromFaceDescriptor', nullFn);
     var getTerrainMaterialIdForRenderCell = resolveFunction(__deps, 'getTerrainMaterialIdForRenderCell', nullFn);
     var compareRenderablesByDomain = resolveFunction(__deps, 'compareRenderablesByDomain', defaultCompareRenderablesByDomain);
+    var screenPointsFromWorldFaceNoCamera = resolveFunction(__deps, 'screenPointsFromWorldFaceNoCamera', nullFn);
     var emitChunkRebuildScopeVerify = resolveFunction(__deps, 'emitChunkRebuildScopeVerify', noop);
     var emitChunkRebuildDetail = resolveFunction(__deps, 'emitChunkRebuildDetail', noop);
     var emitChunkRebuildHotspot = resolveFunction(__deps, 'emitChunkRebuildHotspot', noop);
@@ -234,6 +574,9 @@
       getTerrainSortBandKeyForRenderFace: getTerrainSortBandKeyForRenderFace,
       getTerrainSideEdgeVisibilitySignature: getTerrainSideEdgeVisibilitySignature,
       getTerrainSideStepBreakSignature: getTerrainSideStepBreakSignature,
+      getTerrainTopStepBoundarySignature: (global && global.__TERRAIN_RENDER_CORE__ && typeof global.__TERRAIN_RENDER_CORE__.getTerrainTopStepBoundarySignature === 'function')
+        ? global.__TERRAIN_RENDER_CORE__.getTerrainTopStepBoundarySignature
+        : nullFn,
       getTerrainMaterialMergeKeyForRenderCell: getTerrainMaterialMergeKeyForRenderCell,
       getTerrainFaceMergeSignature: getTerrainFaceMergeSignature,
       getStaticWorldFaceMergeSignature: getStaticWorldFaceMergeSignature
@@ -254,6 +597,64 @@
     var terrainSideMergedStaticFaceCount = 0;
     var terrainSideMergeReductionRatio = 0;
     var terrainSideStepBreakCount = 0;
+    var terrainTopOcclusionBreakCount = 0;
+    var terrainTopStepBoundaryDescriptorCount = 0;
+    var terrainTopStepBoundaryUniqueSignatureCount = 0;
+    var terrainTopStepBoundaryMixedStripCount = 0;
+    var terrainTopStepBoundaryMixedMemberCount = 0;
+    var terrainTopStepBoundaryWouldBreakCount = 0;
+    var terrainTopStepBoundarySampleCount = 0;
+    var terrainTopStepBoundarySamples = [];
+    var terrainTopStepBoundaryMergeKeyEnabled = false;
+    var terrainTopBarrierSplitCount = 0;
+    var terrainTopBarrierCutPointCount = 0;
+    var terrainTopBarrierCandidateCount = 0;
+    var terrainTopBarrierAcceptedCount = 0;
+    var terrainTopBarrierRejectedOutOfPlaneCount = 0;
+    var terrainTopBarrierRejectedOutsideStripBoundsCount = 0;
+    var terrainTopBarrierRejectedOutsideSortRangeCount = 0;
+    var terrainTopBarrierRejectedNoInsertionIndexCount = 0;
+    var terrainTopBarrierNonMonotonicStripCount = 0;
+    var terrainTopBarrierMaxSegmentLength = 0;
+    var terrainTopBarrierIndexSideCount = 0;
+    var terrainTopBarrierIndexPlaneCount = 0;
+    var terrainTopBarrierIndexUpperPlaneCount = 0;
+    var terrainTopBarrierIndexVerticalIntervalPlaneCount = 0;
+    var terrainTopBarrierLegacyPlaneCandidateCount = 0;
+    var terrainTopBarrierUpperPlaneCandidateCount = 0;
+    var terrainTopBarrierIntervalPlaneCandidateCount = 0;
+    var terrainTopBarrierWouldAcceptBySideUpperPlaneCount = 0;
+    var terrainTopBarrierWouldAcceptBySortKeyOnlyCount = 0;
+    var terrainTopBarrierTieSortMismatchCount = 0;
+    var terrainTopBarrierPlaneMissButWouldAcceptCount = 0;
+    var terrainTopBarrierSortKeyInsertionIndexCount = 0;
+    var terrainTopBarrierTieSortInsertionIndexCount = 0;
+    var terrainTopBarrierDiagnosticsOnlySuppressedSplitCount = 0;
+    var terrainTopBarrierCorrectedAcceptedCount = 0;
+    var terrainTopBarrierCorrectedSplitCount = 0;
+    var terrainTopBarrierCorrectedCutPointCount = 0;
+    var terrainTopBarrierCorrectedRejectedOutsideStripBoundsCount = 0;
+    var terrainTopBarrierCorrectedRejectedOutsideSortRangeCount = 0;
+    var terrainTopBarrierCorrectedRejectedNoInsertionIndexCount = 0;
+    var terrainTopBarrierSamples = [];
+    var terrainTopBarrierRejectedOutsideStripBoundsSamples = [];
+    var terrainTopBarrierRejectedOutsideSortRangeSamples = [];
+    var terrainTopBarrierTieSortMismatchSamples = [];
+    var terrainTopBarrierPlaneMissButWouldAcceptSamples = [];
+    var terrainTopBarrierSortKeyOnlyAcceptSamples = [];
+    var terrainTopBlockerSplitCount = 0;
+    var terrainTopBlockerCutPointCount = 0;
+    var terrainTopBlockerCount = 0;
+    var terrainTopBlockerExactCellHitCount = 0;
+    var terrainTopBlockerAdjacentCellCandidateCount = 0;
+    var terrainTopBlockerAdjacentCellAcceptedCount = 0;
+    var terrainTopBlockerAdjacentCellRejectedNotFacingCount = 0;
+    var terrainTopBlockerSortInsertionCandidateCount = 0;
+    var terrainTopBlockerRejectedNonExactCount = 0;
+    var terrainTopBlockerRejectedOutOfSortRangeCount = 0;
+    var terrainTopBlockerAcceptedSamples = [];
+    var terrainTopBlockerRejectedSamples = [];
+    var terrainFinalVisibleSideDescriptorCount = 0;
     var terrainFaceMergeMode = 'not-applicable';
     var terrainFaceMergeFallbackReason = null;
     var faceMergeCore = getStaticWorldFaceMergeCoreApi();
@@ -268,8 +669,9 @@
     terrainInputFaceDescriptorCount = terrainDescriptors.length;
     terrainSideInputFaceDescriptorCount = terrainDescriptors.filter(function (face) {
       var sf = String(face && face.semanticFace || '');
-      return sf === 'east' || sf === 'south';
+      return sf === 'east' || sf === 'south' || sf === 'north' || sf === 'west';
     }).length;
+    terrainFinalVisibleSideDescriptorCount = terrainSideInputFaceDescriptorCount;
     var mergedNonTerrainDescriptors = nonTerrainDescriptors;
     var mergedTerrainDescriptors = terrainDescriptors;
     var nonTerrainMergedCount = 0;
@@ -305,6 +707,63 @@
           terrainMergedStaticFaceCount = Number(terrainMergeResult.mergedFaceCount || Math.max(0, terrainDescriptors.length - terrainMergedFaceDescriptorCount));
           terrainMergeReductionRatio = Number(terrainMergeResult.reductionRatio || (terrainDescriptors.length > 0 ? Math.max(0, (terrainDescriptors.length - terrainMergedFaceDescriptorCount) / terrainDescriptors.length) : 0));
           terrainSideStepBreakCount = Number(terrainMergeResult.sideStepBreakCount || 0);
+          terrainTopOcclusionBreakCount = Number(terrainMergeResult.terrainTopOcclusionBreakCount || 0);
+          terrainTopStepBoundaryDescriptorCount = Number(terrainMergeResult.terrainTopStepBoundaryDescriptorCount || 0);
+          terrainTopStepBoundaryUniqueSignatureCount = Number(terrainMergeResult.terrainTopStepBoundaryUniqueSignatureCount || 0);
+          terrainTopStepBoundaryMixedStripCount = Number(terrainMergeResult.terrainTopStepBoundaryMixedStripCount || 0);
+          terrainTopStepBoundaryMixedMemberCount = Number(terrainMergeResult.terrainTopStepBoundaryMixedMemberCount || 0);
+          terrainTopStepBoundaryWouldBreakCount = Number(terrainMergeResult.terrainTopStepBoundaryWouldBreakCount || 0);
+          terrainTopStepBoundarySamples = Array.isArray(terrainMergeResult.terrainTopStepBoundarySamples) ? terrainMergeResult.terrainTopStepBoundarySamples.slice(0, 12) : [];
+          terrainTopStepBoundarySampleCount = terrainTopStepBoundarySamples.length;
+          terrainTopStepBoundaryMergeKeyEnabled = terrainMergeResult.terrainTopStepBoundaryMergeKeyEnabled === true;
+          terrainTopBarrierSplitCount = Number(terrainMergeResult.terrainTopBarrierSplitCount || 0);
+          terrainTopBarrierCutPointCount = Number(terrainMergeResult.terrainTopBarrierCutPointCount || 0);
+          terrainTopBarrierCandidateCount = Number(terrainMergeResult.terrainTopBarrierCandidateCount || 0);
+          terrainTopBarrierAcceptedCount = Number(terrainMergeResult.terrainTopBarrierAcceptedCount || 0);
+          terrainTopBarrierRejectedOutOfPlaneCount = Number(terrainMergeResult.terrainTopBarrierRejectedOutOfPlaneCount || 0);
+          terrainTopBarrierRejectedOutsideStripBoundsCount = Number(terrainMergeResult.terrainTopBarrierRejectedOutsideStripBoundsCount || 0);
+          terrainTopBarrierRejectedOutsideSortRangeCount = Number(terrainMergeResult.terrainTopBarrierRejectedOutsideSortRangeCount || 0);
+          terrainTopBarrierRejectedNoInsertionIndexCount = Number(terrainMergeResult.terrainTopBarrierRejectedNoInsertionIndexCount || 0);
+          terrainTopBarrierNonMonotonicStripCount = Number(terrainMergeResult.terrainTopBarrierNonMonotonicStripCount || 0);
+          terrainTopBarrierMaxSegmentLength = Number(terrainMergeResult.terrainTopBarrierMaxSegmentLength || 0);
+          terrainTopBarrierIndexSideCount = Number(terrainMergeResult.terrainTopBarrierIndexSideCount || 0);
+          terrainTopBarrierIndexPlaneCount = Number(terrainMergeResult.terrainTopBarrierIndexPlaneCount || 0);
+          terrainTopBarrierIndexUpperPlaneCount = Number(terrainMergeResult.terrainTopBarrierIndexUpperPlaneCount || 0);
+          terrainTopBarrierIndexVerticalIntervalPlaneCount = Number(terrainMergeResult.terrainTopBarrierIndexVerticalIntervalPlaneCount || 0);
+          terrainTopBarrierLegacyPlaneCandidateCount = Number(terrainMergeResult.terrainTopBarrierLegacyPlaneCandidateCount || 0);
+          terrainTopBarrierUpperPlaneCandidateCount = Number(terrainMergeResult.terrainTopBarrierUpperPlaneCandidateCount || 0);
+          terrainTopBarrierIntervalPlaneCandidateCount = Number(terrainMergeResult.terrainTopBarrierIntervalPlaneCandidateCount || 0);
+          terrainTopBarrierWouldAcceptBySideUpperPlaneCount = Number(terrainMergeResult.terrainTopBarrierWouldAcceptBySideUpperPlaneCount || 0);
+          terrainTopBarrierWouldAcceptBySortKeyOnlyCount = Number(terrainMergeResult.terrainTopBarrierWouldAcceptBySortKeyOnlyCount || 0);
+          terrainTopBarrierTieSortMismatchCount = Number(terrainMergeResult.terrainTopBarrierTieSortMismatchCount || 0);
+          terrainTopBarrierPlaneMissButWouldAcceptCount = Number(terrainMergeResult.terrainTopBarrierPlaneMissButWouldAcceptCount || 0);
+          terrainTopBarrierSortKeyInsertionIndexCount = Number(terrainMergeResult.terrainTopBarrierSortKeyInsertionIndexCount || 0);
+          terrainTopBarrierTieSortInsertionIndexCount = Number(terrainMergeResult.terrainTopBarrierTieSortInsertionIndexCount || 0);
+          terrainTopBarrierDiagnosticsOnlySuppressedSplitCount = Number(terrainMergeResult.terrainTopBarrierDiagnosticsOnlySuppressedSplitCount || 0);
+          terrainTopBarrierCorrectedAcceptedCount = Number(terrainMergeResult.terrainTopBarrierCorrectedAcceptedCount || 0);
+          terrainTopBarrierCorrectedSplitCount = Number(terrainMergeResult.terrainTopBarrierCorrectedSplitCount || 0);
+          terrainTopBarrierCorrectedCutPointCount = Number(terrainMergeResult.terrainTopBarrierCorrectedCutPointCount || 0);
+          terrainTopBarrierCorrectedRejectedOutsideStripBoundsCount = Number(terrainMergeResult.terrainTopBarrierCorrectedRejectedOutsideStripBoundsCount || 0);
+          terrainTopBarrierCorrectedRejectedOutsideSortRangeCount = Number(terrainMergeResult.terrainTopBarrierCorrectedRejectedOutsideSortRangeCount || 0);
+          terrainTopBarrierCorrectedRejectedNoInsertionIndexCount = Number(terrainMergeResult.terrainTopBarrierCorrectedRejectedNoInsertionIndexCount || 0);
+          terrainTopBarrierSamples = Array.isArray(terrainMergeResult.terrainTopBarrierSamples) ? terrainMergeResult.terrainTopBarrierSamples.slice(0, 12) : [];
+          terrainTopBarrierRejectedOutsideStripBoundsSamples = Array.isArray(terrainMergeResult.terrainTopBarrierRejectedOutsideStripBoundsSamples) ? terrainMergeResult.terrainTopBarrierRejectedOutsideStripBoundsSamples.slice(0, 12) : [];
+          terrainTopBarrierRejectedOutsideSortRangeSamples = Array.isArray(terrainMergeResult.terrainTopBarrierRejectedOutsideSortRangeSamples) ? terrainMergeResult.terrainTopBarrierRejectedOutsideSortRangeSamples.slice(0, 12) : [];
+          terrainTopBarrierTieSortMismatchSamples = Array.isArray(terrainMergeResult.terrainTopBarrierTieSortMismatchSamples) ? terrainMergeResult.terrainTopBarrierTieSortMismatchSamples.slice(0, 12) : [];
+          terrainTopBarrierPlaneMissButWouldAcceptSamples = Array.isArray(terrainMergeResult.terrainTopBarrierPlaneMissButWouldAcceptSamples) ? terrainMergeResult.terrainTopBarrierPlaneMissButWouldAcceptSamples.slice(0, 12) : [];
+          terrainTopBarrierSortKeyOnlyAcceptSamples = Array.isArray(terrainMergeResult.terrainTopBarrierSortKeyOnlyAcceptSamples) ? terrainMergeResult.terrainTopBarrierSortKeyOnlyAcceptSamples.slice(0, 12) : [];
+          terrainTopBlockerSplitCount = Number(terrainMergeResult.terrainTopBlockerSplitCount || 0);
+          terrainTopBlockerCutPointCount = Number(terrainMergeResult.terrainTopBlockerCutPointCount || 0);
+          terrainTopBlockerCount = Number(terrainMergeResult.terrainTopBlockerCount || 0);
+          terrainTopBlockerExactCellHitCount = Number(terrainMergeResult.terrainTopBlockerExactCellHitCount || 0);
+          terrainTopBlockerAdjacentCellCandidateCount = Number(terrainMergeResult.terrainTopBlockerAdjacentCellCandidateCount || 0);
+          terrainTopBlockerAdjacentCellAcceptedCount = Number(terrainMergeResult.terrainTopBlockerAdjacentCellAcceptedCount || 0);
+          terrainTopBlockerAdjacentCellRejectedNotFacingCount = Number(terrainMergeResult.terrainTopBlockerAdjacentCellRejectedNotFacingCount || 0);
+          terrainTopBlockerSortInsertionCandidateCount = Number(terrainMergeResult.terrainTopBlockerSortInsertionCandidateCount || 0);
+          terrainTopBlockerRejectedNonExactCount = Number(terrainMergeResult.terrainTopBlockerRejectedNonExactCount || 0);
+          terrainTopBlockerRejectedOutOfSortRangeCount = Number(terrainMergeResult.terrainTopBlockerRejectedOutOfSortRangeCount || 0);
+          terrainTopBlockerAcceptedSamples = Array.isArray(terrainMergeResult.terrainTopBlockerAcceptedSamples) ? terrainMergeResult.terrainTopBlockerAcceptedSamples.slice(0, 12) : [];
+          terrainTopBlockerRejectedSamples = Array.isArray(terrainMergeResult.terrainTopBlockerRejectedSamples) ? terrainMergeResult.terrainTopBlockerRejectedSamples.slice(0, 12) : [];
           terrainFaceMergeMode = 'terrain-core-merge';
         } else {
           terrainMergedFaceDescriptorCount = terrainDescriptors.length;
@@ -324,7 +783,7 @@
     if (terrainMergedFaceDescriptorCount <= 0 && terrainInputFaceDescriptorCount > 0) terrainMergedFaceDescriptorCount = terrainInputFaceDescriptorCount;
     terrainSideMergedFaceDescriptorCount = mergedTerrainDescriptors.filter(function (face) {
       var sf = String(face && face.semanticFace || '');
-      return sf === 'east' || sf === 'south';
+      return sf === 'east' || sf === 'south' || sf === 'north' || sf === 'west';
     }).length;
     terrainSideMergedStaticFaceCount = Math.max(0, Number(terrainSideInputFaceDescriptorCount || 0) - Number(terrainSideMergedFaceDescriptorCount || 0));
     terrainSideMergeReductionRatio = terrainSideInputFaceDescriptorCount > 0
@@ -401,6 +860,7 @@
         sortKey: sortKey,
         tie: tie,
         sortViewRotation: currentViewRotation,
+        itemRotation: cell && cell.rotation != null ? Number(cell.rotation || 0) : 0,
         sortWorldAnchor: descriptor.sortWorldAnchor || { x: Number(cell.x || 0), y: Number(cell.y || 0), z: Number(cell.z || 0), h: 1 },
         sortRotatedPoint: descriptor.sortRotatedPoint || null,
         instanceId: cell.instanceId || null,
@@ -408,6 +868,7 @@
         renderPath: 'static-world-chunk-packet',
         cacheViewRotation: currentViewRotation,
         cacheContentType: 'world-face-packets',
+        chunkKey: chunk && chunk.key ? String(chunk.key) : null,
         cameraIndependent: true,
         usesScreenSpaceCache: false,
         semanticFace: semanticFace,
@@ -459,6 +920,8 @@
       perfNow: perfNow
     });
     step8FinalizeRenderableListMs += Number(packetOrderResult && packetOrderResult.sortMs || 0);
+    emitStaticFaceRotationPacketDiagnostics({ packets: packets, currentViewRotation: currentViewRotation, chunkKey: chunk && chunk.key ? String(chunk.key) : null, faceMergeMode: faceMergeMode, screenPointsFromWorldFaceNoCamera: screenPointsFromWorldFaceNoCamera });
+    emitTerrainMergeStackPacketDiagnostics({ packets: packets, currentViewRotation: currentViewRotation, chunkKey: chunk && chunk.key ? String(chunk.key) : null, faceMergeMode: faceMergeMode, screenPointsFromWorldFaceNoCamera: screenPointsFromWorldFaceNoCamera });
     var step6BuildStaticRenderablesMs = Math.max(0, perfNow() - staticRenderableBuildStartAt);
     var step7SortRenderablesMs = Number(step8FinalizeRenderableListMs.toFixed(3));
     var sortStartAt = perfNow();
@@ -534,6 +997,64 @@
       terrainSideMergedStaticFaceCount: Number(terrainSideMergedStaticFaceCount || 0),
       terrainSideMergeReductionRatio: Number(terrainSideMergeReductionRatio || 0),
       terrainSideStepBreakCount: Number(terrainSideStepBreakCount || 0),
+      terrainTopOcclusionBreakCount: Number(terrainTopOcclusionBreakCount || 0),
+      terrainTopStepBoundaryDescriptorCount: Number(terrainTopStepBoundaryDescriptorCount || 0),
+      terrainTopStepBoundaryUniqueSignatureCount: Number(terrainTopStepBoundaryUniqueSignatureCount || 0),
+      terrainTopStepBoundaryMixedStripCount: Number(terrainTopStepBoundaryMixedStripCount || 0),
+      terrainTopStepBoundaryMixedMemberCount: Number(terrainTopStepBoundaryMixedMemberCount || 0),
+      terrainTopStepBoundaryWouldBreakCount: Number(terrainTopStepBoundaryWouldBreakCount || 0),
+      terrainTopStepBoundarySampleCount: Number(terrainTopStepBoundarySampleCount || 0),
+      terrainTopStepBoundarySamples: terrainTopStepBoundarySamples,
+      terrainTopStepBoundaryMergeKeyEnabled: terrainTopStepBoundaryMergeKeyEnabled === true,
+      terrainTopBarrierSplitCount: Number(terrainTopBarrierSplitCount || 0),
+      terrainTopBarrierCutPointCount: Number(terrainTopBarrierCutPointCount || 0),
+      terrainTopBarrierCandidateCount: Number(terrainTopBarrierCandidateCount || 0),
+      terrainTopBarrierAcceptedCount: Number(terrainTopBarrierAcceptedCount || 0),
+      terrainTopBarrierRejectedOutOfPlaneCount: Number(terrainTopBarrierRejectedOutOfPlaneCount || 0),
+      terrainTopBarrierRejectedOutsideStripBoundsCount: Number(terrainTopBarrierRejectedOutsideStripBoundsCount || 0),
+      terrainTopBarrierRejectedOutsideSortRangeCount: Number(terrainTopBarrierRejectedOutsideSortRangeCount || 0),
+      terrainTopBarrierRejectedNoInsertionIndexCount: Number(terrainTopBarrierRejectedNoInsertionIndexCount || 0),
+      terrainTopBarrierNonMonotonicStripCount: Number(terrainTopBarrierNonMonotonicStripCount || 0),
+      terrainTopBarrierMaxSegmentLength: Number(terrainTopBarrierMaxSegmentLength || 0),
+      terrainTopBarrierIndexSideCount: Number(terrainTopBarrierIndexSideCount || 0),
+      terrainTopBarrierIndexPlaneCount: Number(terrainTopBarrierIndexPlaneCount || 0),
+      terrainTopBarrierIndexUpperPlaneCount: Number(terrainTopBarrierIndexUpperPlaneCount || 0),
+      terrainTopBarrierIndexVerticalIntervalPlaneCount: Number(terrainTopBarrierIndexVerticalIntervalPlaneCount || 0),
+      terrainTopBarrierLegacyPlaneCandidateCount: Number(terrainTopBarrierLegacyPlaneCandidateCount || 0),
+      terrainTopBarrierUpperPlaneCandidateCount: Number(terrainTopBarrierUpperPlaneCandidateCount || 0),
+      terrainTopBarrierIntervalPlaneCandidateCount: Number(terrainTopBarrierIntervalPlaneCandidateCount || 0),
+      terrainTopBarrierWouldAcceptBySideUpperPlaneCount: Number(terrainTopBarrierWouldAcceptBySideUpperPlaneCount || 0),
+      terrainTopBarrierWouldAcceptBySortKeyOnlyCount: Number(terrainTopBarrierWouldAcceptBySortKeyOnlyCount || 0),
+      terrainTopBarrierTieSortMismatchCount: Number(terrainTopBarrierTieSortMismatchCount || 0),
+      terrainTopBarrierPlaneMissButWouldAcceptCount: Number(terrainTopBarrierPlaneMissButWouldAcceptCount || 0),
+      terrainTopBarrierSortKeyInsertionIndexCount: Number(terrainTopBarrierSortKeyInsertionIndexCount || 0),
+      terrainTopBarrierTieSortInsertionIndexCount: Number(terrainTopBarrierTieSortInsertionIndexCount || 0),
+      terrainTopBarrierDiagnosticsOnlySuppressedSplitCount: Number(terrainTopBarrierDiagnosticsOnlySuppressedSplitCount || 0),
+      terrainTopBarrierCorrectedAcceptedCount: Number(terrainTopBarrierCorrectedAcceptedCount || 0),
+      terrainTopBarrierCorrectedSplitCount: Number(terrainTopBarrierCorrectedSplitCount || 0),
+      terrainTopBarrierCorrectedCutPointCount: Number(terrainTopBarrierCorrectedCutPointCount || 0),
+      terrainTopBarrierCorrectedRejectedOutsideStripBoundsCount: Number(terrainTopBarrierCorrectedRejectedOutsideStripBoundsCount || 0),
+      terrainTopBarrierCorrectedRejectedOutsideSortRangeCount: Number(terrainTopBarrierCorrectedRejectedOutsideSortRangeCount || 0),
+      terrainTopBarrierCorrectedRejectedNoInsertionIndexCount: Number(terrainTopBarrierCorrectedRejectedNoInsertionIndexCount || 0),
+      terrainTopBarrierSamples: terrainTopBarrierSamples,
+      terrainTopBarrierRejectedOutsideStripBoundsSamples: terrainTopBarrierRejectedOutsideStripBoundsSamples,
+      terrainTopBarrierRejectedOutsideSortRangeSamples: terrainTopBarrierRejectedOutsideSortRangeSamples,
+      terrainTopBarrierTieSortMismatchSamples: terrainTopBarrierTieSortMismatchSamples,
+      terrainTopBarrierPlaneMissButWouldAcceptSamples: terrainTopBarrierPlaneMissButWouldAcceptSamples,
+      terrainTopBarrierSortKeyOnlyAcceptSamples: terrainTopBarrierSortKeyOnlyAcceptSamples,
+      terrainTopBlockerSplitCount: Number(terrainTopBlockerSplitCount || 0),
+      terrainTopBlockerCutPointCount: Number(terrainTopBlockerCutPointCount || 0),
+      terrainTopBlockerCount: Number(terrainTopBlockerCount || 0),
+      terrainTopBlockerExactCellHitCount: Number(terrainTopBlockerExactCellHitCount || 0),
+      terrainTopBlockerAdjacentCellCandidateCount: Number(terrainTopBlockerAdjacentCellCandidateCount || 0),
+      terrainTopBlockerAdjacentCellAcceptedCount: Number(terrainTopBlockerAdjacentCellAcceptedCount || 0),
+      terrainTopBlockerAdjacentCellRejectedNotFacingCount: Number(terrainTopBlockerAdjacentCellRejectedNotFacingCount || 0),
+      terrainTopBlockerSortInsertionCandidateCount: Number(terrainTopBlockerSortInsertionCandidateCount || 0),
+      terrainTopBlockerRejectedNonExactCount: Number(terrainTopBlockerRejectedNonExactCount || 0),
+      terrainTopBlockerRejectedOutOfSortRangeCount: Number(terrainTopBlockerRejectedOutOfSortRangeCount || 0),
+      terrainFinalVisibleSideDescriptorCount: Number(terrainFinalVisibleSideDescriptorCount || 0),
+      terrainTopBlockerAcceptedSamples: terrainTopBlockerAcceptedSamples,
+      terrainTopBlockerRejectedSamples: terrainTopBlockerRejectedSamples,
       terrainMergeFaceDescriptorsMs: Number(terrainMergeFaceDescriptorsMs.toFixed(3)),
       terrainFaceMergeMode: terrainFaceMergeMode,
       terrainFaceMergeFallbackReason: terrainFaceMergeFallbackReason,
@@ -852,6 +1373,64 @@
       terrainSideMergedStaticFaceCount: Number(terrainSideMergedStaticFaceCount || 0),
       terrainSideMergeReductionRatio: Number(terrainSideMergeReductionRatio || 0),
       terrainSideStepBreakCount: Number(terrainSideStepBreakCount || 0),
+      terrainTopOcclusionBreakCount: Number(terrainTopOcclusionBreakCount || 0),
+      terrainTopStepBoundaryDescriptorCount: Number(terrainTopStepBoundaryDescriptorCount || 0),
+      terrainTopStepBoundaryUniqueSignatureCount: Number(terrainTopStepBoundaryUniqueSignatureCount || 0),
+      terrainTopStepBoundaryMixedStripCount: Number(terrainTopStepBoundaryMixedStripCount || 0),
+      terrainTopStepBoundaryMixedMemberCount: Number(terrainTopStepBoundaryMixedMemberCount || 0),
+      terrainTopStepBoundaryWouldBreakCount: Number(terrainTopStepBoundaryWouldBreakCount || 0),
+      terrainTopStepBoundarySampleCount: Number(terrainTopStepBoundarySampleCount || 0),
+      terrainTopStepBoundarySamples: terrainTopStepBoundarySamples,
+      terrainTopStepBoundaryMergeKeyEnabled: terrainTopStepBoundaryMergeKeyEnabled === true,
+      terrainTopBarrierSplitCount: Number(terrainTopBarrierSplitCount || 0),
+      terrainTopBarrierCutPointCount: Number(terrainTopBarrierCutPointCount || 0),
+      terrainTopBarrierCandidateCount: Number(terrainTopBarrierCandidateCount || 0),
+      terrainTopBarrierAcceptedCount: Number(terrainTopBarrierAcceptedCount || 0),
+      terrainTopBarrierRejectedOutOfPlaneCount: Number(terrainTopBarrierRejectedOutOfPlaneCount || 0),
+      terrainTopBarrierRejectedOutsideStripBoundsCount: Number(terrainTopBarrierRejectedOutsideStripBoundsCount || 0),
+      terrainTopBarrierRejectedOutsideSortRangeCount: Number(terrainTopBarrierRejectedOutsideSortRangeCount || 0),
+      terrainTopBarrierRejectedNoInsertionIndexCount: Number(terrainTopBarrierRejectedNoInsertionIndexCount || 0),
+      terrainTopBarrierNonMonotonicStripCount: Number(terrainTopBarrierNonMonotonicStripCount || 0),
+      terrainTopBarrierMaxSegmentLength: Number(terrainTopBarrierMaxSegmentLength || 0),
+      terrainTopBarrierIndexSideCount: Number(terrainTopBarrierIndexSideCount || 0),
+      terrainTopBarrierIndexPlaneCount: Number(terrainTopBarrierIndexPlaneCount || 0),
+      terrainTopBarrierIndexUpperPlaneCount: Number(terrainTopBarrierIndexUpperPlaneCount || 0),
+      terrainTopBarrierIndexVerticalIntervalPlaneCount: Number(terrainTopBarrierIndexVerticalIntervalPlaneCount || 0),
+      terrainTopBarrierLegacyPlaneCandidateCount: Number(terrainTopBarrierLegacyPlaneCandidateCount || 0),
+      terrainTopBarrierUpperPlaneCandidateCount: Number(terrainTopBarrierUpperPlaneCandidateCount || 0),
+      terrainTopBarrierIntervalPlaneCandidateCount: Number(terrainTopBarrierIntervalPlaneCandidateCount || 0),
+      terrainTopBarrierWouldAcceptBySideUpperPlaneCount: Number(terrainTopBarrierWouldAcceptBySideUpperPlaneCount || 0),
+      terrainTopBarrierWouldAcceptBySortKeyOnlyCount: Number(terrainTopBarrierWouldAcceptBySortKeyOnlyCount || 0),
+      terrainTopBarrierTieSortMismatchCount: Number(terrainTopBarrierTieSortMismatchCount || 0),
+      terrainTopBarrierPlaneMissButWouldAcceptCount: Number(terrainTopBarrierPlaneMissButWouldAcceptCount || 0),
+      terrainTopBarrierSortKeyInsertionIndexCount: Number(terrainTopBarrierSortKeyInsertionIndexCount || 0),
+      terrainTopBarrierTieSortInsertionIndexCount: Number(terrainTopBarrierTieSortInsertionIndexCount || 0),
+      terrainTopBarrierDiagnosticsOnlySuppressedSplitCount: Number(terrainTopBarrierDiagnosticsOnlySuppressedSplitCount || 0),
+      terrainTopBarrierCorrectedAcceptedCount: Number(terrainTopBarrierCorrectedAcceptedCount || 0),
+      terrainTopBarrierCorrectedSplitCount: Number(terrainTopBarrierCorrectedSplitCount || 0),
+      terrainTopBarrierCorrectedCutPointCount: Number(terrainTopBarrierCorrectedCutPointCount || 0),
+      terrainTopBarrierCorrectedRejectedOutsideStripBoundsCount: Number(terrainTopBarrierCorrectedRejectedOutsideStripBoundsCount || 0),
+      terrainTopBarrierCorrectedRejectedOutsideSortRangeCount: Number(terrainTopBarrierCorrectedRejectedOutsideSortRangeCount || 0),
+      terrainTopBarrierCorrectedRejectedNoInsertionIndexCount: Number(terrainTopBarrierCorrectedRejectedNoInsertionIndexCount || 0),
+      terrainTopBarrierSamples: terrainTopBarrierSamples,
+      terrainTopBarrierRejectedOutsideStripBoundsSamples: terrainTopBarrierRejectedOutsideStripBoundsSamples,
+      terrainTopBarrierRejectedOutsideSortRangeSamples: terrainTopBarrierRejectedOutsideSortRangeSamples,
+      terrainTopBarrierTieSortMismatchSamples: terrainTopBarrierTieSortMismatchSamples,
+      terrainTopBarrierPlaneMissButWouldAcceptSamples: terrainTopBarrierPlaneMissButWouldAcceptSamples,
+      terrainTopBarrierSortKeyOnlyAcceptSamples: terrainTopBarrierSortKeyOnlyAcceptSamples,
+      terrainTopBlockerSplitCount: Number(terrainTopBlockerSplitCount || 0),
+      terrainTopBlockerCutPointCount: Number(terrainTopBlockerCutPointCount || 0),
+      terrainTopBlockerCount: Number(terrainTopBlockerCount || 0),
+      terrainTopBlockerExactCellHitCount: Number(terrainTopBlockerExactCellHitCount || 0),
+      terrainTopBlockerAdjacentCellCandidateCount: Number(terrainTopBlockerAdjacentCellCandidateCount || 0),
+      terrainTopBlockerAdjacentCellAcceptedCount: Number(terrainTopBlockerAdjacentCellAcceptedCount || 0),
+      terrainTopBlockerAdjacentCellRejectedNotFacingCount: Number(terrainTopBlockerAdjacentCellRejectedNotFacingCount || 0),
+      terrainTopBlockerSortInsertionCandidateCount: Number(terrainTopBlockerSortInsertionCandidateCount || 0),
+      terrainTopBlockerRejectedNonExactCount: Number(terrainTopBlockerRejectedNonExactCount || 0),
+      terrainTopBlockerRejectedOutOfSortRangeCount: Number(terrainTopBlockerRejectedOutOfSortRangeCount || 0),
+      terrainFinalVisibleSideDescriptorCount: Number(terrainFinalVisibleSideDescriptorCount || 0),
+      terrainTopBlockerAcceptedSamples: terrainTopBlockerAcceptedSamples,
+      terrainTopBlockerRejectedSamples: terrainTopBlockerRejectedSamples,
       terrainMergeFaceDescriptorsMs: Number(terrainMergeFaceDescriptorsMs.toFixed(3)),
       terrainPacketCount: Number(terrainPacketCount || 0),
       totalChunkBuildMs: Number(totalChunkBuildMs.toFixed(3))

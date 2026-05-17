@@ -82,6 +82,7 @@
           <label><input id="showFrontLines" type="checkbox"> 调试：显示所有前沿线</label>
           <label><input id="verboseLog" type="checkbox" checked> 调试：详细日志（很啰嗦）</label>
           <label><input id="actorSortDiagEnabled" type="checkbox"> 调试：人物/方块排序深度日志（导出用）</label>
+          <label><input id="showPixiPlayerChunkDebugOverlay" type="checkbox" checked> 调试：显示 Pixi 人物 chunk 网格覆盖层</label>
           <label><input id="shadowDebugDetailed" type="checkbox" checked> 阴影调试：详细几何日志</label>
           <label><input id="terrainDetailedProfilingEnabled" type="checkbox"> 生成详细地形日志（默认关闭）</label>
         </div>
@@ -93,6 +94,7 @@
             <button id="enableCanvas2dBackendTest" type="button">回到 Canvas2D</button>
           </div>
           <div class="rowButtons rowButtons2" aria-label="PixiJS migration performance controls">
+            <button id="enablePixiPerformanceMode" type="button">开启性能模式并清空日志</button>
             <button id="runPixiPerfSample" type="button">性能采样：当前后端</button>
             <button id="comparePixiPerfSample" type="button">输出性能对比</button>
           </div>
@@ -493,6 +495,29 @@
             <button id="terrainClear">Clear Terrain</button>
             <button id="terrainResetParams">Reset Params</button>
           </div>
+          <label>地形方块形状
+            <select id="terrainPlaceBlockShape">
+              <option value="cube_1x1">1×1×1 地形方块</option>
+              <option value="cabinet_1x1x2">1×1×2 地形柱</option>
+              <option value="terrain_column_1x1x3">1×1×3 地形柱</option>
+              <option value="terrain_column_1x1x4">1×1×4 地形柱</option>
+              <option value="terrain_column_1x1x5">1×1×5 地形柱</option>
+              <option value="terrain_column_1x1x6">1×1×6 地形柱</option>
+            </select>
+          </label>
+          <div class="rowButtons rowButtons2">
+            <button id="terrainPlaceBlock">放置地形方块</button>
+            <button id="terrainPlaceBlockOff">退出地形方块放置</button>
+          </div>
+          <div class="rowButtons rowButtons2">
+            <button id="terrainAddFaceMergeColumnRow">生成 side-merge 柱子行</button>
+            <button id="terrainAddFaceMergeStepCluster">生成高低柱子簇</button>
+          </div>
+          <div class="rowButtons rowButtons2">
+            <button id="terrainAddFaceMergeColumnBlock">生成 2×2 高柱块</button>
+            <button id="terrainAddFaceMergeLWall">生成 L 型柱墙</button>
+          </div>
+          <div id="terrainPlaceBlockStatus" class="hintBox">地形方块放置：未启用。点击“放置地形方块”后，左键会放置进入 terrain merge path 的所选形状。</div>
           <div id="terrainSummary" class="hintBox">Terrain：尚未生成。</div>
           <pre id="terrainDetails" class="inspectorPre"></pre>
         </div>
@@ -807,7 +832,7 @@
   <script src="src/presentation/ui/ui-camera-render-panel.js"></script>
   <script src="src/presentation/ui/ui-terrain-panel-refresh.js"></script>
   <script src="src/presentation/ui/ui.js?v=20260429-terrain-edge-outline-debug-v3"></script>
-  <script src="src/presentation/ui/pixi-backend-test-controls.js?v=20260508-pxm075-ui-backend-perf-controls"></script>
+  <script src="src/presentation/ui/pixi-backend-test-controls.js?v=20260517-pxm0718o5h1-overlay-toggle"></script>
   <script src="src/presentation/render/interaction/render-logic-interaction-boundary.js"></script>
   <script src="src/presentation/render/interaction/render-hit-test.js"></script>
   <script src="src/presentation/render/interaction/render-preview-interaction-controller.js"></script>
@@ -823,13 +848,14 @@
   <script src="src/presentation/render/renderer/canvas2d-shadow-overlays.js?v=20260429-terrain-edge-outline-debug-v3"></script>
   <script src="src/presentation/render/renderer/canvas2d-shadow-overlay-cache.js?v=20260502-p11a4-shadow-overlay-cache"></script>
   <script src="src/presentation/render/optimization/static-world-projected-geometry-cache.js?v=20260510-pxm0712e-static-world-projected-geometry-cache"></script>
+  <script src="src/presentation/render/optimization/static-world-gpu-chunk-cache-input.js?v=20260510-pxm0714b-static-world-gpu-chunk-cache-input"></script>
   <script src="src/presentation/render/renderer/canvas2d-static-world-face-draw-pass.js?v=20260429-terrain-edge-outline-debug-v3"></script>
   <script src="src/presentation/render/renderer/canvas2d-floor-layer-draw-pass.js?v=20260429-terrain-edge-outline-debug-v3"></script>
   <script src="src/presentation/render/renderer/canvas2d-frame-diagnostics.js?v=20260503-p11c1-frame-diagnostics"></script>
   <script src="src/presentation/render/renderer/canvas2d-zoom-preview-state.js?v=20260503-p11c2-zoom-preview-state"></script>
   <script src="src/presentation/render/renderer/canvas2d-static-bitmap-run-cache.js?v=20260503-p11c3-static-bitmap-run-cache"></script>
   <script src="src/presentation/render/renderer/canvas2d-static-packet-fallback-draw.js?v=20260503-p11c4-static-packet-fallback-draw"></script>
-  <script src="src/presentation/render/renderer/canvas2d-renderable-order-draw.js?v=20260503-p11c5-renderable-order-draw"></script>
+  <script src="src/presentation/render/renderer/canvas2d-renderable-order-draw.js?v=20260514-pxm0718k0f-strict-preinit-gate"></script>
   <script src="src/presentation/render/renderer/canvas2d-overlay-hud-pass.js?v=20260503-p11c6-overlay-hud-pass"></script>
   <script src="src/presentation/render/renderer/canvas2d-interaction-pipeline-capture.js?v=20260503-p11c6-interaction-pipeline-capture"></script>
   <script src="src/presentation/render/renderer/canvas2d-frame-pipeline.js?v=20260503-p11c7-frame-pipeline"></script>
@@ -851,7 +877,8 @@
   <script src="src/presentation/render/diagnostics/pixi-migration-diagnostics-throttle.js?v=20260509-pxm078d-diagnostics-throttle"></script>
   <script src="src/presentation/render/diagnostics/pixi-migration-baseline-diagnostics.js?v=20260508-pxm01-baseline"></script>
   <script src="src/presentation/render/renderer/world-renderer-backend-selection.js?v=20260508-pxm02-backend-selection"></script>
-  <script src="src/presentation/render/renderer/pixi-world-renderer.js?v=20260508-pxm07-pixi-tile-floor-layer"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pixi.js@8/dist/pixi.min.js" data-pixi-migration="pxm0718k0f-preload"></script>
+  <script src="src/presentation/render/renderer/pixi-world-renderer.js?v=20260514-pxm0718k0f-strict-preinit-gate"></script>
   <script src="src/presentation/render/diagnostics/pixi-migration-pixi-interleaved-frameplan-skeleton-diagnostics.js?v=20260509-pxm0712a-pixi-interleaved-frameplan-skeleton-diagnostics"></script>
   <script src="src/presentation/render/renderer/pixi-interleaved-frameplan-renderer.js?v=20260509-pxm0712a-pixi-interleaved-frameplan-renderer"></script>
   <script src="src/presentation/render/diagnostics/pixi-migration-renderable-kind-diagnostics.js?v=20260508-pxm03-renderable-kind-diagnostics"></script>
@@ -865,7 +892,7 @@
   <script src="src/presentation/render/optimization/shared-render-optimization-source-layer.js?v=20260509-pxm077a-shared-source-layer"></script>
   <script src="src/presentation/render/optimization/shared-render-optimization-canvas2d-consumer-adapter.js?v=20260509-pxm077b-canvas2d-consumer-adapter"></script>
   <script src="src/presentation/render/optimization/shared-render-optimization-canvas2d-shared-consumer.js?v=20260509-pxm077c-canvas2d-shared-consumer"></script>
-  <script src="src/presentation/render/optimization/shared-render-optimization-pixi-static-world-packet-consumer.js?v=20260510-pxm0712e-pixi-static-world-packet-consumer"></script>
+  <script src="src/presentation/render/optimization/shared-render-optimization-pixi-static-world-packet-consumer.js?v=20260510-pxm0714b-pixi-static-world-chunk-rendertexture-consumer"></script>
   <script src="src/presentation/render/optimization/shared-render-optimization-pixi-static-run-consumer.js?v=20260509-pxm078b-pixi-static-run-consumer"></script>
   <script src="src/presentation/render/diagnostics/pixi-migration-shared-optimization-contract-diagnostics.js?v=20260508-pxm076b-shared-optimization-contract-diagnostics"></script>
   <script src="src/presentation/render/diagnostics/pixi-migration-shared-optimization-manifest-diagnostics.js?v=20260508-pxm076c-runtime-manifest-diagnostics"></script>

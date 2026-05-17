@@ -58,3 +58,40 @@ const sideStepBreak = api.mergeTerrainFaceDescriptors([
 ]);
 assert.strictEqual(sideStepBreak.outputCount, 2, 'different side step break signatures should proactively split side strips');
 assert(sideStepBreak.sideStepBreakCount >= 1, 'side step break count should be tracked when side strips are proactively split');
+
+const topBarrierSortKeyOnly = api.mergeTerrainFaceDescriptors([
+  Object.assign({}, topBase, { id: 'top-barrier-0', mergeU: 0, mergeV: 0, sortKey: 10, tie: 1, cell: { x: 0, y: 0, z: 0 } }),
+  Object.assign({}, topBase, { id: 'top-barrier-1', mergeU: 1, mergeV: 0, sortKey: 20, tie: 2, cell: { x: 1, y: 0, z: 0 } }),
+  Object.assign({}, topBase, { id: 'top-barrier-2', mergeU: 2, mergeV: 0, sortKey: 30, tie: 3, cell: { x: 2, y: 0, z: 0 } }),
+  {
+    isTerrainFaceMergeCandidate: true,
+    terrainMaterialMergeKey: '__terrain_default__',
+    terrainMergeSignature: 'terrain-face|west|west|0|__terrain_default__|',
+    semanticFace: 'west',
+    screenFace: 'west',
+    mergePlane: 1,
+    sortKey: 20,
+    tie: 50000,
+    terrainSortBandKey: 'west|u:0',
+    edgeVisibilitySignature: 'west|west,top',
+    cell: { x: 1, y: 0, z: 0 },
+    mergeU: 0,
+    mergeV: 0
+  }
+], { enabled: true });
+assert(topBarrierSortKeyOnly.terrainTopBarrierCorrectedAcceptedCount >= 1, 'frozen corrected interval-plane sortKey-only diagnostic should still detect candidate blockers');
+assert.strictEqual(topBarrierSortKeyOnly.terrainTopBarrierCorrectedSplitCount, 0, '07.16A must not actively split top strips with side-face sortKey barriers');
+assert(topBarrierSortKeyOnly.terrainTopBarrierCorrectedCutPointCount >= 1, '07.16A should keep diagnostic cut-point counts for comparison');
+assert(topBarrierSortKeyOnly.terrainTopBarrierDiagnosticsOnlySuppressedSplitCount >= 1, '07.16A should suppress corrected barrier cuts instead of applying them');
+assert.strictEqual(topBarrierSortKeyOnly.mergeStrategy, 'top-step-boundary-merge-key-active+barrier-frozen-diagnostics-only', '07.16C merge strategy should advertise active top boundary key plus frozen barrier diagnostics');
+
+
+const topBoundaryMixed = api.mergeTerrainFaceDescriptors([
+  Object.assign({}, topBase, { id: 'top-boundary-0', mergeU: 0, mergeV: 0, topStepBoundarySignature: 'top-step-boundary|N:same-height|E:higher-neighbor|S:same-height|W:empty' }),
+  Object.assign({}, topBase, { id: 'top-boundary-1', mergeU: 1, mergeV: 0, sortKey: 2, tie: 2, cell: { x: 1, y: 0, z: 0 }, topStepBoundarySignature: 'top-step-boundary|N:same-height|E:same-height|S:same-height|W:same-height' })
+], { enabled: true });
+assert.strictEqual(topBoundaryMixed.outputCount, 2, '07.16C top boundary signature is active in the top merge key and must split mixed-signature top runs');
+assert(topBoundaryMixed.terrainTopStepBoundaryDescriptorCount >= 2, 'top step-boundary diagnostics should count top descriptors');
+assert.strictEqual(topBoundaryMixed.terrainTopStepBoundaryMixedStripCount, 0, '07.16C should prevent mixed-signature top strips from forming');
+assert.strictEqual(topBoundaryMixed.terrainTopStepBoundaryWouldBreakCount, 0, '07.16C should not need diagnostic breaks after active merge-key splitting');
+assert.strictEqual(topBoundaryMixed.terrainTopStepBoundaryMergeKeyEnabled, true, '07.16C should expose active top boundary merge key status');

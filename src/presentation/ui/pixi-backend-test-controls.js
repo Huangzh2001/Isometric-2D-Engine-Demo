@@ -9,7 +9,7 @@
   if (!global) return;
 
   var OWNER = 'src/presentation/ui/pixi-backend-test-controls.js';
-  var STEP = 'PXM-07';
+  var STEP = 'PXM-07.18O5H1';
   var PREFIX = '[pixi-migration][step=' + STEP + ']';
   var STORAGE_KEY = 'pixiMigrationBackendUiControlPending';
   var DEFAULT_BACKEND = 'pixi';
@@ -169,7 +169,65 @@
     return null;
   }
 
+
+  function getPerfLogMode() {
+    try { return global.__PIXI_PERFORMANCE_LOG_MODE__ || null; } catch (_) {}
+    return null;
+  }
+
+  function readPlayerChunkDebugOverlayEnabled() {
+    try {
+      if (global.__PIXI_PLAYER_CHUNK_DEBUG_OVERLAY__ === true) return true;
+      if (global.__PIXI_PLAYER_CHUNK_DEBUG_OVERLAY__ === false) return false;
+      if (global.localStorage) {
+        var raw = global.localStorage.getItem('pixiPlayerChunkDebugOverlay');
+        if (raw === '0' || raw === 'false' || raw === 'off') return false;
+        if (raw === '1' || raw === 'true' || raw === 'on') return true;
+      }
+    } catch (_) {}
+    return true;
+  }
+
+  function setPlayerChunkDebugOverlayEnabled(enabled, source) {
+    var next = enabled !== false;
+    try { global.__PIXI_PLAYER_CHUNK_DEBUG_OVERLAY__ = next; } catch (_) {}
+    try {
+      if (global.localStorage) global.localStorage.setItem('pixiPlayerChunkDebugOverlay', next ? '1' : '0');
+    } catch (_) {}
+    emit('ui-control', {
+      action: 'set-pixi-player-chunk-debug-overlay',
+      enabled: next,
+      storageKey: 'pixiPlayerChunkDebugOverlay',
+      source: source || 'ui-control'
+    });
+    setStatus(next
+      ? 'Pixi 人物 chunk 调试网格：已开启。'
+      : 'Pixi 人物 chunk 调试网格：已关闭。');
+    return next;
+  }
+
+  function syncPlayerChunkDebugOverlayToggle() {
+    var toggle = getElement('showPixiPlayerChunkDebugOverlay');
+    if (!toggle) return false;
+    var enabled = readPlayerChunkDebugOverlayEnabled();
+    try { toggle.checked = enabled; } catch (_) {}
+    return enabled;
+  }
+
+  function enablePerformanceModeAndClearLog(source) {
+    var mode = getPerfLogMode();
+    if (mode && typeof mode.setEnabled === 'function') {
+      var snapshot = mode.setEnabled(true, { clear: true, source: source || 'ui-button' });
+      setStatus('性能模式已开启：已清空日志，只保留 compact perf-summary / comparison / error 日志。suppressed=' + String(snapshot && snapshot.suppressionCount || 0));
+      return true;
+    }
+    try { if (typeof global.clearLogs === 'function') global.clearLogs(); } catch (_) {}
+    setStatus('性能模式模块未加载；已尽量清空日志。');
+    return false;
+  }
+
   function startCurrentBackendPerfSample() {
+    enablePerformanceModeAndClearLog('perf-sample-button');
     var diagnostics = getPerfDiagnostics();
     var active = getActiveBackend();
     emit('ui-control', {
@@ -211,12 +269,17 @@
     var active = getActiveBackend();
     var enablePixi = getElement('enablePixiBackendTest');
     var enableCanvas = getElement('enableCanvas2dBackendTest');
+    var perfMode = getElement('enablePixiPerformanceMode');
     var runPerf = getElement('runPixiPerfSample');
     var comparePerf = getElement('comparePixiPerfSample');
+    var overlayToggle = getElement('showPixiPlayerChunkDebugOverlay');
     if (enablePixi) enablePixi.disabled = requested === 'pixi';
     if (enableCanvas) enableCanvas.disabled = requested === 'canvas2d';
+    if (perfMode) perfMode.disabled = false;
     if (runPerf) runPerf.disabled = false;
     if (comparePerf) comparePerf.disabled = false;
+    if (overlayToggle) overlayToggle.disabled = false;
+    syncPlayerChunkDebugOverlayToggle();
     setEngineStatus(requested, active);
     setStatus('默认后端：PixiJS。requested=' + requested + '，active=' + active + '。如需对照测试，可点击“回到 Canvas2D”；点击“切换到 PixiJS”会刷新回 PixiJS backend。');
     return { requested: requested, active: active };
@@ -225,8 +288,10 @@
   function bindControls() {
     var enablePixi = getElement('enablePixiBackendTest');
     var enableCanvas = getElement('enableCanvas2dBackendTest');
+    var perfMode = getElement('enablePixiPerformanceMode');
     var runPerf = getElement('runPixiPerfSample');
     var comparePerf = getElement('comparePixiPerfSample');
+    var overlayToggle = getElement('showPixiPlayerChunkDebugOverlay');
     var status = updateButtonState();
     var pending = readPendingAction();
     emit('ui-control', {
@@ -239,8 +304,11 @@
       pendingBackend: pending && pending.backend || 'none',
       pixiButtonPresent: !!enablePixi,
       canvas2dButtonPresent: !!enableCanvas,
+      perfModeButtonPresent: !!perfMode,
       perfSampleButtonPresent: !!runPerf,
       perfCompareButtonPresent: !!comparePerf,
+      playerChunkDebugOverlayTogglePresent: !!overlayToggle,
+      playerChunkDebugOverlayEnabled: readPlayerChunkDebugOverlayEnabled(),
       ownsPointer: false,
       ownsPicking: false,
       mutatesBusinessObjects: false,
@@ -256,6 +324,12 @@
         navigateToBackend('canvas2d', 'enable-canvas2d-backend');
       });
     }
+    if (perfMode) {
+      perfMode.addEventListener('click', function () {
+        emit('ui-control', { action: 'enable-performance-mode-clear-logs', active: getActiveBackend(), source: 'button-click' });
+        enablePerformanceModeAndClearLog('performance-mode-button');
+      });
+    }
     if (runPerf) {
       runPerf.addEventListener('click', function () {
         startCurrentBackendPerfSample();
@@ -265,6 +339,12 @@
       comparePerf.addEventListener('click', function () {
         emitCurrentPerformanceComparison();
       });
+    }
+    if (overlayToggle) {
+      overlayToggle.addEventListener('change', function () {
+        setPlayerChunkDebugOverlayEnabled(!!overlayToggle.checked, 'test-panel-checkbox');
+      });
+      syncPlayerChunkDebugOverlayToggle();
     }
     try {
       if (!global.__PIXI_BACKEND_TEST_STATUS_INTERVAL__) {
@@ -286,8 +366,11 @@
       activeBackend: getActiveBackend(),
       enablePixiButton: !!getElement('enablePixiBackendTest'),
       enableCanvas2dButton: !!getElement('enableCanvas2dBackendTest'),
+      perfModeButton: !!getElement('enablePixiPerformanceMode'),
       perfSampleButton: !!getElement('runPixiPerfSample'),
       perfCompareButton: !!getElement('comparePixiPerfSample'),
+      playerChunkDebugOverlayToggle: !!getElement('showPixiPlayerChunkDebugOverlay'),
+      playerChunkDebugOverlayEnabled: readPlayerChunkDebugOverlayEnabled(),
       ownsPointer: false,
       ownsPicking: false,
       mutatesBusinessObjects: false
@@ -300,7 +383,9 @@
     bindControls: bindControls,
     getStatus: getStatus,
     switchToPixi: function switchToPixi() { navigateToBackend('pixi', 'enable-pixi-tile-floor-layer'); },
-    switchToCanvas2d: function switchToCanvas2d() { navigateToBackend('canvas2d', 'enable-canvas2d-backend'); }
+    switchToCanvas2d: function switchToCanvas2d() { navigateToBackend('canvas2d', 'enable-canvas2d-backend'); },
+    setPlayerChunkDebugOverlayEnabled: setPlayerChunkDebugOverlayEnabled,
+    isPlayerChunkDebugOverlayEnabled: readPlayerChunkDebugOverlayEnabled
   };
 
   try {

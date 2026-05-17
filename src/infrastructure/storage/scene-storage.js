@@ -150,7 +150,7 @@ function restoreTerrainStateFromSnapshot(incoming, sourceName) {
 
 function copyScenePersistenceFields(target, source) {
   if (!target || !source || typeof source !== 'object') return target;
-  var keys = ['generatedBy', 'terrainBatchId', 'terrainCellX', 'terrainCellY', 'semanticTextureMap', 'semanticTextures', 'semanticFaceColors', 'terrainMaterialId', 'materialType', 'terrainMaterialLabel', 'base', 'renderUpdateMode'];
+  var keys = ['generatedBy', 'terrainBatchId', 'terrainCellX', 'terrainCellY', 'terrainManualShapePrefabId', 'terrainManualShapeLabel', 'terrainManualColumnHeight', 'terrainStressPresetId', 'terrainStressPresetLabel', 'terrainStressPlacementIndex', 'semanticTextureMap', 'semanticTextures', 'semanticFaceColors', 'terrainMaterialId', 'materialType', 'terrainMaterialLabel', 'base', 'renderUpdateMode'];
   for (var i = 0; i < keys.length; i++) {
     var key = keys[i];
     if (Object.prototype.hasOwnProperty.call(source, key)) target[key] = cloneSceneSerializable(source[key], source[key]);
@@ -513,15 +513,89 @@ function applySceneSnapshot(snapshot, options = {}) {
   return owner.applySceneSnapshot(snapshot, options);
 }
 
-function saveSceneToLocalStorage() {
-  if (!sceneStorageAvailable()) {
-    pushLog('scene-save: localStorage unavailable');
+function estimateSceneStorageBytes(text) {
+  try {
+    if (typeof TextEncoder !== 'undefined') return new TextEncoder().encode(String(text || '')).length;
+  } catch (_) {}
+  try { return new Blob([String(text || '')]).size; } catch (_) {}
+  return String(text || '').length * 2;
+}
+
+function isSceneLocalStorageQuotaError(err) {
+  if (!err) return false;
+  var name = String(err.name || '');
+  var code = Number(err.code || 0);
+  var message = String(err.message || err || '');
+  return name === 'QuotaExceededError' ||
+    name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+    code === 22 ||
+    code === 1014 ||
+    /quota/i.test(message);
+}
+
+async function saveSceneSnapshotToServerFile(snapshot, filename, options = {}) {
+  if (!sceneFilesSupported()) {
+    updateSceneFileStatus();
+    pushLog('scene-file-save: server mode unavailable');
     return false;
   }
+  var nextFilename = suggestSceneFilename(filename);
+  try {
+    var sceneApi = getSceneApiAdapter();
+    var saveResult = await sceneApi.saveScene({ filename: nextFilename, scene: snapshot, setDefault: options.setDefault !== false });
+    var res = saveResult.response;
+    var data = saveResult.data;
+    if (!res.ok || !data || data.ok === false) throw new Error((data && data.error) || ('HTTP ' + res.status));
+    persistCurrentSceneServerFileName(data.file || nextFilename);
+    updateSceneFileStatus(`场景文件：已保存到 ${data.path || ('assets/scenes/' + (data.file || nextFilename))}，并设为默认打开。`);
+    pushLog(`scene-file-save: file=${data.file || nextFilename} instances=${snapshot.instances.length} boxes=${snapshot.boxes.length} lights=${snapshot.lights.length} default=${options.setDefault !== false}`);
+    return true;
+  } catch (err) {
+    updateSceneFileStatus(`场景文件保存失败：${err?.message || err}`);
+    pushLog(`scene-file-save:error ${err?.message || err}`);
+    return false;
+  }
+}
+
+async function saveSceneToServerFileAfterLocalStorageFailure(snapshot, reason, options = {}) {
+  var reasonText = String(reason || 'local-storage-failed');
+  if (!sceneFilesSupported()) {
+    updateSceneFileStatus('浏览器存档容量不足；当前不是本地服务器模式，无法自动保存为默认场景文件。请使用“导出 JSON”。');
+    pushLog('scene-save:local-fallback-unavailable reason=' + reasonText + ' serverMode=false');
+    return false;
+  }
+  var filename = options.filename || recallCurrentSceneServerFileName() || `scene_large_${makeSceneTimestampToken()}.json`;
+  pushLog('scene-save:local-fallback-server-file:start reason=' + reasonText + ' filename=' + String(filename || '') + ' instances=' + String(snapshot.instances && snapshot.instances.length || 0) + ' boxes=' + String(snapshot.boxes && snapshot.boxes.length || 0));
+  var ok = await saveSceneSnapshotToServerFile(snapshot, filename, Object.assign({}, options, { setDefault: options.setDefault !== false }));
+  if (ok) {
+    try { window.localStorage.removeItem(LOCAL_SCENE_STORAGE_KEY); } catch (_) {}
+    pushLog('scene-save:local-fallback-server-file:done ok=true removedLocalKey=true');
+  } else {
+    pushLog('scene-save:local-fallback-server-file:done ok=false');
+  }
+  return !!ok;
+}
+
+async function saveSceneToLocalStorage(options = {}) {
   const snapshot = buildSceneSnapshot({ kind: 'persistent', source: 'scene-storage:save-local', log: false });
-  window.localStorage.setItem(LOCAL_SCENE_STORAGE_KEY, JSON.stringify(snapshot));
-  pushLog(`scene-save: key=${LOCAL_SCENE_STORAGE_KEY} instances=${snapshot.instances.length} boxes=${snapshot.boxes.length} lights=${snapshot.lights.length}`);
-  return true;
+  const payload = JSON.stringify(snapshot);
+  const payloadBytes = estimateSceneStorageBytes(payload);
+  if (!sceneStorageAvailable()) {
+    pushLog('scene-save: localStorage unavailable payloadBytes=' + String(payloadBytes));
+    return await saveSceneToServerFileAfterLocalStorageFailure(snapshot, 'local-storage-unavailable', options);
+  }
+  try {
+    window.localStorage.setItem(LOCAL_SCENE_STORAGE_KEY, payload);
+    pushLog(`scene-save: key=${LOCAL_SCENE_STORAGE_KEY} payloadBytes=${payloadBytes} instances=${snapshot.instances.length} boxes=${snapshot.boxes.length} lights=${snapshot.lights.length}`);
+    return true;
+  } catch (err) {
+    if (isSceneLocalStorageQuotaError(err)) {
+      pushLog('scene-save:localStorage-quota-exceeded payloadBytes=' + String(payloadBytes) + ' instances=' + String(snapshot.instances.length) + ' boxes=' + String(snapshot.boxes.length));
+      return await saveSceneToServerFileAfterLocalStorageFailure(snapshot, 'quota-exceeded', options);
+    }
+    pushLog(`scene-save:error ${err?.message || err}`);
+    return false;
+  }
 }
 
 async function loadSceneFromLocalStorage(options = {}) {
@@ -615,28 +689,8 @@ function updateSceneFileStatus(message) {
 }
 
 async function saveSceneToServerFile(filename, options = {}) {
-  if (!sceneFilesSupported()) {
-    updateSceneFileStatus();
-    pushLog('scene-file-save: server mode unavailable');
-    return false;
-  }
-  var nextFilename = suggestSceneFilename(filename);
-  try {
-    var snapshot = buildSceneSnapshot({ kind: 'persistent', source: 'scene-storage:save-server-file', log: false });
-    var sceneApi = getSceneApiAdapter();
-    var saveResult = await sceneApi.saveScene({ filename: nextFilename, scene: snapshot, setDefault: options.setDefault !== false });
-    var res = saveResult.response;
-    var data = saveResult.data;
-    if (!res.ok || !data || data.ok === false) throw new Error((data && data.error) || ('HTTP ' + res.status));
-    persistCurrentSceneServerFileName(data.file || nextFilename);
-    updateSceneFileStatus(`场景文件：已保存到 ${data.path || ('assets/scenes/' + (data.file || nextFilename))}，并设为默认打开。`);
-    pushLog(`scene-file-save: file=${data.file || nextFilename} instances=${snapshot.instances.length} boxes=${snapshot.boxes.length} lights=${snapshot.lights.length} default=${options.setDefault !== false}`);
-    return true;
-  } catch (err) {
-    updateSceneFileStatus(`场景文件保存失败：${err?.message || err}`);
-    pushLog(`scene-file-save:error ${err?.message || err}`);
-    return false;
-  }
+  var snapshot = buildSceneSnapshot({ kind: 'persistent', source: 'scene-storage:save-server-file', log: false });
+  return await saveSceneSnapshotToServerFile(snapshot, filename, options);
 }
 
 async function loadSceneFromServerFile(filename, options = {}) {
@@ -703,8 +757,8 @@ async function importSceneJsonFile(file, options = {}) {
       var importedFilename = suggestSceneFilename(file.name || 'imported_scene.json');
       await saveSceneToServerFile(importedFilename, { setDefault: options.setDefault !== false });
     } else {
-      saveSceneToLocalStorage();
-      updateSceneFileStatus('场景文件：已导入到当前场景；当前模式不支持默认文件，已同时写入浏览器存档。');
+      await saveSceneToLocalStorage({ source: 'scene-import' });
+      updateSceneFileStatus('场景文件：已导入到当前场景；当前模式不支持默认文件，已尝试写入浏览器存档。');
     }
     return true;
   } catch (err) {
@@ -852,9 +906,10 @@ function saveSceneCore(options) {
   var source = String(options.source || 'unknown');
   sceneIoLog('save-scene:start', 'target=' + target + ' source=' + source);
   if (target === 'local') {
-    var ok = saveSceneToLocalStorage();
-    sceneIoLog('save-scene:done', 'target=' + target + ' source=' + source + ' ok=' + (!!ok));
-    return Promise.resolve(!!ok);
+    return Promise.resolve(saveSceneToLocalStorage(options)).then(function(ok) {
+      sceneIoLog('save-scene:done', 'target=' + target + ' source=' + source + ' ok=' + (!!ok));
+      return !!ok;
+    });
   }
   if (target === 'server-file') {
     return Promise.resolve(saveSceneToServerFile(options.filename, options)).then(function(ok) {

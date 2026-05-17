@@ -66,6 +66,12 @@
     var buildFramePlanWallMs = 0;
     var drawRenderableOrderMs = 0;
     var drawRenderableOrderWallMs = 0;
+    var drawRenderableOrderInnerLoopMs = 0;
+    var pixiStaticWorldBeginFrameWallMs = 0;
+    var pixiStaticWorldBeginFrameOk = false;
+    var pixiDrawsStaticWorldPackets = false;
+    var pixiStaticWorldActualDrawUnitCount = null;
+    var pixiStaticWorldFallbackReason = '';
     var drawOverlayPassesMs = 0;
     var drawOverlayPassesWallMs = 0;
     var drawHudPassMs = 0;
@@ -172,6 +178,17 @@
       drawRenderableOrderWallMs = Math.max(0, (nowMs(deps)) - drawLoopStartAt);
       drawRenderableOrderMs = drawRenderableOrderWallMs;
       try {
+        var lastDrawLoopBreakdown = adapterApi && adapterApi.__lastDrawLoopBreakdown ? adapterApi.__lastDrawLoopBreakdown : null;
+        if (lastDrawLoopBreakdown) {
+          drawRenderableOrderInnerLoopMs = Number(lastDrawLoopBreakdown.drawRenderableOrderMs || 0);
+          pixiStaticWorldBeginFrameWallMs = Number(lastDrawLoopBreakdown.pixiStaticWorldBeginFrameWallMs || 0);
+          pixiStaticWorldBeginFrameOk = lastDrawLoopBreakdown.pixiStaticWorldBeginFrameOk === true;
+          pixiDrawsStaticWorldPackets = lastDrawLoopBreakdown.pixiDrawsStaticWorldPackets === true;
+          pixiStaticWorldActualDrawUnitCount = lastDrawLoopBreakdown.pixiStaticWorldActualDrawUnitCount != null ? Number(lastDrawLoopBreakdown.pixiStaticWorldActualDrawUnitCount) : null;
+          pixiStaticWorldFallbackReason = lastDrawLoopBreakdown.pixiStaticWorldFallbackReason ? String(lastDrawLoopBreakdown.pixiStaticWorldFallbackReason) : '';
+        }
+      } catch (_) {}
+      try {
         if (window.__PIXI_MIGRATION_CANVAS2D_FRAMEPLAN_CONSUMPTION_DIAGNOSTICS__ && typeof window.__PIXI_MIGRATION_CANVAS2D_FRAMEPLAN_CONSUMPTION_DIAGNOSTICS__.noteCanvas2dFramePlanConsumption === 'function') {
           window.__PIXI_MIGRATION_CANVAS2D_FRAMEPLAN_CONSUMPTION_DIAGNOSTICS__.noteCanvas2dFramePlanConsumption(framePlan, {
             source: 'canvas2d-frame-pipeline',
@@ -230,6 +247,13 @@
       buildFramePlanWallMs: safeFixed(deps, buildFramePlanWallMs),
       drawRenderableOrderMs: safeFixed(deps, drawRenderableOrderMs),
       drawRenderableOrderWallMs: safeFixed(deps, drawRenderableOrderWallMs),
+      drawRenderableOrderInnerLoopMs: safeFixed(deps, drawRenderableOrderInnerLoopMs),
+      drawRenderableOrderPixiStaticBeginFrameWallMs: safeFixed(deps, pixiStaticWorldBeginFrameWallMs),
+      drawRenderableOrderUnaccountedWrapperMs: safeFixed(deps, Math.max(0, drawRenderableOrderWallMs - drawRenderableOrderInnerLoopMs - pixiStaticWorldBeginFrameWallMs)),
+      pixiStaticWorldBeginFrameOk: !!pixiStaticWorldBeginFrameOk,
+      pixiDrawsStaticWorldPackets: !!pixiDrawsStaticWorldPackets,
+      pixiStaticWorldActualDrawUnitCount: pixiStaticWorldActualDrawUnitCount,
+      pixiStaticWorldFallbackReason: pixiStaticWorldFallbackReason,
       drawOverlayPassesMs: safeFixed(deps, drawOverlayPassesMs),
       drawOverlayPassesWallMs: safeFixed(deps, drawOverlayPassesWallMs),
       drawHudPassMs: safeFixed(deps, drawHudPassMs),
@@ -265,6 +289,22 @@
     ].join('|'), 1000, { slow: Number(totalPipelineMs || 0) > 24 });
     if (shouldEmit) {
       call(deps, 'emitRendererProfile', 'CANVAS2D-PIPELINE-BREAKDOWN', Object.assign({}, pipelineBreakdown, { totalPipelineMs: safeFixed(deps, totalPipelineMs), adapterGlueMs: 0, debugHookMs: 0, knownAccountedMs: 0, unaccountedMs: 0 }));
+      call(deps, 'emitRendererProfile', 'LARGE-SCENE-FULL-FRAME-PATH-DIAGNOSTICS', {
+        step: 'PXM-07.18K0-large-scene-frameplan-diagnostics-only',
+        source: 'canvas2d-frame-pipeline.after-drawRenderableOrder',
+        framePlanId: pipelineBreakdown.framePlanId || null,
+        renderableCount: Number(pipelineBreakdown.renderableCount || 0),
+        totalPipelineMs: safeFixed(deps, totalPipelineMs),
+        buildFramePlanWallMs: safeFixed(deps, buildFramePlanWallMs),
+        drawRenderableOrderWallMs: safeFixed(deps, drawRenderableOrderWallMs),
+        drawRenderableOrderInnerLoopMs: safeFixed(deps, drawRenderableOrderInnerLoopMs),
+        drawRenderableOrderPixiStaticBeginFrameWallMs: safeFixed(deps, pixiStaticWorldBeginFrameWallMs),
+        drawRenderableOrderUnaccountedWrapperMs: safeFixed(deps, Math.max(0, drawRenderableOrderWallMs - drawRenderableOrderInnerLoopMs - pixiStaticWorldBeginFrameWallMs)),
+        pixiStaticWorldBeginFrameOk: !!pixiStaticWorldBeginFrameOk,
+        pixiDrawsStaticWorldPackets: !!pixiDrawsStaticWorldPackets,
+        pixiStaticWorldActualDrawUnitCount: pixiStaticWorldActualDrawUnitCount,
+        pixiStaticWorldFallbackReason: pixiStaticWorldFallbackReason
+      });
       var functionBreakdownPayload = call(deps, 'getFunctionBreakdownFrame');
       if (functionBreakdownPayload) {
         call(deps, 'emitRendererProfile', 'RENDER-FUNCTION-BREAKDOWN', {

@@ -614,6 +614,20 @@ function finalizeCameraInteractionProfile() {
   state.pendingUiAndInspectorMs = 0;
 }
 
+
+function isPixiPerformanceModeEnabledForApp() {
+  try {
+    var mode = window.__PIXI_PERFORMANCE_LOG_MODE__ || null;
+    if (mode && typeof mode.isEnabled === 'function') return mode.isEnabled() === true;
+    if (window.__PIXI_PERFORMANCE_MODE__ === true) return true;
+    if (window.localStorage) {
+      var value = window.localStorage.getItem('pixiPerformanceMode');
+      return value === '1' || value === 'true';
+    }
+  } catch (_) {}
+  return false;
+}
+
 function maybeEmitCameraInteractionProfile(payload) {
   var state = __cameraInteractionProfile;
   if (!state.active || !payload || typeof payload !== 'object') return false;
@@ -636,6 +650,11 @@ function maybeEmitCameraInteractionProfile(payload) {
   state.maxRendererActiveCallWallMs = Math.max(state.maxRendererActiveCallWallMs || 0, Number(payload.rendererActiveCallWallMs || 0));
   state.maxRunFramePipelineWallMs = Math.max(state.maxRunFramePipelineWallMs || 0, Number(payload.runFramePipelineWallMs || 0));
   state.maxBaseWorldPassesWallMs = Math.max(state.maxBaseWorldPassesWallMs || 0, Number(payload.baseWorldPassesWallMs || 0));
+  if (isPixiPerformanceModeEnabledForApp()) {
+    var compactNowMs = perfNow();
+    if (state.frameCount >= state.maxFrames || (compactNowMs - Number(state.lastActivityMs || 0)) > state.idleWindowMs) finalizeCameraInteractionProfile();
+    return true;
+  }
   emitCameraInteractionProfile(payload);
   if (Number(payload.renderPipelineCallCount || 0) > 1 && payload.pipelineCalls && payload.pipelineCalls.length) {
     emitCameraInteractionPipelineCalls({
@@ -831,6 +850,11 @@ function loop(now) {
         ? (rendererProfileApi.consumeInteractionPipelineCapture() || {})
         : {};
       var mainStats = (typeof __lastMainRenderableBuildStats !== 'undefined' && __lastMainRenderableBuildStats) ? __lastMainRenderableBuildStats : {};
+      var __lastGpuDiagnostics = (typeof window !== 'undefined' && window.__PIXI_MIGRATION_LAST_GPU_DIAGNOSTICS__) ? window.__PIXI_MIGRATION_LAST_GPU_DIAGNOSTICS__ : {};
+      var __rendererStatus = {};
+      try {
+        if (rendererProfileApi && typeof rendererProfileApi.getStatus === 'function') __rendererStatus = rendererProfileApi.getStatus() || {};
+      } catch (_) { __rendererStatus = {}; }
       var __fullFramePayload = {
         totalFrameWallMs: Number((loopEndMs - loopStartMs).toFixed(3)),
         beforeRenderMs: Number((updateEndMs - updateStartMs).toFixed(3)),
@@ -846,6 +870,28 @@ function loop(now) {
         rebuiltChunkCountThisFrame: Number(mainStats.rebuiltChunkCountThisFrame || 0),
         reusedChunkCountThisFrame: Number(mainStats.reusedChunkCountThisFrame || 0),
         staticCacheRebuiltThisFrame: mainStats.staticCacheRebuiltThisFrame === true,
+        staticCacheInvalidationReason: String(mainStats.staticCacheInvalidationReason || 'none'),
+        staticCacheProfileTotalMs: Number(mainStats.staticCacheProfileTotalMs || 0),
+        staticCacheRenderSignatureChanged: mainStats.staticCacheRenderSignatureChanged === true,
+        staticCacheRenderSignatureChangedFieldNames: Array.isArray(mainStats.staticCacheRenderSignatureChangedFieldNames) ? mainStats.staticCacheRenderSignatureChangedFieldNames.slice() : [],
+        staticCacheRenderSignatureChangedFieldCount: Number(mainStats.staticCacheRenderSignatureChangedFieldCount || 0),
+        staticCacheRenderSignaturePreviousValues: mainStats.staticCacheRenderSignaturePreviousValues || {},
+        staticCacheRenderSignatureNextValues: mainStats.staticCacheRenderSignatureNextValues || {},
+        staticCacheForcedVisibleStructuralRebuild: mainStats.staticCacheForcedVisibleStructuralRebuild === true,
+        staticCacheStructuralRenderSignatureChanged: mainStats.staticCacheStructuralRenderSignatureChanged === true,
+        staticCacheRebuiltChunkKeysThisFrame: Array.isArray(mainStats.staticCacheRebuiltChunkKeysThisFrame) ? mainStats.staticCacheRebuiltChunkKeysThisFrame.slice() : [],
+        activeRendererBackend: String(mainStats.activeRendererBackend || __rendererStatus.activeBackend || __rendererStatus.backend || 'unknown'),
+        activeRendererType: String(mainStats.activeRendererType || __rendererStatus.rendererType || __lastGpuDiagnostics.rendererType || 'unknown'),
+        gpuAccelerated: mainStats.gpuAccelerated === true || __lastGpuDiagnostics.gpuAccelerated === true,
+        gpuBackendFamily: String(mainStats.gpuBackendFamily || __lastGpuDiagnostics.backendFamily || 'unknown'),
+        gpuVendor: String(mainStats.gpuVendor || __lastGpuDiagnostics.gpuVendor || ''),
+        gpuRenderer: String(mainStats.gpuRenderer || __lastGpuDiagnostics.gpuRenderer || ''),
+        pixiInitialized: mainStats.pixiInitialized === true || __rendererStatus.initialized === true,
+        pixiRendererCreated: mainStats.pixiRendererCreated === true || __rendererStatus.rendererCreated === true,
+        pixiDrawsFloor: __lastGpuDiagnostics.pixiDrawsFloor === true,
+        pixiDrawsStaticWorldPackets: __lastGpuDiagnostics.pixiDrawsStaticWorldPackets === true,
+        pixiDrawsPlayerAvatar: __lastGpuDiagnostics.pixiDrawsPlayerAvatar === true,
+        canvas2dFallbackFrameMs: Number(__lastGpuDiagnostics.canvas2dFallbackFrameMs || 0),
         drawRenderableOrderMs: Number(lastPipeline.drawRenderableOrderMs || 0),
         baseWorldPassesMs: Number(lastPipeline.baseWorldPassesMs || 0),
         totalPipelineMs: Number(lastPipeline.totalPipelineMs || 0)

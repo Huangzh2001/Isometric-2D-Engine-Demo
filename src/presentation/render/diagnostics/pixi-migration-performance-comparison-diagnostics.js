@@ -1,4 +1,4 @@
-// PXM-07.5: Canvas2D vs PixiJS performance comparison diagnostics.
+// PXM-07.17A: Canvas2D vs PixiJS performance comparison diagnostics with compact performance-mode logging.
 // Layer: presentation/render/diagnostics.
 //
 // This module only records renderer timing samples for migration validation.
@@ -7,7 +7,7 @@
   if (!global) return;
 
   var OWNER = 'src/presentation/render/diagnostics/pixi-migration-performance-comparison-diagnostics.js';
-  var STEP = 'PXM-07.5';
+  var STEP = 'PXM-07.17A';
   var PREFIX = '[pixi-migration][step=' + STEP + ']';
   var STORAGE_KEY = 'isometric:pixi-migration:perf-summaries:v1';
   var DEFAULT_SAMPLE_FRAMES = 180;
@@ -27,6 +27,36 @@
       if (global.performance && typeof global.performance.now === 'function') return global.performance.now();
     } catch (_) {}
     return Date.now();
+  }
+
+
+  function getPixiPerformanceLogMode() {
+    try { return global.__PIXI_PERFORMANCE_LOG_MODE__ || null; } catch (_) {}
+    return null;
+  }
+
+  function isPixiPerformanceModeEnabled() {
+    try {
+      var mode = getPixiPerformanceLogMode();
+      if (mode && typeof mode.isEnabled === 'function') return mode.isEnabled() === true;
+      if (global.__PIXI_PERFORMANCE_MODE__ === true) return true;
+      if (global.localStorage) {
+        var value = global.localStorage.getItem('pixiPerformanceMode');
+        return value === '1' || value === 'true';
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  function enablePixiPerformanceModeForSample(source) {
+    try {
+      var mode = getPixiPerformanceLogMode();
+      if (mode && typeof mode.setEnabled === 'function') {
+        mode.setEnabled(true, { clear: true, source: source || 'perf-sample' });
+        return true;
+      }
+    } catch (_) {}
+    return false;
   }
 
   function toNumber(value, fallback) {
@@ -166,6 +196,26 @@
       canvas2dFloorRebuildMs: [],
       canvas2dFloorTotalMs: [],
       pixiFloorDrawMs: [],
+      pixiStaticWorldDrawMs: [],
+      pixiPlayerDrawMs: [],
+      pixiChunkRenderTextureWallMs: [],
+      pixiChunkRenderTextureCount: [],
+      pixiChunkRenderTextureHitRate: [],
+      pixiChunkRenderTextureHitCount: [],
+      pixiChunkRenderTextureMissCount: [],
+      pixiChunkRenderTextureRebuildPacketCount: [],
+      pixiChunkRenderTextureReusablePacketCount: [],
+      pixiStaticGraphicsReuseRate: [],
+      pixiStaticGraphicsReusedCount: [],
+      pixiStaticGraphicsRebuiltCount: [],
+      pixiStaticChunkDrawDataCacheHitRate: [],
+      pixiStaticChunkDrawDataCacheMissCount: [],
+      pixiStaticPacketCount: [],
+      pixiStaticPacketDrawCount: [],
+      pixiGpuChunkCacheHitRate: [],
+      pixiGpuChunkCacheHitCount: [],
+      pixiGpuChunkCacheMissCount: [],
+      pixiGpuChunkCacheDiagnosticOnly: [],
       renderableCount: [],
       visibleTiles: [],
       drawnTiles: []
@@ -217,7 +267,8 @@
     var active = getActiveBackend();
     var backend = normalizeBackend(options.backend || active || 'canvas2d');
     var maxFrames = Math.max(30, Math.min(600, Number(options.maxFrames || DEFAULT_SAMPLE_FRAMES)));
-    var id = 'pxm075-' + (++state.sampleSeq) + '-' + Math.round(nowMs());
+    enablePixiPerformanceModeForSample(options.source || 'begin-sample');
+    var id = 'pxm0717a-' + (++state.sampleSeq) + '-' + Math.round(nowMs());
     state.activeSample = {
       id: id,
       backend: backend,
@@ -238,7 +289,8 @@
       active: active,
       maxFrames: maxFrames,
       requested: state.activeSample.requestedBackend,
-      source: state.activeSample.source
+      source: state.activeSample.source,
+      performanceModeEnabled: isPixiPerformanceModeEnabled()
     });
     emitStatus('begin-sample');
     return Object.assign({}, state.activeSample, { bucket: undefined });
@@ -308,6 +360,17 @@
     var canvas2dFallbackPipeline = summarizeValues(bucket.canvas2dFallbackPipelineMs);
     var canvas2dFallbackFrame = summarizeValues(bucket.canvas2dFallbackFrameMs);
     var pixiFloor = summarizeValues(bucket.pixiFloorDrawMs);
+    var pixiStaticWorld = summarizeValues(bucket.pixiStaticWorldDrawMs);
+    var pixiPlayer = summarizeValues(bucket.pixiPlayerDrawMs);
+    var pixiChunkRtWall = summarizeValues(bucket.pixiChunkRenderTextureWallMs);
+    var pixiChunkRtCount = summarizeValues(bucket.pixiChunkRenderTextureCount);
+    var pixiChunkRtHitRate = summarizeValues(bucket.pixiChunkRenderTextureHitRate);
+    var pixiStaticReuseRate = summarizeValues(bucket.pixiStaticGraphicsReuseRate);
+    var pixiStaticChunkDrawDataHitRate = summarizeValues(bucket.pixiStaticChunkDrawDataCacheHitRate);
+    var pixiStaticChunkDrawDataMissCount = summarizeValues(bucket.pixiStaticChunkDrawDataCacheMissCount);
+    var pixiStaticPackets = summarizeValues(bucket.pixiStaticPacketCount);
+    var pixiStaticPacketDraws = summarizeValues(bucket.pixiStaticPacketDrawCount);
+    var pixiGpuChunkHitRate = summarizeValues(bucket.pixiGpuChunkCacheHitRate);
     var canvas2dFloorTotal = summarizeValues(bucket.canvas2dFloorTotalMs);
     var build = summarizeValues(bucket.buildFramePlanMs);
     var drawOrder = summarizeValues(bucket.drawRenderableOrderMs);
@@ -344,6 +407,19 @@
       drawHudPassAvgMs: hud.avg,
       canvas2dFloorTotalAvgMs: canvas2dFloorTotal.avg,
       pixiFloorDrawAvgMs: pixiFloor.avg,
+      pixiStaticWorldDrawAvgMs: pixiStaticWorld.avg,
+      pixiStaticWorldDrawP95Ms: pixiStaticWorld.p95,
+      pixiPlayerDrawAvgMs: pixiPlayer.avg,
+      pixiChunkRenderTextureWallAvgMs: pixiChunkRtWall.avg,
+      pixiChunkRenderTextureCountAvg: pixiChunkRtCount.avg,
+      pixiChunkRenderTextureHitRateAvg: pixiChunkRtHitRate.avg,
+      pixiStaticGraphicsReuseRateAvg: pixiStaticReuseRate.avg,
+      pixiStaticChunkDrawDataCacheHitRateAvg: pixiStaticChunkDrawDataHitRate.avg,
+      pixiStaticChunkDrawDataCacheMissCountAvg: pixiStaticChunkDrawDataMissCount.avg,
+      pixiStaticPacketCountAvg: pixiStaticPackets.avg,
+      pixiStaticPacketDrawCountAvg: pixiStaticPacketDraws.avg,
+      pixiGpuChunkCacheHitRateAvg: pixiGpuChunkHitRate.avg,
+      performanceModeEnabled: isPixiPerformanceModeEnabled(),
       visibleTilesAvg: visibleTiles.avg,
       drawnTilesAvg: drawnTiles.avg,
       renderableCountAvg: renderables.avg,
@@ -385,6 +461,12 @@
       pixiFloorDrawAvgMs: toNumber(pixi.pixiFloorDrawAvgMs, 0),
       canvas2dDrawOrderAvgMs: toNumber(canvas.drawRenderableOrderAvgMs, 0),
       pixiFallbackDrawOrderAvgMs: toNumber(pixi.drawRenderableOrderAvgMs, 0),
+      pixiStaticWorldDrawAvgMs: toNumber(pixi.pixiStaticWorldDrawAvgMs, 0),
+      pixiChunkRenderTextureWallAvgMs: toNumber(pixi.pixiChunkRenderTextureWallAvgMs, 0),
+      pixiChunkRenderTextureHitRateAvg: toNumber(pixi.pixiChunkRenderTextureHitRateAvg, 0),
+      pixiStaticGraphicsReuseRateAvg: toNumber(pixi.pixiStaticGraphicsReuseRateAvg, 0),
+      pixiGpuChunkCacheHitRateAvg: toNumber(pixi.pixiGpuChunkCacheHitRateAvg, 0),
+      targetSpeedup: '100x requires static world to remain chunk-render-texture/sprite-only and Canvas2D world fallback to exit hot path',
       warning: valid ? '' : 'insufficient-samples-or-missing-frame-total',
       source: reason || 'comparison'
     });
@@ -442,6 +524,26 @@
     sample.pixiFrames += 1;
     pushValue(bucket, 'frameTotalMs', payload.frameTotalMs || payload.pixiFrameTotalMs);
     pushValue(bucket, 'pixiFloorDrawMs', payload.pixiFloorDrawMs);
+    pushValue(bucket, 'pixiStaticWorldDrawMs', payload.pixiStaticWorldDrawMs || payload.staticPacketDrawWallMs);
+    pushValue(bucket, 'pixiPlayerDrawMs', payload.pixiPlayerDrawMs);
+    pushValue(bucket, 'pixiChunkRenderTextureWallMs', payload.chunkRenderTextureWallMs);
+    pushValue(bucket, 'pixiChunkRenderTextureCount', payload.chunkRenderTextureCount);
+    pushValue(bucket, 'pixiChunkRenderTextureHitRate', payload.chunkRenderTextureHitRate);
+    pushValue(bucket, 'pixiChunkRenderTextureHitCount', payload.chunkRenderTextureHitCount);
+    pushValue(bucket, 'pixiChunkRenderTextureMissCount', payload.chunkRenderTextureMissCount);
+    pushValue(bucket, 'pixiChunkRenderTextureRebuildPacketCount', payload.chunkRenderTextureRebuildPacketCount);
+    pushValue(bucket, 'pixiChunkRenderTextureReusablePacketCount', payload.chunkRenderTextureReusablePacketCount);
+    pushValue(bucket, 'pixiStaticGraphicsReuseRate', payload.staticGraphicsReuseRate);
+    pushValue(bucket, 'pixiStaticGraphicsReusedCount', payload.staticGraphicsReusedCount);
+    pushValue(bucket, 'pixiStaticGraphicsRebuiltCount', payload.staticGraphicsRebuiltCount);
+    pushValue(bucket, 'pixiStaticChunkDrawDataCacheHitRate', payload.staticChunkDrawDataCacheHitRate);
+    pushValue(bucket, 'pixiStaticChunkDrawDataCacheMissCount', payload.staticChunkDrawDataCacheMissCount);
+    pushValue(bucket, 'pixiStaticPacketCount', payload.staticPacketCount);
+    pushValue(bucket, 'pixiStaticPacketDrawCount', payload.staticPacketDrawCount);
+    pushValue(bucket, 'pixiGpuChunkCacheHitRate', payload.staticGpuChunkCacheHitRate);
+    pushValue(bucket, 'pixiGpuChunkCacheHitCount', payload.staticGpuChunkCacheHitCount);
+    pushValue(bucket, 'pixiGpuChunkCacheMissCount', payload.staticGpuChunkCacheMissCount);
+    pushValue(bucket, 'pixiGpuChunkCacheDiagnosticOnly', payload.staticGpuChunkCacheDiagnosticOnly === true ? 1 : 0);
     pushValue(bucket, 'canvas2dFallbackFrameMs', payload.canvas2dFallbackFrameMs);
     pushValue(bucket, 'visibleTiles', payload.visibleTiles);
     pushValue(bucket, 'drawnTiles', payload.drawnTiles);
