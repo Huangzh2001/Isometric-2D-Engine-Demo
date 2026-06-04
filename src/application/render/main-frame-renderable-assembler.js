@@ -1,3 +1,61 @@
+
+function isUnifiedVertexSquarePrefabId(prefabId) {
+  var id = String(prefabId || '');
+  return id === 'vertex_square_tri_block' || id === 'vertex_square_quarter_block';
+}
+
+function buildUnifiedVertexSquarePrimitiveRenderList(primitives, inst, prefab) {
+  const list = Array.isArray(primitives) ? primitives : [];
+  if (!list.length) return [];
+  const points = [];
+  const seen = new Set();
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let minZ = Infinity, maxH = 1;
+  for (let i = 0; i < list.length; i++) {
+    const prim = list[i] || {};
+    const verts = Array.isArray(prim.vertices2d) ? prim.vertices2d : [];
+    for (let j = 0; j < verts.length; j++) {
+      const x = Number(verts[j] && verts[j].x || 0);
+      const y = Number(verts[j] && verts[j].y || 0);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      minX = Math.min(minX, x); minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+      const key = x.toFixed(6) + ',' + y.toFixed(6);
+      if (!seen.has(key)) { seen.add(key); points.push({ x, y }); }
+    }
+    const z = Number(prim.z || 0);
+    if (Number.isFinite(z)) minZ = Math.min(minZ, z);
+    const h = Number(prim.h != null ? prim.h : 1);
+    if (Number.isFinite(h)) maxH = Math.max(maxH, h);
+  }
+  if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) return list;
+  const cx = (minX + maxX) * 0.5;
+  const cy = (minY + maxY) * 0.5;
+  const boundary = points
+    .filter(function (pt) {
+      const onBounds = Math.abs(pt.x - minX) < 1e-6 || Math.abs(pt.x - maxX) < 1e-6 || Math.abs(pt.y - minY) < 1e-6 || Math.abs(pt.y - maxY) < 1e-6;
+      const isCenter = Math.abs(pt.x - cx) < 1e-6 && Math.abs(pt.y - cy) < 1e-6;
+      return onBounds && !isCenter;
+    })
+    .sort(function (a, b) { return Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx); });
+  if (boundary.length < 3) return list;
+  return [{
+    id: 'vertex-square-unified-visual',
+    primitiveId: 'vertex-square-unified-visual',
+    primitiveKind: 'vertical_polygon_prism',
+    kind: 'vertical_polygon_prism',
+    shapeKind: 'vertex_square_unified_visual',
+    visualComposite: true,
+    vertices2d: boundary,
+    z: Number.isFinite(minZ) ? minZ : Number(inst && inst.z || 0),
+    h: Math.max(0.001, maxH || 1),
+    sortCell: { x: minX, y: minY, z: Number.isFinite(minZ) ? minZ : Number(inst && inst.z || 0) },
+    sortFootprint: { w: Math.max(0.001, maxX - minX), d: Math.max(0.001, maxY - minY) },
+    base: (inst && inst.base) || (prefab && prefab.base) || '#d59a62',
+    sourcePrimitiveCount: list.length
+  }];
+}
+
 // P6c: main frame renderable assembly owner.
 // Layer: application/render.
 //
@@ -103,6 +161,75 @@ function buildRenderablesForMainFrameAssembler() {
         const item = buildShiftedVoxelRenderable({ x: cell.x, y: cell.y, z: cell.z, box: cell, base: cell.base }, visibleOcc, shift, 'habbo-voxel-' + inst.instanceId);
         habboVoxelBuildMs += Math.max(0, perfNow() - habboVoxelBuildStartAt);
         if (item) dynamicRenderables.push(item);
+      }
+    }
+    else if (prefab && prefabDrawsVoxels(prefab)) {
+      const domainCoreForVoxelProxy = getDomainSceneCoreApi();
+      const instPrimitives = (typeof expandInstanceToPrimitives === 'function') ? expandInstanceToPrimitives(inst, false, { source: 'render:dynamic-primitives' }) : [];
+      if (Array.isArray(instPrimitives) && instPrimitives.length) {
+        const primitiveRenderList = (prefab && isUnifiedVertexSquarePrefabId(prefab.id))
+          ? buildUnifiedVertexSquarePrimitiveRenderList(instPrimitives, inst, prefab)
+          : instPrimitives;
+        for (let primitiveIndex = 0; primitiveIndex < primitiveRenderList.length; primitiveIndex++) {
+          const primitive = primitiveRenderList[primitiveIndex];
+          const sortCell = primitive && primitive.sortCell ? primitive.sortCell : { x: inst.x || 0, y: inst.y || 0, z: inst.z || 0 };
+          const sortFootprint = primitive && primitive.sortFootprint ? primitive.sortFootprint : { w: 1, d: 1 };
+          const primitiveSort = domainCoreForVoxelProxy && typeof domainCoreForVoxelProxy.computeVoxelRenderableSort === 'function'
+            ? domainCoreForVoxelProxy.computeVoxelRenderableSort({ cell: { x: sortCell.x, y: sortCell.y, z: sortCell.z, w: sortFootprint.w, d: sortFootprint.d, h: primitive && primitive.h != null ? primitive.h : 1 }, viewRotation: normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation) })
+            : computeViewAwareSortMeta({ x: sortCell.x, y: sortCell.y, z: sortCell.z }, primitive && primitive.h != null ? primitive.h : 1, normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation));
+          dynamicRenderables.push({
+            id: 'primitive-tri-prism-' + String(inst.instanceId || 'unknown') + '-' + String(primitive && primitive.primitiveId || primitiveIndex),
+            kind: 'primitive-tri-prism',
+            dynamic: true,
+            sortKey: Number(primitiveSort.sortKey || 0),
+            tie: Number(primitiveSort.tie || 0) + 120000 + primitiveIndex,
+            instanceId: inst.instanceId || null,
+            prefabId: prefab && prefab.id || null,
+            primitiveId: primitive && primitive.primitiveId || null,
+            primitiveKind: primitive && primitive.primitiveKind || 'vertical_tri_prism',
+            renderPath: 'dynamic-renderables',
+            primitive: primitive,
+            worldBounds: { x: sortCell.x, y: sortCell.y, z: sortCell.z, w: sortFootprint.w, d: sortFootprint.d, h: primitive && primitive.h != null ? primitive.h : 1 },
+            sortWorldAnchor: { x: sortCell.x, y: sortCell.y, z: sortCell.z, w: sortFootprint.w, d: sortFootprint.d, h: primitive && primitive.h != null ? primitive.h : 1 },
+            drawScreenPosition: deriveRenderableDrawPosition({ debugFoot: iso(Number(sortCell.x || 0) + Number(sortFootprint.w || 1), Number(sortCell.y || 0) + Number(sortFootprint.d || 1), Number(sortCell.z || 0)) }),
+            worldX: Number(sortCell.x || 0) + Number(sortFootprint.w || 1),
+            worldY: Number(sortCell.y || 0) + Number(sortFootprint.d || 1),
+            draw: () => {}
+          });
+        }
+        try { detailLog('[TRI-PRISM-TRACE] ' + JSON.stringify({ phase: 'main-frame-primitive-renderables', instanceId: inst.instanceId || null, prefabId: prefab.id || null, primitiveCount: instPrimitives.length, renderPrimitiveCount: primitiveRenderList.length, renderMode: prefab && isUnifiedVertexSquarePrefabId(prefab.id) ? 'unified-vertex-square' : 'per-primitive', source: 'src/application/render/main-frame-renderable-assembler.js' })); } catch (_) {}
+      }
+      const instBoxes = filterBoxesForMainCameraScope(boxes.filter(function (b) { return b.instanceId === inst.instanceId && b.renderHidden !== true; }), cameraScope);
+      for (let voxelProxyIndex = 0; voxelProxyIndex < instBoxes.length; voxelProxyIndex++) {
+        const cell = instBoxes[voxelProxyIndex];
+        const cellBounds = {
+          x: Number(cell && cell.x || 0),
+          y: Number(cell && cell.y || 0),
+          z: Number(cell && cell.z || 0),
+          w: Math.max(0.001, Number(cell && cell.w != null ? cell.w : 1) || 1),
+          d: Math.max(0.001, Number(cell && cell.d != null ? cell.d : 1) || 1),
+          h: Math.max(0.001, Number(cell && cell.h != null ? cell.h : 1) || 1)
+        };
+        const voxelSort = domainCoreForVoxelProxy && typeof domainCoreForVoxelProxy.computeVoxelRenderableSort === 'function'
+          ? domainCoreForVoxelProxy.computeVoxelRenderableSort({ cell: cellBounds, box: cell, viewRotation: normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation) })
+          : computeViewAwareSortMeta({ x: cellBounds.x, y: cellBounds.y, z: cellBounds.z }, cellBounds.h, normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation));
+        dynamicRenderables.push({
+          id: 'voxel-proxy-' + String(inst.instanceId || 'unknown') + '-' + String(cell && cell.id != null ? cell.id : voxelProxyIndex),
+          kind: 'voxel-proxy-box',
+          dynamic: true,
+          sortKey: Number(voxelSort.sortKey || 0),
+          tie: Number(voxelSort.tie || 0) + 100000 + voxelProxyIndex,
+          instanceId: inst.instanceId || null,
+          prefabId: prefab && prefab.id || null,
+          boxId: cell && cell.id != null ? cell.id : null,
+          renderPath: 'dynamic-renderables',
+          worldBounds: Object.assign({}, cellBounds),
+          sortWorldAnchor: Object.assign({}, cellBounds),
+          drawScreenPosition: deriveRenderableDrawPosition({ debugFoot: iso(cellBounds.x + cellBounds.w, cellBounds.y + cellBounds.d, cellBounds.z) }),
+          worldX: cellBounds.x + cellBounds.w,
+          worldY: cellBounds.y + cellBounds.d,
+          draw: () => drawBox(cell, 0.92),
+        });
       }
     }
     if (prefabHasSprite(prefab)) {

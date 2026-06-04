@@ -49,6 +49,10 @@ var settings = {
   playerDropLiftCells: 0.16,
   tileW: BASE_TILE_W,
   tileH: BASE_TILE_H,
+  subTileGridEnabled: false,
+  subTileGridMode: 'diamond_quarters',
+  subTileGridSubdivision: 1,
+  derivedAxisGridEnabled: false,
   originX: 1180 * 0.57,
   originY: 150,
   ambient: 0.22,
@@ -96,6 +100,10 @@ var editor = {
   showCullingBounds: false,
   surfaceOnlyRenderingEnabled: true,
   debugVisibleSurfaces: false,
+  subTileGridEnabled: false,
+  subTileGridMode: 'diamond_quarters',
+  subTileGridSubdivision: 1,
+  derivedAxisGridEnabled: false,
   staticWorldFaceMergeEnabled: true,
   disableFaceMergeAtOrAboveZoomEnabled: false,
   disableFaceMergeAtOrAboveZoomThreshold: 1.6,
@@ -681,6 +689,10 @@ function getEditorCameraSettingsValue() {
     showCullingBounds: !!(editor && editor.showCullingBounds),
     surfaceOnlyRenderingEnabled: editor && editor.surfaceOnlyRenderingEnabled !== false,
     debugVisibleSurfaces: !!(editor && editor.debugVisibleSurfaces),
+    subTileGridEnabled: !!(editor && editor.subTileGridEnabled),
+    subTileGridMode: String(editor && editor.subTileGridMode || 'diamond_quarters'),
+    subTileGridSubdivision: Math.max(1, Math.min(64, Math.round(Number(editor && editor.subTileGridSubdivision) || 1))),
+    derivedAxisGridEnabled: !!(editor && editor.derivedAxisGridEnabled),
     staticWorldFaceMergeEnabled: editor && editor.staticWorldFaceMergeEnabled !== false,
     disableFaceMergeAtOrAboveZoomEnabled: !!(editor && editor.disableFaceMergeAtOrAboveZoomEnabled),
     disableFaceMergeAtOrAboveZoomThreshold: Math.max(0.05, Number(editor && editor.disableFaceMergeAtOrAboveZoomThreshold) || 1.6)
@@ -715,6 +727,24 @@ function patchEditorCameraSettings(patch, meta) {
   if (Object.prototype.hasOwnProperty.call(patch, 'showCullingBounds')) editor.showCullingBounds = !!patch.showCullingBounds;
   if (Object.prototype.hasOwnProperty.call(patch, 'surfaceOnlyRenderingEnabled')) editor.surfaceOnlyRenderingEnabled = patch.surfaceOnlyRenderingEnabled !== false;
   if (Object.prototype.hasOwnProperty.call(patch, 'debugVisibleSurfaces')) editor.debugVisibleSurfaces = !!patch.debugVisibleSurfaces;
+  if (Object.prototype.hasOwnProperty.call(patch, 'subTileGridEnabled')) {
+    editor.subTileGridEnabled = !!patch.subTileGridEnabled;
+    settings.subTileGridEnabled = !!patch.subTileGridEnabled;
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'subTileGridMode')) {
+    var subTileGridMode = String(patch.subTileGridMode || 'diamond_quarters');
+    editor.subTileGridMode = subTileGridMode;
+    settings.subTileGridMode = subTileGridMode;
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'subTileGridSubdivision')) {
+    var subTileGridSubdivision = Math.max(1, Math.min(64, Math.round(Number(patch.subTileGridSubdivision) || 1)));
+    editor.subTileGridSubdivision = subTileGridSubdivision;
+    settings.subTileGridSubdivision = subTileGridSubdivision;
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'derivedAxisGridEnabled')) {
+    editor.derivedAxisGridEnabled = !!patch.derivedAxisGridEnabled;
+    settings.derivedAxisGridEnabled = !!patch.derivedAxisGridEnabled;
+  }
   if (Object.prototype.hasOwnProperty.call(patch, 'staticWorldFaceMergeEnabled')) editor.staticWorldFaceMergeEnabled = patch.staticWorldFaceMergeEnabled !== false;
   if (Object.prototype.hasOwnProperty.call(patch, 'disableFaceMergeAtOrAboveZoomEnabled')) editor.disableFaceMergeAtOrAboveZoomEnabled = !!patch.disableFaceMergeAtOrAboveZoomEnabled;
   if (Object.prototype.hasOwnProperty.call(patch, 'disableFaceMergeAtOrAboveZoomThreshold')) {
@@ -761,7 +791,7 @@ var RUNTIME_STATE_API = {
       cameraSettings: getEditorCameraSettingsValue(),
       mouseInside: !!(mouse && mouse.inside),
       keyCount: keys && typeof keys.size === 'number' ? keys.size : null,
-      world: settings ? { cols: settings.worldCols, rows: settings.worldRows, scale: settings.worldDisplayScale } : null,
+      world: settings ? { cols: settings.worldCols, rows: settings.worldRows, scale: settings.worldDisplayScale, subTileGridEnabled: !!settings.subTileGridEnabled, subTileGridMode: String(settings.subTileGridMode || 'diamond_quarters'), subTileGridSubdivision: Math.max(1, Math.min(64, Math.round(Number(settings.subTileGridSubdivision) || 1))), derivedAxisGridEnabled: !!settings.derivedAxisGridEnabled } : null,
       terrain: getTerrainGeneratorSettingsValue(),
       terrainLogic: getTerrainRuntimeModelValue()
     };

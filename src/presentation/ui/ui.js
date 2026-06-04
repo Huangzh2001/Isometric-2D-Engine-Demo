@@ -512,6 +512,64 @@ function uiHandleMainCameraSetDebugVisibleSurfaces(enabled, source) {
   return { ok: false, reason: 'missing-main-camera-debug-visible-surfaces-controller' };
 }
 
+function uiHandleMainCameraSetSubTileGridEnabled(enabled, source) {
+  var controller = getUiMainController();
+  var dispatched = uiDispatchControllerCommand('main', 'setMainEditorSubTileGridEnabled', [!!enabled, source || 'camera-panel:sub-tile-grid']);
+  if (dispatched) { uiRefreshMainCameraPanel(source); return dispatched; }
+  if (controller && typeof controller.setMainEditorSubTileGridEnabled === 'function') {
+    var result = controller.setMainEditorSubTileGridEnabled(!!enabled, source || 'camera-panel:sub-tile-grid');
+    uiRefreshMainCameraPanel(source);
+    return result;
+  }
+  try {
+    if (window.App && window.App.state && window.App.state.runtimeState && typeof window.App.state.runtimeState.patchEditorCameraSettings === 'function') {
+      var fallback = window.App.state.runtimeState.patchEditorCameraSettings({ subTileGridEnabled: !!enabled, subTileGridMode: 'diamond_quarters' }, { source: source || 'camera-panel:sub-tile-grid:fallback' });
+      uiRefreshMainCameraPanel(source);
+      return fallback;
+    }
+  } catch (_) {}
+  return { ok: false, reason: 'missing-main-camera-sub-tile-grid-controller' };
+}
+
+function uiHandleMainCameraSetSubTileGridSubdivision(subdivision, source) {
+  var nextSubdivision = Math.max(1, Math.min(64, Math.round(Number(subdivision) || 1)));
+  var controller = getUiMainController();
+  var dispatched = uiDispatchControllerCommand('main', 'setMainEditorSubTileGridSubdivision', [nextSubdivision, source || 'camera-panel:sub-tile-grid-subdivision']);
+  if (dispatched) { uiRefreshMainCameraPanel(source); return dispatched; }
+  if (controller && typeof controller.setMainEditorSubTileGridSubdivision === 'function') {
+    var result = controller.setMainEditorSubTileGridSubdivision(nextSubdivision, source || 'camera-panel:sub-tile-grid-subdivision');
+    uiRefreshMainCameraPanel(source);
+    return result;
+  }
+  try {
+    if (window.App && window.App.state && window.App.state.runtimeState && typeof window.App.state.runtimeState.patchEditorCameraSettings === 'function') {
+      var fallback = window.App.state.runtimeState.patchEditorCameraSettings({ subTileGridSubdivision: nextSubdivision, subTileGridMode: 'diamond_quarters' }, { source: source || 'camera-panel:sub-tile-grid-subdivision:fallback' });
+      uiRefreshMainCameraPanel(source);
+      return fallback;
+    }
+  } catch (_) {}
+  return { ok: false, reason: 'missing-main-camera-sub-tile-grid-subdivision-controller' };
+}
+
+
+function uiHandleTerrainMapSetDerivedAxisGridEnabled(enabled, source) {
+  var controller = getUiMainController();
+  var dispatched = uiDispatchControllerCommand('main', 'setMainEditorDerivedAxisGridEnabled', [!!enabled, source || 'terrain-map:derived-axis-grid']);
+  if (dispatched) { uiRefreshMainCameraPanel(source); return dispatched; }
+  if (controller && typeof controller.setMainEditorDerivedAxisGridEnabled === 'function') {
+    var result = controller.setMainEditorDerivedAxisGridEnabled(!!enabled, source || 'terrain-map:derived-axis-grid');
+    uiRefreshMainCameraPanel(source);
+    return result;
+  }
+  try {
+    if (window.App && window.App.state && window.App.state.runtimeState && typeof window.App.state.runtimeState.patchEditorCameraSettings === 'function') {
+      var fallback = window.App.state.runtimeState.patchEditorCameraSettings({ derivedAxisGridEnabled: !!enabled, subTileGridEnabled: !!enabled, subTileGridMode: 'diamond_quarters' }, { source: source || 'terrain-map:derived-axis-grid:fallback' });
+      uiRefreshMainCameraPanel(source);
+      return fallback;
+    }
+  } catch (_) {}
+  return { ok: false, reason: 'missing-derived-axis-grid-controller' };
+}
 
 function getUiTerrainPanelRefreshService() {
   try {
@@ -1034,6 +1092,9 @@ safeListen(ui.mainCameraShowBounds, 'change', () => uiHandleMainCameraSetShowBou
 safeListen(ui.mainCameraShowCullingBounds, 'change', () => uiHandleMainCameraSetShowCullingBounds(!!(ui.mainCameraShowCullingBounds && ui.mainCameraShowCullingBounds.checked), 'camera-panel:show-culling-bounds'));
 safeListen(ui.mainCameraSurfaceOnlyRenderingEnabled, 'change', () => uiHandleMainCameraSetSurfaceOnlyRenderingEnabled(!!(ui.mainCameraSurfaceOnlyRenderingEnabled && ui.mainCameraSurfaceOnlyRenderingEnabled.checked), 'camera-panel:surface-only-rendering'));
 safeListen(ui.mainCameraDebugVisibleSurfaces, 'change', () => uiHandleMainCameraSetDebugVisibleSurfaces(!!(ui.mainCameraDebugVisibleSurfaces && ui.mainCameraDebugVisibleSurfaces.checked), 'camera-panel:debug-visible-surfaces'));
+safeListen(ui.mainCameraSubTileGridEnabled, 'change', () => uiHandleMainCameraSetSubTileGridEnabled(!!(ui.mainCameraSubTileGridEnabled && ui.mainCameraSubTileGridEnabled.checked), 'camera-panel:sub-tile-grid'));
+safeListen(ui.mainCameraSubTileGridSubdivision, 'input', () => uiHandleMainCameraSetSubTileGridSubdivision(Number(ui.mainCameraSubTileGridSubdivision && ui.mainCameraSubTileGridSubdivision.value || 1), 'camera-panel:sub-tile-grid-subdivision:input'));
+safeListen(ui.mainCameraSubTileGridSubdivision, 'change', () => uiHandleMainCameraSetSubTileGridSubdivision(Number(ui.mainCameraSubTileGridSubdivision && ui.mainCameraSubTileGridSubdivision.value || 1), 'camera-panel:sub-tile-grid-subdivision'));
 safeListen(ui.downloadMainViewRotationDiagnostic, 'click', () => uiHandleMainViewRotationDiagnosticExport('camera-panel:download-diagnostic'));
 safeListen(ui.renderFaceMergeEnabled, 'click', () => uiHandleRenderSetFaceMergeEnabled(!!(ui.renderFaceMergeEnabled && ui.renderFaceMergeEnabled.checked), 'render-panel:face-merge-enabled:click'));
 safeListen(ui.renderFaceMergeEnabled, 'change', () => uiHandleRenderSetFaceMergeEnabled(!!(ui.renderFaceMergeEnabled && ui.renderFaceMergeEnabled.checked), 'render-panel:face-merge-enabled'));
@@ -1067,6 +1128,7 @@ safeListen(ui.terrainAddFaceMergeColumnBlock, 'click', () => uiHandleTerrainFace
 safeListen(ui.terrainAddFaceMergeLWall, 'click', () => uiHandleTerrainFaceMergeStressPreset('l_shaped_column_wall', 'ui.terrainAddFaceMergeLWall.click'));
 safeListen(ui.terrainMapToggle, 'click', () => uiHandleTerrainMapToggle('terrain-panel:map-toggle'));
 safeListen(ui.terrainMapRefresh, 'click', () => uiRenderTerrainMapWindow('terrain-panel:map-refresh'));
+safeListen(ui.terrainMapDerivedAxisGridEnabled, 'change', () => uiHandleTerrainMapSetDerivedAxisGridEnabled(!!(ui.terrainMapDerivedAxisGridEnabled && ui.terrainMapDerivedAxisGridEnabled.checked), 'terrain-map:derived-axis-grid'));
 safeListen(ui.terrainMapClose, 'click', () => uiHandleTerrainMapClose('terrain-panel:map-close'));
 safeListen(ui.terrainMapWindowRefresh, 'click', () => uiRenderTerrainMapWindow('terrain-panel:map-window-refresh'));
 safeListen(ui.terrainMapColorMode, 'change', () => { uiSyncTerrainMapColorMode('terrain-panel:map-color-mode'); uiRenderTerrainMapWindow('terrain-panel:map-color-mode'); });

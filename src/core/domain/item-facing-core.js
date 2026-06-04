@@ -122,12 +122,17 @@
     return withLegacySemanticAliases(SEMANTIC_FACE_COLORS);
   }
 
+  function toFiniteNumber(value, fallback) {
+    var n = Number(value);
+    return Number.isFinite(n) ? n : Number(fallback || 0);
+  }
+
   function getBaseDimensions(prefab) {
     var safe = prefab || {};
     return {
-      w: Math.max(1, toInt(safe.w, 1)),
-      d: Math.max(1, toInt(safe.d, 1)),
-      h: Math.max(1, toInt(safe.h, 1))
+      w: Math.max(1, toFiniteNumber(safe.w, 1)),
+      d: Math.max(1, toFiniteNumber(safe.d, 1)),
+      h: Math.max(1, toFiniteNumber(safe.h, 1))
     };
   }
 
@@ -407,9 +412,52 @@
   }
 
   function rotateVoxel(v, prefab, facing) {
-    var x = toInt(v && v.x, 0);
-    var y = toInt(v && v.y, 0);
-    var z = toInt(v && v.z, 0);
+    var x = toFiniteNumber(v && v.x, 0);
+    var y = toFiniteNumber(v && v.y, 0);
+    var z = toFiniteNumber(v && v.z, 0);
+    var w = Math.max(0.001, toFiniteNumber(v && v.w, 1));
+    var d = Math.max(0.001, toFiniteNumber(v && v.d, 1));
+    var h = Math.max(0.001, toFiniteNumber(v && v.h, 1));
+    var dims = getBaseDimensions(prefab);
+    var r = normalizeFacing(facing);
+    var base;
+    switch (r) {
+      case 0: base = { x: x, y: y, z: z, w: w, d: d, h: h }; break;
+      case 1: base = { x: y, y: Math.max(0, dims.w - x - w), z: z, w: d, d: w, h: h }; break;
+      case 2: base = { x: Math.max(0, dims.w - x - w), y: Math.max(0, dims.d - y - d), z: z, w: w, d: d, h: h }; break;
+      case 3: base = { x: Math.max(0, dims.d - y - d), y: x, z: z, w: d, d: w, h: h }; break;
+      default: base = { x: x, y: y, z: z, w: w, d: d, h: h }; break;
+    }
+    if (Array.isArray(v && v.collisionPolygon2d)) {
+      base.collisionPolygon2d = v.collisionPolygon2d.map(function (pt) { return rotatePrimitivePoint(pt, prefab, r); });
+    }
+    return base;
+  }
+
+  function rotateVoxelList(prefab, facing) {
+    var list = Array.isArray(prefab && prefab.voxels) ? prefab.voxels : [];
+    return list.map(function (v) {
+      var rotated = rotateVoxel(v, prefab, facing);
+      return Object.assign({}, v, rotated);
+    });
+  }
+  function rotatePrimitivePoint(pt, prefab, facing) {
+    var x = toFiniteNumber(pt && pt.x, 0);
+    var y = toFiniteNumber(pt && pt.y, 0);
+    var dims = getBaseDimensions(prefab);
+    switch (normalizeFacing(facing)) {
+      case 0: return { x: x, y: y };
+      case 1: return { x: y, y: Math.max(0, dims.w - x) };
+      case 2: return { x: Math.max(0, dims.w - x), y: Math.max(0, dims.d - y) };
+      case 3: return { x: Math.max(0, dims.d - y), y: x };
+      default: return { x: x, y: y };
+    }
+  }
+
+  function rotatePrimitiveSortCell(cell, prefab, facing) {
+    var x = toFiniteNumber(cell && cell.x, 0);
+    var y = toFiniteNumber(cell && cell.y, 0);
+    var z = toFiniteNumber(cell && cell.z, 0);
     var dims = getBaseDimensions(prefab);
     switch (normalizeFacing(facing)) {
       case 0: return { x: x, y: y, z: z };
@@ -420,13 +468,22 @@
     }
   }
 
-  function rotateVoxelList(prefab, facing) {
-    var list = Array.isArray(prefab && prefab.voxels) ? prefab.voxels : [];
-    return list.map(function (v) {
-      var rotated = rotateVoxel(v, prefab, facing);
-      return Object.assign({}, v, rotated);
+  function rotatePrimitive(p, prefab, facing) {
+    var safe = p && typeof p === 'object' ? p : {};
+    var vertices = Array.isArray(safe.vertices2d) ? safe.vertices2d : [];
+    return Object.assign({}, safe, {
+      vertices2d: vertices.map(function (pt) { return rotatePrimitivePoint(pt, prefab, facing); }),
+      sortCell: rotatePrimitiveSortCell(safe.sortCell || { x: safe.cellX || 0, y: safe.cellY || 0, z: safe.cellZ || 0 }, prefab, facing),
+      z: toFiniteNumber(safe.z, 0),
+      h: Math.max(0.001, toFiniteNumber(safe.h, 1))
     });
   }
+
+  function rotatePrimitiveList(prefab, facing) {
+    var list = Array.isArray(prefab && prefab.primitives) ? prefab.primitives : [];
+    return list.map(function (p) { return rotatePrimitive(p, prefab, facing); });
+  }
+
 
   function getAvailableDirectionKeys(prefab) {
     var source = null;
@@ -538,6 +595,7 @@
     getRotatedAnchor: getRotatedAnchor,
     rotateVoxel: rotateVoxel,
     rotateVoxelList: rotateVoxelList,
+    rotatePrimitiveList: rotatePrimitiveList,
     detectSpriteStrategy: detectSpriteStrategy,
     resolveSpriteFacing: resolveSpriteFacing,
     computeSortBase: computeSortBase,

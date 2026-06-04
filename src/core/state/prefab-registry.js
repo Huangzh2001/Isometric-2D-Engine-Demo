@@ -36,14 +36,59 @@ function tracePrefabRegister(prefabId, source, extra) {
   prefabRegistryLog('register prefab', Object.assign({ prefabId: key, source: source || 'unknown' }, extra || {}));
 }
 
+function finiteNumber(value, fallback) {
+  var n = Number(value);
+  return Number.isFinite(n) ? n : Number(fallback || 0);
+}
+
+function positiveNumber(value, fallback) {
+  return Math.max(0, finiteNumber(value, fallback));
+}
+
 function cloneVoxel(v) {
+  var safe = v && typeof v === 'object' ? v : {};
   return {
-    x: Number(v && v.x) || 0,
-    y: Number(v && v.y) || 0,
-    z: Number(v && v.z) || 0,
-    solid: v && v.solid !== false,
-    collidable: v && v.collidable !== false,
-    base: (v && v.base) || null,
+    x: finiteNumber(safe.x, 0),
+    y: finiteNumber(safe.y, 0),
+    z: finiteNumber(safe.z, 0),
+    w: Math.max(0.001, positiveNumber(safe.w, 1) || 1),
+    d: Math.max(0.001, positiveNumber(safe.d, 1) || 1),
+    h: Math.max(0.001, positiveNumber(safe.h, 1) || 1),
+    solid: safe.solid !== false,
+    collidable: safe.collidable !== false,
+    renderHidden: safe.renderHidden === true,
+    collisionOnly: safe.collisionOnly === true,
+    base: safe.base || null,
+    shapeKind: safe.shapeKind || null,
+    collisionPolygon2d: Array.isArray(safe.collisionPolygon2d) ? safe.collisionPolygon2d.map(function (pt) { return { x: finiteNumber(pt && pt.x, 0), y: finiteNumber(pt && pt.y, 0) }; }) : null,
+    stairRole: safe.stairRole || null,
+    stairStepIndex: safe.stairStepIndex != null ? finiteNumber(safe.stairStepIndex, 0) : null,
+    stairStepCount: safe.stairStepCount != null ? Math.max(1, finiteNumber(safe.stairStepCount, 1)) : null,
+    stairMaxStepUpCells: safe.stairMaxStepUpCells != null ? Math.max(0, finiteNumber(safe.stairMaxStepUpCells, 0.6)) : null,
+    cylinderResolution: safe.cylinderResolution != null ? Math.max(1, finiteNumber(safe.cylinderResolution, 1)) : null,
+    cylinderCellX: safe.cylinderCellX != null ? finiteNumber(safe.cylinderCellX, 0) : null,
+    cylinderCellY: safe.cylinderCellY != null ? finiteNumber(safe.cylinderCellY, 0) : null,
+    cylinderCellIndex: safe.cylinderCellIndex != null ? finiteNumber(safe.cylinderCellIndex, 0) : null,
+  };
+}
+
+function clonePrimitive(p) {
+  var safe = p && typeof p === 'object' ? p : {};
+  var vertices = Array.isArray(safe.vertices2d) ? safe.vertices2d : [];
+  return {
+    id: String(safe.id || safe.primitiveId || ''),
+    kind: String(safe.kind || safe.primitiveKind || 'vertical_tri_prism'),
+    primitiveKind: String(safe.primitiveKind || safe.kind || 'vertical_tri_prism'),
+    z: finiteNumber(safe.z, 0),
+    h: Math.max(0.001, positiveNumber(safe.h, 1) || 1),
+    vertices2d: vertices.map(function (pt) { return { x: finiteNumber(pt && pt.x, 0), y: finiteNumber(pt && pt.y, 0) }; }),
+    sortCell: {
+      x: finiteNumber(safe.sortCell && safe.sortCell.x, safe.cellX != null ? safe.cellX : 0),
+      y: finiteNumber(safe.sortCell && safe.sortCell.y, safe.cellY != null ? safe.cellY : 0),
+      z: finiteNumber(safe.sortCell && safe.sortCell.z, safe.cellZ != null ? safe.cellZ : 0)
+    },
+    base: safe.base || null,
+    shapeKind: safe.shapeKind || 'vertical_tri_prism'
   };
 }
 
@@ -190,6 +235,9 @@ function normalizePrefab(def) {
   var rawVoxels = hasExplicitVoxelArray && def.voxels.length
     ? def.voxels.map(function (v) { return Object.assign({ solid: true, collidable: true, base: def.base || '#c7b0df' }, cloneVoxel(v)); })
     : makeRectVoxels(Math.max(1, def.w || 1), Math.max(1, def.d || 1), Math.max(1, def.h || 1), def.base || '#c7b0df');
+  var rawPrimitives = Array.isArray(def.primitives) ? def.primitives.map(function (p) {
+    return Object.assign({ base: def.base || '#c7b0df' }, clonePrimitive(p));
+  }).filter(function (p) { return Array.isArray(p.vertices2d) && p.vertices2d.length >= 3; }) : [];
   var sprite = normalizeSpriteInfo(def.sprite);
   var spriteDirections = normalizeSpriteDirections(def.spriteDirections);
   var habboLayerDirections = normalizeHabboLayerDirections(def.habboLayerDirections);
@@ -209,10 +257,13 @@ function normalizePrefab(def) {
   var maxX = 0, maxY = 0, maxZ = 0;
   for (var i = 0; i < rawVoxels.length; i++) {
     var v = rawVoxels[i];
-    maxX = Math.max(maxX, v.x || 0);
-    maxY = Math.max(maxY, v.y || 0);
-    maxZ = Math.max(maxZ, v.z || 0);
+    maxX = Math.max(maxX, finiteNumber(v.x, 0) + Math.max(0.001, finiteNumber(v.w, 1)));
+    maxY = Math.max(maxY, finiteNumber(v.y, 0) + Math.max(0.001, finiteNumber(v.d, 1)));
+    maxZ = Math.max(maxZ, finiteNumber(v.z, 0) + Math.max(0.001, finiteNumber(v.h, 1)));
   }
+  var explicitSupportCells = Array.isArray(def.supportCells)
+    ? def.supportCells.map(function (cell) { return { x: finiteNumber(cell && cell.x, 0), y: finiteNumber(cell && cell.y, 0), localZ: finiteNumber(cell && cell.localZ, 0) }; })
+    : null;
   return Object.assign({}, def, {
     id: def.id,
     key: def.key || '',
@@ -234,11 +285,13 @@ function normalizePrefab(def) {
     renderUpdateMode: renderUpdateMode,
     slices: Array.isArray(def.slices) ? def.slices.slice() : [],
     voxels: rawVoxels,
+    primitives: rawPrimitives,
+    supportCells: explicitSupportCells,
     explicitVoxelCount: explicitVoxelCount,
     proxyFallbackUsed: !!(hasExplicitVoxelArray && explicitVoxelCount === 0),
-    w: maxX + 1,
-    d: maxY + 1,
-    h: maxZ + 1,
+    w: Math.max(1, finiteNumber(def.w, maxX), maxX),
+    d: Math.max(1, finiteNumber(def.d, maxY), maxY),
+    h: Math.max(1, finiteNumber(def.h, maxZ), maxZ),
   });
 }
 
@@ -250,10 +303,381 @@ var DEBUG_5FACE_TEXTURE_MAP = {
   west: { textureId: 'debug.semantic.west.solid-purple', kind: 'solid-color', color: '#9B51E0', semanticFace: 'west' }
 };
 
+
+
+function makeVoxelCylinderVoxels(resolution, base) {
+  var n = Math.max(4, Math.round(Number(resolution) || 8));
+  var voxels = [];
+  var radius = 0.5;
+  var radiusSq = radius * radius;
+  for (var y = 0; y < n; y++) {
+    for (var x = 0; x < n; x++) {
+      var cx = ((x + 0.5) / n) - 0.5;
+      var cy = ((y + 0.5) / n) - 0.5;
+      if ((cx * cx + cy * cy) > radiusSq + 1e-9) continue;
+      voxels.push({
+        x: x / n,
+        y: y / n,
+        z: 0,
+        w: 1 / n,
+        d: 1 / n,
+        h: 1,
+        base: base || '#a8b66f',
+        shapeKind: 'cylinder_voxel_' + n,
+        cylinderResolution: n,
+        cylinderCellX: x,
+        cylinderCellY: y,
+        cylinderCellIndex: voxels.length
+      });
+    }
+  }
+  return voxels;
+}
+
+
+
+function makeTriPrismCollisionVoxelFromPolygonWithHeight(id, vertices, base, height, shapeKind) {
+  var verts = Array.isArray(vertices) ? vertices : [];
+  var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (var i = 0; i < verts.length; i++) {
+    var x = finiteNumber(verts[i] && verts[i].x, 0);
+    var y = finiteNumber(verts[i] && verts[i].y, 0);
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
+    if (x > maxX) maxX = x;
+    if (y > maxY) maxY = y;
+  }
+  if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+    minX = 0; minY = 0; maxX = 1; maxY = 1;
+  }
+  return {
+    x: minX,
+    y: minY,
+    z: 0,
+    w: Math.max(0.001, maxX - minX),
+    d: Math.max(0.001, maxY - minY),
+    h: Math.max(0.001, finiteNumber(height, 1)),
+    renderHidden: true,
+    collisionOnly: true,
+    base: base || '#d59a62',
+    shapeKind: shapeKind || 'tri_prism_collision',
+    collisionPolygon2d: verts.map(function (pt) { return { x: finiteNumber(pt && pt.x, 0), y: finiteNumber(pt && pt.y, 0) }; }),
+    primitiveId: id || null
+  };
+}
+
+function makeTriPrismCollisionVoxelFromPolygon(id, vertices, base) {
+  return makeTriPrismCollisionVoxelFromPolygonWithHeight(id, vertices, base, 1, 'tri_prism_collision');
+}
+
+function makeTriHalfCollisionVoxels(kind, base) {
+  var verts = kind === 'diag_b'
+    ? [{ x: 0, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }]
+    : [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }];
+  return [makeTriPrismCollisionVoxelFromPolygon('tri-half-collision-' + String(kind || 'diag_a'), verts, base)];
+}
+
+function getTileQuarterTriVertices(kind) {
+  var c = { x: 0.5, y: 0.5 };
+  switch (String(kind || 'ne')) {
+    case 'se': return [{ x: 1, y: 0 }, { x: 1, y: 1 }, c];
+    case 'sw': return [{ x: 1, y: 1 }, { x: 0, y: 1 }, c];
+    case 'nw': return [{ x: 0, y: 1 }, { x: 0, y: 0 }, c];
+    case 'ne':
+    default: return [{ x: 0, y: 0 }, { x: 1, y: 0 }, c];
+  }
+}
+
+function makeTriQuarterCollisionVoxels(kind, base) {
+  var safeKind = String(kind || 'ne');
+  return [makeTriPrismCollisionVoxelFromPolygon('tri-quarter-collision-' + safeKind, getTileQuarterTriVertices(safeKind), base)];
+}
+
+function makeVertexQuadTriCollisionVoxels(base) {
+  return [
+    makeTriPrismCollisionVoxelFromPolygon('vertex-collision-nw', [{ x: 1, y: 1 }, { x: 0, y: 1 }, { x: 1, y: 0 }], base),
+    makeTriPrismCollisionVoxelFromPolygon('vertex-collision-ne', [{ x: 1, y: 1 }, { x: 1, y: 0 }, { x: 2, y: 1 }], base),
+    makeTriPrismCollisionVoxelFromPolygon('vertex-collision-sw', [{ x: 1, y: 1 }, { x: 1, y: 2 }, { x: 0, y: 1 }], base),
+    makeTriPrismCollisionVoxelFromPolygon('vertex-collision-se', [{ x: 1, y: 1 }, { x: 2, y: 1 }, { x: 1, y: 2 }], base)
+  ];
+}
+
+
+function getQuarterTriLeg() {
+  // Each corner triangle has area 1/4 of a 1×1 diamond-tile footprint:
+  // area = leg² / 2 = 1/4, so leg = sqrt(1/2).
+  return Math.SQRT1_2 || Math.sqrt(0.5);
+}
+
+function makeVertexQuarterTriCollisionVoxels(base) {
+  var q = getQuarterTriLeg();
+  var c = { x: 1, y: 1 };
+  return [
+    makeTriPrismCollisionVoxelFromPolygon('vertex-quarter-collision-nw', [c, { x: 1 - q, y: 1 }, { x: 1, y: 1 - q }], base),
+    makeTriPrismCollisionVoxelFromPolygon('vertex-quarter-collision-ne', [c, { x: 1, y: 1 - q }, { x: 1 + q, y: 1 }], base),
+    makeTriPrismCollisionVoxelFromPolygon('vertex-quarter-collision-sw', [c, { x: 1, y: 1 + q }, { x: 1 - q, y: 1 }], base),
+    makeTriPrismCollisionVoxelFromPolygon('vertex-quarter-collision-se', [c, { x: 1 + q, y: 1 }, { x: 1, y: 1 + q }], base)
+  ];
+}
+
+function makeTriHalfPrimitives(kind, base) {
+  var verts = kind === 'diag_b'
+    ? [{ x: 0, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }]
+    : [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }];
+  return [{
+    id: 'tri-half-' + String(kind || 'diag_a'),
+    kind: 'vertical_tri_prism',
+    primitiveKind: 'vertical_tri_prism',
+    vertices2d: verts,
+    z: 0,
+    h: 1,
+    sortCell: { x: 0, y: 0, z: 0 },
+    base: base || '#d59a62',
+    shapeKind: 'vertical_tri_prism'
+  }];
+}
+
+function makeTriQuarterPrimitives(kind, base) {
+  var safeKind = String(kind || 'ne');
+  return [{
+    id: 'tri-quarter-' + safeKind,
+    kind: 'vertical_tri_prism',
+    primitiveKind: 'vertical_tri_prism',
+    vertices2d: getTileQuarterTriVertices(safeKind),
+    z: 0,
+    h: 1,
+    sortCell: { x: 0, y: 0, z: 0 },
+    base: base || '#d59a62',
+    shapeKind: 'quarter_tile_tri_prism'
+  }];
+}
+
+
+function getDerivedGridUnitHeight() {
+  // The derived axis grid uses the natural altitude of a unit equilateral-triangle split:
+  // h = sqrt(3) / 2 ≈ 0.866. This keeps the new derived-grid atom height tied
+  // to the same geometric scale as the four-way diamond split.
+  return Math.sqrt(3) / 2;
+}
+
+function makeDerivedQuarterTriCollisionVoxels(kind, base) {
+  var safeKind = String(kind || 'ne');
+  return [makeTriPrismCollisionVoxelFromPolygonWithHeight(
+    'derived-quarter-collision-' + safeKind,
+    getTileQuarterTriVertices(safeKind),
+    base || '#7fb4d8',
+    getDerivedGridUnitHeight(),
+    'derived_quarter_tri_prism'
+  )];
+}
+
+function makeDerivedQuarterTriPrimitives(kind, base) {
+  var safeKind = String(kind || 'ne');
+  return [{
+    id: 'derived-quarter-tri-' + safeKind,
+    kind: 'vertical_tri_prism',
+    primitiveKind: 'vertical_tri_prism',
+    vertices2d: getTileQuarterTriVertices(safeKind),
+    z: 0,
+    h: getDerivedGridUnitHeight(),
+    sortCell: { x: 0, y: 0, z: 0 },
+    base: base || '#7fb4d8',
+    shapeKind: 'derived_quarter_tri_prism'
+  }];
+}
+
+function translateVertices2d(vertices, dx, dy) {
+  return (Array.isArray(vertices) ? vertices : []).map(function (pt) {
+    return { x: finiteNumber(pt && pt.x, 0) + finiteNumber(dx, 0), y: finiteNumber(pt && pt.y, 0) + finiteNumber(dy, 0) };
+  });
+}
+
+function getDerivedAxisUnitAdjacentParts(kind) {
+  var safeKind = String(kind || 'right');
+  // A derived axis unit is not two quarters inside the same diamond. It is made
+  // from two adjacent diamond cells, each contributing the quarter triangle that
+  // touches their shared edge. The base/right unit crosses the edge between
+  // cell(0,0) and cell(1,0): left cell SE + right cell NW.
+  // The prefab itself declares a 2×2 rotation frame and does NOT use explicit
+  // supportCells, so prefabVariant() derives support from the rotated polygon
+  // footprints instead of keeping the right-facing support cells for all rotations.
+  if (safeKind === 'top') {
+    return [
+      { part: 'ne', dx: 0, dy: 0, sortCell: { x: 0, y: 0, z: 0 } },
+      { part: 'sw', dx: 0, dy: -1, sortCell: { x: 0, y: -1, z: 0 } }
+    ];
+  }
+  if (safeKind === 'left') {
+    return [
+      { part: 'nw', dx: 0, dy: 0, sortCell: { x: 0, y: 0, z: 0 } },
+      { part: 'se', dx: -1, dy: 0, sortCell: { x: -1, y: 0, z: 0 } }
+    ];
+  }
+  if (safeKind === 'bottom') {
+    return [
+      { part: 'sw', dx: 0, dy: 0, sortCell: { x: 0, y: 0, z: 0 } },
+      { part: 'ne', dx: 0, dy: 1, sortCell: { x: 0, y: 1, z: 0 } }
+    ];
+  }
+  return [
+    { part: 'se', dx: 0, dy: 0, sortCell: { x: 0, y: 0, z: 0 } },
+    { part: 'nw', dx: 1, dy: 0, sortCell: { x: 1, y: 0, z: 0 } }
+  ];
+}
+
+function makeDerivedAxisUnitCollisionVoxels(kind, base) {
+  var safeKind = String(kind || 'right');
+  return getDerivedAxisUnitAdjacentParts(safeKind).map(function (entry, idx) {
+    return makeTriPrismCollisionVoxelFromPolygonWithHeight(
+      'derived-axis-unit-collision-' + safeKind + '-' + entry.part + '-' + idx,
+      translateVertices2d(getTileQuarterTriVertices(entry.part), entry.dx, entry.dy),
+      base || '#72c49b',
+      getDerivedGridUnitHeight(),
+      'derived_axis_unit_adjacent_tri_part'
+    );
+  });
+}
+
+function makeDerivedAxisUnitPrimitives(kind, base) {
+  var safeKind = String(kind || 'right');
+  return getDerivedAxisUnitAdjacentParts(safeKind).map(function (entry, idx) {
+    return {
+      id: 'derived-axis-unit-' + safeKind + '-' + entry.part + '-' + idx,
+      kind: 'vertical_tri_prism',
+      primitiveKind: 'vertical_tri_prism',
+      vertices2d: translateVertices2d(getTileQuarterTriVertices(entry.part), entry.dx, entry.dy),
+      z: 0,
+      h: getDerivedGridUnitHeight(),
+      sortCell: entry.sortCell || { x: 0, y: 0, z: 0 },
+      base: base || '#72c49b',
+      shapeKind: 'derived_axis_unit_adjacent_tri_part',
+      derivedAxisPartIndex: idx,
+      derivedAxisSourceCell: { x: finiteNumber(entry.dx, 0), y: finiteNumber(entry.dy, 0) }
+    };
+  });
+}
+
+function getMicroTriPrismDefaultVertices() {
+  // Catalog/default visual only. Runtime placement replaces this with the
+  // current scene subdivision + pointed micro-diamond triangle.
+  return [{ x: 0, y: 0 }, { x: 0.5, y: 0 }, { x: 0.25, y: 0.25 }];
+}
+
+function makeMicroTriPrismCollisionVoxels(base) {
+  return [makeTriPrismCollisionVoxelFromPolygon('micro-tri-collision-default', getMicroTriPrismDefaultVertices(), base || '#e39b4f')];
+}
+
+function makeMicroTriPrismPrimitives(base) {
+  return [{
+    id: 'micro-tri-default',
+    kind: 'vertical_tri_prism',
+    primitiveKind: 'vertical_tri_prism',
+    vertices2d: getMicroTriPrismDefaultVertices(),
+    z: 0,
+    h: 1,
+    sortCell: { x: 0, y: 0, z: 0 },
+    base: base || '#e39b4f',
+    shapeKind: 'micro_tri_prism'
+  }];
+}
+
+function getCompatibleAxisBlockDefaultVertices() {
+  // Catalog/default visual only. Runtime placement replaces this with an
+  // atom-grid-aligned rectangle based on the active subTileGridSubdivision.
+  return [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }];
+}
+
+function makeCompatibleAxisBlockCollisionVoxels(base) {
+  return [makeTriPrismCollisionVoxelFromPolygon('compatible-axis-collision-default', getCompatibleAxisBlockDefaultVertices(), base || '#5dbb8a')];
+}
+
+function makeCompatibleAxisBlockPrimitives(base) {
+  return [{
+    id: 'compatible-axis-default',
+    kind: 'vertical_polygon_prism',
+    primitiveKind: 'vertical_polygon_prism',
+    vertices2d: getCompatibleAxisBlockDefaultVertices(),
+    z: 0,
+    h: 1,
+    sortCell: { x: 0, y: 0, z: 0 },
+    base: base || '#5dbb8a',
+    shapeKind: 'compatible_axis_block'
+  }];
+}
+
+function makeVertexQuadTriPrimitives(base) {
+  var fill = base || '#d59a62';
+  return [
+    { id: 'vertex-tri-nw', kind: 'vertical_tri_prism', primitiveKind: 'vertical_tri_prism', vertices2d: [{ x: 1, y: 1 }, { x: 0, y: 1 }, { x: 1, y: 0 }], z: 0, h: 1, sortCell: { x: 0, y: 0, z: 0 }, base: fill, shapeKind: 'vertical_tri_prism' },
+    { id: 'vertex-tri-ne', kind: 'vertical_tri_prism', primitiveKind: 'vertical_tri_prism', vertices2d: [{ x: 1, y: 1 }, { x: 1, y: 0 }, { x: 2, y: 1 }], z: 0, h: 1, sortCell: { x: 1, y: 0, z: 0 }, base: fill, shapeKind: 'vertical_tri_prism' },
+    { id: 'vertex-tri-sw', kind: 'vertical_tri_prism', primitiveKind: 'vertical_tri_prism', vertices2d: [{ x: 1, y: 1 }, { x: 1, y: 2 }, { x: 0, y: 1 }], z: 0, h: 1, sortCell: { x: 0, y: 1, z: 0 }, base: fill, shapeKind: 'vertical_tri_prism' },
+    { id: 'vertex-tri-se', kind: 'vertical_tri_prism', primitiveKind: 'vertical_tri_prism', vertices2d: [{ x: 1, y: 1 }, { x: 2, y: 1 }, { x: 1, y: 2 }], z: 0, h: 1, sortCell: { x: 1, y: 1, z: 0 }, base: fill, shapeKind: 'vertical_tri_prism' }
+  ];
+}
+
+
+function makeVertexQuarterTriPrimitives(base) {
+  var fill = base || '#d59a62';
+  var q = getQuarterTriLeg();
+  var c = { x: 1, y: 1 };
+  return [
+    { id: 'vertex-quarter-tri-nw', kind: 'vertical_tri_prism', primitiveKind: 'vertical_tri_prism', vertices2d: [c, { x: 1 - q, y: 1 }, { x: 1, y: 1 - q }], z: 0, h: 1, sortCell: { x: 0, y: 0, z: 0 }, base: fill, shapeKind: 'quarter_tile_tri_prism' },
+    { id: 'vertex-quarter-tri-ne', kind: 'vertical_tri_prism', primitiveKind: 'vertical_tri_prism', vertices2d: [c, { x: 1, y: 1 - q }, { x: 1 + q, y: 1 }], z: 0, h: 1, sortCell: { x: 1, y: 0, z: 0 }, base: fill, shapeKind: 'quarter_tile_tri_prism' },
+    { id: 'vertex-quarter-tri-sw', kind: 'vertical_tri_prism', primitiveKind: 'vertical_tri_prism', vertices2d: [c, { x: 1, y: 1 + q }, { x: 1 - q, y: 1 }], z: 0, h: 1, sortCell: { x: 0, y: 1, z: 0 }, base: fill, shapeKind: 'quarter_tile_tri_prism' },
+    { id: 'vertex-quarter-tri-se', kind: 'vertical_tri_prism', primitiveKind: 'vertical_tri_prism', vertices2d: [c, { x: 1 + q, y: 1 }, { x: 1, y: 1 + q }], z: 0, h: 1, sortCell: { x: 1, y: 1, z: 0 }, base: fill, shapeKind: 'quarter_tile_tri_prism' }
+  ];
+}
+
+function makeMcStairStepVoxels(stepCount, stepLimit, base) {
+  var n = Math.max(2, Math.round(Number(stepCount) || 2));
+  var limit = Math.max(0, finiteNumber(stepLimit, Math.min(0.6, 1 / n + 0.1)));
+  var voxels = [];
+  for (var i = 0; i < n; i++) {
+    var role = i === 0 ? 'lower' : (i === n - 1 ? 'upper' : 'middle');
+    voxels.push({
+      x: i / n,
+      y: 0,
+      z: 0,
+      w: 1 / n,
+      d: 1,
+      h: (i + 1) / n,
+      base: base || '#c99568',
+      shapeKind: 'stair_mc_' + n + 'step',
+      stairRole: role,
+      stairStepIndex: i,
+      stairStepCount: n,
+      stairMaxStepUpCells: limit
+    });
+  }
+  return voxels;
+}
+
 var prototypes = [
   normalizePrefab({ key: '1', id: 'debug_cube_5faces', name: 'Debug Cube · 5 Faces', base: '#c7b0df', renderUpdateMode: 'dynamic', spriteStrategyHint: 'single', itemRotationDebug: true, semanticTextureMap: DEBUG_5FACE_TEXTURE_MAP, semanticTextures: DEBUG_5FACE_TEXTURE_MAP, semanticFaceColors: { top: '#2F80ED', north: '#E74C3C', east: '#27AE60', south: '#F2C94C', west: '#9B51E0' }, voxels: [{ x: 0, y: 0, z: 0 }] }),
   normalizePrefab({ key: '2', id: 'debug_rect_2x1_5faces', name: 'Debug Rect 2×1 · 5 Faces', base: '#d4bb90', renderUpdateMode: 'dynamic', spriteStrategyHint: 'single', itemRotationDebug: true, semanticTextureMap: DEBUG_5FACE_TEXTURE_MAP, semanticTextures: DEBUG_5FACE_TEXTURE_MAP, semanticFaceColors: { top: '#2F80ED', north: '#E74C3C', east: '#27AE60', south: '#F2C94C', west: '#9B51E0' }, voxels: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }] }),
   normalizePrefab({ key: '3', id: 'cube_1x1', name: 'Cube', base: '#c7b0df', renderUpdateMode: 'static', voxels: [{ x: 0, y: 0, z: 0 }] }),
+  normalizePrefab({ key: '3a', id: 'stair_mc_2step', name: 'MC Stair · 2-step', kind: 'stair_mc', base: '#c99568', renderUpdateMode: 'dynamic', supportCells: [{ x: 0, y: 0, localZ: 0 }], voxels: makeMcStairStepVoxels(2, 0.6, '#c99568') }),
+  normalizePrefab({ key: '3b', id: 'stair_mc_4step', name: 'MC Stair · 4-step', kind: 'stair_mc', base: '#c99568', renderUpdateMode: 'dynamic', supportCells: [{ x: 0, y: 0, localZ: 0 }], voxels: makeMcStairStepVoxels(4, 0.35, '#c99568') }),
+  normalizePrefab({ key: '3c', id: 'stair_mc_8step', name: 'MC Stair · 8-step', kind: 'stair_mc', base: '#c99568', renderUpdateMode: 'dynamic', supportCells: [{ x: 0, y: 0, localZ: 0 }], voxels: makeMcStairStepVoxels(8, 0.2, '#c99568') }),
+  normalizePrefab({ key: '3d', id: 'cylinder_voxel_4', name: 'Voxel Cylinder · 4×4', kind: 'cylinder_voxel', base: '#a8b66f', renderUpdateMode: 'dynamic', supportCells: [{ x: 0, y: 0, localZ: 0 }], voxels: makeVoxelCylinderVoxels(4, '#a8b66f') }),
+  normalizePrefab({ key: '3e', id: 'cylinder_voxel_8', name: 'Voxel Cylinder · 8×8', kind: 'cylinder_voxel', base: '#a8b66f', renderUpdateMode: 'dynamic', supportCells: [{ x: 0, y: 0, localZ: 0 }], voxels: makeVoxelCylinderVoxels(8, '#a8b66f') }),
+  normalizePrefab({ key: '3f', id: 'cylinder_voxel_12', name: 'Voxel Cylinder · 12×12', kind: 'cylinder_voxel', base: '#a8b66f', renderUpdateMode: 'dynamic', supportCells: [{ x: 0, y: 0, localZ: 0 }], voxels: makeVoxelCylinderVoxels(12, '#a8b66f') }),
+  normalizePrefab({ key: '3g', id: 'tri_prism_half_a', name: 'Tri Prism Half · A', kind: 'tri_prism', base: '#d59a62', renderUpdateMode: 'dynamic', supportCells: [{ x: 0, y: 0, localZ: 0 }], voxels: makeTriHalfCollisionVoxels('diag_a', '#d59a62'), primitives: makeTriHalfPrimitives('diag_a', '#d59a62') }),
+  normalizePrefab({ key: '3h', id: 'tri_prism_half_b', name: 'Tri Prism Half · B', kind: 'tri_prism', base: '#d59a62', renderUpdateMode: 'dynamic', supportCells: [{ x: 0, y: 0, localZ: 0 }], voxels: makeTriHalfCollisionVoxels('diag_b', '#d59a62'), primitives: makeTriHalfPrimitives('diag_b', '#d59a62') }),
+  normalizePrefab({ key: '3l', id: 'tri_prism_quarter_ne', name: 'Tri Prism Quarter · NE', kind: 'tri_prism', base: '#d59a62', renderUpdateMode: 'dynamic', supportCells: [{ x: 0, y: 0, localZ: 0 }], voxels: makeTriQuarterCollisionVoxels('ne', '#d59a62'), primitives: makeTriQuarterPrimitives('ne', '#d59a62') }),
+  normalizePrefab({ key: '3m', id: 'tri_prism_quarter_se', name: 'Tri Prism Quarter · SE', kind: 'tri_prism', base: '#d59a62', renderUpdateMode: 'dynamic', supportCells: [{ x: 0, y: 0, localZ: 0 }], voxels: makeTriQuarterCollisionVoxels('se', '#d59a62'), primitives: makeTriQuarterPrimitives('se', '#d59a62') }),
+  normalizePrefab({ key: '3n', id: 'tri_prism_quarter_sw', name: 'Tri Prism Quarter · SW', kind: 'tri_prism', base: '#d59a62', renderUpdateMode: 'dynamic', supportCells: [{ x: 0, y: 0, localZ: 0 }], voxels: makeTriQuarterCollisionVoxels('sw', '#d59a62'), primitives: makeTriQuarterPrimitives('sw', '#d59a62') }),
+  normalizePrefab({ key: '3o', id: 'tri_prism_quarter_nw', name: 'Tri Prism Quarter · NW', kind: 'tri_prism', base: '#d59a62', renderUpdateMode: 'dynamic', supportCells: [{ x: 0, y: 0, localZ: 0 }], voxels: makeTriQuarterCollisionVoxels('nw', '#d59a62'), primitives: makeTriQuarterPrimitives('nw', '#d59a62') }),
+  normalizePrefab({ key: '4a', id: 'derived_tri_prism_ne', name: 'Derived Tri Prism · NE · h√3/2', kind: 'derived_tri_prism', base: '#7fb4d8', renderUpdateMode: 'dynamic', supportCells: [{ x: 0, y: 0, localZ: 0 }], voxels: makeDerivedQuarterTriCollisionVoxels('ne', '#7fb4d8'), primitives: makeDerivedQuarterTriPrimitives('ne', '#7fb4d8') }),
+  normalizePrefab({ key: '4b', id: 'derived_tri_prism_se', name: 'Derived Tri Prism · SE · h√3/2', kind: 'derived_tri_prism', base: '#7fb4d8', renderUpdateMode: 'dynamic', supportCells: [{ x: 0, y: 0, localZ: 0 }], voxels: makeDerivedQuarterTriCollisionVoxels('se', '#7fb4d8'), primitives: makeDerivedQuarterTriPrimitives('se', '#7fb4d8') }),
+  normalizePrefab({ key: '4c', id: 'derived_tri_prism_sw', name: 'Derived Tri Prism · SW · h√3/2', kind: 'derived_tri_prism', base: '#7fb4d8', renderUpdateMode: 'dynamic', supportCells: [{ x: 0, y: 0, localZ: 0 }], voxels: makeDerivedQuarterTriCollisionVoxels('sw', '#7fb4d8'), primitives: makeDerivedQuarterTriPrimitives('sw', '#7fb4d8') }),
+  normalizePrefab({ key: '4d', id: 'derived_tri_prism_nw', name: 'Derived Tri Prism · NW · h√3/2', kind: 'derived_tri_prism', base: '#7fb4d8', renderUpdateMode: 'dynamic', supportCells: [{ x: 0, y: 0, localZ: 0 }], voxels: makeDerivedQuarterTriCollisionVoxels('nw', '#7fb4d8'), primitives: makeDerivedQuarterTriPrimitives('nw', '#7fb4d8') }),
+  normalizePrefab({ key: '4e', id: 'derived_axis_unit_block', name: 'Derived Axis Unit · Adjacent 2 Tri Prisms', kind: 'derived_axis_unit', w: 2, d: 2, base: '#72c49b', renderUpdateMode: 'dynamic', voxels: makeDerivedAxisUnitCollisionVoxels('right', '#72c49b'), primitives: makeDerivedAxisUnitPrimitives('right', '#72c49b') }),
+  normalizePrefab({ key: '3p', id: 'micro_tri_prism', name: 'Micro Tri Prism · Atomic', kind: 'micro_tri_prism', base: '#e39b4f', renderUpdateMode: 'dynamic', supportCells: [{ x: 0, y: 0, localZ: 0 }], voxels: makeMicroTriPrismCollisionVoxels('#e39b4f'), primitives: makeMicroTriPrismPrimitives('#e39b4f') }),
+  normalizePrefab({ key: '3q', id: 'compatible_axis_block', name: 'Compatible Axis Block · Atom-fit', kind: 'compatible_axis_block', base: '#5dbb8a', renderUpdateMode: 'dynamic', supportCells: [{ x: 0, y: 0, localZ: 0 }], voxels: makeCompatibleAxisBlockCollisionVoxels('#5dbb8a'), primitives: makeCompatibleAxisBlockPrimitives('#5dbb8a') }),
+  normalizePrefab({ key: '3i', id: 'vertex_quad_tri_block', name: 'Vertex Block · 4 Tri Prisms', kind: 'tri_prism_compound', w: 2, d: 2, base: '#d59a62', renderUpdateMode: 'dynamic', supportCells: [{ x: 0, y: 0, localZ: 0 }, { x: 1, y: 0, localZ: 0 }, { x: 0, y: 1, localZ: 0 }, { x: 1, y: 1, localZ: 0 }], voxels: makeVertexQuadTriCollisionVoxels('#d59a62'), primitives: makeVertexQuadTriPrimitives('#d59a62') }),
+  normalizePrefab({ key: '3j', id: 'vertex_square_tri_block', name: 'Vertex Square · Unified Tri Prism Block', kind: 'tri_prism_compound', w: 2, d: 2, base: '#d59a62', renderUpdateMode: 'dynamic', supportCells: [{ x: 0, y: 0, localZ: 0 }, { x: 1, y: 0, localZ: 0 }, { x: 0, y: 1, localZ: 0 }, { x: 1, y: 1, localZ: 0 }], voxels: makeVertexQuadTriCollisionVoxels('#d59a62'), primitives: makeVertexQuadTriPrimitives('#d59a62') }),
+  normalizePrefab({ key: '3k', id: 'vertex_square_quarter_block', name: 'Vertex Square · Quarter Tri Block', kind: 'tri_prism_compound', w: 2, d: 2, base: '#d59a62', renderUpdateMode: 'dynamic', supportCells: [{ x: 0, y: 0, localZ: 0 }, { x: 1, y: 0, localZ: 0 }, { x: 0, y: 1, localZ: 0 }, { x: 1, y: 1, localZ: 0 }], voxels: makeVertexQuarterTriCollisionVoxels('#d59a62'), primitives: makeVertexQuarterTriPrimitives('#d59a62') }),
   normalizePrefab({ key: '2', id: 'bench_2x1', name: 'Bench', base: '#d4bb90', renderUpdateMode: 'static', voxels: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }] }),
   normalizePrefab({ key: '3', id: 'sofa_2x1', name: 'Sofa', base: '#9eb6dd', renderUpdateMode: 'static', voxels: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }] }),
   normalizePrefab({ key: '4', id: 'cabinet_1x1x2', name: 'Cabinet', base: '#a8c46d', renderUpdateMode: 'static', voxels: [{ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }] }),
@@ -394,21 +818,40 @@ function prefabVariant(prefab, rotation) {
   var voxels = facingApi && typeof facingApi.rotateVoxelList === 'function'
     ? facingApi.rotateVoxelList(prefab, r)
     : (Array.isArray(prefab.voxels) ? prefab.voxels.map(function (v) { return Object.assign({}, v); }) : []);
+  var primitives = facingApi && typeof facingApi.rotatePrimitiveList === 'function'
+    ? facingApi.rotatePrimitiveList(prefab, r)
+    : (Array.isArray(prefab.primitives) ? prefab.primitives.map(function (p) { return clonePrimitive(p); }) : []);
   var maxX = 0, maxY = 0, maxZ = 0;
   var bottomMap = new Map();
   for (var i = 0; i < voxels.length; i++) {
     var vv = voxels[i];
-    maxX = Math.max(maxX, vv.x || 0);
-    maxY = Math.max(maxY, vv.y || 0);
-    maxZ = Math.max(maxZ, vv.z || 0);
-    var key = vv.x + ',' + vv.y;
-    var prev = bottomMap.get(key);
-    if (prev == null || vv.z < prev) bottomMap.set(key, vv.z);
+    var vx = finiteNumber(vv.x, 0);
+    var vy = finiteNumber(vv.y, 0);
+    var vz = finiteNumber(vv.z, 0);
+    var vw = Math.max(0.001, finiteNumber(vv.w, 1));
+    var vd = Math.max(0.001, finiteNumber(vv.d, 1));
+    var vh = Math.max(0.001, finiteNumber(vv.h, 1));
+    maxX = Math.max(maxX, vx + vw);
+    maxY = Math.max(maxY, vy + vd);
+    maxZ = Math.max(maxZ, vz + vh);
+    var minCellX = Math.floor(vx + 1e-6);
+    var maxCellX = Math.ceil(vx + vw - 1e-6);
+    var minCellY = Math.floor(vy + 1e-6);
+    var maxCellY = Math.ceil(vy + vd - 1e-6);
+    for (var bx = minCellX; bx < maxCellX; bx++) {
+      for (var by = minCellY; by < maxCellY; by++) {
+        var key = bx + ',' + by;
+        var prev = bottomMap.get(key);
+        if (prev == null || vz < prev) bottomMap.set(key, vz);
+      }
+    }
   }
-  var supportCells = Array.from(bottomMap.entries()).map(function (entry) {
-    var xy = entry[0].split(',').map(Number);
-    return { x: xy[0], y: xy[1], localZ: entry[1] };
-  });
+  var supportCells = Array.isArray(prefab.supportCells) && prefab.supportCells.length
+    ? prefab.supportCells.map(function (cell) { return { x: finiteNumber(cell && cell.x, 0), y: finiteNumber(cell && cell.y, 0), localZ: finiteNumber(cell && cell.localZ, 0) }; })
+    : Array.from(bottomMap.entries()).map(function (entry) {
+        var xy = entry[0].split(',').map(Number);
+        return { x: xy[0], y: xy[1], localZ: entry[1] };
+      });
   var rotatedAnchor = facingApi && typeof facingApi.getRotatedAnchor === 'function'
     ? facingApi.getRotatedAnchor(prefab, r)
     : (prefab.anchor ? { x: Number(prefab.anchor.x) || 0, y: Number(prefab.anchor.y) || 0, z: Number(prefab.anchor.z) || 0 } : { x: 0, y: 0, z: 0 });
@@ -419,15 +862,16 @@ function prefabVariant(prefab, rotation) {
     rotation: r,
     facing: r,
     voxels: voxels,
-    w: maxX + 1,
-    d: maxY + 1,
-    h: maxZ + 1,
+    primitives: primitives,
+    w: Math.max(1, maxX),
+    d: Math.max(1, maxY),
+    h: Math.max(1, maxZ),
     supportCells: supportCells,
     anchor: rotatedAnchor,
     itemFacingPrototype: facingPrototype
   });
   prefab._variantCache.set(r, variant);
-  tracePrefabVariant(prefab.id, r, { voxels: voxels.length, w: variant.w, d: variant.d, h: variant.h, anchor: rotatedAnchor });
+  tracePrefabVariant(prefab.id, r, { voxels: voxels.length, primitives: primitives.length, w: variant.w, d: variant.d, h: variant.h, anchor: rotatedAnchor });
   return variant;
 }
 

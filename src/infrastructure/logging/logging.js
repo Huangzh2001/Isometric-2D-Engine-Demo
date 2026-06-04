@@ -84,6 +84,9 @@ function isPixiPerformanceCriticalLine(text) {
   if (text.indexOf('rendertexture-churn-diagnostics') >= 0) return true;
   if (text.indexOf('begin-frame-phase-diagnostics') >= 0) return true;
   if (text.indexOf('PIXI-RESIDUAL-CANVAS2D-FORENSICS') >= 0) return true;
+  if (text.indexOf('PIXI-PREVIEW-ALIGNMENT') >= 0) return true;
+  if (text.indexOf('PIXI-WORLD-OWNER') >= 0) return true;
+  if (text.indexOf('STAIR-PLACE-TRACE') >= 0) return true;
   if (text.indexOf('DRAW-LOOP-BREAKDOWN') >= 0) return true;
   if (text.indexOf('staticStableItemPlanCacheGate') >= 0) return true;
   if (text.indexOf('stablePlanKeyDiff') >= 0) return true;
@@ -560,6 +563,26 @@ function buildLogExportHeader() {
   } catch (err) {}
   try {
     if (typeof getShadowProbeSnapshot === 'function') parts.push('# shadowProbe=' + JSON.stringify(getShadowProbeSnapshot()));
+  } catch (err) {}
+  try {
+    if (typeof window !== 'undefined' && window.__PIXI_PREVIEW_ALIGNMENT_LAST__) {
+      parts.push('# lastPixiPreviewAlignment=' + JSON.stringify(window.__PIXI_PREVIEW_ALIGNMENT_LAST__));
+    }
+  } catch (err) {}
+  try {
+    if (typeof window !== 'undefined' && window.__PIXI_PREVIEW_ALIGNMENT_LAST_CANDIDATE__) {
+      parts.push('# lastPixiPreviewCandidate=' + JSON.stringify(window.__PIXI_PREVIEW_ALIGNMENT_LAST_CANDIDATE__));
+    }
+  } catch (err) {}
+  try {
+    if (typeof window !== 'undefined' && window.__PIXI_PREVIEW_ALIGNMENT_LAST_PIXI__) {
+      parts.push('# lastPixiPreviewPixi=' + JSON.stringify(window.__PIXI_PREVIEW_ALIGNMENT_LAST_PIXI__));
+    }
+  } catch (err) {}
+  try {
+    if (typeof window !== 'undefined' && window.__PIXI_MIGRATION_LAST_PIXI_FLOOR_SUMMARY__) {
+      parts.push('# lastPixiFloorSummary=' + JSON.stringify(window.__PIXI_MIGRATION_LAST_PIXI_FLOOR_SUMMARY__));
+    }
   } catch (err) {}
   parts.push('');
   return parts.join('\n');

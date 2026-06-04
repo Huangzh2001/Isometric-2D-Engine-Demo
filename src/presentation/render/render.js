@@ -1249,20 +1249,36 @@ function drawFrontLines() {
 }
 
 function buildSurfaceFaces(boxList, alpha = 1, includeHidden = false) {
-  const occ = buildOccupancy(boxList);
+  const sourceBoxes = Array.isArray(boxList) ? boxList : [];
   const faces = [];
   const e = 0.001;
   const prio = { bottom: 0, north: 1, west: 2, east: 3, south: 4, top: 5 };
 
+  function safeSize(value, fallback = 1) {
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 ? Math.max(0.001, n) : fallback;
+  }
+
+  function hasFractionalAabb(box) {
+    if (!box) return false;
+    const vals = [box.x, box.y, box.z, box.w, box.d, box.h];
+    for (let i = 0; i < vals.length; i++) {
+      const n = Number(vals[i] == null ? (i >= 3 ? 1 : 0) : vals[i]);
+      if (!Number.isFinite(n)) continue;
+      if (Math.abs(n - Math.round(n)) > 1e-6) return true;
+    }
+    return false;
+  }
+
   function makeFace(cell, dir, poly, fill, aabb, worldPts) {
-    const depth = poly.reduce((s, p) => s + p.y, 0) / poly.length + prio[dir] * 0.0001;
+    const depth = poly.reduce((sum, p) => sum + p.y, 0) / poly.length + prio[dir] * 0.0001;
     faces.push({
-      id: `box-${cell.box.id}-${cell.x}-${cell.y}-${cell.z}-${dir}`,
+      id: `box-${cell.box && cell.box.id != null ? cell.box.id : 'x'}-${cell.x}-${cell.y}-${cell.z}-${dir}`,
       kind: 'box-face',
-      boxId: cell.box.id,
-      instanceId: cell.box.instanceId || null,
+      boxId: cell.box && cell.box.id != null ? cell.box.id : null,
+      instanceId: cell.box && cell.box.instanceId || null,
       dir,
-      cell: { x: cell.x, y: cell.y, z: cell.z },
+      cell: { x: cell.x, y: cell.y, z: cell.z, w: cell.w, d: cell.d, h: cell.h },
       poly,
       worldPts: Array.isArray(worldPts) ? worldPts.map(function (p) { return { x: p.x, y: p.y, z: p.z }; }) : [],
       aabb,
@@ -1276,6 +1292,52 @@ function buildSurfaceFaces(boxList, alpha = 1, includeHidden = false) {
       },
     });
   }
+
+  function emitDirectCuboidFaces(box) {
+    const x = Number(box && box.x) || 0;
+    const y = Number(box && box.y) || 0;
+    const z = Number(box && box.z) || 0;
+    const w = safeSize(box && box.w, 1);
+    const d = safeSize(box && box.d, 1);
+    const h = safeSize(box && box.h, 1);
+    const cell = { box, x, y, z, w, d, h };
+    const pts = cubePoints(x, y, z, w, d, h);
+    const { p000,p100,p110,p010,p001,p101,p111,p011 } = pts;
+    const fc = faceColors((box && box.base) || '#7aa2f7');
+    makeFace(cell, 'top', [p001,p101,p111,p011], xrayFaces ? 'rgba(255,255,255,.20)' : fc.top,
+             makeAABB(x, y, z + h, w, d, e), [
+               { x, y, z: z + h }, { x: x + w, y, z: z + h }, { x: x + w, y: y + d, z: z + h }, { x, y: y + d, z: z + h }
+             ]);
+    makeFace(cell, 'east', [p101,p111,p110,p100], xrayFaces ? 'rgba(255,255,255,.18)' : fc.left,
+             makeAABB(x + w, y, z, e, d, h), [
+               { x: x + w, y, z }, { x: x + w, y: y + d, z }, { x: x + w, y: y + d, z: z + h }, { x: x + w, y, z: z + h }
+             ]);
+    makeFace(cell, 'south', [p011,p111,p110,p010], xrayFaces ? 'rgba(255,255,255,.16)' : fc.right,
+             makeAABB(x, y + d, z, w, e, h), [
+               { x, y: y + d, z }, { x: x + w, y: y + d, z }, { x: x + w, y: y + d, z: z + h }, { x, y: y + d, z: z + h }
+             ]);
+    if (includeHidden) {
+      makeFace(cell, 'bottom', [p000,p100,p110,p010], 'rgba(255,255,255,.08)',
+               makeAABB(x, y, z - e, w, d, e), [
+                 { x, y, z }, { x: x + w, y, z }, { x: x + w, y: y + d, z }, { x, y: y + d, z }
+               ]);
+      makeFace(cell, 'north', [p001,p101,p100,p000], 'rgba(255,255,255,.10)',
+               makeAABB(x, y - e, z, w, e, h), [
+                 { x, y, z: z + h }, { x: x + w, y, z: z + h }, { x: x + w, y, z }, { x, y, z }
+               ]);
+      makeFace(cell, 'west', [p001,p011,p010,p000], 'rgba(255,255,255,.10)',
+               makeAABB(x - e, y, z, e, d, h), [
+                 { x, y, z: z + h }, { x, y: y + d, z: z + h }, { x, y: y + d, z }, { x, y, z }
+               ]);
+    }
+  }
+
+  if (sourceBoxes.some(hasFractionalAabb)) {
+    for (let i = 0; i < sourceBoxes.length; i++) emitDirectCuboidFaces(sourceBoxes[i]);
+    return faces;
+  }
+
+  const occ = buildOccupancy(sourceBoxes);
 
   for (const cell of occ.values()) {
     const { box, x, y, z } = cell;
@@ -1294,29 +1356,29 @@ function buildSurfaceFaces(boxList, alpha = 1, includeHidden = false) {
 
     // 当前相机下真正可见的是：top + east + south
     if (!neighbors.top) {
-      makeFace(cell, 'top', [p001,p101,p111,p011], xrayFaces ? 'rgba(255,255,255,.20)' : fc.top,
+      makeFace({ box, x, y, z, w: 1, d: 1, h: 1 }, 'top', [p001,p101,p111,p011], xrayFaces ? 'rgba(255,255,255,.20)' : fc.top,
                makeAABB(x, y, z + 1, 1, 1, e), [p001,p101,p111,p011]);
     }
     if (!neighbors.east) {
-      makeFace(cell, 'east', [p101,p111,p110,p100], xrayFaces ? 'rgba(255,255,255,.18)' : fc.left,
+      makeFace({ box, x, y, z, w: 1, d: 1, h: 1 }, 'east', [p101,p111,p110,p100], xrayFaces ? 'rgba(255,255,255,.18)' : fc.left,
                makeAABB(x + 1, y, z, e, 1, 1), [p101,p111,p110,p100]);
     }
     if (!neighbors.south) {
-      makeFace(cell, 'south', [p011,p111,p110,p010], xrayFaces ? 'rgba(255,255,255,.16)' : fc.right,
+      makeFace({ box, x, y, z, w: 1, d: 1, h: 1 }, 'south', [p011,p111,p110,p010], xrayFaces ? 'rgba(255,255,255,.16)' : fc.right,
                makeAABB(x, y + 1, z, 1, e, 1), [p011,p111,p110,p010]);
     }
 
     if (includeHidden) {
       if (!neighbors.bottom) {
-        makeFace(cell, 'bottom', [p000,p100,p110,p010], 'rgba(255,255,255,.08)',
+        makeFace({ box, x, y, z, w: 1, d: 1, h: 1 }, 'bottom', [p000,p100,p110,p010], 'rgba(255,255,255,.08)',
                  makeAABB(x, y, z - e, 1, 1, e), [p000,p100,p110,p010]);
       }
       if (!neighbors.north) {
-        makeFace(cell, 'north', [p001,p101,p100,p000], 'rgba(255,255,255,.10)',
+        makeFace({ box, x, y, z, w: 1, d: 1, h: 1 }, 'north', [p001,p101,p100,p000], 'rgba(255,255,255,.10)',
                  makeAABB(x, y - e, z, 1, e, 1), [p001,p101,p100,p000]);
       }
       if (!neighbors.west) {
-        makeFace(cell, 'west', [p001,p011,p010,p000], 'rgba(255,255,255,.10)',
+        makeFace({ box, x, y, z, w: 1, d: 1, h: 1 }, 'west', [p001,p011,p010,p000], 'rgba(255,255,255,.10)',
                  makeAABB(x - e, y, z, e, 1, 1), [p001,p011,p010,p000]);
       }
     }

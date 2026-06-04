@@ -507,6 +507,80 @@
     };
   }
 
+  function shouldUseSharedFloorLayerCacheForPixi() {
+    // PXM-FLOOR-CORRECTNESS-01:
+    // The shared floor canvas cache is currently unsafe in the Pixi-only world path:
+    // logs show usesSharedFloorLayerCache=true while the user sees only a partial
+    // floor region. Until the cache-space/viewport transform contract is proven
+    // with diagnostics, Pixi owns floor drawing directly. Canvas2D may still keep
+    // its cache for legacy fallback, but Pixi must not consume it as the floor
+    // authority.
+    return false;
+  }
+
+  function getPixiStageCoordinateBounds(targetCanvas) {
+    // Pixi was initialized/resized with the backing canvas size
+    // (targetCanvas.width/height, usually CSS size * DPR).  The floor projection
+    // points are submitted into that same Pixi stage coordinate space.  Using the
+    // CSS client rect here under-culls the right/bottom side at DPR > 1, which is
+    // exactly the visible symptom reported by the user: the floor exists, but the
+    // computed visible range is too small.
+    var css = getCanvasCssRect(targetCanvas);
+    var dpr = getDevicePixelRatio();
+    var rendererW = Number(state.pixiRendererWidth || 0);
+    var rendererH = Number(state.pixiRendererHeight || 0);
+    var canvasW = Number(targetCanvas && targetCanvas.width || 0);
+    var canvasH = Number(targetCanvas && targetCanvas.height || 0);
+    var cssWAsStage = Number(css.width || 0) * dpr;
+    var cssHAsStage = Number(css.height || 0) * dpr;
+    var w = Math.max(1, Math.round(rendererW || canvasW || cssWAsStage || Number(css.width || 0) || 1));
+    var h = Math.max(1, Math.round(rendererH || canvasH || cssHAsStage || Number(css.height || 0) || 1));
+    return {
+      minX: 0,
+      minY: 0,
+      maxX: w,
+      maxY: h,
+      width: w,
+      height: h,
+      coordinateSpace: 'pixi-stage-backing-pixels',
+      cssWidth: Number(css.width || 0),
+      cssHeight: Number(css.height || 0),
+      dpr: dpr,
+      rendererWidth: rendererW,
+      rendererHeight: rendererH,
+      canvasWidth: canvasW,
+      canvasHeight: canvasH
+    };
+  }
+
+  function getViewportScreenBoundsForPixiFloor() {
+    return getPixiStageCoordinateBounds(getTargetCanvas());
+  }
+
+  function getPointBounds(points) {
+    var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (var i = 0; i < (points || []).length; i += 1) {
+      var pt = points[i] || {};
+      var x = Number(pt.x);
+      var y = Number(pt.y);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+    if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+      return null;
+    }
+    return { minX: minX, minY: minY, maxX: maxX, maxY: maxY, width: maxX - minX, height: maxY - minY };
+  }
+
+  function boundsIntersectWithMargin(a, b, margin) {
+    if (!a || !b) return false;
+    var m = Math.max(0, Number(margin || 0) || 0);
+    return !(Number(a.maxX) < Number(b.minX) - m || Number(a.minX) > Number(b.maxX) + m || Number(a.maxY) < Number(b.minY) - m || Number(a.minY) > Number(b.maxY) + m);
+  }
+
   function projectWorldFaceNoCamera(points, viewRotation, settings) {
     try {
       if (typeof global.screenPointsFromWorldFaceNoCamera === 'function') return global.screenPointsFromWorldFaceNoCamera(points, viewRotation) || [];
@@ -583,6 +657,42 @@
         return true;
       }
     } catch (_) {}
+    return false;
+  }
+
+
+  function drawLine(graphics, a, b, strokeCss, strokeWidth) {
+    if (!graphics || !a || !b) return false;
+    var stroke = parseCssColor(strokeCss || 'rgba(255,255,255,.16)', 0xffffff, 0.16);
+    var width = Number(strokeWidth || 1);
+    try {
+      if (typeof graphics.moveTo === 'function' && typeof graphics.lineTo === 'function') {
+        graphics.moveTo(Number(a.x || 0), Number(a.y || 0));
+        graphics.lineTo(Number(b.x || 0), Number(b.y || 0));
+        if (typeof graphics.stroke === 'function') graphics.stroke({ color: stroke.color, alpha: stroke.alpha, width: width });
+        return true;
+      }
+    } catch (_) {}
+    try {
+      if (typeof graphics.lineStyle === 'function') {
+        graphics.lineStyle(width, stroke.color, stroke.alpha);
+        if (typeof graphics.moveTo === 'function') graphics.moveTo(Number(a.x || 0), Number(a.y || 0));
+        if (typeof graphics.lineTo === 'function') graphics.lineTo(Number(b.x || 0), Number(b.y || 0));
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  function isSubTileGridEnabled() {
+    try {
+      var runtimeApi = global.App && global.App.state ? global.App.state.runtimeState || null : null;
+      if (runtimeApi && typeof runtimeApi.getEditorCameraSettingsValue === 'function') {
+        var cameraSettings = runtimeApi.getEditorCameraSettingsValue() || {};
+        if (cameraSettings.subTileGridEnabled === true) return true;
+      }
+    } catch (_) {}
+    try { if (global.settings && global.settings.subTileGridEnabled === true) return true; } catch (_) {}
     return false;
   }
 
@@ -665,10 +775,9 @@
   function drawPixiBackground() {
     if (!state.backgroundGraphics || !state.pixiApp) return false;
     clearGraphics(state.backgroundGraphics);
-    var targetCanvas = getTargetCanvas();
-    var css = getCanvasCssRect(targetCanvas);
-    var w = Number(css.width || state.pixiRendererWidth || (targetCanvas && targetCanvas.width) || 0);
-    var h = Number(css.height || state.pixiRendererHeight || (targetCanvas && targetCanvas.height) || 0);
+    var bounds = getPixiStageCoordinateBounds(getTargetCanvas());
+    var w = Number(bounds.width || 0);
+    var h = Number(bounds.height || 0);
     drawRect(state.backgroundGraphics, 0, 0, w, h * 0.52, '#0e1320');
     drawRect(state.backgroundGraphics, 0, h * 0.52, w, h * 0.48, '#141b2b');
     return true;
@@ -1078,6 +1187,11 @@
       floorCacheSignature: String(snapshot.signature || ''),
       stableFloorTextureVersion: String(snapshot.textureVersion || snapshot.version || ''),
       sharedSurfaceRevision: Number(snapshot.sharedSurfaceRevision || 0),
+      floorVisibleChunksComplete: snapshot.floorVisibleChunksComplete === true,
+      floorRequiredCompleteVisibleChunks: snapshot.requireCompleteVisibleChunks === true,
+      floorCompleteVisibleChunkCount: Array.isArray(snapshot.completeVisibleChunkKeys) ? snapshot.completeVisibleChunkKeys.length : 0,
+      floorVisibleChunkCount: Array.isArray(snapshot.visibleChunkKeys) ? snapshot.visibleChunkKeys.length : 0,
+      floorMissingVisibleChunkCountAfter: Number(snapshot.missingVisibleChunkCountAfter || 0),
       textureSignatureStable: true,
       textureUpdateReason: textureUpdateReason,
       cameraMoveOnly: cameraTransformOnly,
@@ -1129,14 +1243,73 @@
     return summary;
   }
 
+  function isDerivedAxisGridEnabled(settings) {
+    try {
+      var root = global || {};
+      var input = root.document && root.document.getElementById ? root.document.getElementById('terrainMapDerivedAxisGridEnabled') : null;
+      if (input && input.checked === true) return true;
+    } catch (_) {}
+    try { if (settings && settings.derivedAxisGridEnabled === true) return true; } catch (_) {}
+    try { if (global.settings && global.settings.derivedAxisGridEnabled === true) return true; } catch (_) {}
+    return false;
+  }
+
+  function getSubTileGridSubdivision(settings) {
+    try {
+      var root = global || {};
+      var input = root.document && root.document.getElementById ? root.document.getElementById('mainCameraSubTileGridSubdivision') : null;
+      var fromInput = Number(input && input.value);
+      if (Number.isFinite(fromInput)) return Math.max(1, Math.min(64, Math.round(fromInput)));
+    } catch (_) {}
+    try {
+      var direct = Number(settings && settings.subTileGridSubdivision);
+      if (Number.isFinite(direct)) return Math.max(1, Math.min(64, Math.round(direct)));
+    } catch (_) {}
+    try {
+      if (global.settings) {
+        var legacy = Number(global.settings.subTileGridSubdivision);
+        if (Number.isFinite(legacy)) return Math.max(1, Math.min(64, Math.round(legacy)));
+      }
+    } catch (_) {}
+    return 1;
+  }
+
+  function drawSubTileGridForDiamond(tileGraphics, tileX, tileY, subdivision, viewRotation, settings, camera, diamondStrokeCss, quarterStrokeCss, hideDiamondEdges) {
+    subdivision = Math.max(1, Math.min(64, Math.round(Number(subdivision) || 1)));
+    var lines = 0;
+    for (var sy = 0; sy < subdivision; sy++) {
+      for (var sx = 0; sx < subdivision; sx++) {
+        var x0 = tileX + (sx / subdivision);
+        var x1 = tileX + ((sx + 1) / subdivision);
+        var y0 = tileY + (sy / subdivision);
+        var y1 = tileY + ((sy + 1) / subdivision);
+        var projected = addCamera(projectWorldFaceNoCamera([
+          { x: x0, y: y0, z: 0 },
+          { x: x1, y: y0, z: 0 },
+          { x: x1, y: y1, z: 0 },
+          { x: x0, y: y1, z: 0 }
+        ], viewRotation, settings), camera);
+        if (!hideDiamondEdges && drawPolygon(tileGraphics, projected, 'rgba(0,0,0,0)', diamondStrokeCss, 1)) lines += 4;
+        if (projected.length >= 4) {
+          if (drawLine(tileGraphics, projected[0], projected[2], quarterStrokeCss, 1)) lines += 1;
+          if (drawLine(tileGraphics, projected[1], projected[3], quarterStrokeCss, 1)) lines += 1;
+        }
+      }
+    }
+    return lines;
+  }
+
   function drawPixiFloorLayer(reason, sharedFrameSnapshot) {
     var startAt = nowMs();
     if (!state.initialized || !ensurePixiContainers()) {
       state.lastFloorSummary = Object.assign({}, state.lastFloorSummary, { ok: false, reason: 'pixi-not-initialized', drawnTiles: 0, visibleTiles: 0 });
       return state.lastFloorSummary;
     }
-    var sharedFloorSummary = tryDrawSharedFloorLayer(reason || 'draw-pixi-floor-layer', sharedFrameSnapshot);
-    if (sharedFloorSummary && sharedFloorSummary.ok === true && sharedFloorSummary.usesSharedFloorLayerCache === true) return sharedFloorSummary;
+    var sharedFloorSummary = null;
+    if (shouldUseSharedFloorLayerCacheForPixi()) {
+      sharedFloorSummary = tryDrawSharedFloorLayer(reason || 'draw-pixi-floor-layer', sharedFrameSnapshot);
+      if (sharedFloorSummary && sharedFloorSummary.ok === true && sharedFloorSummary.usesSharedFloorLayerCache === true) return sharedFloorSummary;
+    }
     var Graphics = getPixiConstructor('Graphics');
     if (typeof Graphics !== 'function') {
       state.lastFloorSummary = Object.assign({}, state.lastFloorSummary, { ok: false, reason: 'pixi-graphics-missing', drawnTiles: 0, visibleTiles: 0 });
@@ -1151,16 +1324,35 @@
     var camera = getRuntimeCamera();
     var viewRotation = getCurrentViewRotation();
     var range = getVisibleTileRange(settings, viewRotation);
-    var visibleTiles = Math.max(0, Number(range.maxX - range.minX || 0)) * Math.max(0, Number(range.maxY - range.minY || 0));
+    var gridW = Math.max(0, Math.round(Number(settings.gridW || settings.worldCols || 0) || 0));
+    var gridH = Math.max(0, Math.round(Number(settings.gridH || settings.worldRows || 0) || 0));
+    var viewportBounds = getViewportScreenBoundsForPixiFloor();
+    var screenCullMargin = 96;
+    var visibleTiles = 0;
     var drawnTiles = 0;
     var skippedTiles = 0;
+    var consideredTiles = 0;
+    var culledTiles = 0;
     var strokeCss = 'rgba(255,255,255,.05)';
+    var derivedAxisGridEnabled = isDerivedAxisGridEnabled(settings);
+    var subTileGridEnabled = isSubTileGridEnabled() || derivedAxisGridEnabled;
+    var subTileGridSubdivision = getSubTileGridSubdivision(settings);
+    var subTileGridLineCss = 'rgba(255,255,255,.18)';
+    var subTileGridVisualSubdivision = Math.min(subTileGridSubdivision, 24);
+    var subTileGridSubdivisionCss = 'rgba(255,255,255,.10)';
+    var subTileGridLineCount = 0;
+    var subTileGridMicroDiamondCount = 0;
     var tileGraphics = new Graphics();
-    tileGraphics.label = 'pixi-migration-floor-tiles';
+    tileGraphics.label = 'pixi-migration-floor-tiles-screen-culling';
     try { tileGraphics.eventMode = 'none'; } catch (_) {}
 
-    for (var y = range.minY; y < range.maxY; y++) {
-      for (var x = range.minX; x < range.maxX; x++) {
+    // Correctness-first floor visibility: derive visibility from actual projected
+    // screen bounds, not from the shared floor cache's chunk/range estimate. This
+    // prevents the "only the upper-left floor patch is drawn" failure where the
+    // cache/range path incorrectly treats a partial surface as authoritative.
+    for (var y = 0; y < gridH; y++) {
+      for (var x = 0; x < gridW; x++) {
+        consideredTiles += 1;
         var projectedNoCamera = projectWorldFaceNoCamera([
           { x: x, y: y, z: 0 },
           { x: x + 1, y: y, z: 0 },
@@ -1168,10 +1360,29 @@
           { x: x, y: y + 1, z: 0 }
         ], viewRotation, settings);
         var projected = addCamera(projectedNoCamera, camera);
-        if (drawPolygon(tileGraphics, projected, getTileFillCss(x, y), strokeCss, 1)) drawnTiles += 1;
+        var tileBounds = getPointBounds(projected);
+        if (!boundsIntersectWithMargin(tileBounds, viewportBounds, screenCullMargin)) {
+          culledTiles += 1;
+          continue;
+        }
+        visibleTiles += 1;
+        if (drawPolygon(tileGraphics, projected, getTileFillCss(x, y), derivedAxisGridEnabled ? 'rgba(0,0,0,0)' : strokeCss, 1)) {
+          drawnTiles += 1;
+          if (subTileGridEnabled && projected.length >= 4) {
+            if (subTileGridSubdivision <= 1) {
+              if (drawLine(tileGraphics, projected[0], projected[2], subTileGridLineCss, 1)) subTileGridLineCount += 1;
+              if (drawLine(tileGraphics, projected[1], projected[3], subTileGridLineCss, 1)) subTileGridLineCount += 1;
+              subTileGridMicroDiamondCount += 1;
+            } else {
+              subTileGridLineCount += drawSubTileGridForDiamond(tileGraphics, x, y, subTileGridVisualSubdivision, viewRotation, settings, camera, subTileGridSubdivisionCss, subTileGridLineCss, derivedAxisGridEnabled);
+              subTileGridMicroDiamondCount += subTileGridVisualSubdivision * subTileGridVisualSubdivision;
+            }
+          }
+        }
         else skippedTiles += 1;
       }
     }
+
 
     var outlineNoCamera = projectWorldFaceNoCamera([
       { x: 0, y: 0, z: 0 },
@@ -1189,13 +1400,30 @@
       active: detectActiveBackend(),
       visibleTiles: visibleTiles,
       drawnTiles: drawnTiles,
+      subTileGridEnabled: subTileGridEnabled,
+      derivedAxisGridEnabled: derivedAxisGridEnabled,
+      subTileGridMode: 'diamond_quarters',
+      subTileGridSubdivision: subTileGridSubdivision,
+      subTileGridVisualSubdivision: subTileGridVisualSubdivision,
+      subTileGridLineCount: subTileGridLineCount,
+      subTileGridMicroDiamondCount: subTileGridMicroDiamondCount,
       skippedTiles: skippedTiles,
-      gridW: range.gridW,
-      gridH: range.gridH,
-      minX: range.minX,
-      minY: range.minY,
-      maxX: range.maxX,
-      maxY: range.maxY,
+      gridW: gridW,
+      gridH: gridH,
+      minX: 0,
+      minY: 0,
+      maxX: gridW,
+      maxY: gridH,
+      previousRangeMinX: range && range.minX,
+      previousRangeMinY: range && range.minY,
+      previousRangeMaxX: range && range.maxX,
+      previousRangeMaxY: range && range.maxY,
+      previousRangeSource: range && range.source,
+      screenCullingEnabled: true,
+      screenCullMargin: screenCullMargin,
+      consideredTiles: consideredTiles,
+      culledTiles: culledTiles,
+      viewportBounds: viewportBounds,
       viewRotation: Number(viewRotation || 0),
       projectionSource: typeof global.screenPointsFromWorldFaceNoCamera === 'function' ? 'existing-screenPointsFromWorldFaceNoCamera' : 'fallback-iso-formula',
       usesSharedFloorLayerCache: false,
@@ -1216,11 +1444,80 @@
       pixiSortChildren: false,
       pixiZIndexUsed: false,
       ok: drawnTiles > 0,
-      reason: drawnTiles > 0 ? 'pixi-floor-drawn' : 'no-tiles-drawn',
+      reason: drawnTiles > 0 ? 'pixi-floor-first-pass-screen-culling-drawn' : 'no-tiles-drawn',
+      sharedFloorCacheDisabledForCorrectness: true,
       drawWallMs: Number(wallMs.toFixed ? wallMs.toFixed(3) : wallMs),
       drawCount: state.floorDrawCount,
       source: reason || 'draw-pixi-floor-layer'
     };
+    try {
+      var floorLine = '[PIXI-FLOOR-OWNER] ' + JSON.stringify({
+        phase: 'pixi-direct-floor-screen-culling',
+        usesSharedFloorLayerCache: false,
+        sharedFloorCacheDisabledForCorrectness: true,
+        gridW: gridW,
+        gridH: gridH,
+        consideredTiles: consideredTiles,
+        visibleTiles: visibleTiles,
+        drawnTiles: drawnTiles,
+        subTileGridEnabled: subTileGridEnabled,
+        derivedAxisGridEnabled: derivedAxisGridEnabled,
+        subTileGridMode: 'diamond_quarters',
+        subTileGridSubdivision: subTileGridSubdivision,
+        subTileGridVisualSubdivision: subTileGridVisualSubdivision,
+        subTileGridLineCount: subTileGridLineCount,
+        subTileGridMicroDiamondCount: subTileGridMicroDiamondCount,
+        culledTiles: culledTiles,
+        previousRange: { minX: range && range.minX, minY: range && range.minY, maxX: range && range.maxX, maxY: range && range.maxY, source: range && range.source },
+        viewportBounds: viewportBounds,
+        viewportCoordinateSpace: viewportBounds && viewportBounds.coordinateSpace || '',
+        cssViewport: { width: viewportBounds && viewportBounds.cssWidth || 0, height: viewportBounds && viewportBounds.cssHeight || 0 },
+        pixiStageViewport: { width: viewportBounds && viewportBounds.width || 0, height: viewportBounds && viewportBounds.height || 0 },
+        dpr: viewportBounds && viewportBounds.dpr || getDevicePixelRatio(),
+        source: OWNER
+      });
+      if (typeof global.detailLog === 'function') global.detailLog(floorLine);
+      else if (typeof global.pushLog === 'function') global.pushLog(floorLine);
+      else if (global.console && typeof global.console.log === 'function') global.console.log(floorLine);
+    } catch (_) {}
+    try {
+      var subTileLine = '[SUB-TILE-GRID] ' + JSON.stringify({
+        phase: 'pixi-floor-quarter-grid-overlay',
+        enabled: !!subTileGridEnabled,
+        derivedAxisGridEnabled: derivedAxisGridEnabled,
+        mode: 'diamond_quarters',
+        subdivision: subTileGridSubdivision,
+        visualSubdivision: subTileGridVisualSubdivision,
+        drawnTiles: drawnTiles,
+        lineCount: subTileGridLineCount,
+        microDiamondCount: subTileGridMicroDiamondCount,
+        renderer: 'pixi',
+        canvas2dWorldDraw: false,
+        source: OWNER
+      });
+      if (typeof global.detailLog === 'function') global.detailLog(subTileLine);
+      else if (typeof global.pushLog === 'function') global.pushLog(subTileLine);
+      else if (global.console && typeof global.console.log === 'function') global.console.log(subTileLine);
+    } catch (_) {}
+    try {
+      if (derivedAxisGridEnabled) {
+        var derivedAxisLine = '[DERIVED-AXIS-GRID] ' + JSON.stringify({
+          phase: 'pixi-floor-derived-axis-grid',
+          enabled: true,
+          hiddenDiamondEdges: true,
+          sourceGrid: 'diamond_quarters',
+          subdivision: subTileGridSubdivision,
+          visualSubdivision: subTileGridVisualSubdivision,
+          lineCount: subTileGridLineCount,
+          microDiamondCount: subTileGridMicroDiamondCount,
+          renderer: 'pixi',
+          source: OWNER
+        });
+        if (typeof global.detailLog === 'function') global.detailLog(derivedAxisLine);
+        else if (typeof global.pushLog === 'function') global.pushLog(derivedAxisLine);
+        else if (global.console && typeof global.console.log === 'function') global.console.log(derivedAxisLine);
+      }
+    } catch (_) {}
     global.__PIXI_MIGRATION_LAST_PIXI_FLOOR_SUMMARY__ = state.lastFloorSummary;
     notifyPixiFloorSharedConsumer(state.lastFloorSummary);
     try {
@@ -1254,6 +1551,11 @@
       textureUpdatedOnDirty: floor.textureUpdatedOnDirty === true,
       spriteReusedOnStableFrame: floor.spriteReusedOnStableFrame === true,
       floorCacheVersion: floor.floorCacheVersion || '',
+      floorVisibleChunksComplete: floor.floorVisibleChunksComplete === true,
+      floorRequiredCompleteVisibleChunks: floor.floorRequiredCompleteVisibleChunks === true,
+      floorCompleteVisibleChunkCount: Number(floor.floorCompleteVisibleChunkCount || 0),
+      floorVisibleChunkCount: Number(floor.floorVisibleChunkCount || floor.visibleTiles || 0),
+      floorMissingVisibleChunkCountAfter: Number(floor.floorMissingVisibleChunkCountAfter || 0),
       tileHitTestOwner: 'legacy',
       objectSelectionOwner: 'legacy',
       canvas2dFloorFallback: 'enabled',
@@ -1439,6 +1741,11 @@
       textureUpdatedOnDirty: floor.textureUpdatedOnDirty === true,
       spriteReusedOnStableFrame: floor.spriteReusedOnStableFrame === true,
       floorCacheVersion: floor.floorCacheVersion || '',
+      floorVisibleChunksComplete: floor.floorVisibleChunksComplete === true,
+      floorRequiredCompleteVisibleChunks: floor.floorRequiredCompleteVisibleChunks === true,
+      floorCompleteVisibleChunkCount: Number(floor.floorCompleteVisibleChunkCount || 0),
+      floorVisibleChunkCount: Number(floor.floorVisibleChunkCount || floor.visibleTiles || 0),
+      floorMissingVisibleChunkCountAfter: Number(floor.floorMissingVisibleChunkCountAfter || 0),
       tileHitTestOwner: 'legacy',
       objectSelectionOwner: 'legacy',
       pixiDrawsWorldContent: floor.usesSharedFloorLayerCache === true || Number(floor.drawnTiles || 0) > 0,
@@ -1783,7 +2090,10 @@
       if (!consumer || typeof consumer.beginFrame !== 'function') return null;
       return consumer.beginFrame({
         source: reason || 'pixi-renderFrame-before-canvas2d-fallback',
-        container: state.dynamicRenderableContainer || null,
+        // Dynamic renderables that need actor/static depth interleaving must share
+        // the same Pixi container as static order-run sprites and the player.
+        // A separate dynamic container creates a second visual world.
+        container: state.staticRunContainer || state.dynamicRenderableContainer || null,
         framePlanId: options.framePlanId || '',
         activeBackend: 'pixi',
         visualAdoption: options.visualAdoption === true,
@@ -2415,7 +2725,7 @@
     maybeEmitFloorSummary('pixi-renderFrame');
     emitSummary('pixi-renderFrame');
     var staticRunVisualPlanSummary = getLastPixiStaticWorldPacketSummary();
-    beginPixiDynamicRenderableFrame('pixi-renderFrame-before-canvas2d-fallback', { framePlanId: meta && meta.framePlanId || '', visualAdoption: false, disabledReason: 'pxm-0711e-unsafe-interleaved-world-adoption-disabled' });
+    beginPixiDynamicRenderableFrame('pixi-renderFrame-before-canvas2d-fallback', { framePlanId: meta && meta.framePlanId || '', visualAdoption: true, disabledReason: '' });
     var playerConsumerSummary = consumePixiPlayerSharedSprite('pixi-renderFrame-before-canvas2d-fallback', { framePlanId: meta && meta.framePlanId || '', visualAdoption: false, disabledReason: 'pxm-0711e-unsafe-interleaved-world-adoption-disabled' });
     var interleavedFramePlanSummary = notePixiInterleavedFramePlanRender('pixi-renderFrame-before-canvas2d-fallback', meta);
     var fallback = getCanvas2dFallbackApi();
@@ -2446,13 +2756,16 @@
           activeBackend: 'pixi',
           pixiDrawsFloor: floorReady,
           pixiDrawsStaticPacketRuns: !!(staticRunConsumerSummary && staticRunConsumerSummary.pixiDrawsStaticWorldPackets),
-          pixiDrawsPlayerAvatar: false,
-          pixiDrawsDynamicRenderables: false,
+          pixiDrawsPlayerAvatar: !!(finalPlayerConsumerSummary && finalPlayerConsumerSummary.pixiDrawsPlayerAvatar),
+          pixiDrawsDynamicRenderables: !!(dynamicRenderableConsumerSummary && dynamicRenderableConsumerSummary.pixiDrawsDynamicRenderables),
+          pixiDrawsPlacementPreview: !!(dynamicRenderableConsumerSummary && dynamicRenderableConsumerSummary.pixiDrawsPlacementPreview),
+          canvas2dSkipsPlacementPreviewWorld: !!(dynamicRenderableConsumerSummary && dynamicRenderableConsumerSummary.canvas2dSkipsPlacementPreviewWorld),
+          debugFaceAdoptedCount: Number(dynamicRenderableConsumerSummary && dynamicRenderableConsumerSummary.debugFaceAdoptedCount || 0),
           canvas2dDrawsStaticWorld: !(staticRunConsumerSummary && staticRunConsumerSummary.canvas2dSkipsStaticWorldPackets),
-          canvas2dDrawsPlayerAvatar: true,
-          canvas2dDrawsDynamicRenderables: true,
-          canvas2dSkipsPlayerAvatar: false,
-          canvas2dSkipsAdoptedDynamicRenderables: false,
+          canvas2dDrawsPlayerAvatar: !(finalPlayerConsumerSummary && finalPlayerConsumerSummary.canvas2dSkipsPlayerAvatar),
+          canvas2dDrawsDynamicRenderables: !(dynamicRenderableConsumerSummary && dynamicRenderableConsumerSummary.canvas2dSkipsAdoptedDynamicRenderables),
+          canvas2dSkipsPlayerAvatar: !!(finalPlayerConsumerSummary && finalPlayerConsumerSummary.canvas2dSkipsPlayerAvatar),
+          canvas2dSkipsAdoptedDynamicRenderables: !!(dynamicRenderableConsumerSummary && dynamicRenderableConsumerSummary.canvas2dSkipsAdoptedDynamicRenderables),
           canvas2dSkipsAdoptedStaticRuns: !!(staticRunConsumerSummary && staticRunConsumerSummary.canvas2dSkipsAdoptedStaticRuns),
           source: 'pixi-renderFrame-after-canvas2d-fallback'
         });
@@ -2516,6 +2829,10 @@
       playerSpriteReuseCount: Number(finalPlayerConsumerSummary && finalPlayerConsumerSummary.spriteReuseCount || 0),
       pixiDrawsDynamicRenderables: !!(dynamicRenderableConsumerSummary && dynamicRenderableConsumerSummary.pixiDrawsDynamicRenderables),
       adoptedDynamicRenderableCount: Number(dynamicRenderableConsumerSummary && dynamicRenderableConsumerSummary.adoptedDynamicRenderableCount || 0),
+      pixiDrawsPlacementPreview: !!(dynamicRenderableConsumerSummary && dynamicRenderableConsumerSummary.pixiDrawsPlacementPreview),
+      canvas2dSkipsPlacementPreviewWorld: !!(dynamicRenderableConsumerSummary && dynamicRenderableConsumerSummary.canvas2dSkipsPlacementPreviewWorld),
+      previewBoxCount: Number(dynamicRenderableConsumerSummary && dynamicRenderableConsumerSummary.previewBoxCount || 0),
+      debugFaceAdoptedCount: Number(dynamicRenderableConsumerSummary && dynamicRenderableConsumerSummary.debugFaceAdoptedCount || 0),
       canvas2dSkipsAdoptedDynamicRenderables: !!(dynamicRenderableConsumerSummary && dynamicRenderableConsumerSummary.canvas2dSkipsAdoptedDynamicRenderables),
       pixiInitialized: state.initialized === true,
       pixiRendererCreated: state.rendererCreated === true,
@@ -2534,6 +2851,10 @@
       pixiDrawsStaticWorldPackets: !!(staticRunConsumerSummary && staticRunConsumerSummary.pixiDrawsStaticWorldPackets),
       pixiDrawsPlayerAvatar: !!(finalPlayerConsumerSummary && finalPlayerConsumerSummary.pixiDrawsPlayerAvatar),
       pixiDrawsDynamicRenderables: !!(dynamicRenderableConsumerSummary && dynamicRenderableConsumerSummary.pixiDrawsDynamicRenderables),
+      pixiDrawsPlacementPreview: !!(dynamicRenderableConsumerSummary && dynamicRenderableConsumerSummary.pixiDrawsPlacementPreview),
+      canvas2dSkipsPlacementPreviewWorld: !!(dynamicRenderableConsumerSummary && dynamicRenderableConsumerSummary.canvas2dSkipsPlacementPreviewWorld),
+      previewBoxCount: Number(dynamicRenderableConsumerSummary && dynamicRenderableConsumerSummary.previewBoxCount || 0),
+      debugFaceAdoptedCount: Number(dynamicRenderableConsumerSummary && dynamicRenderableConsumerSummary.debugFaceAdoptedCount || 0),
       canvas2dStaticWorldSkipped: !!(staticRunConsumerSummary && staticRunConsumerSummary.canvas2dSkipsStaticWorldPackets),
       canvas2dSkipsPlayerAvatar: !!(finalPlayerConsumerSummary && finalPlayerConsumerSummary.canvas2dSkipsPlayerAvatar),
       canvas2dSkipsAdoptedDynamicRenderables: !!(dynamicRenderableConsumerSummary && dynamicRenderableConsumerSummary.canvas2dSkipsAdoptedDynamicRenderables),

@@ -27,6 +27,19 @@
     return null;
   }
 
+
+  function emitPixiFloorCompletenessTrace(phase, payload) {
+    payload = payload || {};
+    payload.phase = String(phase || 'unknown');
+    payload.source = payload.source || OWNER;
+    try {
+      var line = '[PIXI-FLOOR-COMPLETE] ' + JSON.stringify(payload);
+      if (typeof global.detailLog === 'function') global.detailLog(line);
+      else if (typeof global.pushLog === 'function') global.pushLog(line);
+      else if (global.console && typeof global.console.log === 'function') global.console.log(line);
+    } catch (_) {}
+  }
+
   function getSettings(deps) {
     return deps && deps.settings ? deps.settings : {};
   }
@@ -172,6 +185,9 @@
       floorMissingChunkCountAfter: 0,
       floorBuiltTileCountThisFrame: 0,
       floorChunkSize: 0,
+      floorVisibleChunksComplete: false,
+      floorCompleteVisibleChunkCount: 0,
+      floorRequiredCompleteVisibleChunks: false,
       floorVersionTag: 'floor-static-chunk-v1'
     }, partial || {});
     writeBaseWorldActualPathProfile({
@@ -192,6 +208,9 @@
       floorMissingChunkCountAfter: Number(data.floorMissingChunkCountAfter || 0),
       floorBuiltTileCountThisFrame: Number(data.floorBuiltTileCountThisFrame || 0),
       floorChunkSize: Number(data.floorChunkSize || 0),
+      floorVisibleChunksComplete: data.floorVisibleChunksComplete === true,
+      floorCompleteVisibleChunkCount: Number(data.floorCompleteVisibleChunkCount || 0),
+      floorRequiredCompleteVisibleChunks: data.floorRequiredCompleteVisibleChunks === true,
       floorVersionTag: data.floorVersionTag || 'floor-static-chunk-v1'
     }, deps);
     return data;
@@ -475,8 +494,10 @@
       : Number(raw || 0);
   }
 
-  function rebuildFloorLayerIfNeeded(force, deps) {
+  function rebuildFloorLayerIfNeeded(force, deps, options) {
     force = force === true;
+    options = options || {};
+    var requireCompleteVisibleChunks = options.requireCompleteVisibleChunks === true;
     var perfNow = deps && typeof deps.perfNow === 'function' ? deps.perfNow : function () { return Date.now(); };
     var camera = deps && deps.camera ? deps.camera : {};
     var rebuildStartAt = perfNow();
@@ -524,7 +545,7 @@
     var preSetupEndAt = perfNow();
 
     var isInteractive = deps && typeof deps.isInteractiveRenderPressure === 'function' ? deps.isInteractiveRenderPressure() : false;
-    var interactiveChunkBudget = !force && (activeType === 'drag' || activeType === 'pan' || activeType === 'pinch' || isInteractive);
+    var interactiveChunkBudget = !requireCompleteVisibleChunks && !force && (activeType === 'drag' || activeType === 'pan' || activeType === 'pinch' || isInteractive);
     var buildBudgetValue = interactiveChunkBudget ? 1 : Math.max(1, visibleChunkKeys.length);
     if (!cache.chunks || cache.chunks.size === 0) buildBudgetValue = Math.max(1, visibleChunkKeys.length);
 
@@ -556,6 +577,8 @@
       }
       if (entry) visibleEntries.push(entry);
     }
+    var floorVisibleChunksComplete = missingChunkCountAfter === 0 && visibleEntries.length === visibleChunkKeys.length;
+    var completeVisibleChunkCount = floorVisibleChunksComplete ? visibleChunkKeys.length : visibleEntries.length;
     var composeStartAt = perfNow();
     if (targetCtx && typeof targetCtx.clearRect === 'function') targetCtx.clearRect(0, 0, getViewW(deps), getViewH(deps));
     for (var entryIndex = 0; entryIndex < visibleEntries.length; entryIndex++) {
@@ -589,7 +612,21 @@
     cache.buildCameraY = currentCameraYForLayer;
     cache.buildZoom = currentZoomForLayer;
     cache.visibleChunkKeys = visibleChunkKeys.slice();
+    cache.floorVisibleChunksComplete = floorVisibleChunksComplete === true;
+    cache.completeVisibleChunkKeys = floorVisibleChunksComplete ? visibleChunkKeys.slice() : [];
+    cache.missingVisibleChunkCountAfter = Number(missingChunkCountAfter || 0);
     setFloorLayerCache(deps, cache);
+    emitPixiFloorCompletenessTrace('floor-layer-rebuild', {
+      visibleChunkCount: visibleChunkKeys.length,
+      visibleChunkKeys: visibleChunkKeys.slice(0, 12),
+      builtChunkCountThisFrame: builtChunkCountThisFrame,
+      missingChunkCountBefore: missingChunkCountBefore,
+      missingChunkCountAfter: missingChunkCountAfter,
+      floorVisibleChunksComplete: floorVisibleChunksComplete === true,
+      completeVisibleChunkCount: completeVisibleChunkCount,
+      requireCompleteVisibleChunks: requireCompleteVisibleChunks === true,
+      branch: floorVisibleChunksComplete ? 'complete-visible-floor' : 'incomplete-visible-floor'
+    });
     if (deps && typeof deps.logItemRotationPrototype === 'function') deps.logItemRotationPrototype('main-floor-rotation-cache-check', {
       previousViewRotation: deps.normalizeMainEditorViewRotationValue ? deps.normalizeMainEditorViewRotationValue(previousViewRotation) : previousViewRotation,
       nextViewRotation: currentViewRotation,
@@ -601,6 +638,8 @@
       floorVisibleChunkCount: visibleChunkKeys.length,
       floorBuiltChunkCountThisFrame: builtChunkCountThisFrame,
       floorMissingChunkCountAfter: missingChunkCountAfter,
+      floorVisibleChunksComplete: floorVisibleChunksComplete === true,
+      floorRequiredCompleteVisibleChunks: requireCompleteVisibleChunks === true,
       floorChunkSize: chunkSize,
       floorVersionTag: 'floor-static-chunk-v1'
     });
@@ -637,6 +676,9 @@
       floorMissingChunkCountAfter: missingChunkCountAfter,
       floorBuiltTileCountThisFrame: builtTileCountThisFrame,
       floorChunkSize: chunkSize,
+      floorVisibleChunksComplete: floorVisibleChunksComplete === true,
+      floorCompleteVisibleChunkCount: completeVisibleChunkCount,
+      floorRequiredCompleteVisibleChunks: requireCompleteVisibleChunks === true,
       floorVersionTag: 'floor-static-chunk-v1'
     }, deps);
   }
@@ -661,6 +703,10 @@
     var scope = deps && typeof deps.getMainCameraRenderScope === 'function' ? deps.getMainCameraRenderScope(currentViewRotation) : null;
     var visibleChunkKeys = computeVisibleFloorChunkKeysForLayer(scope, chunkSize, deps);
     if (!areFloorChunkKeyListsEqual(visibleChunkKeys, cache.visibleChunkKeys || [])) return null;
+    if (options.requireCompleteVisibleChunks === true) {
+      if (cache.floorVisibleChunksComplete !== true) return null;
+      if (!areFloorChunkKeyListsEqual(visibleChunkKeys, cache.completeVisibleChunkKeys || [])) return null;
+    }
     var builtZoomForReuse = Number(cache.buildZoom || currentZoomForLayer) || 1;
     var reuseScale = Number((currentZoomForLayer / builtZoomForReuse).toFixed(4));
     var dx = Number((currentCameraXForLayer - Number(cache.buildCameraX || 0)).toFixed(3));
@@ -686,6 +732,9 @@
       floorMissingChunkCountAfter: 0,
       floorBuiltTileCountThisFrame: 0,
       floorChunkSize: chunkSize,
+      floorVisibleChunksComplete: cache.floorVisibleChunksComplete === true,
+      floorCompleteVisibleChunkCount: cache.floorVisibleChunksComplete === true ? visibleChunkKeys.length : 0,
+      floorRequiredCompleteVisibleChunks: options.requireCompleteVisibleChunks === true,
       floorVersionTag: 'floor-static-chunk-v1'
     }, deps);
   }
@@ -697,7 +746,9 @@
     var canvas = getFloorLayerCanvas(deps);
     var cache = getFloorLayerCache(deps);
     var currentViewRotation = getCurrentViewRotation(deps);
+    var requireCompleteVisibleChunks = options.requireCompleteVisibleChunks === true || String(options.consumer || '') === 'pixi-floor-layer-cache-shared-consumer';
     var surfaceReady = !!(canvas && canvas.width > 0 && canvas.height > 0 && cache && cache.signature);
+    if (requireCompleteVisibleChunks && !(cache && cache.floorVisibleChunksComplete === true)) surfaceReady = false;
     var signature = String(cache && (cache.cacheSignature || cache.signature || '') || '');
     var sharedSurfaceRevision = Math.max(0, Math.round(Number(cache && cache.sharedSurfaceRevision || 0) || 0));
     // PXM-07.8A-fix: texture version must describe the visible shared
@@ -741,6 +792,10 @@
       visibleChunkKeys: cache && Array.isArray(cache.visibleChunkKeys) ? cache.visibleChunkKeys.slice() : [],
       chunkSize: Number(cache && cache.chunkSize || 0),
       chunkCount: cache && cache.chunks && typeof cache.chunks.size === 'number' ? Number(cache.chunks.size || 0) : 0,
+      floorVisibleChunksComplete: cache && cache.floorVisibleChunksComplete === true,
+      completeVisibleChunkKeys: cache && Array.isArray(cache.completeVisibleChunkKeys) ? cache.completeVisibleChunkKeys.slice() : [],
+      missingVisibleChunkCountAfter: Number(cache && cache.missingVisibleChunkCountAfter || 0),
+      requireCompleteVisibleChunks: requireCompleteVisibleChunks === true,
       currentCameraX: Number(deps && deps.camera && deps.camera.x || 0),
       currentCameraY: Number(deps && deps.camera && deps.camera.y || 0),
       currentZoom: deps && typeof deps.getMainEditorZoomValueForRender === 'function' ? Number(deps.getMainEditorZoomValueForRender()) || 1 : 1,
@@ -765,6 +820,9 @@
         floorMissingChunkCountBefore: Number(breakdown && breakdown.floorMissingChunkCountBefore || 0),
         floorMissingChunkCountAfter: Number(breakdown && breakdown.floorMissingChunkCountAfter || 0),
         floorBuiltTileCountThisFrame: Number(breakdown && breakdown.floorBuiltTileCountThisFrame || 0),
+        floorVisibleChunksComplete: breakdown && breakdown.floorVisibleChunksComplete === true,
+        floorCompleteVisibleChunkCount: Number(breakdown && breakdown.floorCompleteVisibleChunkCount || 0),
+        floorRequiredCompleteVisibleChunks: breakdown && breakdown.floorRequiredCompleteVisibleChunks === true,
         floorLayerActualBranch: String(breakdown && breakdown.floorLayerActualBranch || 'floor-layer-cache-shared-source')
       },
       canvas2dConsumer: 'existing-canvas2d-drawImage',
@@ -779,14 +837,27 @@
 
   function ensureSharedFloorLayerCacheSnapshot(force, deps, options) {
     options = options || {};
+    var snapshotOptions = Object.assign({}, options);
+    if (String(snapshotOptions.consumer || '') === 'pixi-floor-layer-cache-shared-consumer') snapshotOptions.requireCompleteVisibleChunks = true;
     var breakdown = null;
     try {
-      breakdown = force === true ? null : tryBuildFloorLayerCameraTransformReuseBreakdown(deps, options);
-      if (!breakdown) breakdown = rebuildFloorLayerIfNeeded(force === true, deps) || null;
+      breakdown = force === true ? null : tryBuildFloorLayerCameraTransformReuseBreakdown(deps, snapshotOptions);
+      if (!breakdown) breakdown = rebuildFloorLayerIfNeeded(force === true, deps, snapshotOptions) || null;
     } catch (_) {
       breakdown = null;
     }
-    return buildSharedFloorLayerCacheSnapshot(deps, breakdown, options || {});
+    var snapshot = buildSharedFloorLayerCacheSnapshot(deps, breakdown, snapshotOptions || {});
+    emitPixiFloorCompletenessTrace('shared-floor-snapshot', {
+      ready: snapshot && snapshot.ready === true,
+      consumer: String(snapshotOptions.consumer || ''),
+      requireCompleteVisibleChunks: snapshotOptions.requireCompleteVisibleChunks === true,
+      floorVisibleChunksComplete: snapshot && snapshot.floorVisibleChunksComplete === true,
+      visibleChunkCount: snapshot && Array.isArray(snapshot.visibleChunkKeys) ? snapshot.visibleChunkKeys.length : 0,
+      completeVisibleChunkCount: snapshot && Array.isArray(snapshot.completeVisibleChunkKeys) ? snapshot.completeVisibleChunkKeys.length : 0,
+      missingVisibleChunkCountAfter: Number(snapshot && snapshot.missingVisibleChunkCountAfter || 0),
+      fallbackExpected: !(snapshot && snapshot.ready === true)
+    });
+    return snapshot;
   }
 
   function drawFloor(deps) {

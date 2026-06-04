@@ -12,6 +12,207 @@ var __APP_CORE_SCENE_DOMAIN_CORE__ = (function () {
     return Number.isFinite(n) ? n : (fallback || 0);
   }
 
+  function positiveSize(value, fallback) {
+    var n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) n = Number(fallback || 1);
+    return Math.max(0.001, n);
+  }
+
+
+  function rectPolygon(box) {
+    var x = toInt(box && box.x, 0);
+    var y = toInt(box && box.y, 0);
+    var w = positiveSize(box && box.w, 1);
+    var d = positiveSize(box && box.d, 1);
+    return [
+      { x: x, y: y },
+      { x: x + w, y: y },
+      { x: x + w, y: y + d },
+      { x: x, y: y + d }
+    ];
+  }
+
+  function collisionPolygon(box) {
+    return Array.isArray(box && box.collisionPolygon2d) && box.collisionPolygon2d.length >= 3
+      ? box.collisionPolygon2d.map(function (pt) { return { x: toInt(pt && pt.x, 0), y: toInt(pt && pt.y, 0) }; })
+      : rectPolygon(box || {});
+  }
+
+  function projectPolygon(axis, poly) {
+    var min = Infinity;
+    var max = -Infinity;
+    for (var i = 0; i < poly.length; i++) {
+      var value = poly[i].x * axis.x + poly[i].y * axis.y;
+      if (value < min) min = value;
+      if (value > max) max = value;
+    }
+    return { min: min, max: max };
+  }
+
+  function polygonsOverlap(polyA, polyB) {
+    var EPS = 1e-7;
+    var polys = [polyA, polyB];
+    for (var p = 0; p < polys.length; p++) {
+      var poly = polys[p];
+      for (var i = 0; i < poly.length; i++) {
+        var a = poly[i];
+        var b = poly[(i + 1) % poly.length];
+        var edge = { x: b.x - a.x, y: b.y - a.y };
+        var axis = { x: -edge.y, y: edge.x };
+        var len = Math.sqrt(axis.x * axis.x + axis.y * axis.y);
+        if (len <= EPS) continue;
+        axis.x /= len;
+        axis.y /= len;
+        var pa = projectPolygon(axis, polyA);
+        var pb = projectPolygon(axis, polyB);
+        if (pa.max <= pb.min + EPS || pb.max <= pa.min + EPS) return false;
+      }
+    }
+    return true;
+  }
+
+
+
+  var QUARTER_MASK_BITS = { ne: 1, se: 2, sw: 4, nw: 8 };
+  var QUARTER_MASK_NAMES = ['ne', 'se', 'sw', 'nw'];
+
+  function pointInPolygon2d(point, polygon) {
+    var x = toInt(point && point.x, 0);
+    var y = toInt(point && point.y, 0);
+    var inside = false;
+    var poly = Array.isArray(polygon) ? polygon : [];
+    for (var i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      var xi = toInt(poly[i] && poly[i].x, 0);
+      var yi = toInt(poly[i] && poly[i].y, 0);
+      var xj = toInt(poly[j] && poly[j].x, 0);
+      var yj = toInt(poly[j] && poly[j].y, 0);
+      var intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / ((yj - yi) || 1e-12) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+
+  function buildDiamondQuarterPolygons(cellX, cellY) {
+    var x = toInt(cellX, 0);
+    var y = toInt(cellY, 0);
+    var c = { x: x + 0.5, y: y + 0.5 };
+    return {
+      ne: [{ x: x, y: y }, { x: x + 1, y: y }, c],
+      se: [{ x: x + 1, y: y }, { x: x + 1, y: y + 1 }, c],
+      sw: [{ x: x + 1, y: y + 1 }, { x: x, y: y + 1 }, c],
+      nw: [{ x: x, y: y + 1 }, { x: x, y: y }, c]
+    };
+  }
+
+  function quarterMaskToNames(mask) {
+    var value = Math.round(Number(mask) || 0);
+    var out = [];
+    for (var i = 0; i < QUARTER_MASK_NAMES.length; i++) {
+      var name = QUARTER_MASK_NAMES[i];
+      if ((value & QUARTER_MASK_BITS[name]) !== 0) out.push(name);
+    }
+    return out;
+  }
+
+  function computeBoxQuarterMaskAtCell(box, cellX, cellY) {
+    var poly = collisionPolygon(box || {});
+    var quarters = buildDiamondQuarterPolygons(cellX, cellY);
+    var mask = 0;
+    for (var i = 0; i < QUARTER_MASK_NAMES.length; i++) {
+      var name = QUARTER_MASK_NAMES[i];
+      var qPoly = quarters[name];
+      if (polygonsOverlap(poly, qPoly)) mask |= QUARTER_MASK_BITS[name];
+    }
+    return mask;
+  }
+
+  function buildQuarterOccupancyIndex(boxes, options) {
+    var list = Array.isArray(boxes) ? boxes : [];
+    var opts = options && typeof options === 'object' ? options : {};
+    var index = Object.create(null);
+    var summary = {
+      boxCount: list.length,
+      occupiedCellLayerCount: 0,
+      fullMaskCellLayerCount: 0,
+      partialMaskCellLayerCount: 0,
+      quarterHitCount: 0,
+      maskHistogram: Object.create(null),
+      sampleCells: [],
+      mode: 'diamond_quarters'
+    };
+    for (var i = 0; i < list.length; i++) {
+      var b = list[i] || {};
+      if (b.collidable === false) continue;
+      var x0 = toInt(b.x, 0);
+      var y0 = toInt(b.y, 0);
+      var z0 = toInt(b.z, 0);
+      var w = positiveSize(b.w, 1);
+      var d = positiveSize(b.d, 1);
+      var h = positiveSize(b.h, 1);
+      var ix0 = Math.floor(x0 + 1e-6);
+      var ix1 = Math.ceil(x0 + w - 1e-6);
+      var iy0 = Math.floor(y0 + 1e-6);
+      var iy1 = Math.ceil(y0 + d - 1e-6);
+      var iz0 = Math.floor(z0 + 1e-6);
+      var iz1 = Math.ceil(z0 + h - 1e-6);
+      for (var x = ix0; x < ix1; x++) {
+        for (var y = iy0; y < iy1; y++) {
+          var mask = computeBoxQuarterMaskAtCell(b, x, y);
+          if (!mask) continue;
+          for (var z = iz0; z < iz1; z++) {
+            var key = [x, y, z].join(',');
+            var cell = index[key];
+            if (!cell) {
+              cell = index[key] = { x: x, y: y, z: z, mask: 0, quarters: [], count: 0, boxIds: [] };
+            }
+            var before = cell.mask;
+            cell.mask = cell.mask | mask;
+            cell.count += 1;
+            if (b.id || b.instanceId) cell.boxIds.push(String(b.id || b.instanceId));
+            if (cell.mask !== before) cell.quarters = quarterMaskToNames(cell.mask);
+          }
+        }
+      }
+    }
+    var keys = Object.keys(index);
+    summary.occupiedCellLayerCount = keys.length;
+    for (var k = 0; k < keys.length; k++) {
+      var item = index[keys[k]] || {};
+      var m = Math.round(Number(item.mask) || 0);
+      var qn = quarterMaskToNames(m);
+      summary.quarterHitCount += qn.length;
+      summary.maskHistogram[String(m)] = (summary.maskHistogram[String(m)] || 0) + 1;
+      if (m === 15) summary.fullMaskCellLayerCount += 1;
+      else if (m > 0) summary.partialMaskCellLayerCount += 1;
+      if (summary.sampleCells.length < Math.max(0, Number(opts.sampleLimit != null ? opts.sampleLimit : 8))) {
+        summary.sampleCells.push({ key: keys[k], x: item.x, y: item.y, z: item.z, mask: m, quarters: qn });
+      }
+    }
+    return { cells: index, summary: summary, mode: 'diamond_quarters' };
+  }
+
+  function getQuarterOccupancyCell(index, cellX, cellY, cellZ) {
+    var source = index && index.cells ? index.cells : index;
+    if (!source) return null;
+    var key = [toInt(cellX, 0), toInt(cellY, 0), toInt(cellZ, 0)].join(',');
+    return source[key] || null;
+  }
+
+  function collisionXYOverlap(a, b) {
+    if (!a || !b) return false;
+    var ax1 = toInt(a.x, 0), ay1 = toInt(a.y, 0);
+    var bx1 = toInt(b.x, 0), by1 = toInt(b.y, 0);
+    var ax2 = ax1 + positiveSize(a.w, 1);
+    var ay2 = ay1 + positiveSize(a.d, 1);
+    var bx2 = bx1 + positiveSize(b.w, 1);
+    var by2 = by1 + positiveSize(b.d, 1);
+    if (ax2 <= bx1 || bx2 <= ax1 || ay2 <= by1 || by2 <= ay1) return false;
+    if (Array.isArray(a.collisionPolygon2d) || Array.isArray(b.collisionPolygon2d)) {
+      return polygonsOverlap(collisionPolygon(a), collisionPolygon(b));
+    }
+    return true;
+  }
+
   function getSpriteProxySortMode(prefab) {
     var mode = prefab && prefab.sprite && prefab.sprite.sortMode;
     return String(mode || 'box_occlusion');
@@ -60,12 +261,18 @@ var __APP_CORE_SCENE_DOMAIN_CORE__ = (function () {
       var x0 = toInt(b.x, 0);
       var y0 = toInt(b.y, 0);
       var z0 = toInt(b.z, 0);
-      var w = Math.max(1, toInt(b.w, 1));
-      var d = Math.max(1, toInt(b.d, 1));
-      var h = Math.max(1, toInt(b.h, 1));
-      for (var x = x0; x < x0 + w; x++) {
-        for (var y = y0; y < y0 + d; y++) {
-          for (var z = z0; z < z0 + h; z++) {
+      var w = positiveSize(b.w, 1);
+      var d = positiveSize(b.d, 1);
+      var h = positiveSize(b.h, 1);
+      var ix0 = Math.floor(x0 + 1e-6);
+      var ix1 = Math.ceil(x0 + w - 1e-6);
+      var iy0 = Math.floor(y0 + 1e-6);
+      var iy1 = Math.ceil(y0 + d - 1e-6);
+      var iz0 = Math.floor(z0 + 1e-6);
+      var iz1 = Math.ceil(z0 + h - 1e-6);
+      for (var x = ix0; x < ix1; x++) {
+        for (var y = iy0; y < iy1; y++) {
+          for (var z = iz0; z < iz1; z++) {
             var key = [x, y, z].join(',');
             index[key] = (index[key] || 0) + 1;
           }
@@ -78,15 +285,12 @@ var __APP_CORE_SCENE_DOMAIN_CORE__ = (function () {
   function boxesOverlap(a, b, ignoreInstanceId) {
     if (!a || !b) return false;
     if (ignoreInstanceId && (a.instanceId === ignoreInstanceId || b.instanceId === ignoreInstanceId)) return false;
-    var ax1 = toInt(a.x, 0), ay1 = toInt(a.y, 0), az1 = toInt(a.z, 0);
-    var bx1 = toInt(b.x, 0), by1 = toInt(b.y, 0), bz1 = toInt(b.z, 0);
-    var ax2 = ax1 + Math.max(1, toInt(a.w, 1));
-    var ay2 = ay1 + Math.max(1, toInt(a.d, 1));
-    var az2 = az1 + Math.max(1, toInt(a.h, 1));
-    var bx2 = bx1 + Math.max(1, toInt(b.w, 1));
-    var by2 = by1 + Math.max(1, toInt(b.d, 1));
-    var bz2 = bz1 + Math.max(1, toInt(b.h, 1));
-    return !(ax2 <= bx1 || bx2 <= ax1 || ay2 <= by1 || by2 <= ay1 || az2 <= bz1 || bz2 <= az1);
+    var az1 = toInt(a.z, 0);
+    var bz1 = toInt(b.z, 0);
+    var az2 = az1 + positiveSize(a.h, 1);
+    var bz2 = bz1 + positiveSize(b.h, 1);
+    if (az2 <= bz1 || bz2 <= az1) return false;
+    return collisionXYOverlap(a, b);
   }
 
   function canPlaceBoxes(candidateBoxes, existingBoxes, ignoreInstanceId) {
@@ -117,14 +321,62 @@ var __APP_CORE_SCENE_DOMAIN_CORE__ = (function () {
       var x0 = toInt(b.x, 0);
       var y0 = toInt(b.y, 0);
       var z0 = toInt(b.z, 0);
-      var w = Math.max(1, toInt(b.w, 1));
-      var d = Math.max(1, toInt(b.d, 1));
-      var top = z0 + Math.max(1, toInt(b.h, 1));
-      for (var x = x0; x < x0 + w; x++) {
-        for (var y = y0; y < y0 + d; y++) {
+      var w = positiveSize(b.w, 1);
+      var d = positiveSize(b.d, 1);
+      var top = z0 + positiveSize(b.h, 1);
+      var ix0 = Math.floor(x0 + 1e-6);
+      var ix1 = Math.ceil(x0 + w - 1e-6);
+      var iy0 = Math.floor(y0 + 1e-6);
+      var iy1 = Math.ceil(y0 + d - 1e-6);
+      for (var x = ix0; x < ix1; x++) {
+        for (var y = iy0; y < iy1; y++) {
           var key = x + ',' + y;
           if (!(key in index) || top > index[key]) index[key] = top;
         }
+      }
+    }
+    return index;
+  }
+
+
+  function hasCollisionPolygons(boxes) {
+    var list = Array.isArray(boxes) ? boxes : [];
+    for (var i = 0; i < list.length; i++) {
+      if (Array.isArray(list[i] && list[i].collisionPolygon2d) && list[i].collisionPolygon2d.length >= 3) return true;
+    }
+    return false;
+  }
+
+  function writeTopForCandidateFootprint(index, candidateBox, top) {
+    var cb = candidateBox || {};
+    var x0 = toInt(cb.x, 0);
+    var y0 = toInt(cb.y, 0);
+    var w = positiveSize(cb.w, 1);
+    var d = positiveSize(cb.d, 1);
+    var ix0 = Math.floor(x0 + 1e-6);
+    var ix1 = Math.ceil(x0 + w - 1e-6);
+    var iy0 = Math.floor(y0 + 1e-6);
+    var iy1 = Math.ceil(y0 + d - 1e-6);
+    for (var x = ix0; x < ix1; x++) {
+      for (var y = iy0; y < iy1; y++) {
+        var key = x + ',' + y;
+        if (!(key in index) || top > index[key]) index[key] = top;
+      }
+    }
+  }
+
+  function buildCandidateAwareColumnTopIndex(candidateBoxes, existingBoxes, ignoreInstanceId) {
+    var candidates = Array.isArray(candidateBoxes) ? candidateBoxes : [];
+    var existing = Array.isArray(existingBoxes) ? existingBoxes : [];
+    var index = Object.create(null);
+    for (var i = 0; i < candidates.length; i++) {
+      var cb = candidates[i] || {};
+      for (var j = 0; j < existing.length; j++) {
+        var eb = existing[j] || {};
+        if (ignoreInstanceId && eb.instanceId === ignoreInstanceId) continue;
+        if (!collisionXYOverlap(cb, eb)) continue;
+        var top = toInt(eb.z, 0) + positiveSize(eb.h, 1);
+        writeTopForCandidateFootprint(index, cb, top);
       }
     }
     return index;
@@ -174,9 +426,21 @@ var __APP_CORE_SCENE_DOMAIN_CORE__ = (function () {
         x: toInt(cellX, 0) + toInt(v.x, 0),
         y: toInt(cellY, 0) + toInt(v.y, 0),
         z: toInt(supportZ, 0) + toInt(v.z, 0),
-        w: 1,
-        d: 1,
-        h: 1,
+        w: positiveSize(v.w, 1),
+        d: positiveSize(v.d, 1),
+        h: positiveSize(v.h, 1),
+        shapeKind: v.shapeKind || safeProto.shapeKind || null,
+        collisionPolygon2d: Array.isArray(v.collisionPolygon2d) ? v.collisionPolygon2d.map(function (pt) { return { x: toInt(cellX, 0) + toInt(pt && pt.x, 0), y: toInt(cellY, 0) + toInt(pt && pt.y, 0) }; }) : null,
+        renderHidden: v.renderHidden === true,
+        collisionOnly: v.collisionOnly === true,
+        stairRole: v.stairRole || null,
+        stairStepIndex: v.stairStepIndex != null ? toInt(v.stairStepIndex, 0) : null,
+        stairStepCount: v.stairStepCount != null ? Math.max(1, toInt(v.stairStepCount, 1)) : null,
+        stairMaxStepUpCells: v.stairMaxStepUpCells != null ? Math.max(0, toInt(v.stairMaxStepUpCells, 0.6)) : null,
+        cylinderResolution: v.cylinderResolution != null ? Math.max(1, toInt(v.cylinderResolution, 1)) : null,
+        cylinderCellX: v.cylinderCellX != null ? toInt(v.cylinderCellX, 0) : null,
+        cylinderCellY: v.cylinderCellY != null ? toInt(v.cylinderCellY, 0) : null,
+        cylinderCellIndex: v.cylinderCellIndex != null ? toInt(v.cylinderCellIndex, 0) : null,
         base: v.base || safeProto.base,
         localIndex: i
       });
@@ -193,9 +457,9 @@ var __APP_CORE_SCENE_DOMAIN_CORE__ = (function () {
       minX = Math.min(minX, toInt(b.x, 0));
       minY = Math.min(minY, toInt(b.y, 0));
       minZ = Math.min(minZ, toInt(b.z, 0));
-      maxX = Math.max(maxX, toInt(b.x, 0) + Math.max(1, toInt(b.w, 1)));
-      maxY = Math.max(maxY, toInt(b.y, 0) + Math.max(1, toInt(b.d, 1)));
-      maxZ = Math.max(maxZ, toInt(b.z, 0) + Math.max(1, toInt(b.h, 1)));
+      maxX = Math.max(maxX, toInt(b.x, 0) + positiveSize(b.w, 1));
+      maxY = Math.max(maxY, toInt(b.y, 0) + positiveSize(b.d, 1));
+      maxZ = Math.max(maxZ, toInt(b.z, 0) + positiveSize(b.h, 1));
     }
     var bbox = { x: minX, y: minY, z: minZ, w: maxX - minX, d: maxY - minY, h: maxZ - minZ };
     var anchorBox = { name: proto && proto.name ? proto.name : 'unknown', base: proto && proto.base ? proto.base : null, x: bbox.x, y: bbox.y, z: bbox.z, w: bbox.w, d: bbox.d, h: bbox.h };
@@ -208,7 +472,11 @@ var __APP_CORE_SCENE_DOMAIN_CORE__ = (function () {
     var gridH = grid ? toInt(grid.gridH || grid.rows, 0) : 0;
     for (var i = 0; i < boxesList.length; i++) {
       var box = boxesList[i] || {};
-      if (toInt(box.x, 0) < 0 || toInt(box.y, 0) < 0 || toInt(box.x, 0) >= gridW || toInt(box.y, 0) >= gridH) {
+      var bx = toInt(box.x, 0);
+      var by = toInt(box.y, 0);
+      var bw = positiveSize(box.w, 1);
+      var bd = positiveSize(box.d, 1);
+      if (bx < 0 || by < 0 || bx + bw > gridW + 1e-6 || by + bd > gridH + 1e-6) {
         return { ok: false, reason: 'out', overlapIds: [] };
       }
     }
@@ -230,8 +498,10 @@ var __APP_CORE_SCENE_DOMAIN_CORE__ = (function () {
     return { ok: true, reason: 'ok', overlapIds: [] };
   }
 
-  function getInstanceBoundsFromBoxes(boxes) {
-    var list = Array.isArray(boxes) ? boxes : [];
+  function getInstanceBoundsFromBoxes(boxes, instanceId) {
+    var rawList = Array.isArray(boxes) ? boxes : [];
+    var id = instanceId != null ? String(instanceId) : '';
+    var list = id ? rawList.filter(function (box) { return box && String(box.instanceId || '') === id; }) : rawList;
     if (!list.length) return null;
     var minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
     for (var i = 0; i < list.length; i++) {
@@ -239,9 +509,9 @@ var __APP_CORE_SCENE_DOMAIN_CORE__ = (function () {
       minX = Math.min(minX, toInt(b.x, 0));
       minY = Math.min(minY, toInt(b.y, 0));
       minZ = Math.min(minZ, toInt(b.z, 0));
-      maxX = Math.max(maxX, toInt(b.x, 0) + Math.max(1, toInt(b.w, 1)));
-      maxY = Math.max(maxY, toInt(b.y, 0) + Math.max(1, toInt(b.d, 1)));
-      maxZ = Math.max(maxZ, toInt(b.z, 0) + Math.max(1, toInt(b.h, 1)));
+      maxX = Math.max(maxX, toInt(b.x, 0) + positiveSize(b.w, 1));
+      maxY = Math.max(maxY, toInt(b.y, 0) + positiveSize(b.d, 1));
+      maxZ = Math.max(maxZ, toInt(b.z, 0) + positiveSize(b.h, 1));
     }
     return { x: minX, y: minY, z: minZ, w: maxX - minX, d: maxY - minY, h: maxZ - minZ };
   }
@@ -287,8 +557,8 @@ var __APP_CORE_SCENE_DOMAIN_CORE__ = (function () {
     var x = toInt(point && point.x, 0);
     var y = toInt(point && point.y, 0);
     var z = toInt(point && point.z, 0);
-    var width = Math.max(1, toInt(w, 1));
-    var depth = Math.max(1, toInt(d, 1));
+    var width = Math.max(0.001, positiveSize(w, 1));
+    var depth = Math.max(0.001, positiveSize(d, 1));
     var corners = [
       rotatePointForSort({ x: x, y: y }, viewRotation),
       rotatePointForSort({ x: x + width, y: y }, viewRotation),
@@ -335,9 +605,9 @@ var __APP_CORE_SCENE_DOMAIN_CORE__ = (function () {
     var x = toInt(cell.x != null ? cell.x : b.x, 0);
     var y = toInt(cell.y != null ? cell.y : b.y, 0);
     var z = toInt(cell.z != null ? cell.z : b.z, 0);
-    var w = Math.max(1, toInt(cell.w != null ? cell.w : b.w, 1));
-    var d = Math.max(1, toInt(cell.d != null ? cell.d : b.d, 1));
-    var h = Math.max(1, toInt(cell.h != null ? cell.h : b.h, 1));
+    var w = positiveSize(cell.w != null ? cell.w : b.w, 1);
+    var d = positiveSize(cell.d != null ? cell.d : b.d, 1);
+    var h = positiveSize(cell.h != null ? cell.h : b.h, 1);
     var viewRotation = normalizeViewRotationLocal(b.viewRotation != null ? b.viewRotation : 0);
     var sortMeta = computeViewAwareFootprintSortMeta({ x: x, y: y, z: z }, w, d, h, viewRotation, sortBias);
     var occludesPlayer = computeProjectedPlayerSpriteOcclusion(playerBox, { x: x, y: y, z: z, w: w, d: d, h: h, viewRotation: viewRotation });
@@ -473,7 +743,11 @@ var __APP_CORE_SCENE_DOMAIN_CORE__ = (function () {
     var ignoreInstanceId = safe.ignoreInstanceId || null;
     var existingBoxes = Array.isArray(safe.existingBoxes) ? safe.existingBoxes : [];
     var supportCells = Array.isArray(proto.supportCells) && proto.supportCells.length ? proto.supportCells : [{ x: 0, y: 0, localZ: 0 }];
-    var support = resolveSupportPlane(cellX, cellY, supportCells, buildColumnTopIndex(existingBoxes, ignoreInstanceId), safe.grid || null);
+    var candidateFootprintBoxes = projectWorldBoxes(proto, cellX, cellY, 0);
+    var columnTopIndex = hasCollisionPolygons(candidateFootprintBoxes)
+      ? buildCandidateAwareColumnTopIndex(candidateFootprintBoxes, existingBoxes, ignoreInstanceId)
+      : buildColumnTopIndex(existingBoxes, ignoreInstanceId);
+    var support = resolveSupportPlane(cellX, cellY, supportCells, columnTopIndex, safe.grid || null);
     if (!support.ok) {
       return { valid: false, reason: support.reason, supportZ: support.supportZ, supportHeights: support.supportHeights || [], supportSummary: support.supportSummary || summarizeSupportPlane(support.supportHeights || [], support.supportZ), overlapIds: [], box: null, boxes: [], bbox: null, origin: support.reason === 'out' ? null : null, prefabId: proto.id || null, rotation: proto.rotation };
     }
@@ -489,10 +763,13 @@ var __APP_CORE_SCENE_DOMAIN_CORE__ = (function () {
   function deriveSceneGraph(instances, expandInstanceToBoxes) {
     var safeInstances = Array.isArray(instances) ? instances.slice() : [];
     var boxes = deriveBoxesFromInstances(safeInstances, expandInstanceToBoxes);
+    var quarterOccupancy = buildQuarterOccupancyIndex(boxes, { sampleLimit: 8 });
     return {
       instances: safeInstances,
       boxes: boxes,
-      occupancy: buildOccupancyIndex(boxes)
+      occupancy: buildOccupancyIndex(boxes),
+      quarterOccupancy: quarterOccupancy,
+      quarterOccupancySummary: quarterOccupancy.summary
     };
   }
 
@@ -500,7 +777,7 @@ var __APP_CORE_SCENE_DOMAIN_CORE__ = (function () {
     return {
       phase: PHASE,
       owner: OWNER,
-      pureFunctions: ['deriveBoxesFromInstances', 'buildOccupancyIndex', 'canPlaceBoxes', 'buildColumnTopIndex', 'summarizeSupportPlane', 'resolveSupportPlane', 'projectWorldBoxes', 'getInstanceBoundsFromBoxes', 'computeProjectedPlayerSpriteOcclusion', 'computeVoxelRenderableSort', 'computeSpriteRenderableSort', 'computePlayerActorRenderableSort', 'buildTileAlignedSpriteRenderParts', 'compareRenderableOrder', 'evaluatePlacementCandidate', 'deriveSceneGraph'],
+      pureFunctions: ['deriveBoxesFromInstances', 'buildOccupancyIndex', 'buildQuarterOccupancyIndex', 'getQuarterOccupancyCell', 'quarterMaskToNames', 'canPlaceBoxes', 'buildColumnTopIndex', 'buildCandidateAwareColumnTopIndex', 'summarizeSupportPlane', 'resolveSupportPlane', 'projectWorldBoxes', 'getInstanceBoundsFromBoxes', 'computeProjectedPlayerSpriteOcclusion', 'computeVoxelRenderableSort', 'computeSpriteRenderableSort', 'computePlayerActorRenderableSort', 'buildTileAlignedSpriteRenderParts', 'compareRenderableOrder', 'evaluatePlacementCandidate', 'deriveSceneGraph'],
       wiredInto: ['src/application/placement/placement.js:rebuildBoxesFromInstances', 'src/application/placement/placement.js:placeCurrentPrefab', 'src/application/placement/placement.js:commitPreview.drag', 'src/presentation/render/render.js:computeCandidate', 'src/presentation/render/render.js:buildStaticVoxelRenderable', 'src/presentation/render/render.js:computeSpriteRenderableSort', 'src/presentation/render/render.js:buildRenderables'],
       notes: ['P4-E keeps placement authority in domain and exposes only pure placement / scene rule functions. Platform binding moved out of core.']
     };
@@ -511,7 +788,11 @@ var __APP_CORE_SCENE_DOMAIN_CORE__ = (function () {
     owner: OWNER,
     deriveBoxesFromInstances: deriveBoxesFromInstances,
     buildOccupancyIndex: buildOccupancyIndex,
+    buildQuarterOccupancyIndex: buildQuarterOccupancyIndex,
+    getQuarterOccupancyCell: getQuarterOccupancyCell,
+    quarterMaskToNames: quarterMaskToNames,
     canPlaceBoxes: canPlaceBoxes,
+    buildCandidateAwareColumnTopIndex: buildCandidateAwareColumnTopIndex,
     buildColumnTopIndex: buildColumnTopIndex,
     summarizeSupportPlane: summarizeSupportPlane,
     resolveSupportPlane: resolveSupportPlane,

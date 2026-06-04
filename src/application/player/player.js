@@ -269,39 +269,83 @@ function logBlockedPlayerStep(result, axis) {
   }, { route: false });
 }
 
-function startPlayerStepJump(fromZ, toZ, axis, mode) {
+function clampNumberLocal(value, minValue, maxValue) {
+  var n = Number(value);
+  if (!Number.isFinite(n)) n = Number(minValue || 0);
+  return Math.max(Number(minValue || 0), Math.min(Number(maxValue || 0), n));
+}
+
+function isStairStepSupportBox(box) {
+  if (!box || typeof box !== 'object') return false;
+  var shapeKind = String(box.shapeKind || '');
+  var prefabId = String(box.prefabId || '');
+  return /^stair_mc_\d+step$/.test(shapeKind) || /^stair_mc_\d+step$/.test(prefabId) || Number(box.stairStepCount || 0) > 1;
+}
+
+function startPlayerStepJump(fromZ, toZ, axis, mode, transitionInfo) {
   ensurePlayerStepState();
 
   var transitionMode = mode || 'jump-up';
   var isDrop = transitionMode === 'drop';
+  var info = transitionInfo && typeof transitionInfo === 'object' ? transitionInfo : {};
+  var from = Number(fromZ || 0);
+  var to = Number(toZ || 0);
+  var deltaAbs = Math.abs(to - from);
+  var supportBox = info.supportBox || null;
+  var isStairStep = transitionMode === 'jump-up' && isStairStepSupportBox(supportBox);
 
   player.jump.active = true;
   player.jump.mode = transitionMode;
-  player.jump.fromZ = Number(fromZ || 0);
-  player.jump.toZ = Number(toZ || 0);
+  player.jump.fromZ = from;
+  player.jump.toZ = to;
   player.jump.t = 0;
+  player.jump.deltaZ = to - from;
+  player.jump.isStairStep = !!isStairStep;
 
-  player.jump.duration = Math.max(0.05, Number(
-    isDrop
-      ? (settings.playerDropDurationSec || settings.playerJumpDurationSec || player.jump.duration || 0.16)
-      : (settings.playerJumpDurationSec || player.jump.duration || 0.18)
-  ));
+  var baseJumpDuration = Math.max(0.05, Number(settings.playerJumpDurationSec || player.jump.duration || 0.18));
+  var baseDropDuration = Math.max(0.05, Number(settings.playerDropDurationSec || settings.playerJumpDurationSec || player.jump.duration || 0.16));
+  var stairMinDuration = Math.max(0.04, Number(settings.playerStairStepMinDurationSec != null ? settings.playerStairStepMinDurationSec : 0.055));
+  var stairMaxDuration = Math.max(stairMinDuration, Number(settings.playerStairStepMaxDurationSec != null ? settings.playerStairStepMaxDurationSec : 0.11));
+  var deltaScale = clampNumberLocal(deltaAbs / 0.5, 0, 1);
 
-  player.jump.lift = Math.max(0, Number(
-    isDrop
-      ? (settings.playerDropLiftCells != null ? settings.playerDropLiftCells : 0.16)
-      : (settings.playerJumpLiftCells || player.jump.lift || 0.35)
-  ));
+  if (isDrop) {
+    player.jump.duration = baseDropDuration;
+  } else if (isStairStep) {
+    player.jump.duration = stairMinDuration + (stairMaxDuration - stairMinDuration) * deltaScale;
+  } else {
+    player.jump.duration = baseJumpDuration;
+  }
+
+  var configuredJumpLift = Math.max(0, Number(settings.playerJumpLiftCells || player.jump.lift || 0.35));
+  var configuredDropLift = Math.max(0, Number(settings.playerDropLiftCells != null ? settings.playerDropLiftCells : 0.16));
+  if (isDrop) {
+    player.jump.lift = Math.min(configuredDropLift, Math.max(0, deltaAbs * 0.5));
+    player.jump.arcEnabled = player.jump.lift > 1e-6;
+  } else if (isStairStep) {
+    // MC-style stepped slopes should feel like climbing a small ledge, not like a jump.
+    // The visual height is therefore a direct interpolation from fromZ to toZ.
+    player.jump.lift = 0;
+    player.jump.arcEnabled = false;
+  } else {
+    player.jump.lift = Math.min(configuredJumpLift, configuredJumpLift * clampNumberLocal(deltaAbs, 0, 1));
+    player.jump.arcEnabled = player.jump.lift > 1e-6;
+  }
 
   player.visualZ = player.jump.fromZ;
   player.renderSortZ = player.jump.fromZ;
 
-  playerStepLog(isDrop ? 'drop-start' : 'jump-start', {
+  playerStepLog(isDrop ? 'drop-start' : (isStairStep ? 'stair-step-start' : 'jump-start'), {
     axis: axis || null,
     fromZ: Number(player.jump.fromZ.toFixed(3)),
     toZ: Number(player.jump.toZ.toFixed(3)),
+    deltaZ: Number(player.jump.deltaZ.toFixed(3)),
     duration: Number(player.jump.duration.toFixed(3)),
     lift: Number(player.jump.lift.toFixed(3)),
+    arcEnabled: !!player.jump.arcEnabled,
+    isStairStep: !!isStairStep,
+    supportShapeKind: supportBox && supportBox.shapeKind || null,
+    supportStepIndex: supportBox && supportBox.stairStepIndex != null ? Number(supportBox.stairStepIndex) : null,
+    supportStepCount: supportBox && supportBox.stairStepCount != null ? Number(supportBox.stairStepCount) : null,
     position: { x: Number(player.x.toFixed(3)), y: Number(player.y.toFixed(3)) }
   });
 }
@@ -317,7 +361,7 @@ function updatePlayerJumpVisual(dt) {
   player.jump.t += Math.max(0, Number(dt || 0));
   var p = clamp(player.jump.t / duration, 0, 1);
   var baseZ = Number(player.jump.fromZ || 0) + (Number(player.jump.toZ || 0) - Number(player.jump.fromZ || 0)) * p;
-  var arc = Math.sin(Math.PI * p) * Math.max(0, Number(player.jump.lift || settings.playerJumpLiftCells || 0.35));
+  var arc = player.jump.arcEnabled === false ? 0 : Math.sin(Math.PI * p) * Math.max(0, Number(player.jump.lift || 0));
   player.renderSortZ = baseZ;
   player.visualZ = baseZ + arc;
   if (p >= 1) {
@@ -345,7 +389,7 @@ function applyResolvedPlayerMove(result, axis) {
   player.y = Number(result.targetY != null ? result.targetY : player.y);
   player.z = Number(result.toZ != null ? result.toZ : player.z || 0);
   if (result.mode === 'jump-up' || result.mode === 'drop') {
-    startPlayerStepJump(result.fromZ, result.toZ, axis, result.mode);
+    startPlayerStepJump(result.fromZ, result.toZ, axis, result.mode, { supportBox: result.supportBox, deltaZ: result.deltaZ });
   } else if (!player.jump || !player.jump.active) {
     player.visualZ = player.z;
     player.renderSortZ = player.z;

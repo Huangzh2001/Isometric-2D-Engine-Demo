@@ -457,6 +457,44 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
     tagPlacementExport(name);
   }
 
+
+
+  function isStairTracePrefabId(prefabId) {
+    return /^stair_mc_(2|4|8)step$/.test(String(prefabId || ''));
+  }
+
+  function summarizeStairTraceBoxes(boxList) {
+    var list = Array.isArray(boxList) ? boxList : [];
+    return list.map(function (b, i) {
+      return {
+        i: i,
+        id: b && b.id != null ? b.id : null,
+        instanceId: b && b.instanceId || null,
+        prefabId: b && b.prefabId || null,
+        role: b && b.stairRole || null,
+        localIndex: b && b.localIndex != null ? b.localIndex : null,
+        x: Number(b && b.x || 0),
+        y: Number(b && b.y || 0),
+        z: Number(b && b.z || 0),
+        w: Number(b && b.w != null ? b.w : 1),
+        d: Number(b && b.d != null ? b.d : 1),
+        h: Number(b && b.h != null ? b.h : 1)
+      };
+    });
+  }
+
+  function emitStairPlaceTrace(phase, payload) {
+    payload = payload || {};
+    payload.phase = String(phase || 'unknown');
+    payload.source = payload.source || 'src/application/placement/placement.js';
+    try {
+      var line = '[STAIR-PLACE-TRACE] ' + JSON.stringify(payload);
+      if (typeof detailLog === 'function') detailLog(line);
+      else if (typeof pushLog === 'function') pushLog(line);
+      else if (typeof console !== 'undefined' && console && typeof console.log === 'function') console.log(line);
+    } catch (_) {}
+  }
+
   function allocInstanceId(meta) {
     var sceneSessionApi = getSceneSessionApi();
     if (sceneSessionApi && typeof sceneSessionApi.allocateInstanceId === 'function') {
@@ -489,6 +527,434 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
     return makeInstance(prefabId, x, y, z, rotation, extras);
   }
 
+  function isMicroTriPrismPrefabId(prefabId) {
+    return String(prefabId || '') === 'micro_tri_prism';
+  }
+
+  function isCompatibleAxisBlockPrefabId(prefabId) {
+    return String(prefabId || '') === 'compatible_axis_block';
+  }
+
+  function normalizeMicroTriMeta(meta) {
+    var safe = meta && typeof meta === 'object' ? meta : {};
+    var subdivision = Math.max(1, Math.min(64, Math.round(Number(safe.subdivision) || Number(safe.subTileGridSubdivision) || 1)));
+    var rawTri = safe.baseTriIndex != null ? safe.baseTriIndex : (safe.rawTriIndex != null ? safe.rawTriIndex : safe.triIndex);
+    var baseTriIndex = Math.max(0, Math.min(3, Math.round(Number(rawTri) || 0)));
+    var rotation = (((Math.round(Number(safe.rotation) || 0) % 4) + 4) % 4);
+    var triIndex = (baseTriIndex + rotation) % 4;
+    var subX = Math.max(0, Math.min(subdivision - 1, Math.round(Number(safe.subX) || 0)));
+    var subY = Math.max(0, Math.min(subdivision - 1, Math.round(Number(safe.subY) || 0)));
+    var cellX = Math.floor(Number(safe.cellX != null ? safe.cellX : safe.baseCellX) || Number(safe.originCellX) || 0);
+    var cellY = Math.floor(Number(safe.cellY != null ? safe.cellY : safe.baseCellY) || Number(safe.originCellY) || 0);
+    var size = 1 / subdivision;
+    var originX = cellX + subX * size;
+    var originY = cellY + subY * size;
+    return {
+      subdivision: subdivision,
+      subX: subX,
+      subY: subY,
+      baseTriIndex: baseTriIndex,
+      rawTriIndex: baseTriIndex,
+      rotation: rotation,
+      triIndex: triIndex,
+      cellX: cellX,
+      cellY: cellY,
+      originX: originX,
+      originY: originY,
+      size: size,
+      h: Math.max(0.001, Number(safe.h) || 1)
+    };
+  }
+
+  function buildMicroTriVertices(meta) {
+    var m = normalizeMicroTriMeta(meta);
+    var x0 = Number(m.originX || 0);
+    var y0 = Number(m.originY || 0);
+    var s = Number(m.size || 1);
+    var c = { x: x0 + s / 2, y: y0 + s / 2 };
+    switch (m.triIndex) {
+      case 1: return [{ x: x0 + s, y: y0 }, { x: x0 + s, y: y0 + s }, c];
+      case 2: return [{ x: x0 + s, y: y0 + s }, { x: x0, y: y0 + s }, c];
+      case 3: return [{ x: x0, y: y0 + s }, { x: x0, y: y0 }, c];
+      case 0:
+      default: return [{ x: x0, y: y0 }, { x: x0 + s, y: y0 }, c];
+    }
+  }
+
+  function buildMicroTriBoxFromMeta(instance, meta, assignId, localIndex) {
+    var m = normalizeMicroTriMeta(Object.assign({}, meta || (instance && instance.microTri) || {}, { rotation: instance && instance.rotation != null ? instance.rotation : (meta && meta.rotation) }));
+    var verts = buildMicroTriVertices(m);
+    var minX = Math.min(verts[0].x, verts[1].x, verts[2].x);
+    var minY = Math.min(verts[0].y, verts[1].y, verts[2].y);
+    var maxX = Math.max(verts[0].x, verts[1].x, verts[2].x);
+    var maxY = Math.max(verts[0].y, verts[1].y, verts[2].y);
+    return {
+      id: assignId,
+      instanceId: instance && instance.instanceId || null,
+      prefabId: 'micro_tri_prism',
+      name: instance && instance.name || 'Micro Tri Prism',
+      x: minX,
+      y: minY,
+      z: Number(instance && instance.z || 0),
+      w: Math.max(0.001, maxX - minX),
+      d: Math.max(0.001, maxY - minY),
+      h: Math.max(0.001, Number(m.h) || 1),
+      shapeKind: 'micro_tri_prism',
+      collisionPolygon2d: verts,
+      renderHidden: true,
+      collisionOnly: true,
+      base: instance && instance.base || '#e39b4f',
+      microTriSubdivision: m.subdivision,
+      microTriSubX: m.subX,
+      microTriSubY: m.subY,
+      microTriIndex: m.triIndex,
+      microTriCellX: m.cellX,
+      microTriCellY: m.cellY,
+      localX: minX - m.cellX,
+      localY: minY - m.cellY,
+      localZ: 0,
+      localW: Math.max(0.001, maxX - minX),
+      localD: Math.max(0.001, maxY - minY),
+      localH: Math.max(0.001, Number(m.h) || 1),
+      rotation: Number(instance && instance.rotation) || 0,
+      localIndex: localIndex || 0
+    };
+  }
+
+  function buildMicroTriPrimitiveFromMeta(instance, meta, localIndex) {
+    var m = normalizeMicroTriMeta(Object.assign({}, meta || (instance && instance.microTri) || {}, { rotation: instance && instance.rotation != null ? instance.rotation : (meta && meta.rotation) }));
+    var verts = buildMicroTriVertices(m);
+    return {
+      id: String(instance && instance.instanceId || 'instance') + ':micro-tri:' + String(localIndex || 0),
+      instanceId: instance && instance.instanceId || null,
+      prefabId: 'micro_tri_prism',
+      name: instance && instance.name || 'Micro Tri Prism',
+      primitiveId: 'micro-tri-' + m.cellX + '-' + m.cellY + '-' + m.subX + '-' + m.subY + '-' + m.triIndex,
+      primitiveKind: 'vertical_tri_prism',
+      kind: 'vertical_tri_prism',
+      vertices2d: verts,
+      z: Number(instance && instance.z || 0),
+      h: Math.max(0.001, Number(m.h) || 1),
+      sortCell: { x: m.cellX, y: m.cellY, z: Number(instance && instance.z || 0) },
+      sortFootprint: { w: 1 / m.subdivision, d: 1 / m.subdivision },
+      base: instance && instance.base || '#e39b4f',
+      shapeKind: 'micro_tri_prism',
+      rotation: Number(instance && instance.rotation) || 0,
+      localIndex: localIndex || 0,
+      microTri: m,
+      renderUpdateMode: instance && instance.renderUpdateMode || 'dynamic'
+    };
+  }
+
+
+  function normalizeCompatibleAxisMeta(meta) {
+    var safe = meta && typeof meta === 'object' ? meta : {};
+    var subdivision = Math.max(1, Math.min(64, Math.round(Number(safe.subdivision) || Number(safe.subTileGridSubdivision) || 1)));
+    var subX = Math.max(0, Math.min(subdivision - 1, Math.round(Number(safe.subX) || 0)));
+    var subY = Math.max(0, Math.min(subdivision - 1, Math.round(Number(safe.subY) || 0)));
+    var cellX = Math.floor(Number(safe.cellX != null ? safe.cellX : safe.baseCellX) || Number(safe.originCellX) || 0);
+    var cellY = Math.floor(Number(safe.cellY != null ? safe.cellY : safe.baseCellY) || Number(safe.originCellY) || 0);
+    var k = Math.max(1, Math.round(Number(safe.k) || (2 * subdivision / Math.sqrt(3))));
+    var atomStep = Math.sqrt(3) / (2 * subdivision);
+    var approximatedLength = k * atomStep;
+    var size = 1 / subdivision;
+    var x0 = cellX + subX * size;
+    var y0 = cellY + subY * size;
+    // Non-slanted visual/logic footprint: use the two isometric diagonal axes.
+    // u projects horizontally on screen; v projects vertically/down on screen.
+    // The first logical edge is fixed to 1, represented as 2 * uScale.
+    // The second edge uses k atom steps, represented by vScale = k/(2N),
+    // whose metric length is k*sqrt(3)/(2N) ~= 1.
+    var uScale = 0.5;
+    var vScale = k / (2 * subdivision);
+    var rotation = ((Math.round(Number(safe.rotation) || 0) % 4) + 4) % 4;
+    return {
+      subdivision: subdivision,
+      cellX: cellX,
+      cellY: cellY,
+      subX: subX,
+      subY: subY,
+      rotation: rotation,
+      k: k,
+      atomStep: atomStep,
+      targetLength: 1,
+      approximatedLength: approximatedLength,
+      errorAbs: Math.abs(approximatedLength - 1),
+      errorPctOfOne: Math.abs(approximatedLength - 1) * 100,
+      originX: x0,
+      originY: y0,
+      axisWidth: 1,
+      axisDepth: approximatedLength,
+      uScale: uScale,
+      vScale: vScale,
+      h: Math.max(0.001, Number(safe.h) || 1)
+    };
+  }
+
+  function buildCompatibleAxisVertices(meta) {
+    var m = normalizeCompatibleAxisMeta(meta);
+    var x0 = Number(m.originX || 0);
+    var y0 = Number(m.originY || 0);
+    var exact = Number(m.uScale || 0.5);
+    var approx = Number(m.vScale || 0.5);
+    var r = ((Math.round(Number(m.rotation) || 0) % 4) + 4) % 4;
+    // Two screen-axis directions in world coordinates:
+    // A=(+,-) maps to the horizontal compatible edge. A length 1 is exact=0.5.
+    // B=(+,+) maps to the vertical/down compatible edge. B length is approximated by approx=k/(2N).
+    // Rotation swaps/signs these two axes while keeping both edges on the same atom-compatible lattice.
+    var e1;
+    var e2;
+    if (r === 1) {
+      e1 = { x: approx, y: approx };
+      e2 = { x: -exact, y: exact };
+    } else if (r === 2) {
+      e1 = { x: -exact, y: exact };
+      e2 = { x: -approx, y: -approx };
+    } else if (r === 3) {
+      e1 = { x: -approx, y: -approx };
+      e2 = { x: exact, y: -exact };
+    } else {
+      e1 = { x: exact, y: -exact };
+      e2 = { x: approx, y: approx };
+    }
+    return [
+      { x: x0, y: y0 },
+      { x: x0 + e1.x, y: y0 + e1.y },
+      { x: x0 + e1.x + e2.x, y: y0 + e1.y + e2.y },
+      { x: x0 + e2.x, y: y0 + e2.y }
+    ];
+  }
+
+  function getPolygonBounds2d(points) {
+    var pts = Array.isArray(points) ? points : [];
+    var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (var i = 0; i < pts.length; i++) {
+      var x = Number(pts[i] && pts[i].x || 0);
+      var y = Number(pts[i] && pts[i].y || 0);
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+    }
+    if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) return { x: 0, y: 0, w: 1, d: 1 };
+    return { x: minX, y: minY, w: Math.max(0.001, maxX - minX), d: Math.max(0.001, maxY - minY) };
+  }
+
+  function pointInPolygon2dCompat(pt, poly) {
+    var x = Number(pt && pt.x || 0);
+    var y = Number(pt && pt.y || 0);
+    var vs = Array.isArray(poly) ? poly : [];
+    var inside = false;
+    for (var i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+      var xi = Number(vs[i] && vs[i].x || 0), yi = Number(vs[i] && vs[i].y || 0);
+      var xj = Number(vs[j] && vs[j].x || 0), yj = Number(vs[j] && vs[j].y || 0);
+      var cross = (x - xi) * (yj - yi) - (y - yi) * (xj - xi);
+      var dot = (x - xi) * (xj - xi) + (y - yi) * (yj - yi);
+      var len2 = (xj - xi) * (xj - xi) + (yj - yi) * (yj - yi);
+      if (Math.abs(cross) < 1e-9 && dot >= -1e-9 && dot <= len2 + 1e-9) return true;
+      var intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / ((yj - yi) || 1e-12) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+
+  function buildMicroTriVerticesFromCell(cellX, cellY, subX, subY, triIndex, subdivision) {
+    var n = Math.max(1, Math.min(64, Math.round(Number(subdivision) || 1)));
+    var s = 1 / n;
+    var x0 = Number(cellX || 0) + Math.max(0, Math.min(n - 1, Math.round(Number(subX) || 0))) * s;
+    var y0 = Number(cellY || 0) + Math.max(0, Math.min(n - 1, Math.round(Number(subY) || 0))) * s;
+    var c = { x: x0 + s / 2, y: y0 + s / 2 };
+    switch (Math.max(0, Math.min(3, Math.round(Number(triIndex) || 0)))) {
+      case 1: return [{ x: x0 + s, y: y0 }, { x: x0 + s, y: y0 + s }, c];
+      case 2: return [{ x: x0 + s, y: y0 + s }, { x: x0, y: y0 + s }, c];
+      case 3: return [{ x: x0, y: y0 + s }, { x: x0, y: y0 }, c];
+      case 0:
+      default: return [{ x: x0, y: y0 }, { x: x0 + s, y: y0 }, c];
+    }
+  }
+
+  function centroidOfTriangle2d(verts) {
+    return {
+      x: (Number(verts[0].x || 0) + Number(verts[1].x || 0) + Number(verts[2].x || 0)) / 3,
+      y: (Number(verts[0].y || 0) + Number(verts[1].y || 0) + Number(verts[2].y || 0)) / 3
+    };
+  }
+
+  function buildCompatibleAxisAtomMetas(meta) {
+    var m = normalizeCompatibleAxisMeta(meta || {});
+    var n = Math.max(1, Math.min(64, Math.round(Number(m.subdivision) || 1)));
+    var k = Math.max(1, Math.round(Number(m.k) || (2 * n / Math.sqrt(3))));
+    var halfStep = 1 / (2 * n);
+    var r = ((Math.round(Number(m.rotation) || 0) % 4) + 4) % 4;
+
+    // Deterministic atom strip generator.
+    // Do NOT select atoms by centroid-in-polygon; that changes the real bounds
+    // with rotation and makes the reported L_N disagree with the generated shape.
+    // Instead, generate exactly N strips along the exact edge and k strips along
+    // the approximated edge.  Each strip cell is split into two triangular atoms.
+    var exactDir;
+    var approxDir;
+    if (r === 1) {
+      exactDir = { x: 1, y: 1 };
+      approxDir = { x: -1, y: 1 };
+    } else if (r === 2) {
+      exactDir = { x: -1, y: 1 };
+      approxDir = { x: -1, y: -1 };
+    } else if (r === 3) {
+      exactDir = { x: -1, y: -1 };
+      approxDir = { x: 1, y: -1 };
+    } else {
+      exactDir = { x: 1, y: -1 };
+      approxDir = { x: 1, y: 1 };
+    }
+    var exactStep = { x: exactDir.x * halfStep, y: exactDir.y * halfStep };
+    var approxStep = { x: approxDir.x * halfStep, y: approxDir.y * halfStep };
+    var origin = { x: Number(m.originX || 0), y: Number(m.originY || 0) };
+    var atoms = [];
+    var allPts = [];
+    function sortCellFromVerts(verts) {
+      var cx = (Number(verts[0].x || 0) + Number(verts[1].x || 0) + Number(verts[2].x || 0)) / 3;
+      var cy = (Number(verts[0].y || 0) + Number(verts[1].y || 0) + Number(verts[2].y || 0)) / 3;
+      return { x: Math.floor(cx), y: Math.floor(cy) };
+    }
+    function pushTri(verts, exactIndex, approxIndex, splitIndex) {
+      var sc = sortCellFromVerts(verts);
+      for (var p = 0; p < verts.length; p++) allPts.push(verts[p]);
+      atoms.push({
+        subdivision: n,
+        cellX: sc.x,
+        cellY: sc.y,
+        subX: Math.max(0, Math.min(n - 1, Math.floor(((verts[0].x - sc.x) + 1) * n) % n)),
+        subY: Math.max(0, Math.min(n - 1, Math.floor(((verts[0].y - sc.y) + 1) * n) % n)),
+        baseTriIndex: splitIndex,
+        rawTriIndex: splitIndex,
+        rotation: 0,
+        triIndex: splitIndex,
+        h: m.h,
+        compatibleAxis: true,
+        verts: verts,
+        exactIndex: exactIndex,
+        approxIndex: approxIndex,
+        splitIndex: splitIndex,
+        sortCell: sc
+      });
+    }
+    for (var b = 0; b < k; b++) {
+      for (var a = 0; a < n; a++) {
+        var p0 = {
+          x: origin.x + exactStep.x * a + approxStep.x * b,
+          y: origin.y + exactStep.y * a + approxStep.y * b
+        };
+        var p1 = { x: p0.x + exactStep.x, y: p0.y + exactStep.y };
+        var p2 = { x: p1.x + approxStep.x, y: p1.y + approxStep.y };
+        var p3 = { x: p0.x + approxStep.x, y: p0.y + approxStep.y };
+        pushTri([p0, p1, p2], a, b, 0);
+        pushTri([p0, p2, p3], a, b, 1);
+      }
+    }
+    var footprint = [
+      origin,
+      { x: origin.x + exactStep.x * n, y: origin.y + exactStep.y * n },
+      { x: origin.x + exactStep.x * n + approxStep.x * k, y: origin.y + exactStep.y * n + approxStep.y * k },
+      { x: origin.x + approxStep.x * k, y: origin.y + approxStep.y * k }
+    ];
+    var actualBounds = getPolygonBounds2d(allPts.length ? allPts : footprint);
+    return {
+      meta: Object.assign({}, m, {
+        k: k,
+        atomCount: atoms.length,
+        generatedMode: 'integer-atom-strip',
+        actualBounds: actualBounds,
+        exactAtomCount: n,
+        approximateAtomCount: k
+      }),
+      polygon: footprint,
+      atoms: atoms
+    };
+  }
+
+
+  function buildCompatibleAxisBoxesFromMeta(instance, meta, assignIdStart, localIndexStart) {
+    var built = buildCompatibleAxisAtomMetas(meta || (instance && instance.compatibleAxis) || {});
+    var atoms = built.atoms;
+    var out = [];
+    for (var i = 0; i < atoms.length; i++) {
+      var atomMeta = atoms[i];
+      var verts = Array.isArray(atomMeta.verts) ? atomMeta.verts : buildMicroTriVerticesFromCell(atomMeta.cellX, atomMeta.cellY, atomMeta.subX, atomMeta.subY, atomMeta.triIndex, atomMeta.subdivision);
+      var bounds = getPolygonBounds2d(verts);
+      out.push({
+        id: (assignIdStart || 1) + i,
+        instanceId: instance && instance.instanceId || null,
+        prefabId: 'compatible_axis_block',
+        name: instance && instance.name || 'Compatible Axis Block',
+        x: bounds.x,
+        y: bounds.y,
+        z: Number(instance && instance.z || 0),
+        w: bounds.w,
+        d: bounds.d,
+        h: Math.max(0.001, Number(built.meta.h) || 1),
+        shapeKind: 'compatible_axis_block_atom',
+        collisionPolygon2d: verts,
+        renderHidden: true,
+        collisionOnly: true,
+        base: instance && instance.base || '#5dbb8a',
+        compatibleAxisSubdivision: built.meta.subdivision,
+        compatibleAxisK: built.meta.k,
+        compatibleAxisApproximatedLength: built.meta.approximatedLength,
+        compatibleAxisErrorAbs: built.meta.errorAbs,
+        compatibleAxisAtomCount: atoms.length,
+        compatibleAxisAtomIndex: i,
+        microTriSubdivision: atomMeta.subdivision,
+        microTriSubX: atomMeta.subX,
+        microTriSubY: atomMeta.subY,
+        microTriIndex: atomMeta.triIndex,
+        microTriCellX: atomMeta.cellX,
+        microTriCellY: atomMeta.cellY,
+        localX: bounds.x - built.meta.cellX,
+        localY: bounds.y - built.meta.cellY,
+        localZ: 0,
+        localW: bounds.w,
+        localD: bounds.d,
+        localH: Math.max(0.001, Number(built.meta.h) || 1),
+        rotation: Number(instance && instance.rotation) || 0,
+        localIndex: (localIndexStart || 0) + i
+      });
+    }
+    return out;
+  }
+
+  function buildCompatibleAxisPrimitivesFromMeta(instance, meta, localIndexStart) {
+    var built = buildCompatibleAxisAtomMetas(meta || (instance && instance.compatibleAxis) || {});
+    var atoms = built.atoms;
+    var out = [];
+    for (var i = 0; i < atoms.length; i++) {
+      var atomMeta = atoms[i];
+      var verts = Array.isArray(atomMeta.verts) ? atomMeta.verts : buildMicroTriVerticesFromCell(atomMeta.cellX, atomMeta.cellY, atomMeta.subX, atomMeta.subY, atomMeta.triIndex, atomMeta.subdivision);
+      out.push({
+        id: String(instance && instance.instanceId || 'instance') + ':compatible-axis-atom:' + String(i),
+        instanceId: instance && instance.instanceId || null,
+        prefabId: 'compatible_axis_block',
+        name: instance && instance.name || 'Compatible Axis Block',
+        primitiveId: 'compatible-axis-atom-' + atomMeta.cellX + '-' + atomMeta.cellY + '-' + atomMeta.subX + '-' + atomMeta.subY + '-' + atomMeta.triIndex,
+        primitiveKind: 'vertical_tri_prism',
+        kind: 'vertical_tri_prism',
+        vertices2d: verts,
+        z: Number(instance && instance.z || 0),
+        h: Math.max(0.001, Number(built.meta.h) || 1),
+        sortCell: { x: (atomMeta.sortCell && atomMeta.sortCell.x != null ? atomMeta.sortCell.x : atomMeta.cellX), y: (atomMeta.sortCell && atomMeta.sortCell.y != null ? atomMeta.sortCell.y : atomMeta.cellY), z: Number(instance && instance.z || 0) },
+        sortFootprint: { w: 1 / atomMeta.subdivision, d: 1 / atomMeta.subdivision },
+        base: instance && instance.base || '#5dbb8a',
+        shapeKind: 'compatible_axis_block_atom',
+        rotation: Number(instance && instance.rotation) || 0,
+        localIndex: (localIndexStart || 0) + i,
+        microTri: atomMeta,
+        compatibleAxis: Object.assign({}, built.meta, { atomCount: atoms.length }),
+        renderUpdateMode: instance && instance.renderUpdateMode || 'dynamic'
+      });
+    }
+    return out;
+  }
+
   function recomputeNextInstanceSerial() {
     var maxNum = 0;
     for (var i = 0; i < instances.length; i++) {
@@ -503,6 +969,14 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
     if (assignIds === void 0) assignIds = true;
     options = options || {};
     var prefab = getPrefabById(instance.prefabId);
+    if (isMicroTriPrismPrefabId(instance && instance.prefabId)) {
+      var microId = assignIds ? 1 : 1;
+      return [buildMicroTriBoxFromMeta(instance, instance.microTri || instance, microId, 0)];
+    }
+    if (isCompatibleAxisBlockPrefabId(instance && instance.prefabId)) {
+      var compatibleId = assignIds ? 1 : 1;
+      return buildCompatibleAxisBoxesFromMeta(instance, Object.assign({}, instance.compatibleAxis || {}, { rotation: instance.rotation }), compatibleId, 0);
+    }
     var variant = prefabVariant(prefab, instance.rotation || 0);
     var out = [];
     var nextBoxId = 1;
@@ -529,12 +1003,30 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
         instanceId: instance.instanceId,
         prefabId: prefab.id,
         name: instance.name || prefab.name,
-        x: instance.x + v.x,
-        y: instance.y + v.y,
-        z: instance.z + v.z,
-        w: 1,
-        d: 1,
-        h: 1,
+        x: Number(instance.x || 0) + Number(v.x || 0),
+        y: Number(instance.y || 0) + Number(v.y || 0),
+        z: Number(instance.z || 0) + Number(v.z || 0),
+        w: Math.max(0.001, Number(v.w != null ? v.w : 1) || 1),
+        d: Math.max(0.001, Number(v.d != null ? v.d : 1) || 1),
+        h: Math.max(0.001, Number(v.h != null ? v.h : 1) || 1),
+        shapeKind: v.shapeKind || prefab.shapeKind || null,
+        collisionPolygon2d: Array.isArray(v.collisionPolygon2d) ? v.collisionPolygon2d.map(function (pt) { return { x: Number(instance.x || 0) + Number(pt && pt.x || 0), y: Number(instance.y || 0) + Number(pt && pt.y || 0) }; }) : null,
+        renderHidden: v.renderHidden === true,
+        collisionOnly: v.collisionOnly === true,
+        stairRole: v.stairRole || null,
+        stairStepIndex: v.stairStepIndex != null ? Number(v.stairStepIndex) : null,
+        stairStepCount: v.stairStepCount != null ? Math.max(1, Number(v.stairStepCount) || 1) : null,
+        stairMaxStepUpCells: v.stairMaxStepUpCells != null ? Math.max(0, Number(v.stairMaxStepUpCells) || 0) : null,
+        cylinderResolution: v.cylinderResolution != null ? Math.max(1, Number(v.cylinderResolution) || 1) : null,
+        cylinderCellX: v.cylinderCellX != null ? Number(v.cylinderCellX) : null,
+        cylinderCellY: v.cylinderCellY != null ? Number(v.cylinderCellY) : null,
+        cylinderCellIndex: v.cylinderCellIndex != null ? Number(v.cylinderCellIndex) : null,
+        localX: Number(v.x || 0),
+        localY: Number(v.y || 0),
+        localZ: Number(v.z || 0),
+        localW: Math.max(0.001, Number(v.w != null ? v.w : 1) || 1),
+        localD: Math.max(0.001, Number(v.d != null ? v.d : 1) || 1),
+        localH: Math.max(0.001, Number(v.h != null ? v.h : 1) || 1),
         base: instance.base || v.base || prefab.base,
         generatedBy: instance.generatedBy || null,
         terrainBatchId: instance.terrainBatchId || null,
@@ -554,6 +1046,62 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
         localIndex: i,
       });
     }
+    return out;
+  }
+
+
+  function expandInstanceToPrimitives(instance, assignIds, options) {
+    if (assignIds === void 0) assignIds = true;
+    options = options || {};
+    if (!instance || !instance.prefabId) return [];
+    if (isMicroTriPrismPrefabId(instance && instance.prefabId)) {
+      var microPrimitive = buildMicroTriPrimitiveFromMeta(instance, instance.microTri || instance, 0);
+      try { if (typeof detailLog === 'function') detailLog('[MICRO-TRI-PRISM] ' + JSON.stringify({ phase: 'expand-instance-primitives', instanceId: instance.instanceId || null, subdivision: microPrimitive.microTri && microPrimitive.microTri.subdivision, subX: microPrimitive.microTri && microPrimitive.microTri.subX, subY: microPrimitive.microTri && microPrimitive.microTri.subY, baseTriIndex: microPrimitive.microTri && microPrimitive.microTri.baseTriIndex, rotation: microPrimitive.microTri && microPrimitive.microTri.rotation, triIndex: microPrimitive.microTri && microPrimitive.microTri.triIndex, source: 'src/application/placement/placement.js' })); } catch (_) {}
+      return [microPrimitive];
+    }
+    if (isCompatibleAxisBlockPrefabId(instance && instance.prefabId)) {
+      var compatiblePrimitives = buildCompatibleAxisPrimitivesFromMeta(instance, Object.assign({}, instance.compatibleAxis || {}, { rotation: instance.rotation }), 0);
+      var compatibleMeta = compatiblePrimitives.length ? compatiblePrimitives[0].compatibleAxis : normalizeCompatibleAxisMeta(Object.assign({}, instance.compatibleAxis || {}, { rotation: instance.rotation }));
+      try { if (typeof detailLog === 'function') detailLog('[COMPATIBLE-AXIS-BLOCK] ' + JSON.stringify({ phase: 'expand-instance-primitives', instanceId: instance.instanceId || null, subdivision: compatibleMeta && compatibleMeta.subdivision, rotation: compatibleMeta && compatibleMeta.rotation, k: compatibleMeta && compatibleMeta.k, approximatedLength: compatibleMeta && compatibleMeta.approximatedLength, errorAbs: compatibleMeta && compatibleMeta.errorAbs, atomCount: compatiblePrimitives.length, generatedMode: compatibleMeta && compatibleMeta.generatedMode || 'integer-atom-strip', exactAtomCount: compatibleMeta && compatibleMeta.exactAtomCount, approximateAtomCount: compatibleMeta && compatibleMeta.approximateAtomCount, actualBounds: compatibleMeta && compatibleMeta.actualBounds || null, renderMode: 'micro-tri-atom-composite', source: 'src/application/placement/placement.js' })); } catch (_) {}
+      return compatiblePrimitives;
+    }
+    var prefab = getPrefabById(instance.prefabId);
+    var variant = prefabVariant(prefab, instance.rotation || 0);
+    var primitives = Array.isArray(variant && variant.primitives) ? variant.primitives : [];
+    var out = [];
+    for (var i = 0; i < primitives.length; i++) {
+      var p = primitives[i] || {};
+      var verts = Array.isArray(p.vertices2d) ? p.vertices2d : [];
+      if (verts.length < 3) continue;
+      var sortCell = p.sortCell || { x: 0, y: 0, z: 0 };
+      out.push({
+        id: assignIds ? String(instance.instanceId || 'instance') + ':primitive:' + String(p.id || i) : String(i + 1),
+        instanceId: instance.instanceId || null,
+        prefabId: prefab.id,
+        name: instance.name || prefab.name,
+        primitiveId: p.id || ('primitive-' + i),
+        primitiveKind: p.primitiveKind || p.kind || 'vertical_tri_prism',
+        kind: p.kind || p.primitiveKind || 'vertical_tri_prism',
+        vertices2d: verts.map(function (pt) { return { x: Number(instance.x || 0) + Number(pt && pt.x || 0), y: Number(instance.y || 0) + Number(pt && pt.y || 0) }; }),
+        z: Number(instance.z || 0) + Number(p.z || 0),
+        h: Math.max(0.001, Number(p.h != null ? p.h : 1) || 1),
+        sortCell: {
+          x: Number(instance.x || 0) + Number(sortCell && sortCell.x || 0),
+          y: Number(instance.y || 0) + Number(sortCell && sortCell.y || 0),
+          z: Number(instance.z || 0) + Number(sortCell && sortCell.z || 0)
+        },
+        base: instance.base || p.base || prefab.base,
+        shapeKind: p.shapeKind || 'vertical_tri_prism',
+        rotation: Number(instance.rotation) || 0,
+        localIndex: i,
+        renderUpdateMode: instance.renderUpdateMode || prefab.renderUpdateMode || null
+      });
+    }
+    try {
+      if (out.length && typeof detailLog === 'function') {
+        detailLog('[TRI-PRISM-TRACE] ' + JSON.stringify({ phase: 'expand-instance-primitives', prefabId: prefab.id, instanceId: instance.instanceId || null, primitiveCount: out.length, source: 'src/application/placement/placement.js' }));
+      }
+    } catch (_) {}
     return out;
   }
 
@@ -614,6 +1162,21 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
         occupancyUpdateMs = Math.max(0, placementPerfNowMs() - legacyOccupancyUpdateStartAt);
       } catch (_) {}
     }
+    var quarterOccupancySummary = null;
+    try {
+      if (domainCore && typeof domainCore.buildQuarterOccupancyIndex === 'function') {
+        var quarterOcc = domainCore.buildQuarterOccupancyIndex(boxes, { sampleLimit: 8 });
+        quarterOccupancySummary = quarterOcc && quarterOcc.summary ? quarterOcc.summary : null;
+        var quarterLine = '[QUARTER-OCCUPANCY] ' + JSON.stringify(Object.assign({
+          phase: 'placement-rebuild',
+          reason: source,
+          source: 'src/application/placement/placement.js',
+          diamondQuarterOccupancyEnabled: true
+        }, quarterOccupancySummary || {}));
+        if (typeof detailLog === 'function') detailLog(quarterLine);
+        else if (typeof pushLog === 'function') pushLog(quarterLine);
+      }
+    } catch (_) {}
     emitPlacementSceneCommitProfile({
       reason: source,
       step: 'rebuildBoxesFromInstances',
@@ -623,6 +1186,12 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
       boxesAfter: Number(boxes.length || 0),
       deriveBoxesMs: Number(deriveBoxesMs.toFixed(3)),
       occupancyUpdateMs: Number(occupancyUpdateMs.toFixed(3)),
+      quarterOccupancy: quarterOccupancySummary ? {
+        occupiedCellLayerCount: quarterOccupancySummary.occupiedCellLayerCount,
+        fullMaskCellLayerCount: quarterOccupancySummary.fullMaskCellLayerCount,
+        partialMaskCellLayerCount: quarterOccupancySummary.partialMaskCellLayerCount,
+        quarterHitCount: quarterOccupancySummary.quarterHitCount
+      } : null,
       totalMs: Number(Math.max(0, placementPerfNowMs() - totalStartAt).toFixed(3))
     });
     placementStateWrite('replaceSceneGraph', { source: source, instances: instances.length, boxes: boxes.length });
@@ -832,6 +1401,12 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
     if (!baseProto) {
       placementWarn('resolveAuthoritativePlacement: prefab-not-found', { prefabId: prefabId, source: opts.source || 'placement:resolve-authority' });
       return null;
+    }
+    if (isMicroTriPrismPrefabId(prefabId) && sourcePreview.microTri && sourcePreview.valid === true) {
+      return Object.assign({}, sourcePreview, { authority: 'domain', source: opts.source || 'placement:resolve-authority' });
+    }
+    if (isCompatibleAxisBlockPrefabId(prefabId) && sourcePreview.compatibleAxis && sourcePreview.valid === true) {
+      return Object.assign({}, sourcePreview, { authority: 'domain', source: opts.source || 'placement:resolve-authority' });
     }
     var rotation = sourcePreview.rotation != null ? sourcePreview.rotation : (opts.rotation != null ? opts.rotation : 0);
     var proto = prefabVariant(baseProto, rotation);
@@ -1219,7 +1794,36 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
     var terrainBlockExtras = shouldCommitAsManualTerrainBlock(committedPrefabId, sourcePreview)
       ? buildManualTerrainBlockPlacementExtras(authoritative.origin, { source: 'placement:placeCurrentPrefab.manual-terrain-block' })
       : null;
-    var instance = makeInstance(committedPrefabId, authoritative.origin.x, authoritative.origin.y, authoritative.origin.z, committedRotation, terrainBlockExtras || undefined);
+    var microTriExtras = isMicroTriPrismPrefabId(committedPrefabId) && (sourcePreview.microTri || authoritative.microTri)
+      ? { microTri: normalizeMicroTriMeta(Object.assign({}, sourcePreview.microTri || authoritative.microTri || {}, { rotation: committedRotation })), source: 'placement:placeCurrentPrefab.micro-tri' }
+      : null;
+    var compatibleAxisExtras = isCompatibleAxisBlockPrefabId(committedPrefabId) && (sourcePreview.compatibleAxis || authoritative.compatibleAxis)
+      ? { compatibleAxis: normalizeCompatibleAxisMeta(Object.assign({}, sourcePreview.compatibleAxis || authoritative.compatibleAxis || {}, { rotation: committedRotation })), source: 'placement:placeCurrentPrefab.compatible-axis' }
+      : null;
+    var instanceExtras = Object.assign({}, terrainBlockExtras || {}, microTriExtras || {}, compatibleAxisExtras || {});
+    var instance = makeInstance(committedPrefabId, authoritative.origin.x, authoritative.origin.y, authoritative.origin.z, committedRotation, Object.keys(instanceExtras).length ? instanceExtras : undefined);
+    try {
+      if (isStairTracePrefabId(committedPrefabId)) {
+        var committedBoxesTrace = expandInstanceToBoxes(instance, false, { source: 'placement:placeCurrentPrefab:trace-expand-committed' });
+        emitStairPlaceTrace('commit-authority', {
+          prefabId: committedPrefabId,
+          instanceId: instance.instanceId || null,
+          previewOrigin: sourcePreview.origin || null,
+          previewRotation: sourcePreview.rotation != null ? sourcePreview.rotation : null,
+          previewBox: sourcePreview.box || null,
+          previewBbox: sourcePreview.bbox || null,
+          previewBoxes: summarizeStairTraceBoxes(sourcePreview.boxes || []),
+          authoritativeOrigin: authoritative.origin || null,
+          authoritativeRotation: authoritative.rotation != null ? authoritative.rotation : null,
+          authoritativeBox: authoritative.box || null,
+          authoritativeBbox: authoritative.bbox || null,
+          authoritativeBoxes: summarizeStairTraceBoxes(authoritative.boxes || []),
+          committedOrigin: { x: instance.x, y: instance.y, z: instance.z },
+          committedRotation: committedRotation,
+          committedBoxes: summarizeStairTraceBoxes(committedBoxesTrace || [])
+        });
+      }
+    } catch (_) {}
     var commitPayload = {
       instanceId: instance.instanceId || null,
       prefabId: instance.prefabId || null,
@@ -1429,6 +2033,8 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
     createPlacedInstance: createPlacedInstance,
     recomputeNextInstanceSerial: recomputeNextInstanceSerial,
     expandInstanceToBoxes: expandInstanceToBoxes,
+    expandInstanceToPrimitives: expandInstanceToPrimitives,
+    normalizeMicroTriMeta: normalizeMicroTriMeta,
     rebuildBoxesFromInstances: rebuildBoxesFromInstances,
     refreshPlacementOrdering: refreshPlacementOrdering,
     instanceFitsGrid: instanceFitsGrid,
@@ -1468,6 +2074,7 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
   installCompatExport('createPlacedInstance', createPlacedInstance);
   installCompatExport('recomputeNextInstanceSerial', recomputeNextInstanceSerial);
   installCompatExport('expandInstanceToBoxes', expandInstanceToBoxes);
+  installCompatExport('expandInstanceToPrimitives', expandInstanceToPrimitives);
   installCompatExport('rebuildBoxesFromInstances', rebuildBoxesFromInstances);
   installCompatExport('refreshPlacementOrdering', refreshPlacementOrdering);
   installCompatExport('instanceFitsGrid', instanceFitsGrid);

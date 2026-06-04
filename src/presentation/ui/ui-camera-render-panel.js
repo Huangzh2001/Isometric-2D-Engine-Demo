@@ -54,6 +54,9 @@
     if (ui.mainCameraShowCullingBounds) ui.mainCameraShowCullingBounds.checked = !!settings.showCullingBounds;
     if (ui.mainCameraSurfaceOnlyRenderingEnabled) ui.mainCameraSurfaceOnlyRenderingEnabled.checked = settings.surfaceOnlyRenderingEnabled !== false;
     if (ui.mainCameraDebugVisibleSurfaces) ui.mainCameraDebugVisibleSurfaces.checked = !!settings.debugVisibleSurfaces;
+    if (ui.mainCameraSubTileGridEnabled) ui.mainCameraSubTileGridEnabled.checked = !!settings.subTileGridEnabled;
+    if (ui.mainCameraSubTileGridSubdivision) ui.mainCameraSubTileGridSubdivision.value = String(Math.max(1, Math.min(64, Math.round(Number(settings.subTileGridSubdivision) || 1))));
+    if (ui.terrainMapDerivedAxisGridEnabled) ui.terrainMapDerivedAxisGridEnabled.checked = !!settings.derivedAxisGridEnabled;
     if (ui.mainCameraSettingsSummary) {
       ui.mainCameraSettingsSummary.textContent = '动画：' + ((settings.rotationAnimationEnabled !== false) ? '开启' : '关闭') +
         '，' + String(Math.max(0, Number(settings.rotationAnimationMs) || 0)) + 'ms，插值：' + ((settings.rotationInterpolationEnabled !== false) ? '开启' : '关闭') +
@@ -62,6 +65,8 @@
         '，裁剪：' + ((settings.cameraCullingEnabled !== false) ? '开启' : '关闭') + ' margin=' + String(Number(settings.cullingMargin || 0)) +
         '，表面渲染：' + ((settings.surfaceOnlyRenderingEnabled !== false) ? '开启' : '关闭') +
         (settings.debugVisibleSurfaces ? '，可见面调试：开' : '') +
+        (settings.subTileGridEnabled ? ('，四分割子网格：开 x' + String(Math.max(1, Math.min(64, Math.round(Number(settings.subTileGridSubdivision) || 1))))) : '') +
+        (settings.derivedAxisGridEnabled ? '，派生正向网格：开' : '') +
         (settings.isViewRotating ? ' · 视角过渡中' : '');
     }
     return settings;

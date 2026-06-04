@@ -818,7 +818,9 @@
     var pixiStaticWorldPacketSummary = beginPixiStaticWorldPacketFrame(order, meta, deps);
     meta.__pixiStaticWorldFrameOk = !!(pixiStaticWorldPacketSummary && pixiStaticWorldPacketSummary.ok === true && pixiStaticWorldPacketSummary.pixiDrawsStaticWorldPackets === true);
     var pixiStaticWorldBeginFrameWallMs = Math.max(0, nowMs(deps) - pixiStaticBeginFrameStartAt);
+    meta.__forceCanvas2dPlayerForDepthInterleavedDynamics = false;
     var largeSceneFrameplanDiagnostics = buildLargeSceneFrameplanDiagnostics(order, meta, deps, pixiStaticWorldPacketSummary, pixiStaticWorldBeginFrameWallMs);
+    if (largeSceneFrameplanDiagnostics) largeSceneFrameplanDiagnostics.forceCanvas2dPlayerForDepthInterleavedDynamics = false;
     maybeEmitLargeSceneFrameplanDiagnostics(deps, largeSceneFrameplanDiagnostics);
     assertPixiStaticWorldDrawsOrThrow(deps, largeSceneFrameplanDiagnostics, pixiStaticWorldPacketSummary);
     var drawStartAt = nowMs(deps);

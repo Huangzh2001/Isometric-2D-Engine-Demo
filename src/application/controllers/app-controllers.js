@@ -1138,6 +1138,10 @@
       showCullingBounds: !!cameraSettings.showCullingBounds,
       surfaceOnlyRenderingEnabled: cameraSettings.surfaceOnlyRenderingEnabled !== false,
       debugVisibleSurfaces: !!cameraSettings.debugVisibleSurfaces,
+      subTileGridEnabled: !!cameraSettings.subTileGridEnabled,
+      subTileGridMode: String(cameraSettings.subTileGridMode || 'diamond_quarters'),
+      subTileGridSubdivision: Math.max(1, Math.min(64, Math.round(Number(cameraSettings.subTileGridSubdivision) || 1))),
+      derivedAxisGridEnabled: !!cameraSettings.derivedAxisGridEnabled,
       staticWorldFaceMergeEnabled: cameraSettings.staticWorldFaceMergeEnabled !== false,
       disableFaceMergeAtOrAboveZoomEnabled: !!cameraSettings.disableFaceMergeAtOrAboveZoomEnabled,
       disableFaceMergeAtOrAboveZoomThreshold: Math.max(0.05, Number(cameraSettings.disableFaceMergeAtOrAboveZoomThreshold) || 1.6)
@@ -1272,6 +1276,39 @@
     }
     return getMainEditorCameraSettings(requestSource);
   }
+
+
+  function setMainEditorSubTileGridEnabled(enabled, source) {
+    var requestSource = String(source || 'main-camera:set-sub-tile-grid-enabled');
+    var runtimeApi = getRuntimeStateApi();
+    if (runtimeApi && typeof runtimeApi.patchEditorCameraSettings === 'function') {
+      runtimeApi.patchEditorCameraSettings({ subTileGridEnabled: !!enabled, subTileGridMode: 'diamond_quarters' }, { source: requestSource });
+    }
+    markMainCameraRenderLayersDirty('main-camera-sub-tile-grid-enabled');
+    return getMainEditorCameraSettings(requestSource);
+  }
+
+  function setMainEditorSubTileGridSubdivision(subdivision, source) {
+    var requestSource = String(source || 'main-camera:set-sub-tile-grid-subdivision');
+    var nextSubdivision = Math.max(1, Math.min(64, Math.round(Number(subdivision) || 1)));
+    var runtimeApi = getRuntimeStateApi();
+    if (runtimeApi && typeof runtimeApi.patchEditorCameraSettings === 'function') {
+      runtimeApi.patchEditorCameraSettings({ subTileGridSubdivision: nextSubdivision, subTileGridMode: 'diamond_quarters' }, { source: requestSource });
+    }
+    markMainCameraRenderLayersDirty('main-camera-sub-tile-grid-subdivision');
+    return getMainEditorCameraSettings(requestSource);
+  }
+
+  function setMainEditorDerivedAxisGridEnabled(enabled, source) {
+    var requestSource = String(source || 'terrain-map:set-derived-axis-grid-enabled');
+    var runtimeApi = getRuntimeStateApi();
+    if (runtimeApi && typeof runtimeApi.patchEditorCameraSettings === 'function') {
+      runtimeApi.patchEditorCameraSettings({ derivedAxisGridEnabled: !!enabled, subTileGridEnabled: !!enabled || undefined, subTileGridMode: 'diamond_quarters' }, { source: requestSource });
+    }
+    markMainCameraRenderLayersDirty('terrain-map-derived-axis-grid-enabled');
+    return getMainEditorCameraSettings(requestSource);
+  }
+
 
   function setMainEditorStaticWorldFaceMergeEnabled(enabled, source) {
     var requestSource = String(source || 'render-panel:set-face-merge-enabled');
@@ -2510,6 +2547,14 @@
     setMainEditorCullingMargin: setMainEditorCullingMargin,
     setMainEditorShowCameraBounds: setMainEditorShowCameraBounds,
     setMainEditorShowCullingBounds: setMainEditorShowCullingBounds,
+    setMainEditorSurfaceOnlyRenderingEnabled: setMainEditorSurfaceOnlyRenderingEnabled,
+    setMainEditorDebugVisibleSurfaces: setMainEditorDebugVisibleSurfaces,
+    setMainEditorSubTileGridEnabled: setMainEditorSubTileGridEnabled,
+    setMainEditorSubTileGridSubdivision: setMainEditorSubTileGridSubdivision,
+    setMainEditorDerivedAxisGridEnabled: setMainEditorDerivedAxisGridEnabled,
+    setMainEditorStaticWorldFaceMergeEnabled: setMainEditorStaticWorldFaceMergeEnabled,
+    setMainEditorDisableFaceMergeAtOrAboveZoomEnabled: setMainEditorDisableFaceMergeAtOrAboveZoomEnabled,
+    setMainEditorDisableFaceMergeAtOrAboveZoomThreshold: setMainEditorDisableFaceMergeAtOrAboveZoomThreshold,
     getMainEditorTerrainSettings: getMainEditorTerrainSettings,
     setMainEditorTerrainSettings: setMainEditorTerrainSettings,
     resetMainEditorTerrainSettings: resetMainEditorTerrainSettings,

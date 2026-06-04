@@ -55,7 +55,51 @@ function getMainEditorCullingMarginForRender() {
   return Math.max(0, Number(getMainEditorCameraSettingsForRender().cullingMargin) || 0);
 }
 
+function isPrimitiveDynamicInstanceForRenderScope(inst) {
+  var id = String(inst && inst.prefabId || '');
+  return id === 'micro_tri_prism' || id === 'compatible_axis_block';
+}
+
+function getPrimitiveDynamicInstanceWorldBoundsForRender(inst) {
+  if (!inst || !isPrimitiveDynamicInstanceForRenderScope(inst)) return null;
+
+  // These primitive-backed objects are not regular AABB voxel prefabs. Their
+  // persisted collision boxes are intentionally hidden/collision-only and can be
+  // much smaller than a full tile.  The old camera-scope filter asked the
+  // legacy voxel proxy bounds for visibility; after view rotation this path can
+  // classify the primitive as outside the camera scope even though the Pixi
+  // primitive itself would be visible.  Use a conservative source-cell bound for
+  // render-scope culling.  The actual rendered primitive still uses its exact
+  // triangle/polygon vertices later in the Pixi render path.
+  if (String(inst.prefabId || '') === 'micro_tri_prism') {
+    var m = inst.microTri && typeof inst.microTri === 'object' ? inst.microTri : inst;
+    var subdivision = Math.max(1, Math.min(64, Math.round(Number(m.subdivision) || Number(m.subTileGridSubdivision) || 1)));
+    var cellX = Math.floor(Number(m.cellX != null ? m.cellX : inst.x) || 0);
+    var cellY = Math.floor(Number(m.cellY != null ? m.cellY : inst.y) || 0);
+    var subX = Math.max(0, Math.min(subdivision - 1, Math.round(Number(m.subX) || 0)));
+    var subY = Math.max(0, Math.min(subdivision - 1, Math.round(Number(m.subY) || 0)));
+    var size = 1 / subdivision;
+    var minX = cellX + subX * size;
+    var minY = cellY + subY * size;
+    // One-cell padding keeps tiny atom primitives from being clipped by
+    // rotation-dependent scope rounding while still remaining local.
+    return { minX: minX - 1, minY: minY - 1, maxX: minX + size + 1, maxY: minY + size + 1 };
+  }
+
+  if (String(inst.prefabId || '') === 'compatible_axis_block') {
+    var c = inst.compatibleAxis && typeof inst.compatibleAxis === 'object' ? inst.compatibleAxis : inst;
+    var cx = Math.floor(Number(c.cellX != null ? c.cellX : inst.x) || 0);
+    var cy = Math.floor(Number(c.cellY != null ? c.cellY : inst.y) || 0);
+    return { minX: cx - 2, minY: cy - 2, maxX: cx + 3, maxY: cy + 3 };
+  }
+
+  return null;
+}
+
 function getInstanceWorldBoundsForRender(inst) {
+  var primitiveBounds = getPrimitiveDynamicInstanceWorldBoundsForRender(inst);
+  if (primitiveBounds) return primitiveBounds;
+
   var visibilityCore = getRenderVisibilityCoreApi();
   if (visibilityCore && typeof visibilityCore.getRenderSourceWorldBounds === 'function') {
     var proxy = getInstanceProxyBounds(inst);
