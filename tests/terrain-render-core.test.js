@@ -25,6 +25,7 @@ assert.strictEqual(typeof api.getTerrainFaceMergeSignature, 'function', 'getTerr
 assert.strictEqual(typeof api.getTerrainSideStepBreakSignature, 'function', 'getTerrainSideStepBreakSignature should be a core function');
 assert.strictEqual(typeof api.buildTerrainTopBoundarySegmentsWorldFromDescriptor, 'function', 'buildTerrainTopBoundarySegmentsWorldFromDescriptor should be a core function');
 assert.strictEqual(typeof api.buildMergedVoxelFaceWorldGeometry, 'function', 'buildMergedVoxelFaceWorldGeometry should be a core function');
+assert.strictEqual(typeof api.buildSlope1x1FaceWorldPolygon, 'function', 'single-cell slope geometry should be owned by terrain render core');
 
 assert(indexSource.includes('src/core/domain/terrain-render-core.js'), 'index should load terrain render core');
 assert(indexSource.indexOf('src/core/domain/terrain-face-merge-core.js') < indexSource.indexOf('src/core/domain/terrain-render-core.js'), 'terrain face merge core should load before terrain render core');
@@ -46,6 +47,11 @@ assert.strictEqual(api.getTerrainMaterialMergeKeyForRenderCell(terrainCell), 'te
 assert.strictEqual(api.getTerrainMaterialMergeKeyForRenderCell({ generatedBy: 'terrain-generator' }), '__terrain_default__', 'terrain cells without a merge key should use legacy default');
 assert.strictEqual(api.getTerrainMaterialMergeKeyForRenderCell({ generatedBy: 'manual' }), null, 'non-terrain cells should not get terrain merge keys');
 assert.strictEqual(api.getTerrainFaceMergeSignature(terrainCell, 'top', 'top', 1), 'terrain-face|top|top|1|terrain:sand|{"top":"grass"}||{"top":"#fff"}', 'terrain face merge signature should stay stable');
+assert.strictEqual(
+  api.getTerrainFaceMergeSignature({ generatedBy: 'terrain-generator', prefabId: 'slope_1x1', shapeKind: 'slope_1x1', slopeDirection: 'east', x: 2, y: 3, z: 0 }, 'top', 'top', 0),
+  'terrain-face|top|top|0|__terrain_default__||||slope:slope_1x1:east:2:3:0:',
+  'single-cell slope terrain faces should keep a slope-specific merge signature'
+);
 assert.strictEqual(api.getTerrainSortBandKeyForRenderFace({ generatedBy: 'terrain-generator' }, 'top', { u: 2, v: 3 }, { rotatedPoint: { y: 7 } }), 'ry:7', 'top terrain sort band should use rotated y');
 assert.strictEqual(api.getTerrainSortBandKeyForRenderFace({ generatedBy: 'terrain-generator' }, 'east', { u: 4, v: 5 }, {}), 'east|u:4', 'side terrain sort band should use merge u');
 assert.strictEqual(api.getTerrainSideEdgeVisibilitySignature(['top', 'east'], 'east'), 'east|east,top', 'side edge visibility signature should sort visible faces');
@@ -78,6 +84,47 @@ assert.deepStrictEqual(clean(api.buildMergedVoxelFaceWorldPolygon({ semanticFace
   { x: 5, y: 5, z: 2 },
   { x: 3, y: 5, z: 2 }
 ], 'merged top terrain face polygon should stay stable');
+
+const slopeCell = { prefabId: 'slope_1x1', shapeKind: 'slope_1x1', slopeDirection: 'east', x: 2, y: 3, z: 0 };
+assert.deepStrictEqual(clean(api.buildMergedVoxelFaceWorldPolygon({ semanticFace: 'top', cell: slopeCell })), [
+  { x: 2, y: 3, z: 0 },
+  { x: 3, y: 3, z: 1 },
+  { x: 3, y: 4, z: 1 },
+  { x: 2, y: 4, z: 0 }
+], 'single-cell east slope top face should be inclined while occupying one cell');
+assert.deepStrictEqual(clean(api.buildMergedVoxelFaceWorldPolygon({ semanticFace: 'west', cell: slopeCell })), [], 'single-cell east slope low side should not draw a zero-height side face');
+assert.deepStrictEqual(clean(api.buildMergedVoxelFaceWorldPolygon({ semanticFace: 'east', cell: slopeCell })), [
+  { x: 3, y: 3, z: 0 },
+  { x: 3, y: 4, z: 0 },
+  { x: 3, y: 4, z: 1 },
+  { x: 3, y: 3, z: 1 }
+], 'single-cell east slope high side should render as a vertical face');
+assert.deepStrictEqual(clean(api.buildMergedVoxelFaceWorldPolygon({ semanticFace: 'north', cell: slopeCell })), [
+  { x: 2, y: 3, z: 0 },
+  { x: 3, y: 3, z: 0 },
+  { x: 3, y: 3, z: 1 }
+], 'single-cell east slope north side should render as a triangular side face');
+assert.deepStrictEqual(clean(api.buildMergedVoxelFaceWorldPolygon({ semanticFace: 'south', cell: slopeCell })), [
+  { x: 3, y: 4, z: 0 },
+  { x: 2, y: 4, z: 0 },
+  { x: 3, y: 4, z: 1 }
+], 'single-cell east slope south side should render as a triangular side face');
+assert.deepStrictEqual(clean(api.getSlope1x1DrawableFaces(slopeCell, ['top', 'east', 'south', 'west', 'north'])), ['top', 'east', 'south', 'north'], 'single-cell east slope drawable faces should keep both triangular side faces and skip only the zero-height low side');
+
+const slopeNorth = { prefabId: 'slope_1x1', shapeKind: 'slope_1x1', slopeDirection: 'north', x: 5, y: 6, z: 0 };
+assert.deepStrictEqual(clean(api.buildMergedVoxelFaceWorldPolygon({ semanticFace: 'top', cell: slopeNorth })), [
+  { x: 5, y: 6, z: 1 },
+  { x: 6, y: 6, z: 1 },
+  { x: 6, y: 7, z: 0 },
+  { x: 5, y: 7, z: 0 }
+], 'single-cell north slope top face should rotate its incline direction');
+assert.deepStrictEqual(clean(api.buildMergedVoxelFaceWorldPolygon({ semanticFace: 'north', cell: slopeNorth })), [
+  { x: 5, y: 6, z: 0 },
+  { x: 6, y: 6, z: 0 },
+  { x: 6, y: 6, z: 1 },
+  { x: 5, y: 6, z: 1 }
+], 'single-cell north slope high side should render as a vertical face');
+assert.deepStrictEqual(clean(api.buildMergedVoxelFaceWorldPolygon({ semanticFace: 'south', cell: slopeNorth })), [], 'single-cell north slope low side should not draw a zero-height side face');
 
 const loopGeometry = api.buildMergedVoxelFaceWorldGeometry({
   semanticFace: 'top',

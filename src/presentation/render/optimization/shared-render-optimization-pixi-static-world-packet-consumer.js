@@ -445,9 +445,9 @@
     };
   }
 
-  function mapNoCameraPointToFinalScreenPoint(pt, camera, renderTransform, deps) {
+  function mapNoCameraPointToFinalScreenPoint(pt, camera, renderTransform, deps, projected) {
     if (renderTransform && renderTransform.active === true) {
-      var builtNoCamera = projectCurrentNoCameraPointToBuiltNoCamera(pt, renderTransform.floorSnapshot, deps);
+      var builtNoCamera = projectNoCameraPointToBuiltNoCamera(pt, renderTransform.floorSnapshot, deps, projected);
       var builtScreenX = toNumber(builtNoCamera && builtNoCamera.x, 0) + toNumber(renderTransform.floorBuildCameraX, 0);
       var builtScreenY = toNumber(builtNoCamera && builtNoCamera.y, 0) + toNumber(renderTransform.floorBuildCameraY, 0);
       return {
@@ -458,20 +458,20 @@
     return addCameraPoint(pt, camera);
   }
 
-  function mapNoCameraPointsToFinalScreenPoints(points, camera, renderTransform, deps) {
+  function mapNoCameraPointsToFinalScreenPoints(points, camera, renderTransform, deps, projected) {
     points = Array.isArray(points) ? points : [];
     var out = [];
-    for (var i = 0; i < points.length; i += 1) out.push(mapNoCameraPointToFinalScreenPoint(points[i], camera, renderTransform, deps));
+    for (var i = 0; i < points.length; i += 1) out.push(mapNoCameraPointToFinalScreenPoint(points[i], camera, renderTransform, deps, projected));
     return out;
   }
 
-  function mapNoCameraPointToChunkCachePoint(pt, camera, renderTransform, deps) {
+  function mapNoCameraPointToChunkCachePoint(pt, camera, renderTransform, deps, projected) {
     // PXM-07.14C: RenderTexture chunks are cached in the same build-space used
     // by the shared floor reuse transform. Pan/zoom then updates only the chunk
     // sprite transform, instead of rebuilding the chunk texture for every
     // current-camera/current-zoom tick.
     if (renderTransform && renderTransform.active === true) {
-      var builtNoCamera = projectCurrentNoCameraPointToBuiltNoCamera(pt, renderTransform.floorSnapshot, deps);
+      var builtNoCamera = projectNoCameraPointToBuiltNoCamera(pt, renderTransform.floorSnapshot, deps, projected);
       return {
         x: toNumber(builtNoCamera && builtNoCamera.x, 0) + toNumber(renderTransform.floorBuildCameraX, 0),
         y: toNumber(builtNoCamera && builtNoCamera.y, 0) + toNumber(renderTransform.floorBuildCameraY, 0)
@@ -480,10 +480,10 @@
     return addCameraPoint(pt, camera);
   }
 
-  function mapNoCameraPointsToChunkCachePoints(points, camera, renderTransform, deps) {
+  function mapNoCameraPointsToChunkCachePoints(points, camera, renderTransform, deps, projected) {
     points = Array.isArray(points) ? points : [];
     var out = [];
-    for (var i = 0; i < points.length; i += 1) out.push(mapNoCameraPointToChunkCachePoint(points[i], camera, renderTransform, deps));
+    for (var i = 0; i < points.length; i += 1) out.push(mapNoCameraPointToChunkCachePoint(points[i], camera, renderTransform, deps, projected));
     return out;
   }
 
@@ -584,7 +584,7 @@
       var polys = Array.isArray(overlay.polysNoCamera) ? overlay.polysNoCamera : [];
       var alpha = Math.max(0, Math.min(0.95, toNumber(overlay.alpha != null ? overlay.alpha : overlay.baseAlpha, 0.18)));
       for (var pi = 0; pi < polys.length; pi += 1) {
-        var pts = mapNoCameraPointsToFinalScreenPoints(polys[pi], camera, renderTransform, deps);
+        var pts = mapNoCameraPointsToFinalScreenPoints(polys[pi], camera, renderTransform, deps, projected);
         if (pts.length >= 3 && drawPolygon(graphics, pts, 'rgba(0,0,0,' + String(alpha) + ')', null, 0)) overlayCount += 1;
       }
     }
@@ -685,14 +685,14 @@
     var points = Array.isArray(projected && projected.pointsNoCamera) ? projected.pointsNoCamera : [];
     if (loops.length) {
       for (var li = 0; li < loops.length; li += 1) {
-        var loopPts = mapNoCameraPointsToFinalScreenPoints(loops[li], camera, renderTransform, deps);
+        var loopPts = mapNoCameraPointsToFinalScreenPoints(loops[li], camera, renderTransform, deps, projected);
         if (loopPts.length >= 3) {
           expandBoundsWithPoints(bounds, loopPts);
           commands.push({ kind: 'polygon', points: loopPts, fill: packet && packet.fill, stroke: packet && packet.stroke, width: packet && (packet.width || 1) });
         }
       }
     } else {
-      var pts = mapNoCameraPointsToFinalScreenPoints(points, camera, renderTransform, deps);
+      var pts = mapNoCameraPointsToFinalScreenPoints(points, camera, renderTransform, deps, projected);
       if (pts.length >= 3) {
         expandBoundsWithPoints(bounds, pts);
         commands.push({ kind: 'polygon', points: pts, fill: packet && packet.fill, stroke: packet && packet.stroke, width: packet && (packet.width || 1) });
@@ -703,8 +703,8 @@
       for (var oi = 0; oi < outlineSegments.length; oi += 1) {
         var seg = outlineSegments[oi];
         if (Array.isArray(seg) && seg[0] && seg[1]) {
-          var a = mapNoCameraPointToFinalScreenPoint(seg[0], camera, renderTransform, deps);
-          var b = mapNoCameraPointToFinalScreenPoint(seg[1], camera, renderTransform, deps);
+          var a = mapNoCameraPointToFinalScreenPoint(seg[0], camera, renderTransform, deps, projected);
+          var b = mapNoCameraPointToFinalScreenPoint(seg[1], camera, renderTransform, deps, projected);
           expandBoundsWithPoint(bounds, a);
           expandBoundsWithPoint(bounds, b);
           commands.push({ kind: 'segment', a: a, b: b, stroke: packet.stroke, width: packet.width || 1 });
@@ -716,8 +716,8 @@
       for (var bi = 0; bi < terrainBoundarySegments.length; bi += 1) {
         var bseg = terrainBoundarySegments[bi];
         if (Array.isArray(bseg) && bseg[0] && bseg[1]) {
-          var ba = mapNoCameraPointToFinalScreenPoint(bseg[0], camera, renderTransform, deps);
-          var bb = mapNoCameraPointToFinalScreenPoint(bseg[1], camera, renderTransform, deps);
+          var ba = mapNoCameraPointToFinalScreenPoint(bseg[0], camera, renderTransform, deps, projected);
+          var bb = mapNoCameraPointToFinalScreenPoint(bseg[1], camera, renderTransform, deps, projected);
           expandBoundsWithPoint(bounds, ba);
           expandBoundsWithPoint(bounds, bb);
           commands.push({ kind: 'segment', a: ba, b: bb, stroke: packet.terrainBoundaryStroke, width: packet.terrainBoundaryStrokeWidth });
@@ -730,7 +730,7 @@
       var polys = Array.isArray(overlay.polysNoCamera) ? overlay.polysNoCamera : [];
       var alpha = Math.max(0, Math.min(0.95, toNumber(overlay.alpha != null ? overlay.alpha : overlay.baseAlpha, 0.18)));
       for (var op = 0; op < polys.length; op += 1) {
-        var ovPts = mapNoCameraPointsToFinalScreenPoints(polys[op], camera, renderTransform, deps);
+        var ovPts = mapNoCameraPointsToFinalScreenPoints(polys[op], camera, renderTransform, deps, projected);
         if (ovPts.length >= 3) {
           expandBoundsWithPoints(bounds, ovPts);
           commands.push({ kind: 'polygon', points: ovPts, fill: 'rgba(0,0,0,' + String(alpha) + ')', stroke: null, width: 0 });
@@ -767,14 +767,14 @@
     var points = Array.isArray(projected && projected.pointsNoCamera) ? projected.pointsNoCamera : [];
     if (loops.length) {
       for (var li = 0; li < loops.length; li += 1) {
-        var loopPts = mapNoCameraPointsToChunkCachePoints(loops[li], camera, renderTransform, deps);
+        var loopPts = mapNoCameraPointsToChunkCachePoints(loops[li], camera, renderTransform, deps, projected);
         if (loopPts.length >= 3) {
           expandBoundsWithPoints(bounds, loopPts);
           commands.push({ kind: 'polygon', points: loopPts, fill: packet && packet.fill, stroke: packet && packet.stroke, width: packet && (packet.width || 1) });
         }
       }
     } else {
-      var pts = mapNoCameraPointsToChunkCachePoints(points, camera, renderTransform, deps);
+      var pts = mapNoCameraPointsToChunkCachePoints(points, camera, renderTransform, deps, projected);
       if (pts.length >= 3) {
         expandBoundsWithPoints(bounds, pts);
         commands.push({ kind: 'polygon', points: pts, fill: packet && packet.fill, stroke: packet && packet.stroke, width: packet && (packet.width || 1) });
@@ -785,8 +785,8 @@
       for (var oi = 0; oi < outlineSegments.length; oi += 1) {
         var seg = outlineSegments[oi];
         if (Array.isArray(seg) && seg[0] && seg[1]) {
-          var a = mapNoCameraPointToChunkCachePoint(seg[0], camera, renderTransform, deps);
-          var b = mapNoCameraPointToChunkCachePoint(seg[1], camera, renderTransform, deps);
+          var a = mapNoCameraPointToChunkCachePoint(seg[0], camera, renderTransform, deps, projected);
+          var b = mapNoCameraPointToChunkCachePoint(seg[1], camera, renderTransform, deps, projected);
           expandBoundsWithPoint(bounds, a);
           expandBoundsWithPoint(bounds, b);
           commands.push({ kind: 'segment', a: a, b: b, stroke: packet.stroke, width: packet.width || 1 });
@@ -798,8 +798,8 @@
       for (var bi = 0; bi < terrainBoundarySegments.length; bi += 1) {
         var bseg = terrainBoundarySegments[bi];
         if (Array.isArray(bseg) && bseg[0] && bseg[1]) {
-          var ba = mapNoCameraPointToChunkCachePoint(bseg[0], camera, renderTransform, deps);
-          var bb = mapNoCameraPointToChunkCachePoint(bseg[1], camera, renderTransform, deps);
+          var ba = mapNoCameraPointToChunkCachePoint(bseg[0], camera, renderTransform, deps, projected);
+          var bb = mapNoCameraPointToChunkCachePoint(bseg[1], camera, renderTransform, deps, projected);
           expandBoundsWithPoint(bounds, ba);
           expandBoundsWithPoint(bounds, bb);
           commands.push({ kind: 'segment', a: ba, b: bb, stroke: packet.terrainBoundaryStroke, width: packet.terrainBoundaryStrokeWidth });
@@ -812,7 +812,7 @@
       var polys = Array.isArray(overlay.polysNoCamera) ? overlay.polysNoCamera : [];
       var alpha = Math.max(0, Math.min(0.95, toNumber(overlay.alpha != null ? overlay.alpha : overlay.baseAlpha, 0.18)));
       for (var op = 0; op < polys.length; op += 1) {
-        var ovPts = mapNoCameraPointsToChunkCachePoints(polys[op], camera, renderTransform, deps);
+        var ovPts = mapNoCameraPointsToChunkCachePoints(polys[op], camera, renderTransform, deps, projected);
         if (ovPts.length >= 3) {
           expandBoundsWithPoints(bounds, ovPts);
           commands.push({ kind: 'polygon', points: ovPts, fill: 'rgba(0,0,0,' + String(alpha) + ')', stroke: null, width: 0 });
@@ -2368,9 +2368,9 @@
     var loops = Array.isArray(projected && projected.loopsNoCamera) ? projected.loopsNoCamera : [];
     var points = Array.isArray(projected && projected.pointsNoCamera) ? projected.pointsNoCamera : [];
     if (loops.length) {
-      for (var li = 0; li < loops.length; li += 1) expandBoundsWithPoints(bounds, mapNoCameraPointsToFinalScreenPoints(loops[li], camera, renderTransform, deps));
+      for (var li = 0; li < loops.length; li += 1) expandBoundsWithPoints(bounds, mapNoCameraPointsToFinalScreenPoints(loops[li], camera, renderTransform, deps, projected));
     } else if (points.length) {
-      expandBoundsWithPoints(bounds, mapNoCameraPointsToFinalScreenPoints(points, camera, renderTransform, deps));
+      expandBoundsWithPoints(bounds, mapNoCameraPointsToFinalScreenPoints(points, camera, renderTransform, deps, projected));
     }
     return boundsAreValid(bounds) ? bounds : null;
   }
@@ -3571,11 +3571,11 @@
     var polygonDrawCount = 0;
     if (loops.length) {
       for (var li = 0; li < loops.length; li += 1) {
-        var loopPts = mapNoCameraPointsToFinalScreenPoints(loops[li], camera, renderTransform, deps);
+        var loopPts = mapNoCameraPointsToFinalScreenPoints(loops[li], camera, renderTransform, deps, projected);
         if (loopPts.length >= 3 && drawPolygon(graphics, loopPts, packet.fill, packet.stroke, packet.width || 1)) polygonDrawCount += 1;
       }
     } else {
-      var pts = mapNoCameraPointsToFinalScreenPoints(points, camera, renderTransform, deps);
+      var pts = mapNoCameraPointsToFinalScreenPoints(points, camera, renderTransform, deps, projected);
       if (pts.length >= 3 && drawPolygon(graphics, pts, packet.fill, packet.stroke, packet.width || 1)) polygonDrawCount += 1;
     }
     var outlineSegments = Array.isArray(projected.outlineSegmentsNoCamera) ? projected.outlineSegmentsNoCamera : [];
@@ -3584,7 +3584,7 @@
       for (var oi = 0; oi < outlineSegments.length; oi += 1) {
         var seg = outlineSegments[oi];
         if (Array.isArray(seg) && seg[0] && seg[1]) {
-          if (drawSegment(graphics, mapNoCameraPointToFinalScreenPoint(seg[0], camera, renderTransform, deps), mapNoCameraPointToFinalScreenPoint(seg[1], camera, renderTransform, deps), packet.stroke, packet.width || 1)) outlineCount += 1;
+          if (drawSegment(graphics, mapNoCameraPointToFinalScreenPoint(seg[0], camera, renderTransform, deps, projected), mapNoCameraPointToFinalScreenPoint(seg[1], camera, renderTransform, deps, projected), packet.stroke, packet.width || 1)) outlineCount += 1;
         }
       }
     }
@@ -3594,7 +3594,7 @@
       for (var bi = 0; bi < terrainBoundarySegments.length; bi += 1) {
         var bseg = terrainBoundarySegments[bi];
         if (Array.isArray(bseg) && bseg[0] && bseg[1]) {
-          if (drawSegment(graphics, mapNoCameraPointToFinalScreenPoint(bseg[0], camera, renderTransform, deps), mapNoCameraPointToFinalScreenPoint(bseg[1], camera, renderTransform, deps), packet.terrainBoundaryStroke, packet.terrainBoundaryStrokeWidth)) boundaryCount += 1;
+          if (drawSegment(graphics, mapNoCameraPointToFinalScreenPoint(bseg[0], camera, renderTransform, deps, projected), mapNoCameraPointToFinalScreenPoint(bseg[1], camera, renderTransform, deps, projected), packet.terrainBoundaryStroke, packet.terrainBoundaryStrokeWidth)) boundaryCount += 1;
         }
       }
     }
@@ -4103,7 +4103,18 @@
     return null;
   }
 
-  function projectCurrentNoCameraPointToBuiltNoCamera(pointNoCamera, floorSnapshot, deps) {
+  function getProjectedNoCameraProjectionZoom(projected) {
+    var direct = Number(projected && projected.projectionZoom);
+    if (Number.isFinite(direct) && direct > 0) return direct;
+    try {
+      var parts = String(projected && projected.key || '').split('|');
+      var fromKey = Number(parts[5]);
+      if (Number.isFinite(fromKey) && fromKey > 0) return fromKey;
+    } catch (_) {}
+    return null;
+  }
+
+  function projectNoCameraPointToBuiltNoCamera(pointNoCamera, floorSnapshot, deps, projected) {
     var settings = deps && typeof deps.getSettings === 'function' ? deps.getSettings() : (deps && deps.settings ? deps.settings : {});
     var originX = toNumber(settings && settings.originX, toNumber(floorSnapshot && floorSnapshot.floorCacheBlitTransform && floorSnapshot.floorCacheBlitTransform.originX, 0));
     var originY = toNumber(settings && settings.originY, toNumber(floorSnapshot && floorSnapshot.floorCacheBlitTransform && floorSnapshot.floorCacheBlitTransform.originY, 0));
@@ -4112,13 +4123,17 @@
       try { currentZoom = deps && typeof deps.getMainEditorZoomValueForRender === 'function' ? toNumber(deps.getMainEditorZoomValueForRender(), 1) : 1; } catch (_) { currentZoom = 1; }
     }
     var builtZoom = toNumber(floorSnapshot && floorSnapshot.buildZoom, toNumber(floorSnapshot && floorSnapshot.reuseTransform && floorSnapshot.reuseTransform.builtZoom, currentZoom || 1));
-    var ratio = currentZoom ? builtZoom / currentZoom : 1;
+    var projectionZoom = getProjectedNoCameraProjectionZoom(projected);
+    var sourceZoom = Number.isFinite(Number(projectionZoom)) && Number(projectionZoom) > 0 ? Number(projectionZoom) : currentZoom;
+    var ratio = sourceZoom ? builtZoom / sourceZoom : 1;
     return {
       x: originX + (toNumber(pointNoCamera && pointNoCamera.x, 0) - originX) * ratio,
       y: originY + (toNumber(pointNoCamera && pointNoCamera.y, 0) - originY) * ratio,
       currentZoom: currentZoom,
       builtZoom: builtZoom,
-      zoomRatio: ratio
+      projectionZoom: sourceZoom,
+      zoomRatio: ratio,
+      noCameraSourceSpace: Math.abs(sourceZoom - builtZoom) <= 0.0005 ? 'floor-build' : 'current-or-other'
     };
   }
 
@@ -4144,10 +4159,10 @@
         pendingFaceMergeMode: faceMerge && faceMerge.pendingFaceMergeMode ? String(faceMerge.pendingFaceMergeMode) : ''
       };
     }
-    var staticRenderPoint = mapNoCameraPointToFinalScreenPoint(pointNoCamera, camera, renderTransform, deps);
+    var staticRenderPoint = mapNoCameraPointToFinalScreenPoint(pointNoCamera, camera, renderTransform, deps, projected);
     var staticScreenX = toNumber(staticRenderPoint && staticRenderPoint.x, toNumber(pointNoCamera.x, 0) + toNumber(camera && camera.x, 0));
     var staticScreenY = toNumber(staticRenderPoint && staticRenderPoint.y, toNumber(pointNoCamera.y, 0) + toNumber(camera && camera.y, 0));
-    var builtNoCamera = projectCurrentNoCameraPointToBuiltNoCamera(pointNoCamera, floorSnapshot, deps);
+    var builtNoCamera = projectNoCameraPointToBuiltNoCamera(pointNoCamera, floorSnapshot, deps, projected);
     var builtScreenX = toNumber(builtNoCamera.x, 0) + toNumber(floorSnapshot && floorSnapshot.buildCameraX, toNumber(reuse && reuse.builtCameraX, 0));
     var builtScreenY = toNumber(builtNoCamera.y, 0) + toNumber(floorSnapshot && floorSnapshot.buildCameraY, toNumber(reuse && reuse.builtCameraY, 0));
     var floorScale = toNumber(transform && transform.scale, toNumber(reuse && reuse.scale, 1));

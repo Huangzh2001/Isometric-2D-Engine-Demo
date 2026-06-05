@@ -4625,7 +4625,76 @@ function buildVoxelFaceShadowOverlays(facePts, normal, ownerInstanceId) {
   );
 }
 
+function makeSlopeAwareRenderCell(cell) {
+  var safe = cell && typeof cell === 'object' ? cell : {};
+  var box = safe.box && typeof safe.box === 'object' ? safe.box : {};
+  return {
+    x: Number(safe.x != null ? safe.x : (box.x != null ? box.x : 0)) || 0,
+    y: Number(safe.y != null ? safe.y : (box.y != null ? box.y : 0)) || 0,
+    z: Number(safe.z != null ? safe.z : (box.z != null ? box.z : 0)) || 0,
+    prefabId: safe.prefabId || box.prefabId || null,
+    instanceId: safe.instanceId || box.instanceId || null,
+    shapeKind: safe.shapeKind || box.shapeKind || null,
+    slopeDirection: safe.slopeDirection != null ? String(safe.slopeDirection) : (box.slopeDirection != null ? String(box.slopeDirection) : null),
+    rotation: safe.rotation != null ? safe.rotation : (box.rotation != null ? box.rotation : null),
+    base: safe.base || box.base || null,
+    box: box
+  };
+}
+
+function isSlopeRenderCell(cell) {
+  var slopeCell = makeSlopeAwareRenderCell(cell);
+  return String(slopeCell.shapeKind || '').toLowerCase() === 'slope_1x1' ||
+    String(slopeCell.prefabId || '').toLowerCase() === 'slope_1x1' ||
+    slopeCell.slopeDirection != null;
+}
+
+function getSlopeAwareFaceWorldPolygon(cell, semanticFace) {
+  var slopeCell = makeSlopeAwareRenderCell(cell);
+  var geometry = buildMergedVoxelFaceWorldGeometry({ semanticFace: semanticFace, cell: slopeCell });
+  return geometry && Array.isArray(geometry.worldPts) ? geometry.worldPts : [];
+}
+
+function drawSlopeAwareVoxelCell(cell, occ, alpha) {
+  var slopeCell = makeSlopeAwareRenderCell(cell);
+  var fc = baseFaceColors((slopeCell.box && slopeCell.box.base) || slopeCell.base || '#7aa2f7');
+  var ownerInstanceId = slopeCell.instanceId || slopeCell.box && slopeCell.box.instanceId;
+  var explicitVisibleFaces = Array.isArray(cell && cell.visibleFaces) ? cell.visibleFaces.slice() : null;
+  var hasFace = function (name, fallback) {
+    if (explicitVisibleFaces && explicitVisibleFaces.length) return explicitVisibleFaces.indexOf(name) >= 0;
+    return !!fallback;
+  };
+  function occHas(x, y, z) {
+    return occ && typeof occ.has === 'function' ? occ.has(`${x},${y},${z}`) : false;
+  }
+  var candidates = [
+    { semanticFace: 'north', fill: fc.south, normal: { x: 0, y: -1, z: 0 }, alphaFill: 'rgba(255,255,255,.12)', depthKey: 0, visible: hasFace('north', !occHas(slopeCell.x, slopeCell.y - 1, slopeCell.z)) },
+    { semanticFace: 'west', fill: fc.east, normal: { x: -1, y: 0, z: 0 }, alphaFill: 'rgba(255,255,255,.12)', depthKey: 1, visible: hasFace('west', !occHas(slopeCell.x - 1, slopeCell.y, slopeCell.z)) },
+    { semanticFace: 'east', fill: fc.east, normal: { x: 1, y: 0, z: 0 }, alphaFill: 'rgba(255,255,255,.18)', depthKey: 2, visible: hasFace('east', !occHas(slopeCell.x + 1, slopeCell.y, slopeCell.z)) },
+    { semanticFace: 'south', fill: fc.south, normal: { x: 0, y: 1, z: 0 }, alphaFill: 'rgba(255,255,255,.14)', depthKey: 3, visible: hasFace('south', !occHas(slopeCell.x, slopeCell.y + 1, slopeCell.z)) },
+    { semanticFace: 'top', fill: fc.top, normal: { x: 0, y: 0, z: 1 }, alphaFill: null, depthKey: 4, visible: hasFace('top', !occHas(slopeCell.x, slopeCell.y, slopeCell.z + 1)) }
+  ];
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  candidates.forEach(function (candidate) {
+    if (!candidate.visible) return;
+    var worldPts = getSlopeAwareFaceWorldPolygon(slopeCell, candidate.semanticFace);
+    if (!Array.isArray(worldPts) || worldPts.length < 3) return;
+    var screenPts = screenPointsFromWorldFace(worldPts);
+    var fill = xrayFaces && candidate.semanticFace !== 'top' ? candidate.alphaFill : rgbToCss(litFaceColor(candidate.fill, worldPts, candidate.normal, ownerInstanceId));
+    drawPoly(screenPts, fill, fc.line);
+    if (!xrayFaces) drawFaceShadowOverlays(ctx, screenPts, buildVoxelFaceShadowOverlays(worldPts, candidate.normal, ownerInstanceId));
+  });
+  ctx.restore();
+  if (showDebug) {
+    const foot = iso(slopeCell.x + 1, slopeCell.y + 1, slopeCell.z);
+    ctx.fillStyle = '#ffd166';
+    ctx.beginPath(); ctx.arc(foot.x, foot.y, 2.5, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
 function drawVoxelCell(cell, occ, alpha = 1) {
+  if (isSlopeRenderCell(cell)) return drawSlopeAwareVoxelCell(cell, occ, alpha);
   var pts = cubePoints(cell.x, cell.y, cell.z, 1, 1, 1);
   var { p100,p110,p010,p001,p101,p111,p011 } = pts;
   var fc = baseFaceColors((cell.box && cell.box.base) || cell.base || "#7aa2f7");
@@ -4711,7 +4780,7 @@ function buildStaticVoxelRenderable(cell, occ, explicitViewRotation, semanticLog
       if (!candidate.semanticFace) return;
       var delta = getSemanticFaceNeighborDeltaForRender(candidate.semanticFace);
       if (occ.has(`${cell.x + delta.x},${cell.y + delta.y},${cell.z + delta.z}`)) return;
-      var worldPts = getSemanticFaceWorldPolygon(cell, candidate.semanticFace);
+      var worldPts = getSlopeAwareFaceWorldPolygon(cell, candidate.semanticFace);
       if (!Array.isArray(worldPts) || worldPts.length < 3) return;
       var screenPts = screenPointsFromWorldFace(worldPts);
       var normal = getSemanticFaceNormal(candidate.semanticFace);
@@ -4724,11 +4793,11 @@ function buildStaticVoxelRenderable(cell, occ, explicitViewRotation, semanticLog
       var hasWest = !occ.has(`${cell.x - 1},${cell.y},${cell.z}`);
       var hasNorth = !occ.has(`${cell.x},${cell.y - 1},${cell.z}`);
       if (hasWest) {
-        var westWorld = getSemanticFaceWorldPolygon(cell, 'west');
+        var westWorld = getSlopeAwareFaceWorldPolygon(cell, 'west');
         faces.push(buildFaceRenderable(screenPointsFromWorldFace(westWorld), 'rgba(255,255,255,.08)', fc.line, 1, [], { semanticFace: 'west', screenFace: 'west', depthKey: 0, worldPts: westWorld, polygonTemplateId: 'semantic-face-west', polygonSource: 'semantic-face-world-plane-fallback', reusedFromOldEastSouthTemplate: false, cell: { x: cell.x, y: cell.y, z: cell.z } }));
       }
       if (hasNorth) {
-        var northWorld = getSemanticFaceWorldPolygon(cell, 'north');
+        var northWorld = getSlopeAwareFaceWorldPolygon(cell, 'north');
         faces.push(buildFaceRenderable(screenPointsFromWorldFace(northWorld), 'rgba(255,255,255,.08)', fc.line, 1, [], { semanticFace: 'north', screenFace: 'north', depthKey: -1, worldPts: northWorld, polygonTemplateId: 'semantic-face-north', polygonSource: 'semantic-face-world-plane-fallback', reusedFromOldEastSouthTemplate: false, cell: { x: cell.x, y: cell.y, z: cell.z } }));
       }
     }

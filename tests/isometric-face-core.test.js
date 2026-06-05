@@ -46,6 +46,11 @@ assert.deepStrictEqual(clean(api.getBaseFaceFillRgbForSemanticFace(fc, 'west')),
 assert.deepStrictEqual(clean(api.getBaseFaceFillRgbForSemanticFace(fc, 'north')), { r: 3 }, 'north uses south base color for legacy lighting parity');
 assert.deepStrictEqual(clean(api.getStaticWorldFaceMergeCoords({ x: 2, y: 3, z: 4 }, 'south')), { plane: 4, u: 2, v: 4 }, 'south merge coords should stay stable');
 assert.strictEqual(api.getStaticWorldFaceMergeSignature({ instanceId: 'i1', prefabId: 'cube_1x1', semanticTextureMap: { top: 'grass' } }, 'top', 'top', 0), 'instance:i1|cube_1x1||||||top|top|0|{\"top\":\"grass\"}||', 'static world face merge signature should stay stable');
+assert.strictEqual(
+  api.getStaticWorldFaceMergeSignature({ instanceId: 's1', prefabId: 'slope_1x1', shapeKind: 'slope_1x1', slopeDirection: 'east', x: 2, y: 3, z: 0 }, 'top', 'top', 0),
+  'instance:s1|slope_1x1||||||top|top|0||||slope:slope_1x1:east:2:3:0:s1',
+  'single-cell slope object faces should keep a slope-specific static merge signature'
+);
 assert.deepStrictEqual(clean(api.getSemanticFaceNeighborDelta('west')), { x: -1, y: 0, z: 0 }, 'west neighbor delta should stay stable');
 assert.deepStrictEqual(clean(api.getSemanticFaceNormal('lowerRight')), { x: 1, y: 0, z: 0 }, 'lowerRight normal should stay stable');
 assert.deepStrictEqual(clean(api.buildVoxelFaceWorldPolygon(1, 2, 3, 'top')), [

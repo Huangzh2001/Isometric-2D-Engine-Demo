@@ -157,6 +157,37 @@
     }
   }
 
+
+  function normalizeSlopeDirection(direction) {
+    var dir = String(direction || '').trim().toLowerCase();
+    if (dir === 'west' || dir === 'north' || dir === 'south') return dir;
+    return 'east';
+  }
+
+  function isOneCellSlopeCell(cell) {
+    var safeCell = cell && typeof cell === 'object' ? cell : null;
+    if (!safeCell) return false;
+    // A stale slopeDirection field is not enough to classify an ordinary cube
+    // as a slope.  Real slopes must carry the prefab/shape/kind identity.
+    return String(safeCell.shapeKind || '') === 'slope_1x1'
+      || String(safeCell.prefabId || '') === 'slope_1x1'
+      || String(safeCell.kind || '') === 'slope_1x1';
+  }
+
+  function getSlopeFaceMergeSignaturePart(cell) {
+    var safeCell = cell && typeof cell === 'object' ? cell : null;
+    if (!isOneCellSlopeCell(safeCell)) return '';
+    return [
+      'slope',
+      String(safeCell.shapeKind || safeCell.prefabId || 'slope_1x1'),
+      normalizeSlopeDirection(safeCell.slopeDirection),
+      String(toFiniteNumber(safeCell.x, 0)),
+      String(toFiniteNumber(safeCell.y, 0)),
+      String(toFiniteNumber(safeCell.z, 0)),
+      String(safeCell.instanceId || '')
+    ].join(':');
+  }
+
   function getStaticWorldFaceMergeSignature(cell, semanticFace, screenFace, currentViewRotation) {
     var safeCell = cell && typeof cell === 'object' ? cell : {};
     var ownerKey = safeCell.instanceId != null
@@ -169,7 +200,7 @@
       safeCell.semanticTextures ? stableStringify(safeCell.semanticTextures) : '',
       safeCell.semanticFaceColors ? stableStringify(safeCell.semanticFaceColors) : ''
     ].join('|');
-    return [
+    var parts = [
       ownerKey,
       String(safeCell.prefabId || ''),
       String(safeCell.generatedBy || ''),
@@ -181,7 +212,10 @@
       String(screenFace || ''),
       Number(currentViewRotation || 0),
       semanticTextureSignature
-    ].join('|');
+    ];
+    var slopePart = getSlopeFaceMergeSignaturePart(safeCell);
+    if (slopePart) parts.push(slopePart);
+    return parts.join('|');
   }
 
   function getSemanticFaceNormal(faceName) {

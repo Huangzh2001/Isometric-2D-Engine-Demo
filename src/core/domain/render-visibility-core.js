@@ -102,31 +102,103 @@
     return input.filter(function (item) { return isWithinCameraScope(item, scope, boundsGetter); });
   }
 
+  function voxelKey(x, y, z) {
+    return Math.round(toNumber(x, 0)) + ',' + Math.round(toNumber(y, 0)) + ',' + Math.round(toNumber(z, 0));
+  }
+
+  function isSlopeLikeRenderCell(box) {
+    if (!box || typeof box !== 'object') return false;
+    // `slopeDirection` alone is intentionally not enough: stale/null-ish metadata
+    // on ordinary prefab boxes must not turn them into non-cubic render cells.
+    return String(box.shapeKind || '') === 'slope_1x1'
+      || String(box.prefabId || '') === 'slope_1x1'
+      || String(box.kind || '') === 'slope_1x1';
+  }
+
+  function getInstanceOccupancyKey(box) {
+    if (!box || typeof box !== 'object') return '';
+    if (box.instanceId != null && String(box.instanceId)) return 'instance:' + String(box.instanceId);
+    if (box.generatedBy === 'terrain-generator') return 'terrain';
+    return '';
+  }
+
+  function createStructuredVoxelOccupancy() {
+    return {
+      global: new Set(),
+      terrain: new Set(),
+      byInstance: new Map(),
+      add: function (key) { this.global.add(String(key)); },
+      has: function (key) { return this.global.has(String(key)); }
+    };
+  }
+
+  function addToMapSet(map, groupKey, key) {
+    if (!groupKey) return;
+    var set = map.get(groupKey);
+    if (!set) {
+      set = new Set();
+      map.set(groupKey, set);
+    }
+    set.add(String(key));
+  }
+
   function buildStructuredVoxelOccupancy(boxes) {
-    var occ = new Set();
+    var occ = createStructuredVoxelOccupancy();
     var list = Array.isArray(boxes) ? boxes : [];
     for (var i = 0; i < list.length; i++) {
       var box = list[i];
       if (!box || typeof box !== 'object') continue;
-      var x = Math.round(toNumber(box.x, 0));
-      var y = Math.round(toNumber(box.y, 0));
-      var z = Math.round(toNumber(box.z, 0));
-      occ.add(x + ',' + y + ',' + z);
+      // A one-cell slope is not a full cube occluder.  Treating it as a full
+      // occupancy voxel hides side faces of adjacent ordinary cubes and is the
+      // source of the “placed cube loses faces” regression.
+      if (isSlopeLikeRenderCell(box)) continue;
+      var key = voxelKey(box.x, box.y, box.z);
+      occ.global.add(key);
+      if (box.generatedBy === 'terrain-generator') occ.terrain.add(key);
+      addToMapSet(occ.byInstance, getInstanceOccupancyKey(box), key);
     }
     return occ;
   }
 
+  function occupancyHasKey(occupancy, key) {
+    if (!occupancy) return false;
+    if (typeof occupancy.has === 'function') return !!occupancy.has(key);
+    if (occupancy.global && typeof occupancy.global.has === 'function') return !!occupancy.global.has(key);
+    return false;
+  }
+
+  function occupancyHasForCell(cell, occupancy, key) {
+    if (!occupancy) return false;
+    // Terrain remains a shared solid mass; ordinary independent objects do not
+    // erase each other's faces.  Multi-voxel prefabs still cull their own
+    // internal faces via the same instance occupancy group.
+    if (cell && cell.generatedBy === 'terrain-generator') {
+      if (occupancy.terrain && typeof occupancy.terrain.has === 'function') return occupancy.terrain.has(String(key));
+      return occupancyHasKey(occupancy, key);
+    }
+    if (isSlopeLikeRenderCell(cell)) return false;
+    var groupKey = getInstanceOccupancyKey(cell);
+    if (groupKey && occupancy.byInstance && typeof occupancy.byInstance.get === 'function') {
+      var set = occupancy.byInstance.get(groupKey);
+      if (set && set.has(String(key))) return true;
+    }
+    // Terrain can still hide an object face when an object is embedded against
+    // generated terrain, but other furniture instances cannot.
+    if (occupancy.terrain && typeof occupancy.terrain.has === 'function' && occupancy.terrain.has(String(key))) return true;
+    if (!occupancy.global && typeof occupancy.has === 'function') return !!occupancy.has(key);
+    return false;
+  }
+
   function getVisibleFacesForVoxelCell(cell, occupancy) {
-    var occ = occupancy || new Set();
     var x = Math.round(toNumber(cell && cell.x, 0));
     var y = Math.round(toNumber(cell && cell.y, 0));
     var z = Math.round(toNumber(cell && cell.z, 0));
     var faces = [];
-    if (!occ.has(x + ',' + y + ',' + (z + 1))) faces.push('top');
-    if (!occ.has((x + 1) + ',' + y + ',' + z)) faces.push('east');
-    if (!occ.has(x + ',' + (y + 1) + ',' + z)) faces.push('south');
-    if (!occ.has((x - 1) + ',' + y + ',' + z)) faces.push('west');
-    if (!occ.has(x + ',' + (y - 1) + ',' + z)) faces.push('north');
+    if (!occupancyHasForCell(cell, occupancy, voxelKey(x, y, z + 1))) faces.push('top');
+    if (!occupancyHasForCell(cell, occupancy, voxelKey(x + 1, y, z))) faces.push('east');
+    if (!occupancyHasForCell(cell, occupancy, voxelKey(x, y + 1, z))) faces.push('south');
+    if (!occupancyHasForCell(cell, occupancy, voxelKey(x - 1, y, z))) faces.push('west');
+    if (!occupancyHasForCell(cell, occupancy, voxelKey(x, y - 1, z))) faces.push('north');
     return faces;
   }
 

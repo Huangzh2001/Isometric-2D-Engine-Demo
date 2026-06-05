@@ -430,6 +430,7 @@ var __APP_CORE_SCENE_DOMAIN_CORE__ = (function () {
         d: positiveSize(v.d, 1),
         h: positiveSize(v.h, 1),
         shapeKind: v.shapeKind || safeProto.shapeKind || null,
+        slopeDirection: v.slopeDirection != null ? String(v.slopeDirection) : (safeProto.slopeDirection != null ? String(safeProto.slopeDirection) : null),
         collisionPolygon2d: Array.isArray(v.collisionPolygon2d) ? v.collisionPolygon2d.map(function (pt) { return { x: toInt(cellX, 0) + toInt(pt && pt.x, 0), y: toInt(cellY, 0) + toInt(pt && pt.y, 0) }; }) : null,
         renderHidden: v.renderHidden === true,
         collisionOnly: v.collisionOnly === true,

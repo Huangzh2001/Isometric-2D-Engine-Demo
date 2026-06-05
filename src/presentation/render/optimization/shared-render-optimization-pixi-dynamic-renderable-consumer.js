@@ -393,6 +393,77 @@
     return { x: Number(p && p.x || 0), y: Number(p && p.y || 0) };
   }
 
+  function normalizeSlopeDirectionForPixi(value) {
+    var dir = String(value || '').trim().toLowerCase();
+    if (dir === 'east' || dir === 'south' || dir === 'west' || dir === 'north') return dir;
+    return 'east';
+  }
+
+  function isSlopeProxyRenderable(renderable) {
+    var b = renderable && renderable.worldBounds || {};
+    return String((renderable && renderable.shapeKind) || b.shapeKind || '').toLowerCase() === 'slope_1x1' ||
+      String((renderable && renderable.prefabId) || b.prefabId || '').toLowerCase() === 'slope_1x1' ||
+      (renderable && renderable.slopeDirection != null) || b.slopeDirection != null;
+  }
+
+  function slopeCornerHeightForPixi(localX, localY, direction) {
+    var x = Number(localX) || 0;
+    var y = Number(localY) || 0;
+    var dir = normalizeSlopeDirectionForPixi(direction);
+    if (dir === 'west') return 1 - x;
+    if (dir === 'south') return y;
+    if (dir === 'north') return 1 - y;
+    return x;
+  }
+
+  function makeSlopeProxyFaces(renderable, rgb) {
+    var b = renderable && renderable.worldBounds || renderable && renderable.sortWorldAnchor || {};
+    var x = Number(b.x || 0);
+    var y = Number(b.y || 0);
+    var z = Number(b.z || 0);
+    var direction = normalizeSlopeDirectionForPixi((renderable && renderable.slopeDirection) || b.slopeDirection);
+    function worldPoint(localX, localY) {
+      return {
+        x: x + Number(localX || 0),
+        y: y + Number(localY || 0),
+        z: z + slopeCornerHeightForPixi(localX, localY, direction)
+      };
+    }
+    function screenPoint(pt) { return isoPoint(pt.x, pt.y, pt.z); }
+    var nw = worldPoint(0, 0);
+    var ne = worldPoint(1, 0);
+    var se = worldPoint(1, 1);
+    var sw = worldPoint(0, 1);
+    function sideFromTopEdge(name, a, bPt, prio, factor) {
+      var aBase = { x: a.x, y: a.y, z: z };
+      var bBase = { x: bPt.x, y: bPt.y, z: z };
+      var eps = 1e-6;
+      if (a.z <= z + eps && bPt.z <= z + eps) return null;
+      var world = null;
+      if (a.z <= z + eps) world = [aBase, bBase, bPt];
+      else if (bPt.z <= z + eps) world = [aBase, bBase, a];
+      else world = [aBase, bBase, bPt, a];
+      return { name: name, points: world.map(screenPoint), fill: shadeColor(rgb, factor), prio: prio };
+    }
+    var faces = [
+      { name: 'top', points: [nw, ne, se, sw].map(screenPoint), fill: shadeColor(rgb, 1.14), prio: 5 }
+    ];
+    var east = sideFromTopEdge('east', ne, se, 3, 0.86);
+    var south = sideFromTopEdge('south', se, sw, 4, 0.76);
+    var west = sideFromTopEdge('west', sw, nw, 2, 0.82);
+    var north = sideFromTopEdge('north', nw, ne, 1, 0.72);
+    [north, west, east, south].forEach(function (face) { if (face && Array.isArray(face.points) && face.points.length >= 3) faces.push(face); });
+    faces.sort(function (a, b) {
+      function depth(face) {
+        var sum = 0;
+        for (var i = 0; i < face.points.length; i++) sum += Number(face.points[i].y || 0);
+        return sum / Math.max(1, face.points.length) + Number(face.prio || 0) * 0.0001;
+      }
+      return depth(a) - depth(b);
+    });
+    return faces;
+  }
+
   function makeVoxelProxyFaces(renderable) {
     var b = renderable && renderable.worldBounds || renderable && renderable.sortWorldAnchor || {};
     var x = Number(b.x || 0);
@@ -408,6 +479,7 @@
       base = (renderable && renderable.base) || (prefab && prefab.base) || (instance && instance.base) || base;
     } catch (_) {}
     var rgb = parseHexColor(base, '#7aa2f7');
+    if (isSlopeProxyRenderable(renderable)) return makeSlopeProxyFaces(renderable, rgb);
     var p000 = isoPoint(x, y, z);
     var p100 = isoPoint(x + w, y, z);
     var p110 = isoPoint(x + w, y + d, z);
@@ -955,14 +1027,20 @@
         id: 'placement-preview-' + prefabId + '-' + String(i),
         kind: 'placement-preview-box',
         instanceId: 'placement-preview',
-        prefabId: prefabId,
+        prefabId: box.prefabId || prefabId,
+        shapeKind: box.shapeKind || null,
+        slopeDirection: box.slopeDirection != null ? String(box.slopeDirection) : null,
+        rotation: box.rotation != null ? Number(box.rotation) : (options.rotation != null ? Number(options.rotation) : null),
         worldBounds: {
           x: Number(box.x || 0),
           y: Number(box.y || 0),
           z: Number(box.z || 0),
           w: Math.max(0.001, Number(box.w != null ? box.w : 1) || 1),
           d: Math.max(0.001, Number(box.d != null ? box.d : 1) || 1),
-          h: Math.max(0.001, Number(box.h != null ? box.h : 1) || 1)
+          h: Math.max(0.001, Number(box.h != null ? box.h : 1) || 1),
+          prefabId: box.prefabId || prefabId,
+          shapeKind: box.shapeKind || null,
+          slopeDirection: box.slopeDirection != null ? String(box.slopeDirection) : null
         },
         base: valid ? '#36c96c' : '#f04949',
         __drawIndex: Number(options.zIndex != null ? options.zIndex : 900000) + i

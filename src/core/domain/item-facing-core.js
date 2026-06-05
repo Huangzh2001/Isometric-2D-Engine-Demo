@@ -411,6 +411,37 @@
     }
   }
 
+  function normalizeCardinalDirection(value) {
+    var dir = String(value || '').trim().toLowerCase();
+    if (dir === 'east' || dir === 'south' || dir === 'west' || dir === 'north') return dir;
+    return 'east';
+  }
+
+  function cardinalDirectionFromVector(dx, dy) {
+    var ax = Math.abs(Number(dx) || 0);
+    var ay = Math.abs(Number(dy) || 0);
+    if (ax >= ay) return (Number(dx) || 0) >= 0 ? 'east' : 'west';
+    return (Number(dy) || 0) >= 0 ? 'south' : 'north';
+  }
+
+  function rotateCardinalDirection(value, facing) {
+    var dir = normalizeCardinalDirection(value);
+    var r = normalizeFacing(facing);
+    var vectors = {
+      east: { dx: 1, dy: 0 },
+      south: { dx: 0, dy: 1 },
+      west: { dx: -1, dy: 0 },
+      north: { dx: 0, dy: -1 }
+    };
+    var vector = vectors[dir] || vectors.east;
+    var dx = vector.dx;
+    var dy = vector.dy;
+    if (r === 1) return cardinalDirectionFromVector(dy, -dx);
+    if (r === 2) return cardinalDirectionFromVector(-dx, -dy);
+    if (r === 3) return cardinalDirectionFromVector(-dy, dx);
+    return dir;
+  }
+
   function rotateVoxel(v, prefab, facing) {
     var x = toFiniteNumber(v && v.x, 0);
     var y = toFiniteNumber(v && v.y, 0);
@@ -430,6 +461,9 @@
     }
     if (Array.isArray(v && v.collisionPolygon2d)) {
       base.collisionPolygon2d = v.collisionPolygon2d.map(function (pt) { return rotatePrimitivePoint(pt, prefab, r); });
+    }
+    if (v && v.slopeDirection != null) {
+      base.slopeDirection = rotateCardinalDirection(v.slopeDirection, r);
     }
     return base;
   }
@@ -593,6 +627,7 @@
     getRotatedFootprint: getRotatedFootprint,
     getBaseAnchor: getBaseAnchor,
     getRotatedAnchor: getRotatedAnchor,
+    rotateCardinalDirection: rotateCardinalDirection,
     rotateVoxel: rotateVoxel,
     rotateVoxelList: rotateVoxelList,
     rotatePrimitiveList: rotatePrimitiveList,

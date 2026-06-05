@@ -577,6 +577,9 @@
       getTerrainTopStepBoundarySignature: (global && global.__TERRAIN_RENDER_CORE__ && typeof global.__TERRAIN_RENDER_CORE__.getTerrainTopStepBoundarySignature === 'function')
         ? global.__TERRAIN_RENDER_CORE__.getTerrainTopStepBoundarySignature
         : nullFn,
+      getSlope1x1DrawableFaces: (global && global.__TERRAIN_RENDER_CORE__ && typeof global.__TERRAIN_RENDER_CORE__.getSlope1x1DrawableFaces === 'function')
+        ? global.__TERRAIN_RENDER_CORE__.getSlope1x1DrawableFaces
+        : nullFn,
       getTerrainMaterialMergeKeyForRenderCell: getTerrainMaterialMergeKeyForRenderCell,
       getTerrainFaceMergeSignature: getTerrainFaceMergeSignature,
       getStaticWorldFaceMergeSignature: getStaticWorldFaceMergeSignature

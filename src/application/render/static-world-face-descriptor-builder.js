@@ -72,8 +72,27 @@
     return set;
   }
 
-  function filterVisibleFacesForCamera(cell, visibleFaces, currentViewRotation, stats) {
+  function getSlopeDrawableFacesFromDeps(cell, visibleFaces, deps) {
+    var fn = resolveFunction(deps, 'getSlope1x1DrawableFaces', null);
+    if (typeof fn !== 'function') return null;
+    try {
+      var faces = fn(cell, visibleFaces);
+      return Array.isArray(faces) && faces.length ? faces.slice() : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function filterVisibleFacesForCamera(cell, visibleFaces, currentViewRotation, stats, deps) {
     var list = Array.isArray(visibleFaces) ? visibleFaces.slice() : [];
+    var slopeDrawableFaces = getSlopeDrawableFacesFromDeps(cell, list, deps);
+    if (slopeDrawableFaces) {
+      if (stats) {
+        stats.slopeCameraFilterBypassCount = Number(stats.slopeCameraFilterBypassCount || 0) + 1;
+        if (slopeDrawableFaces.length !== list.length) stats.slopeDegenerateFaceSkippedCount = Number(stats.slopeDegenerateFaceSkippedCount || 0) + Math.max(0, list.length - slopeDrawableFaces.length);
+      }
+      return slopeDrawableFaces;
+    }
     var cameraVisible = resolveCameraVisibleSemanticFaceSet(cell, currentViewRotation);
     if (!cameraVisible) return list;
     var out = [];
@@ -177,7 +196,9 @@
       cameraFaceFilterChangedCellCount: 0,
       cameraHiddenFaceSkippedCount: 0,
       cameraTerrainFaceFilterAppliedCount: 0,
-      cameraTerrainHiddenFaceSkippedCount: 0
+      cameraTerrainHiddenFaceSkippedCount: 0,
+      slopeCameraFilterBypassCount: 0,
+      slopeDegenerateFaceSkippedCount: 0
     };
 
     for (var i = 0; i < surfaceCells.length; i++) {
@@ -186,7 +207,7 @@
       if (!cell) continue;
       var visibleFaces = normalizeVisibleFaces(entry);
       var beforeCameraFilterFaceCount = visibleFaces.length;
-      visibleFaces = filterVisibleFacesForCamera(cell, visibleFaces, opts.currentViewRotation, faceVisibilityFilterStats);
+      visibleFaces = filterVisibleFacesForCamera(cell, visibleFaces, opts.currentViewRotation, faceVisibilityFilterStats, __deps);
       if (isTerrainGeneratedCell(cell)) {
         faceVisibilityFilterStats.cameraTerrainFaceFilterAppliedCount = Number(faceVisibilityFilterStats.cameraTerrainFaceFilterAppliedCount || 0) + 1;
         faceVisibilityFilterStats.cameraTerrainHiddenFaceSkippedCount = Number(faceVisibilityFilterStats.cameraTerrainHiddenFaceSkippedCount || 0) + Math.max(0, beforeCameraFilterFaceCount - visibleFaces.length);
@@ -218,6 +239,8 @@
       cameraHiddenFaceSkippedCount: Number(faceVisibilityFilterStats.cameraHiddenFaceSkippedCount || 0),
       cameraTerrainFaceFilterAppliedCount: Number(faceVisibilityFilterStats.cameraTerrainFaceFilterAppliedCount || 0),
       cameraTerrainHiddenFaceSkippedCount: Number(faceVisibilityFilterStats.cameraTerrainHiddenFaceSkippedCount || 0),
+      slopeCameraFilterBypassCount: Number(faceVisibilityFilterStats.slopeCameraFilterBypassCount || 0),
+      slopeDegenerateFaceSkippedCount: Number(faceVisibilityFilterStats.slopeDegenerateFaceSkippedCount || 0),
       step1PrepareFaceInputsMs: step1PrepareFaceInputsMs,
       step5ComputeSortKeyMs: step5ComputeSortKeyMs
     };

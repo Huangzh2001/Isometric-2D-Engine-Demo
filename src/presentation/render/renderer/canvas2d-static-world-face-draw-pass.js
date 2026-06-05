@@ -45,6 +45,17 @@
     ].join(',');
   }
 
+  function getProjectionMetadata(deps) {
+    var settings = getSettings(deps);
+    return {
+      projectionZoom: getProjectionZoomSignature(deps),
+      projectionTileW: Number(settings && settings.tileW || 0),
+      projectionTileH: Number(settings && settings.tileH || 0),
+      projectionOriginX: Number(settings && settings.originX || 0),
+      projectionOriginY: Number(settings && settings.originY || 0)
+    };
+  }
+
   function getCamera(deps) {
     return deps && deps.camera ? deps.camera : {};
   }
@@ -137,8 +148,14 @@
     var overlaysNoCamera = Array.isArray(packet.shadowOverlaysWorld) && packet.shadowOverlaysWorld.length && worldShadowOverlaysToNoCamera
       ? worldShadowOverlaysToNoCamera(packet.shadowOverlaysWorld || [], viewRotation)
       : [];
+    var projectionMetadata = getProjectionMetadata(deps);
     cached = {
       key: cacheKey,
+      projectionZoom: projectionMetadata.projectionZoom,
+      projectionTileW: projectionMetadata.projectionTileW,
+      projectionTileH: projectionMetadata.projectionTileH,
+      projectionOriginX: projectionMetadata.projectionOriginX,
+      projectionOriginY: projectionMetadata.projectionOriginY,
       pointsNoCamera: pointsNoCamera,
       loopsNoCamera: loopsNoCamera,
       outlineSegmentsNoCamera: outlineSegmentsNoCamera,
@@ -188,6 +205,11 @@
     cached = {
       key: cacheKey,
       neutralKey: neutral.key,
+      projectionZoom: neutral.projectionZoom,
+      projectionTileW: neutral.projectionTileW,
+      projectionTileH: neutral.projectionTileH,
+      projectionOriginX: neutral.projectionOriginX,
+      projectionOriginY: neutral.projectionOriginY,
       pointsNoCamera: pointsNoCamera,
       loopsNoCamera: loopsNoCamera,
       outlineSegmentsNoCamera: outlineSegmentsNoCamera,

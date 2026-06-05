@@ -43,4 +43,12 @@ const proto = api.buildFacingPrototype(prefab, 3, { x: 4, y: 6, z: 1 });
 assert(proto.sortBase.sortKey > 0, 'prototype should include sort base mapping');
 assert(proto.semanticColors.front && proto.semanticDirections.front, 'prototype should include semantic face colors and directions');
 
+assert(api.rotateCardinalDirection('east', 0) === 'east', 'slope direction should stay east at facing 0');
+assert(api.rotateCardinalDirection('east', 1) === 'north', 'slope direction should rotate with voxel transform at facing 1');
+assert(api.rotateCardinalDirection('east', 2) === 'west', 'slope direction should rotate with voxel transform at facing 2');
+assert(api.rotateCardinalDirection('east', 3) === 'south', 'slope direction should rotate with voxel transform at facing 3');
+const slopeVoxels = api.rotateVoxelList({ w: 1, d: 1, h: 1, voxels: [{ x: 0, y: 0, z: 0, shapeKind: 'slope_1x1', slopeDirection: 'east' }] }, 1);
+assert(slopeVoxels[0].shapeKind === 'slope_1x1', 'rotated slope voxel should keep shape kind');
+assert(slopeVoxels[0].slopeDirection === 'north', 'rotated slope voxel should carry rotated slope direction');
+
 console.log('item-facing-core.test.js: OK');

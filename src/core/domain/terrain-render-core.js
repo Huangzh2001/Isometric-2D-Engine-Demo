@@ -74,6 +74,129 @@
     return buildFallbackVoxelFaceWorldPolygon(x, y, z, semanticFace);
   }
 
+  function normalizeSlopeDirection(direction) {
+    var dir = String(direction || '').trim().toLowerCase();
+    if (dir === 'west' || dir === 'north' || dir === 'south') return dir;
+    return 'east';
+  }
+
+  function isOneCellSlopeCell(cell) {
+    var safeCell = cell && typeof cell === 'object' ? cell : null;
+    if (!safeCell) return false;
+    // A stale slopeDirection field is not enough to classify an ordinary cube
+    // as a slope.  Real slopes must carry the prefab/shape/kind identity.
+    return String(safeCell.shapeKind || '') === 'slope_1x1'
+      || String(safeCell.prefabId || '') === 'slope_1x1'
+      || String(safeCell.kind || '') === 'slope_1x1';
+  }
+
+  function getSlopeCornerHeight(localX, localY, direction) {
+    var dir = normalizeSlopeDirection(direction);
+    var x = Number(localX || 0);
+    var y = Number(localY || 0);
+    if (dir === 'west') return x <= 0 ? 1 : 0;
+    if (dir === 'south') return y >= 1 ? 1 : 0;
+    if (dir === 'north') return y <= 0 ? 1 : 0;
+    return x >= 1 ? 1 : 0;
+  }
+
+  function slopePoint(cellX, cellY, cellZ, localX, localY, direction) {
+    return {
+      x: cellX + Number(localX || 0),
+      y: cellY + Number(localY || 0),
+      z: cellZ + getSlopeCornerHeight(localX, localY, direction)
+    };
+  }
+
+  function buildSlope1x1FaceWorldPolygon(cell, semanticFace) {
+    var safeCell = cell && typeof cell === 'object' ? cell : {};
+    var cellX = toFiniteNumber(safeCell.x, 0);
+    var cellY = toFiniteNumber(safeCell.y, 0);
+    var cellZ = toFiniteNumber(safeCell.z, 0);
+    var dir = normalizeSlopeDirection(safeCell.slopeDirection);
+    var face = String(semanticFace || '');
+
+    var nw = slopePoint(cellX, cellY, cellZ, 0, 0, dir);
+    var ne = slopePoint(cellX, cellY, cellZ, 1, 0, dir);
+    var se = slopePoint(cellX, cellY, cellZ, 1, 1, dir);
+    var sw = slopePoint(cellX, cellY, cellZ, 0, 1, dir);
+    if (face === 'top') return [nw, ne, se, sw];
+
+    function sideFromTopEdge(a, b) {
+      var az = Number(a && a.z || 0);
+      var bz = Number(b && b.z || 0);
+      if (az <= cellZ && bz <= cellZ) return [];
+      if (az === bz) return [
+        { x: a.x, y: a.y, z: cellZ },
+        { x: b.x, y: b.y, z: cellZ },
+        { x: b.x, y: b.y, z: bz },
+        { x: a.x, y: a.y, z: az }
+      ];
+      if (az <= cellZ) return [
+        { x: a.x, y: a.y, z: cellZ },
+        { x: b.x, y: b.y, z: cellZ },
+        { x: b.x, y: b.y, z: bz }
+      ];
+      if (bz <= cellZ) return [
+        { x: a.x, y: a.y, z: cellZ },
+        { x: b.x, y: b.y, z: cellZ },
+        { x: a.x, y: a.y, z: az }
+      ];
+      return [
+        { x: a.x, y: a.y, z: cellZ },
+        { x: b.x, y: b.y, z: cellZ },
+        { x: b.x, y: b.y, z: bz },
+        { x: a.x, y: a.y, z: az }
+      ];
+    }
+
+    if (face === 'north') return sideFromTopEdge(nw, ne);
+    if (face === 'east') return sideFromTopEdge(ne, se);
+    if (face === 'south') return sideFromTopEdge(se, sw);
+    if (face === 'west') return sideFromTopEdge(sw, nw);
+    return [];
+  }
+
+  function buildVoxelFaceWorldPolygonForCell(cell, semanticFace) {
+    var safeCell = cell && typeof cell === 'object' ? cell : null;
+    if (isOneCellSlopeCell(safeCell)) return buildSlope1x1FaceWorldPolygon(safeCell, semanticFace);
+    return buildVoxelFaceWorldPolygon(safeCell && safeCell.x, safeCell && safeCell.y, safeCell && safeCell.z, semanticFace);
+  }
+
+  function getSlope1x1DrawableFaces(cell, candidateFaces) {
+    var safeCell = cell && typeof cell === 'object' ? cell : null;
+    if (!isOneCellSlopeCell(safeCell)) return null;
+    var candidates = Array.isArray(candidateFaces) && candidateFaces.length
+      ? candidateFaces.slice()
+      : ['top', 'east', 'south', 'west', 'north'];
+    var out = [];
+    var seen = Object.create(null);
+    for (var i = 0; i < candidates.length; i++) {
+      var face = String(candidates[i] || '');
+      if (!face || seen[face]) continue;
+      var pts = buildSlope1x1FaceWorldPolygon(safeCell, face);
+      if (Array.isArray(pts) && pts.length >= 3) {
+        seen[face] = true;
+        out.push(face);
+      }
+    }
+    return out;
+  }
+
+  function getSlopeFaceMergeSignaturePart(cell) {
+    var safeCell = cell && typeof cell === 'object' ? cell : null;
+    if (!isOneCellSlopeCell(safeCell)) return '';
+    return [
+      'slope',
+      String(safeCell.shapeKind || safeCell.prefabId || 'slope_1x1'),
+      normalizeSlopeDirection(safeCell.slopeDirection),
+      String(toFiniteNumber(safeCell.x, 0)),
+      String(toFiniteNumber(safeCell.y, 0)),
+      String(toFiniteNumber(safeCell.z, 0)),
+      String(safeCell.instanceId || '')
+    ].join(':');
+  }
+
   function getTerrainMaterialMergeKeyForRenderCell(cell) {
     var safeCell = cell && typeof cell === 'object' ? cell : null;
     if (!safeCell || safeCell.generatedBy !== 'terrain-generator') return null;
@@ -90,14 +213,17 @@
       safeCell.semanticTextures ? stableStringify(safeCell.semanticTextures) : '',
       safeCell.semanticFaceColors ? stableStringify(safeCell.semanticFaceColors) : ''
     ].join('|');
-    return [
+    var parts = [
       'terrain-face',
       String(semanticFace || 'top'),
       String(screenFace || ''),
       Number(currentViewRotation || 0),
       String(getTerrainMaterialMergeKeyForRenderCell(safeCell) || '__terrain_default__'),
       semanticTextureSignature
-    ].join('|');
+    ];
+    var slopePart = getSlopeFaceMergeSignaturePart(safeCell);
+    if (slopePart) parts.push(slopePart);
+    return parts.join('|');
   }
 
   function getTerrainSortBandKeyForRenderFace(cell, semanticFace, mergeCoords, orderMeta) {
@@ -326,7 +452,7 @@
     var height = Math.max(1, Number(face.mergeHeight || 1));
     if (!(width > 1 || height > 1)) {
       var cell = face.cell || face.box || null;
-      var cellPts = buildVoxelFaceWorldPolygon(cell && cell.x, cell && cell.y, cell && cell.z, semanticFace);
+      var cellPts = buildVoxelFaceWorldPolygonForCell(cell, semanticFace);
       return { worldPts: cellPts, worldLoops: null, worldOutlineSegments: null };
     }
     var rect = [];
@@ -358,6 +484,9 @@
     worldPointFromMergeUV: worldPointFromMergeUV,
     buildTerrainPolygonLoopSignature: buildTerrainPolygonLoopSignature,
     buildTerrainTopBoundarySegmentsWorldFromDescriptor: buildTerrainTopBoundarySegmentsWorldFromDescriptor,
+    buildSlope1x1FaceWorldPolygon: buildSlope1x1FaceWorldPolygon,
+    getSlope1x1DrawableFaces: getSlope1x1DrawableFaces,
+    isOneCellSlopeCell: isOneCellSlopeCell,
     buildMergedVoxelFaceWorldGeometry: buildMergedVoxelFaceWorldGeometry,
     buildMergedVoxelFaceWorldPolygon: buildMergedVoxelFaceWorldPolygon
   };

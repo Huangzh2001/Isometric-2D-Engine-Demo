@@ -40,4 +40,18 @@ assert(v2.w === 2 && v2.d === 1, 'rotation 2 should return to original dims');
 assert(v3.w === 1 && v3.d === 2, 'rotation 3 should swap dims');
 assert(v3.anchor.x === 0 && v3.anchor.y === 0, 'variant should carry rotated anchor');
 assert(v1.itemFacingPrototype && v1.itemFacingPrototype.spriteStrategy === 'two-mirror', 'variant should expose sprite strategy prototype');
+const slopePrefab = {
+  id: 'slope_1x1',
+  name: 'Slope · 1×1',
+  kind: 'slope_1x1',
+  w: 1,
+  d: 1,
+  h: 1,
+  voxels: [{ x: 0, y: 0, z: 0, shapeKind: 'slope_1x1', slopeDirection: 'east' }]
+};
+assert(prefabVariant(slopePrefab, 0).voxels[0].slopeDirection === 'east', 'slope variant rotation 0 should face east');
+assert(prefabVariant(slopePrefab, 1).voxels[0].slopeDirection === 'north', 'slope variant rotation 1 should rotate direction');
+assert(prefabVariant(slopePrefab, 2).voxels[0].slopeDirection === 'west', 'slope variant rotation 2 should rotate direction');
+assert(prefabVariant(slopePrefab, 3).voxels[0].slopeDirection === 'south', 'slope variant rotation 3 should rotate direction');
+
 console.log('prefab-variant-facing.test.js: OK');

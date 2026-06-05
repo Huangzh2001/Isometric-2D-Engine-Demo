@@ -48,4 +48,33 @@ assert.strictEqual(result.faceDescriptors[0].sortKey, 42, 'descriptor should car
 assert.strictEqual(result.faceDescriptors[0].semanticFace, 'top', 'descriptor should carry semantic face');
 assert.strictEqual(result.inputFaceDescriptorCount, 1, 'result should count input descriptors');
 
+const slopeResult = api.buildStaticWorldFaceDescriptors({
+  surfaceCells: [{
+    box: { id: 'slope1', instanceId: 'slopeInst', prefabId: 'slope_1x1', shapeKind: 'slope_1x1', slopeDirection: 'east', x: 0, y: 0, z: 0 },
+    visibleFaces: ['top', 'east', 'south', 'west', 'north']
+  }],
+  currentViewRotation: 0,
+  chunkOcc: { hasSolid: () => false },
+  domainCore: { computeVoxelRenderableSort: () => ({ sortKey: 1, tie: 1 }) }
+}, {
+  perfNow: () => 0,
+  getScreenFaceForSemanticFace: (face) => face,
+  getSemanticFaceNormal: () => ({ x: 0, y: 0, z: 1 }),
+  getStaticWorldFaceMergeCoords: () => ({ plane: 0, u: 1, v: 2 }),
+  getTerrainSortBandKeyForRenderFace: () => null,
+  getTerrainSideEdgeVisibilitySignature: () => null,
+  getTerrainSideStepBreakSignature: () => null,
+  getTerrainMaterialMergeKeyForRenderCell: () => null,
+  getTerrainFaceMergeSignature: () => null,
+  getStaticWorldFaceMergeSignature: () => 'sig',
+  getSlope1x1DrawableFaces: (_cell, faces) => faces.filter((face) => face !== 'west')
+});
+assert.deepStrictEqual(
+  JSON.parse(JSON.stringify(slopeResult.faceDescriptors.map((d) => d.semanticFace))),
+  ['top', 'east', 'south', 'north'],
+  'single-cell slope descriptors should bypass cube camera-face filtering and keep non-degenerate triangular side faces'
+);
+assert.strictEqual(slopeResult.slopeCameraFilterBypassCount, 1, 'slope descriptor path should report camera-filter bypass');
+assert.strictEqual(slopeResult.slopeDegenerateFaceSkippedCount, 1, 'slope descriptor path should count the zero-height low side as skipped');
+
 console.log('static-world-face-descriptor-builder-boundary.test.js PASS');

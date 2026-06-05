@@ -810,6 +810,21 @@ function drawPlacementPreview() {
     });
   }
 
+  function makePreviewVoxelDrawCellFromOccupancyCell(occCell) {
+    var box = occCell && occCell.box || {};
+    return {
+      x: occCell && occCell.x,
+      y: occCell && occCell.y,
+      z: occCell && occCell.z,
+      base: box.base,
+      box: box,
+      prefabId: box.prefabId || null,
+      shapeKind: box.shapeKind || null,
+      slopeDirection: box.slopeDirection != null ? String(box.slopeDirection) : null,
+      rotation: box.rotation != null ? box.rotation : null
+    };
+  }
+
   var previewHasFractionalAabb = hasFractionalPreviewAabb(previewBoxes);
   var occ = previewHasFractionalAabb ? null : buildOccupancy(previewBoxes);
   var drewFiveFacePreview = false;
@@ -823,10 +838,10 @@ function drawPlacementPreview() {
           var drewFractionalPreview = drawFractionalAabbPlacementPreview(previewBoxes, ok ? 0.42 : 0.22);
           if (!drewFractionalPreview) {
             var fallbackOcc = buildOccupancy(previewBoxes);
-            for (var fallbackCell of fallbackOcc.values()) drawVoxelCell({ x: fallbackCell.x, y: fallbackCell.y, z: fallbackCell.z, base: fallbackCell.box.base }, fallbackOcc, ok ? 0.42 : 0.22);
+            for (var fallbackCell of fallbackOcc.values()) drawVoxelCell(makePreviewVoxelDrawCellFromOccupancyCell(fallbackCell), fallbackOcc, ok ? 0.42 : 0.22);
           }
         } else {
-          for (var cell of occ.values()) drawVoxelCell({ x: cell.x, y: cell.y, z: cell.z, base: cell.box.base }, occ, ok ? 0.42 : 0.22);
+          for (var cell of occ.values()) drawVoxelCell(makePreviewVoxelDrawCellFromOccupancyCell(cell), occ, ok ? 0.42 : 0.22);
         }
       }
     });

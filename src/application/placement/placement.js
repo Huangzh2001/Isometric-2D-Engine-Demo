@@ -1010,6 +1010,7 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
         d: Math.max(0.001, Number(v.d != null ? v.d : 1) || 1),
         h: Math.max(0.001, Number(v.h != null ? v.h : 1) || 1),
         shapeKind: v.shapeKind || prefab.shapeKind || null,
+        slopeDirection: v.slopeDirection || prefab.slopeDirection || null,
         collisionPolygon2d: Array.isArray(v.collisionPolygon2d) ? v.collisionPolygon2d.map(function (pt) { return { x: Number(instance.x || 0) + Number(pt && pt.x || 0), y: Number(instance.y || 0) + Number(pt && pt.y || 0) }; }) : null,
         renderHidden: v.renderHidden === true,
         collisionOnly: v.collisionOnly === true,

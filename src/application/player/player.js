@@ -409,7 +409,11 @@ function resolvePlayerPathCellMove(node, nix, niy) {
       targetY: c.y,
       boxes: Array.isArray(boxes) ? boxes : [],
       settings: settings,
-      maxStepUpCells: getPlayerEffectiveMaxStepUpCells()
+      maxStepUpCells: getPlayerEffectiveMaxStepUpCells(),
+      // A* expands by cell centers, so one logical slope edge may span a 0.5-cell
+      // vertical delta. This does not enable normal block jumping; it only lets
+      // core slope support transitions bridge low edge -> center -> high edge.
+      slopeMaxStepUpCells: Number(settings && settings.playerPathSlopeMaxStepUpCells != null ? settings.playerPathSlopeMaxStepUpCells : 1)
     });
   }
   return resolvePlayerMoveTo(c.x, c.y);
