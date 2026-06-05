@@ -126,6 +126,10 @@
       if (ui.playerProxyW) ui.playerProxyW.value = String(settings.playerProxyW);
       if (ui.playerProxyD) ui.playerProxyD.value = String(settings.playerProxyD);
       if (ui.playerHeightCells) ui.playerHeightCells.value = String(settings.playerHeightCells);
+      if (ui.playerOcclusionFadeEnabled) ui.playerOcclusionFadeEnabled.checked = !!settings.playerOcclusionFadeEnabled;
+      if (ui.playerOcclusionFadeAlpha) ui.playerOcclusionFadeAlpha.value = String(settings.playerOcclusionFadeAlpha);
+      if (ui.playerOcclusionFadeInflatePx) ui.playerOcclusionFadeInflatePx.value = String(settings.playerOcclusionFadeInflatePx);
+      if (ui.playerOcclusionDebugBoundsEnabled) ui.playerOcclusionDebugBoundsEnabled.checked = !!settings.playerOcclusionDebugBoundsEnabled;
       updateModeButtons();
       appBootstrapLog('app-bootstrap:runtime-defaults-applied', { mode: editor.mode });
     } else {

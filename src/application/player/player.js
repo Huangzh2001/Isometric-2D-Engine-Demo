@@ -1,4 +1,4 @@
-// player movement / collision entry extraction (PLAYER-STEP-JUMP-V2-DROP-ANIM)
+// player movement / collision entry extraction (PLAYER-STEP-JUMP-V2-DROP-ANIM-PATHFIND)
 
 var PLAYER_MODULE_OWNER = 'src/application/player/player.js';
 var __lastPlayerStepBlockedLog = { signature: '', at: 0 };
@@ -42,6 +42,13 @@ function ensurePlayerStepState() {
   if (player.visualZ == null || !Number.isFinite(Number(player.visualZ))) player.visualZ = Number(player.z || 0);
   if (player.renderSortZ == null || !Number.isFinite(Number(player.renderSortZ))) player.renderSortZ = Number(player.z || 0);
   if (!player.jump || typeof player.jump !== 'object') player.jump = {};
+  if (!player.path || typeof player.path !== 'object') player.path = {};
+  if (!Array.isArray(player.path.waypoints)) player.path.waypoints = [];
+  if (!player.path.debugPreview || typeof player.path.debugPreview !== 'object') player.path.debugPreview = { active: false, source: 'none', target: null, waypoints: [], ok: false, reason: 'idle' };
+  if (!Array.isArray(player.path.debugPreview.waypoints)) player.path.debugPreview.waypoints = [];
+  if (player.path.active == null) player.path.active = false;
+  if (player.path.status == null) player.path.status = 'idle';
+  if (player.path.stuckTime == null) player.path.stuckTime = 0;
   if (player.jump.active == null) player.jump.active = false;
   if (player.jump.fromZ == null) player.jump.fromZ = Number(player.z || 0);
   if (player.jump.toZ == null) player.jump.toZ = Number(player.z || 0);
@@ -67,6 +74,7 @@ function resetPlayer() {
     duration: Number(settings.playerJumpDurationSec || 0.18),
     lift: Number(settings.playerJumpLiftCells || 0.35),
   };
+  player.path = { active: false, waypoints: [], target: null, status: 'idle', stuckTime: 0, debugPreview: { active: false, source: 'none', target: null, waypoints: [], ok: false, reason: 'idle' } };
   playerRoute('resetPlayer', { x: player.x, y: player.y, z: player.z, visualZ: player.visualZ, renderSortZ: player.renderSortZ });
 }
 
@@ -233,6 +241,475 @@ function fallbackBoxOverlap3D(a, b) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.d && a.y + a.d > b.y && a.z < b.z + b.h && a.z + a.h > b.z;
 }
 
+
+function getPlayerEffectiveMaxStepUpCells() {
+  // Top-level rule:
+  // if the player is not allowed to step/climb over higher cells, both manual
+  // movement and A* pathfinding must treat step-up height as zero.
+  if (settings && settings.playerStepOverEnabled === false) return 0;
+
+  var manual = Number(settings && settings.playerMaxStepUpCells != null ? settings.playerMaxStepUpCells : 1);
+  if (!Number.isFinite(manual)) manual = 1;
+  manual = Math.max(0, manual);
+
+  if (settings && settings.playerAutoStepByHeightEnabled) {
+    var h = Number(settings.playerHeightCells || 0);
+    var byHeight = Number.isFinite(h) ? Math.max(1, Math.floor(h + 1e-6)) : manual;
+    return Math.max(manual, byHeight);
+  }
+  return manual;
+}
+
+function playerPathLog(message, payload) {
+  var suffix = '';
+  if (payload != null) {
+    try { suffix = ' ' + JSON.stringify(payload); } catch (_) { suffix = ' [unserializable]'; }
+  }
+  try {
+    if (typeof detailLog === 'function') detailLog('[PLAYER-PATHFIND] ' + message + suffix);
+    else if (typeof pushLog === 'function') pushLog('[PLAYER-PATHFIND] ' + message + suffix);
+    else if (typeof console !== 'undefined' && console.log) console.log('[PLAYER-PATHFIND] ' + message + suffix);
+  } catch (_) {}
+}
+
+function cancelPlayerPath(reason) {
+  ensurePlayerStepState();
+  if (player.path && player.path.active) playerPathLog('cancel', { reason: reason || 'cancel', remaining: player.path.waypoints ? player.path.waypoints.length : 0 });
+  player.path.active = false;
+  player.path.waypoints = [];
+  player.path.target = null;
+  player.path.status = String(reason || 'idle');
+  player.path.stuckTime = 0;
+}
+
+function clearPlayerPathDebugPreview(reason) {
+  ensurePlayerStepState();
+  player.path.debugPreview = {
+    active: false,
+    source: String(reason || 'clear'),
+    target: null,
+    waypoints: [],
+    ok: false,
+    reason: String(reason || 'clear')
+  };
+}
+
+function setPlayerPathDebugPreviewFromResult(result, source) {
+  ensurePlayerStepState();
+  if (!result || !result.ok) {
+    player.path.debugPreview = {
+      active: true,
+      source: String(source || 'preview'),
+      target: result && result.target || null,
+      waypoints: [],
+      ok: false,
+      reason: result && result.reason || 'no-path'
+    };
+    return player.path.debugPreview;
+  }
+  player.path.debugPreview = {
+    active: true,
+    source: String(source || 'preview'),
+    target: result.target || null,
+    waypoints: Array.isArray(result.waypoints) ? result.waypoints.slice(0) : [],
+    ok: true,
+    reason: 'ok'
+  };
+  return player.path.debugPreview;
+}
+
+function resolvePlayerClickTargetFromScreen(sx, sy) {
+  var target = null;
+  try {
+    var picked = typeof pickBoxAtScreen === 'function' ? pickBoxAtScreen(sx, sy) : null;
+    if (picked && Number.isFinite(Number(picked.x)) && Number.isFinite(Number(picked.y))) {
+      target = {
+        x: Number(picked.x) + Math.max(0.01, Number(picked.w || 1)) * 0.5,
+        y: Number(picked.y) + Math.max(0.01, Number(picked.d || 1)) * 0.5,
+        source: 'picked-box'
+      };
+    }
+  } catch (_) {}
+  if (!target) {
+    try {
+      var floor = typeof screenToFloor === 'function' ? screenToFloor(sx, sy) : null;
+      if (floor && Number.isFinite(Number(floor.x)) && Number.isFinite(Number(floor.y))) {
+        target = { x: Number(floor.x), y: Number(floor.y), source: 'screenToFloor' };
+      }
+    } catch (_) {}
+  }
+  return target;
+}
+
+function requestPlayerPathPreviewToWorld(wx, wy, source) {
+  if (!settings || !settings.playerPathDebugEnabled) {
+    clearPlayerPathDebugPreview('debug-disabled');
+    return { ok: false, reason: 'debug-disabled' };
+  }
+  var gridW = Math.max(1, Math.floor(Number(settings.gridW || settings.worldCols || 1)));
+  var gridH = Math.max(1, Math.floor(Number(settings.gridH || settings.worldRows || 1)));
+  var ix = clampPathCellIndex(wx, gridW);
+  var iy = clampPathCellIndex(wy, gridH);
+  var result = findPlayerPathToCell(ix, iy);
+  setPlayerPathDebugPreviewFromResult(result, source || 'hover-preview');
+  return result;
+}
+
+function requestPlayerPathPreviewToScreen(sx, sy, source) {
+  if (!settings || !settings.playerPathDebugEnabled) {
+    clearPlayerPathDebugPreview('debug-disabled');
+    return { ok: false, reason: 'debug-disabled' };
+  }
+  var target = resolvePlayerClickTargetFromScreen(sx, sy);
+  if (!target) {
+    clearPlayerPathDebugPreview('target-miss');
+    return { ok: false, reason: 'target-miss' };
+  }
+  return requestPlayerPathPreviewToWorld(target.x, target.y, source || ('hover:' + target.source));
+}
+
+function getPlayerPathDebugPreviewPoints() {
+  ensurePlayerStepState();
+  if (!settings || !settings.playerPathDebugEnabled || !player.path || !player.path.debugPreview || !player.path.debugPreview.active) return [];
+  var points = [{ x: Number(player.x || 0), y: Number(player.y || 0), z: Number(player.z || 0) }];
+  var wps = Array.isArray(player.path.debugPreview.waypoints) ? player.path.debugPreview.waypoints : [];
+  for (var i = 0; i < wps.length; i += 1) {
+    points.push({ x: Number(wps[i].x || 0), y: Number(wps[i].y || 0), z: Number(wps[i].z || 0), ix: wps[i].ix, iy: wps[i].iy });
+  }
+  return points;
+}
+
+
+function clampPathCellIndex(v, max) {
+  var n = Math.floor(Number(v));
+  if (!Number.isFinite(n)) n = 0;
+  return Math.max(0, Math.min(Math.max(0, Number(max || 0) - 1), n));
+}
+
+function makePlayerPathNodeKey(ix, iy, z) {
+  return String(ix) + ',' + String(iy) + ',' + String(Math.round((Number(z) || 0) * 100));
+}
+
+function makePlayerPathCellCenter(ix, iy) {
+  return { x: Number(ix) + 0.5, y: Number(iy) + 0.5 };
+}
+
+function resolvePlayerPathCellMove(node, nix, niy) {
+  var c = makePlayerPathCellCenter(nix, niy);
+  var virtualPlayer = {
+    x: Number(node && node.x != null ? node.x : player.x),
+    y: Number(node && node.y != null ? node.y : player.y),
+    z: Number(node && node.z != null ? node.z : player.z || 0)
+  };
+  var core = getPlayerStepCoreApi();
+  if (core && typeof core.resolvePlayerStepMove === 'function') {
+    return core.resolvePlayerStepMove({
+      player: virtualPlayer,
+      targetX: c.x,
+      targetY: c.y,
+      boxes: Array.isArray(boxes) ? boxes : [],
+      settings: settings,
+      maxStepUpCells: getPlayerEffectiveMaxStepUpCells()
+    });
+  }
+  return resolvePlayerMoveTo(c.x, c.y);
+}
+
+
+function normalizePlayerPathAlgorithm(value) {
+  var v = String(value || 'astar');
+  if (v === 'a-star' || v === 'A*') v = 'astar';
+  if (v === 'weighted' || v === 'weighted_astar') v = 'weightedAstar';
+  if (v === 'bestFirst' || v === 'best-first') v = 'greedy';
+  if (v === 'astar' || v === 'weightedAstar' || v === 'dijkstra' || v === 'bfs' || v === 'greedy') return v;
+  return 'astar';
+}
+
+function getPlayerPathAlgorithmLabel(value) {
+  var v = normalizePlayerPathAlgorithm(value);
+  if (v === 'weightedAstar') return 'Weighted A*';
+  if (v === 'dijkstra') return 'Dijkstra';
+  if (v === 'bfs') return 'BFS';
+  if (v === 'greedy') return 'Greedy Best-First';
+  return 'A*';
+}
+
+function getPlayerPathAlgorithmConfig() {
+  var algorithm = normalizePlayerPathAlgorithm(settings && settings.playerPathAlgorithm || 'astar');
+  var cfg = {
+    algorithm: algorithm,
+    label: getPlayerPathAlgorithmLabel(algorithm),
+    diagonal: true,
+    useHeightCost: algorithm !== 'bfs',
+    weightedHeuristic: algorithm === 'weightedAstar' ? 1.6 : 1,
+    description: ''
+  };
+  if (algorithm === 'astar') cfg.description = 'f = g + h; balanced shortest-cost grid search';
+  else if (algorithm === 'weightedAstar') cfg.description = 'f = g + 1.6h; more goal-directed, may choose less optimal but faster-looking paths';
+  else if (algorithm === 'dijkstra') cfg.description = 'f = g; no heuristic, expands by accumulated movement cost';
+  else if (algorithm === 'bfs') cfg.description = 'f = step count; ignores diagonal/height cost differences, finds fewest-step path';
+  else if (algorithm === 'greedy') cfg.description = 'f = h; strongly target-directed, may be less optimal around obstacles';
+  return cfg;
+}
+
+function computePlayerPathPriority(algorithm, g, h, depth) {
+  algorithm = normalizePlayerPathAlgorithm(algorithm);
+  if (algorithm === 'dijkstra') return g;
+  if (algorithm === 'bfs') return depth;
+  if (algorithm === 'greedy') return h + g * 0.001;
+  if (algorithm === 'weightedAstar') return g + h * 1.6;
+  return g + h;
+}
+
+function computePlayerPathStepCost(algorithm, baseCost, verticalCost) {
+  algorithm = normalizePlayerPathAlgorithm(algorithm);
+  if (algorithm === 'bfs') return 1;
+  return Number(baseCost || 1) + Number(verticalCost || 0);
+}
+
+
+function findPlayerPathToCell(targetIx, targetIy) {
+  ensurePlayerStepState();
+  var algorithmConfig = getPlayerPathAlgorithmConfig();
+  var algorithm = algorithmConfig.algorithm;
+  var gridW = Math.max(1, Math.floor(Number(settings.gridW || settings.worldCols || 1)));
+  var gridH = Math.max(1, Math.floor(Number(settings.gridH || settings.worldRows || 1)));
+  targetIx = clampPathCellIndex(targetIx, gridW);
+  targetIy = clampPathCellIndex(targetIy, gridH);
+
+  var startIx = clampPathCellIndex(player.x, gridW);
+  var startIy = clampPathCellIndex(player.y, gridH);
+  var start = {
+    ix: startIx,
+    iy: startIy,
+    x: Number(player.x || 0),
+    y: Number(player.y || 0),
+    z: Number(player.z || 0),
+    g: 0,
+    depth: 0,
+    f: 0,
+    seq: 0,
+    parent: null
+  };
+  var maxIterations = Math.max(1000, Math.min(30000, gridW * gridH * 16));
+  var dirs = [
+    [1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1],
+    [1, 1, 1.414], [1, -1, 1.414], [-1, 1, 1.414], [-1, -1, 1.414]
+  ];
+
+  function heuristic(ix, iy) {
+    var dx = Math.abs(ix - targetIx);
+    var dy = Math.abs(iy - targetIy);
+    if (algorithm === 'bfs' || algorithm === 'dijkstra') return 0;
+    var mn = Math.min(dx, dy);
+    var mx = Math.max(dx, dy);
+    return (mx - mn) + mn * 1.414;
+  }
+
+  var seqCounter = 0;
+  start.f = computePlayerPathPriority(algorithm, start.g, heuristic(startIx, startIy), start.depth);
+  var open = [start];
+  var best = {};
+  best[makePlayerPathNodeKey(start.ix, start.iy, start.z)] = 0;
+  var closed = {};
+  var iterations = 0;
+  var found = null;
+  var blockedReasons = {};
+  var expandedCount = 0;
+
+  while (open.length && iterations < maxIterations) {
+    iterations += 1;
+    open.sort(function (a, b) {
+      if (a.f !== b.f) return a.f - b.f;
+      if (a.g !== b.g) return a.g - b.g;
+      return a.seq - b.seq;
+    });
+    var cur = open.shift();
+    var curKey = makePlayerPathNodeKey(cur.ix, cur.iy, cur.z);
+    if (closed[curKey]) continue;
+    closed[curKey] = true;
+    expandedCount += 1;
+
+    if (cur.ix === targetIx && cur.iy === targetIy) {
+      found = cur;
+      break;
+    }
+
+    for (var di = 0; di < dirs.length; di += 1) {
+      var dx = dirs[di][0], dy = dirs[di][1], baseCost = dirs[di][2];
+      var nix = cur.ix + dx;
+      var niy = cur.iy + dy;
+      if (nix < 0 || niy < 0 || nix >= gridW || niy >= gridH) continue;
+
+      if (dx !== 0 && dy !== 0) {
+        var orthoA = resolvePlayerPathCellMove(cur, cur.ix + dx, cur.iy);
+        var orthoB = resolvePlayerPathCellMove(cur, cur.ix, cur.iy + dy);
+        if (!orthoA || !orthoA.allowed || !orthoB || !orthoB.allowed) continue;
+      }
+
+      var resolved = resolvePlayerPathCellMove(cur, nix, niy);
+      if (!resolved || !resolved.allowed) {
+        var reason = resolved && resolved.reason || 'blocked';
+        blockedReasons[reason] = (blockedReasons[reason] || 0) + 1;
+        continue;
+      }
+
+      var center = makePlayerPathCellCenter(nix, niy);
+      var nz = Number(resolved.toZ != null ? resolved.toZ : cur.z);
+      var verticalCost = Math.abs(nz - cur.z) * 0.20;
+      var stepCost = computePlayerPathStepCost(algorithm, baseCost, verticalCost);
+      var ng = cur.g + stepCost;
+      var depth = Number(cur.depth || 0) + 1;
+      var key = makePlayerPathNodeKey(nix, niy, nz);
+
+      // For BFS we still keep best by depth/step count. For cost-based
+      // algorithms this is accumulated path cost.
+      if (best[key] != null && best[key] <= ng) continue;
+      best[key] = ng;
+
+      var h = heuristic(nix, niy);
+      open.push({
+        ix: nix,
+        iy: niy,
+        x: center.x,
+        y: center.y,
+        z: nz,
+        g: ng,
+        depth: depth,
+        h: h,
+        f: computePlayerPathPriority(algorithm, ng, h, depth),
+        seq: ++seqCounter,
+        parent: cur,
+        mode: resolved.mode,
+        reason: resolved.reason
+      });
+    }
+  }
+
+  if (!found) {
+    return {
+      ok: false,
+      reason: 'no-path',
+      algorithm: algorithm,
+      algorithmLabel: algorithmConfig.label,
+      algorithmDescription: algorithmConfig.description,
+      iterations: iterations,
+      expandedCount: expandedCount,
+      target: { ix: targetIx, iy: targetIy },
+      blockedReasons: blockedReasons
+    };
+  }
+
+  var rev = [];
+  var n = found;
+  while (n && n.parent) {
+    rev.push({ x: n.x, y: n.y, z: n.z, ix: n.ix, iy: n.iy, mode: n.mode || 'walk' });
+    n = n.parent;
+  }
+  rev.reverse();
+  return {
+    ok: true,
+    algorithm: algorithm,
+    algorithmLabel: algorithmConfig.label,
+    algorithmDescription: algorithmConfig.description,
+    waypoints: rev,
+    iterations: iterations,
+    expandedCount: expandedCount,
+    target: { ix: targetIx, iy: targetIy, x: found.x, y: found.y, z: found.z },
+    cost: found.g,
+    depth: found.depth
+  };
+}
+
+
+function requestPlayerPathToWorld(wx, wy, source) {
+  ensurePlayerStepState();
+  var gridW = Math.max(1, Math.floor(Number(settings.gridW || settings.worldCols || 1)));
+  var gridH = Math.max(1, Math.floor(Number(settings.gridH || settings.worldRows || 1)));
+  var ix = clampPathCellIndex(wx, gridW);
+  var iy = clampPathCellIndex(wy, gridH);
+  var result = findPlayerPathToCell(ix, iy);
+  if (!result.ok) {
+    cancelPlayerPath('no-path');
+    playerPathLog('plan-failed', Object.assign({ source: source || 'unknown', algorithm: result.algorithm || normalizePlayerPathAlgorithm(settings.playerPathAlgorithm), algorithmLabel: result.algorithmLabel || getPlayerPathAlgorithmLabel(settings.playerPathAlgorithm), effectiveMaxStepUpCells: getPlayerEffectiveMaxStepUpCells(), playerStepOverEnabled: settings.playerStepOverEnabled !== false }, result));
+    return result;
+  }
+  player.path.active = result.waypoints.length > 0;
+  player.path.waypoints = result.waypoints;
+  player.path.target = result.target;
+  player.path.status = player.path.active ? 'moving' : 'already-there';
+  player.path.stuckTime = 0;
+  playerPathLog('plan-ready', {
+    source: source || 'unknown',
+    target: result.target,
+    waypointCount: result.waypoints.length,
+    iterations: result.iterations,
+    cost: Number((result.cost || 0).toFixed(3)),
+    algorithm: result.algorithm || normalizePlayerPathAlgorithm(settings.playerPathAlgorithm), algorithmLabel: result.algorithmLabel || getPlayerPathAlgorithmLabel(settings.playerPathAlgorithm), effectiveMaxStepUpCells: getPlayerEffectiveMaxStepUpCells(), playerStepOverEnabled: settings.playerStepOverEnabled !== false
+  });
+  return result;
+}
+
+function requestPlayerClickMoveToScreen(sx, sy, source) {
+  if (!settings || !settings.playerClickMoveEnabled) return { ok: false, reason: 'click-move-disabled' };
+  var target = null;
+  try {
+    var picked = typeof pickBoxAtScreen === 'function' ? pickBoxAtScreen(sx, sy) : null;
+    if (picked && Number.isFinite(Number(picked.x)) && Number.isFinite(Number(picked.y))) {
+      target = {
+        x: Number(picked.x) + Math.max(0.01, Number(picked.w || 1)) * 0.5,
+        y: Number(picked.y) + Math.max(0.01, Number(picked.d || 1)) * 0.5,
+        source: 'picked-box'
+      };
+    }
+  } catch (_) {}
+  if (!target) {
+    try {
+      var floor = typeof screenToFloor === 'function' ? screenToFloor(sx, sy) : null;
+      if (floor && Number.isFinite(Number(floor.x)) && Number.isFinite(Number(floor.y))) {
+        target = { x: Number(floor.x), y: Number(floor.y), source: 'screenToFloor' };
+      }
+    } catch (_) {}
+  }
+  if (!target) {
+    playerPathLog('click-target-miss', { sx: sx, sy: sy, source: source || 'unknown' });
+    return { ok: false, reason: 'target-miss' };
+  }
+  return requestPlayerPathToWorld(target.x, target.y, source || ('click:' + target.source));
+}
+
+function getPlayerPathInput(dt) {
+  ensurePlayerStepState();
+  if (!settings || !settings.playerClickMoveEnabled || !player.path || !player.path.active) return null;
+  var stop = Math.max(0.02, Number(settings.playerPathStopDistanceCells || 0.08));
+  while (player.path.waypoints.length) {
+    var wp = player.path.waypoints[0];
+    var dx = Number(wp.x || 0) - Number(player.x || 0);
+    var dy = Number(wp.y || 0) - Number(player.y || 0);
+    var dist = Math.hypot(dx, dy);
+    if (dist > stop) break;
+    player.path.waypoints.shift();
+  }
+  if (!player.path.waypoints.length) {
+    player.path.active = false;
+    player.path.status = 'arrived';
+    player.path.target = null;
+    player.path.stuckTime = 0;
+    playerPathLog('arrived', { x: Number(player.x.toFixed(3)), y: Number(player.y.toFixed(3)), z: Number((player.z || 0).toFixed(3)) });
+    return null;
+  }
+  var next = player.path.waypoints[0];
+  var vx = Number(next.x || 0) - Number(player.x || 0);
+  var vy = Number(next.y || 0) - Number(player.y || 0);
+  var len = Math.hypot(vx, vy);
+  if (!Number.isFinite(len) || len <= 1e-6) return null;
+  var wx = vx / len;
+  var wy = vy / len;
+  var dir = Math.abs(wx) > Math.abs(wy) ? (wx > 0 ? 'right' : 'left') : (wy > 0 ? 'down' : 'up');
+  return { wx: wx, wy: wy, dir: dir, pathMove: true };
+}
+
+
 function resolvePlayerMoveTo(nx, ny) {
   ensurePlayerStepState();
   var core = getPlayerStepCoreApi();
@@ -243,7 +720,7 @@ function resolvePlayerMoveTo(nx, ny) {
       targetY: ny,
       boxes: Array.isArray(boxes) ? boxes : [],
       settings: settings,
-      maxStepUpCells: settings.playerMaxStepUpCells
+      maxStepUpCells: getPlayerEffectiveMaxStepUpCells()
     });
   }
   var box = getPlayerProxyBox(nx, ny, player.z || 0);
@@ -436,14 +913,42 @@ function applyPlayerInput(input, dt) {
 
 function updatePlayerMovement(dt) {
   ensurePlayerStepState();
-  const input = SHOW_PLAYER ? getPlayerInput() : null;
+  const manualInput = SHOW_PLAYER ? getPlayerInput() : null;
+  if (manualInput && player.path && player.path.active) cancelPlayerPath('manual-input');
+  const pathInput = (!manualInput && SHOW_PLAYER) ? getPlayerPathInput(dt) : null;
+  const input = manualInput || pathInput;
   if (debugState.frame < 5 || verboseLog) detailLog('player:update:start frame=' + debugState.frame + ' dt=' + dt.toFixed(4) + ' input=' + (input ? JSON.stringify(input) : 'null') + ' playerBefore=(' + player.x.toFixed(2) + ',' + player.y.toFixed(2) + ',' + Number(player.z || 0).toFixed(2) + ') visualZ=' + Number(player.visualZ || 0).toFixed(2) + ' jumpActive=' + !!(player.jump && player.jump.active));
   const result = applyPlayerInput(input, dt);
+  if (pathInput && player.path && player.path.active) {
+    if (!result || !result.moved) player.path.stuckTime = Number(player.path.stuckTime || 0) + Math.max(0, Number(dt || 0));
+    else player.path.stuckTime = 0;
+    if (player.path.stuckTime > 0.75) cancelPlayerPath('stuck');
+  }
   updatePlayerJumpVisual(dt);
   if (debugState.frame < 5 || verboseLog) detailLog('player:update:done frame=' + debugState.frame + ' playerAfter=(' + player.x.toFixed(2) + ',' + player.y.toFixed(2) + ',' + Number(player.z || 0).toFixed(2) + ') visualZ=' + Number(player.visualZ || 0).toFixed(2) + ' jumpActive=' + !!(player.jump && player.jump.active) + ' moving=' + player.moving);
   return result;
 }
 
 ensurePlayerStepState();
-playerStepLog('feature-ready', { phase: 'PLAYER-STEP-JUMP-V2-DROP-ANIM', maxStepUpCells: settings.playerMaxStepUpCells, jumpDurationSec: settings.playerJumpDurationSec, jumpLiftCells: settings.playerJumpLiftCells, dropDurationSec: settings.playerDropDurationSec, dropLiftCells: settings.playerDropLiftCells }, { route: false });
-playerRoute('module-loaded', { owner: PLAYER_MODULE_OWNER, feature: 'PLAYER-STEP-JUMP-V2-DROP-ANIM' });
+playerStepLog('feature-ready', { phase: 'PLAYER-STEP-JUMP-V2-DROP-ANIM-PATHFIND', maxStepUpCells: getPlayerEffectiveMaxStepUpCells(), jumpDurationSec: settings.playerJumpDurationSec, jumpLiftCells: settings.playerJumpLiftCells, dropDurationSec: settings.playerDropDurationSec, dropLiftCells: settings.playerDropLiftCells }, { route: false });
+playerRoute('module-loaded', { owner: PLAYER_MODULE_OWNER, feature: 'PLAYER-STEP-JUMP-V2-DROP-ANIM-PATHFIND' });
+
+
+try {
+  if (typeof window !== 'undefined') {
+    window.clearPlayerPathDebugPreview = clearPlayerPathDebugPreview;
+    window.requestPlayerPathPreviewToScreen = requestPlayerPathPreviewToScreen;
+    window.requestPlayerPathPreviewToWorld = requestPlayerPathPreviewToWorld;
+    window.getPlayerPathDebugPreviewPoints = getPlayerPathDebugPreviewPoints;
+  }
+} catch (_) {}
+
+
+
+try {
+  if (typeof window !== 'undefined') {
+    window.getPlayerPathAlgorithmConfig = getPlayerPathAlgorithmConfig;
+    window.normalizePlayerPathAlgorithm = normalizePlayerPathAlgorithm;
+  }
+} catch (_) {}
+

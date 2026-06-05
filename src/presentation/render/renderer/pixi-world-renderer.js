@@ -95,7 +95,12 @@
     lastGpuDiagnosticsLogAt: 0,
     // PXM-07.18L: frame-level forensic summary for Pixi + residual Canvas2D work.
     lastFrameForensicsSignature: '',
-    lastFrameForensicsEmitAt: 0
+    lastFrameForensicsEmitAt: 0,
+    lastPlayerOcclusionFadeSignature: '',
+    lastPlayerOcclusionFadeSummary: null,
+    playerOcclusionDebugGraphics: null,
+    pathDebugGraphics: null,
+    pathDebugOverlayLayer: null
   };
 
   function nowMs() {
@@ -2656,6 +2661,259 @@
     return payload;
   }
 
+
+  function getOrCreatePlayerPathDebugGraphics(container) {
+    try {
+      if (!container || !global.PIXI || !global.PIXI.Graphics) return null;
+      if (!state.pathDebugGraphics || state.pathDebugGraphics.destroyed) {
+        state.pathDebugGraphics = new global.PIXI.Graphics();
+        state.pathDebugGraphics.label = 'pixi-player-path-debug-line';
+        state.pathDebugGraphics.name = 'pixi-player-path-debug-line';
+        state.pathDebugGraphics.zIndex = 999999;
+      }
+      if (state.pathDebugGraphics.parent !== container) container.addChild(state.pathDebugGraphics);
+      return state.pathDebugGraphics;
+    } catch (_) {}
+    return null;
+  }
+
+  function clearPlayerPathDebugGraphics() {
+    try {
+      if (state.pathDebugGraphics && typeof state.pathDebugGraphics.clear === 'function') state.pathDebugGraphics.clear();
+      if (state.pathDebugGraphics) state.pathDebugGraphics.visible = false;
+    } catch (_) {}
+  }
+
+  function projectPlayerPathDebugPoint(p) {
+    try {
+      if (!p) return null;
+      var wx = Number(p.x || 0);
+      var wy = Number(p.y || 0);
+      var wz = Number(p.z || 0);
+      if (typeof global.worldToScreen === 'function') {
+        var ws = global.worldToScreen(wx, wy, wz);
+        if (ws && Number.isFinite(Number(ws.x)) && Number.isFinite(Number(ws.y))) return { x: Number(ws.x), y: Number(ws.y) };
+      }
+      if (typeof global.iso === 'function') {
+        var s = global.iso(wx, wy, wz);
+        if (s && Number.isFinite(Number(s.x)) && Number.isFinite(Number(s.y))) return { x: Number(s.x), y: Number(s.y) };
+      }
+      try {
+        var hitApi = global.App && global.App.presentation && global.App.presentation.render && global.App.presentation.render.hitTest;
+        var boundary = global.App && global.App.presentation && global.App.presentation.render && global.App.presentation.render.interactionBoundary;
+        if (hitApi && typeof hitApi.worldToScreen === 'function') {
+          var cfg = boundary && typeof boundary.getMainViewProjectionConfig === 'function'
+            ? boundary.getMainViewProjectionConfig({ settings: global.settings, camera: global.camera })
+            : null;
+          var rot = boundary && typeof boundary.getSafeMainEditorViewRotationValue === 'function'
+            ? boundary.getSafeMainEditorViewRotationValue('player-path-debug')
+            : 0;
+          var coreApi = boundary && typeof boundary.getMainViewRotationCoreApi === 'function'
+            ? boundary.getMainViewRotationCoreApi()
+            : null;
+          var hs = hitApi.worldToScreen({
+            x: wx,
+            y: wy,
+            z: wz,
+            settings: global.settings,
+            camera: global.camera,
+            viewW: global.VIEW_W,
+            viewH: global.VIEW_H,
+            rotation: rot,
+            projectionConfig: cfg,
+            viewRotationCoreApi: coreApi
+          });
+          if (hs && Number.isFinite(Number(hs.x)) && Number.isFinite(Number(hs.y))) return { x: Number(hs.x), y: Number(hs.y) };
+        }
+      } catch (_) {}
+      if (typeof worldToScreen === 'function') {
+        var wss = worldToScreen(wx, wy, wz);
+        if (wss && Number.isFinite(Number(wss.x)) && Number.isFinite(Number(wss.y))) return { x: Number(wss.x), y: Number(wss.y) };
+      }
+      if (typeof iso === 'function') {
+        var ss = iso(wx, wy, wz);
+        if (ss && Number.isFinite(Number(ss.x)) && Number.isFinite(Number(ss.y))) return { x: Number(ss.x), y: Number(ss.y) };
+      }
+    } catch (_) {}
+    return null;
+  }
+
+
+
+
+  function getPlayerPathPixiStage() {
+    try {
+      if (state.pixiApp && state.pixiApp.stage) return state.pixiApp.stage;
+      if (state.app && state.app.stage) return state.app.stage;
+    } catch (_) {}
+    return null;
+  }
+
+  function getOrCreatePlayerPathOverlayLayer() {
+    try {
+      var stage = getPlayerPathPixiStage();
+      if (!global.PIXI || !global.PIXI.Container || !stage) return null;
+      try { stage.sortableChildren = true; } catch (_) {}
+      if (!state.pathDebugOverlayLayer || state.pathDebugOverlayLayer.destroyed) {
+        state.pathDebugOverlayLayer = new global.PIXI.Container();
+        state.pathDebugOverlayLayer.label = 'pixi-player-path-debug-overlay-layer';
+        state.pathDebugOverlayLayer.name = 'pixi-player-path-debug-overlay-layer';
+        state.pathDebugOverlayLayer.sortableChildren = true;
+        state.pathDebugOverlayLayer.zIndex = 2147483000;
+        state.pathDebugOverlayLayer.eventMode = 'none';
+        state.pathDebugOverlayLayer.interactiveChildren = false;
+      }
+      if (state.pathDebugOverlayLayer.parent !== stage) stage.addChild(state.pathDebugOverlayLayer);
+      else stage.addChild(state.pathDebugOverlayLayer);
+      try { if (typeof stage.sortChildren === 'function') stage.sortChildren(); } catch (_) {}
+      return state.pathDebugOverlayLayer;
+    } catch (_) {}
+    return null;
+  }
+
+  function getOrCreatePlayerPathDebugGraphics() {
+    try {
+      if (!global.PIXI || !global.PIXI.Graphics) return null;
+      var layer = getOrCreatePlayerPathOverlayLayer();
+      if (!layer) return null;
+      if (!state.pathDebugGraphics || state.pathDebugGraphics.destroyed) {
+        state.pathDebugGraphics = new global.PIXI.Graphics();
+        state.pathDebugGraphics.label = 'pixi-player-path-debug-line';
+        state.pathDebugGraphics.name = 'pixi-player-path-debug-line';
+        state.pathDebugGraphics.zIndex = 2147483001;
+        state.pathDebugGraphics.eventMode = 'none';
+      }
+      if (state.pathDebugGraphics.parent !== layer) layer.addChild(state.pathDebugGraphics);
+      return state.pathDebugGraphics;
+    } catch (_) {}
+    return null;
+  }
+
+  function clearPlayerPathDebugGraphics() {
+    try {
+      if (state.pathDebugGraphics && typeof state.pathDebugGraphics.clear === 'function') state.pathDebugGraphics.clear();
+      if (state.pathDebugGraphics) state.pathDebugGraphics.visible = false;
+      if (state.pathDebugOverlayLayer) state.pathDebugOverlayLayer.visible = false;
+    } catch (_) {}
+  }
+
+  function drawPlayerPathDebugPixiOverlayLine() {
+    try {
+      if (!global.settings || !global.settings.playerPathDebugEnabled || typeof global.getPlayerPathDebugPreviewPoints !== 'function') {
+        clearPlayerPathDebugGraphics();
+        return { enabled: false, pointCount: 0, reason: 'disabled-or-api-missing', hasSettings: !!global.settings, hasApi: typeof global.getPlayerPathDebugPreviewPoints === 'function' };
+      }
+      var pts = global.getPlayerPathDebugPreviewPoints();
+      if (!Array.isArray(pts) || pts.length < 2) {
+        clearPlayerPathDebugGraphics();
+        return { enabled: true, pointCount: Array.isArray(pts) ? pts.length : 0, drawn: false, reason: 'not-enough-points' };
+      }
+      var g = getOrCreatePlayerPathDebugGraphics();
+      if (!g) return { enabled: true, pointCount: pts.length, drawn: false, reason: 'pixi-graphics-missing' };
+
+      var projected = [];
+      for (var i = 0; i < pts.length; i += 1) {
+        var sp = projectPlayerPathDebugPoint(pts[i]);
+        if (sp && Number.isFinite(sp.x) && Number.isFinite(sp.y)) projected.push(sp);
+      }
+      if (projected.length < 2) {
+        clearPlayerPathDebugGraphics();
+        return { enabled: true, pointCount: pts.length, projectedCount: projected.length, drawn: false, reason: 'projection-failed' };
+      }
+
+      if (state.pathDebugOverlayLayer) state.pathDebugOverlayLayer.visible = true;
+      g.visible = true;
+      g.clear();
+
+      // Draw exactly what the debug intends: one point at every step-center,
+      // then connect these points in waypoint order.
+      var usedPixiV8 = false;
+      if (typeof g.moveTo === 'function' && typeof g.lineTo === 'function') {
+        g.moveTo(projected[0].x, projected[0].y);
+        for (var j = 1; j < projected.length; j += 1) g.lineTo(projected[j].x, projected[j].y);
+        if (typeof g.stroke === 'function') {
+          g.stroke({ width: 4, color: 0xff2020, alpha: 0.98, cap: 'round', join: 'round' });
+          usedPixiV8 = true;
+        } else if (typeof g.lineStyle === 'function') {
+          // Legacy fallback.
+          g.clear();
+          g.lineStyle(4, 0xff2020, 0.98);
+          g.moveTo(projected[0].x, projected[0].y);
+          for (var jj = 1; jj < projected.length; jj += 1) g.lineTo(projected[jj].x, projected[jj].y);
+        }
+      }
+
+      for (var k = 0; k < projected.length; k += 1) {
+        var r = k === projected.length - 1 ? 5 : 3;
+        if (typeof g.circle === 'function' && typeof g.fill === 'function') {
+          g.circle(projected[k].x, projected[k].y, r);
+          g.fill({ color: 0xff2020, alpha: 0.98 });
+          usedPixiV8 = true;
+        } else if (typeof g.beginFill === 'function' && typeof g.drawCircle === 'function') {
+          g.beginFill(0xff2020, 0.98);
+          g.drawCircle(projected[k].x, projected[k].y, r);
+          g.endFill();
+        }
+      }
+
+      var summary = { enabled: true, pointCount: pts.length, projectedCount: projected.length, drawn: true, renderer: usedPixiV8 ? 'pixi-v8-graphics-overlay-step-centers' : 'pixi-legacy-graphics-overlay-step-centers' };
+      try {
+        var now = Date.now();
+        if (!state.lastPlayerPathDebugLogAt || now - state.lastPlayerPathDebugLogAt > 1000) {
+          state.lastPlayerPathDebugLogAt = now;
+          if (typeof global.pushLog === 'function') global.pushLog('[PLAYER-PATH-DEBUG] draw-summary ' + JSON.stringify(summary));
+        }
+      } catch (_) {}
+      return summary;
+    } catch (err) {
+      try { if (typeof global.pushLog === 'function') global.pushLog('[PLAYER-PATH-DEBUG] pixi-draw-error ' + (err && err.stack || err)); } catch (_) {}
+    }
+    return { enabled: true, pointCount: 0, drawn: false, reason: 'exception' };
+  }
+
+  function drawPlayerPathDebugLine(container) {
+    return drawPlayerPathDebugPixiOverlayLine();
+    try {
+      if (!global.settings || !global.settings.playerPathDebugEnabled || typeof global.getPlayerPathDebugPreviewPoints !== 'function') {
+        clearPlayerPathDebugGraphics();
+        return { enabled: false, pointCount: 0 };
+      }
+      var pts = global.getPlayerPathDebugPreviewPoints();
+      if (!Array.isArray(pts) || pts.length < 2) {
+        clearPlayerPathDebugGraphics();
+        return { enabled: true, pointCount: Array.isArray(pts) ? pts.length : 0, drawn: false };
+      }
+      var g = getOrCreatePlayerPathDebugGraphics(state.stage || container || state.staticRunContainer);
+      if (!g) return { enabled: true, pointCount: pts.length, drawn: false, reason: 'graphics-missing' };
+      g.clear();
+      g.visible = true;
+      var projected = [];
+      for (var i = 0; i < pts.length; i += 1) {
+        var sp = projectPlayerPathDebugPoint(pts[i]);
+        if (sp) projected.push(sp);
+      }
+      if (projected.length < 2) {
+        g.visible = false;
+        return { enabled: true, pointCount: pts.length, projectedCount: projected.length, drawn: false };
+      }
+      if (typeof g.lineStyle === 'function') g.lineStyle(4, 0xff2020, 0.95);
+      g.moveTo(projected[0].x, projected[0].y);
+      for (var j = 1; j < projected.length; j += 1) g.lineTo(projected[j].x, projected[j].y);
+      var drawSummary = { enabled: true, pointCount: pts.length, projectedCount: projected.length, drawn: true };
+      try {
+        if (!state.lastPlayerPathDebugLogAt || (Date.now() - state.lastPlayerPathDebugLogAt) > 1000) {
+          state.lastPlayerPathDebugLogAt = Date.now();
+          if (typeof global.pushLog === 'function') global.pushLog('[PLAYER-PATH-DEBUG] draw-summary ' + JSON.stringify(drawSummary));
+        }
+      } catch (_) {}
+      return drawSummary;
+    } catch (err) {
+      try { if (typeof global.pushLog === 'function') global.pushLog('[PLAYER-PATH-DEBUG] draw-error ' + (err && err.message || err)); } catch (_) {}
+    }
+    return { enabled: true, pointCount: 0, drawn: false, reason: 'exception' };
+  }
+
+
   function renderFrame(meta) {
     var pixiFrameStartAt = nowMs();
     state.fallbackRenderCount += 1;
@@ -2744,6 +3002,8 @@
     var dynamicRenderableConsumerSummary = endPixiDynamicRenderableFrame('pixi-renderFrame-after-canvas2d-fallback', { framePlanId: meta && meta.framePlanId || '' });
     var staticRunConsumerSummary = getLastPixiStaticWorldPacketSummary() || staticRunVisualPlanSummary;
     var finalPlayerConsumerSummary = getLastPixiPlayerConsumerSummary() || playerConsumerSummary;
+    var playerOcclusionFadeSummary = applyPlayerOcclusionFadePass('pixi-renderFrame-after-canvas2d-fallback', { framePlanId: meta && meta.framePlanId || '', framePlan: meta || null });
+    var playerPathDebugSummary = drawPlayerPathDebugLine(getPlayerPathPixiStage() || state.staticRunContainer);
     setZoomSingleWorldOwnerGuardActive(false, zoomOwnerSnapshot, 'pixi-renderFrame-after-canvas2d-fallback');
     if (!isPixiPerformanceModeEnabled()) emitFinalCompositionTransformProbe(meta, staticRunConsumerSummary, finalPlayerConsumerSummary, dynamicRenderableConsumerSummary, fallbackResult);
     clearPixiSharedRenderFrameSnapshot(sharedFrameSnapshot, 'pixi-renderFrame-after-final-probe');
@@ -2761,6 +3021,8 @@
           pixiDrawsPlacementPreview: !!(dynamicRenderableConsumerSummary && dynamicRenderableConsumerSummary.pixiDrawsPlacementPreview),
           canvas2dSkipsPlacementPreviewWorld: !!(dynamicRenderableConsumerSummary && dynamicRenderableConsumerSummary.canvas2dSkipsPlacementPreviewWorld),
           debugFaceAdoptedCount: Number(dynamicRenderableConsumerSummary && dynamicRenderableConsumerSummary.debugFaceAdoptedCount || 0),
+          playerOcclusionFadeEnabled: !!(playerOcclusionFadeSummary && playerOcclusionFadeSummary.enabled),
+          playerOcclusionFadeOccluderCount: Number(playerOcclusionFadeSummary && playerOcclusionFadeSummary.occluderCount || 0),
           canvas2dDrawsStaticWorld: !(staticRunConsumerSummary && staticRunConsumerSummary.canvas2dSkipsStaticWorldPackets),
           canvas2dDrawsPlayerAvatar: !(finalPlayerConsumerSummary && finalPlayerConsumerSummary.canvas2dSkipsPlayerAvatar),
           canvas2dDrawsDynamicRenderables: !(dynamicRenderableConsumerSummary && dynamicRenderableConsumerSummary.canvas2dSkipsAdoptedDynamicRenderables),
@@ -2833,6 +3095,8 @@
       canvas2dSkipsPlacementPreviewWorld: !!(dynamicRenderableConsumerSummary && dynamicRenderableConsumerSummary.canvas2dSkipsPlacementPreviewWorld),
       previewBoxCount: Number(dynamicRenderableConsumerSummary && dynamicRenderableConsumerSummary.previewBoxCount || 0),
       debugFaceAdoptedCount: Number(dynamicRenderableConsumerSummary && dynamicRenderableConsumerSummary.debugFaceAdoptedCount || 0),
+      playerOcclusionFadeEnabled: !!(playerOcclusionFadeSummary && playerOcclusionFadeSummary.enabled),
+      playerOcclusionFadeOccluderCount: Number(playerOcclusionFadeSummary && playerOcclusionFadeSummary.occluderCount || 0),
       canvas2dSkipsAdoptedDynamicRenderables: !!(dynamicRenderableConsumerSummary && dynamicRenderableConsumerSummary.canvas2dSkipsAdoptedDynamicRenderables),
       pixiInitialized: state.initialized === true,
       pixiRendererCreated: state.rendererCreated === true,
@@ -2899,6 +3163,979 @@
     return null;
   }
 
+  function getPlayerOcclusionCandidateDemergeSummary() {
+    var staticSummary = getLastPixiStaticWorldPacketSummary() || null;
+    return {
+      candidateDemergeEnabled: !!(staticSummary && staticSummary.playerOcclusionCandidateDemergeEnabled === true),
+      candidateDemergePacketCount: Number(staticSummary && (staticSummary.playerOcclusionCandidateDemergePacketCount != null ? staticSummary.playerOcclusionCandidateDemergePacketCount : staticSummary.playerSensitivePacketCount) || 0),
+      candidateDemergeDrawnGraphicsCount: Number(staticSummary && (staticSummary.playerOcclusionCandidateDemergeDrawnGraphicsCount != null ? staticSummary.playerOcclusionCandidateDemergeDrawnGraphicsCount : staticSummary.actualGraphicsPacketDrawCount) || 0),
+      candidateDemergeMeaning: staticSummary && staticSummary.playerOcclusionCandidateDemergeMeaning ? String(staticSummary.playerOcclusionCandidateDemergeMeaning) : 'candidate-only-not-transparent-unless-front-and-screen-overlap;demerged-candidates-not-skipped-as-group-texture',
+      orderRunCacheDisabledForPlayerOcclusionFade: !!(staticSummary && staticSummary.orderRunCacheDisabledForPlayerOcclusionFade === true),
+      orderRunCacheActive: !!(staticSummary && staticSummary.orderRunCacheActive === true),
+      actualGraphicsPacketDrawCount: Number(staticSummary && staticSummary.actualGraphicsPacketDrawCount || 0),
+      orderRunRenderTextureCount: Number(staticSummary && staticSummary.orderRunRenderTextureCount || 0),
+      chunkRenderTextureCount: Number(staticSummary && staticSummary.chunkRenderTextureCount || 0)
+    };
+  }
+
+  function isPlayerOcclusionDemergeCandidate(child) {
+    try { return !!(child && child.__pixiPlayerOcclusionCandidateFace === true); } catch (_) {}
+    return false;
+  }
+
+  function getPlayerOcclusionFadeSettings() {
+    var cfg = { enabled: false, alpha: 0.75, inflatePx: 12, debugBounds: false };
+    try {
+      var s = global.settings || {};
+      cfg.enabled = s.playerOcclusionFadeEnabled === true;
+      var a = Number(s.playerOcclusionFadeAlpha);
+      if (Number.isFinite(a)) cfg.alpha = Math.max(0.1, Math.min(1, a));
+      var inflate = Number(s.playerOcclusionFadeInflatePx);
+      if (Number.isFinite(inflate)) cfg.inflatePx = Math.max(0, Math.min(64, inflate));
+      cfg.debugBounds = s.playerOcclusionDebugBoundsEnabled === true;
+    } catch (_) {}
+    return cfg;
+  }
+
+  function isPixiPlayerOcclusionPlayer(child) {
+    try {
+      if (!child) return false;
+      if (child.__pixiPlayerAvatarSharedSprite === true) return true;
+      var label = String(child.label || child.name || '');
+      return label.indexOf('pixi-migration-player-avatar') === 0;
+    } catch (_) {}
+    return false;
+  }
+
+  function getPixiWorldOcclusionSkipReason(child) {
+    try {
+      if (!child || child.visible === false) return 'hidden';
+      if (isPixiPlayerOcclusionPlayer(child)) return 'player';
+
+      // IMPORTANT:
+      // Player-sensitive packets are deliberately demerged into per-face Graphics
+      // so they can be tested individually. They may still carry chunk metadata
+      // such as __pixiStaticWorldChunkKey. Do NOT classify them as grouped
+      // render textures, otherwise candidate demerge succeeds but the fade pass
+      // checks zero demerged candidates.
+      if (isPlayerOcclusionDemergeCandidate(child)) return '';
+
+      var label = String(child.label || child.name || '');
+      if (label.indexOf('pixi-player-occlusion-debug-bounds') >= 0) return 'player-occlusion-debug-bounds';
+      if (label.indexOf('pixi-migration-placement-preview') >= 0) return 'preview';
+      if (label.indexOf('pixi-migration-debug-cuboid-face') >= 0) return 'debug-cuboid';
+      if (label.indexOf('selection') >= 0 || label.indexOf('hover') >= 0) return 'selection-hover';
+      if (label.indexOf('pixi-migration-shared-floor') >= 0) return 'floor';
+      if (label.indexOf('pixi-migration-background') >= 0) return 'background';
+
+      // Critical guard: chunk/order-run RenderTexture sprites represent many
+      // world faces baked into one large Pixi Sprite. Fading them makes a whole
+      // chunk/large run transparent instead of the few faces overlapping the
+      // player. Demerged player-sensitive Graphics are exempted above.
+      if (label.indexOf('pixi-static-world-chunk-render-texture') >= 0) return 'group-render-texture';
+      if (child.__pixiStaticWorldOrderRunCache === true) return 'group-render-texture';
+      if (child.__pixiStaticWorldChunkKey && child.texture) return 'group-render-texture';
+      if (child.__pixiStaticWorldChunkKey && label.indexOf('pixi-static-world-face-packet') < 0) return 'group-render-texture';
+
+      return '';
+    } catch (_) {}
+    return 'exception';
+  }
+
+  function isPixiWorldOcclusionCandidate(child) {
+    return !getPixiWorldOcclusionSkipReason(child);
+  }
+
+  function isOcclusionCandidateTooLargeForPlayer(childBounds, playerBoundsRaw, cfg) {
+    if (!childBounds || !playerBoundsRaw) return true;
+    var pw = Math.max(1, Number(playerBoundsRaw.width || 0));
+    var ph = Math.max(1, Number(playerBoundsRaw.height || 0));
+    var inflate = Math.max(0, Number(cfg && cfg.inflatePx || 0));
+    var maxW = Math.max(96, pw * 3 + inflate * 2);
+    var maxH = Math.max(96, ph * 3 + inflate * 2);
+    var maxArea = Math.max(96 * 96, pw * ph * 9);
+    var cw = Math.max(0, Number(childBounds.width || 0));
+    var ch = Math.max(0, Number(childBounds.height || 0));
+    return cw > maxW || ch > maxH || (cw * ch) > maxArea;
+  }
+
+  function getDisplayObjectBoundsForOcclusion(child) {
+    if (!child || child.visible === false) return null;
+    try {
+      if (typeof child.getBounds === 'function') {
+        var b = child.getBounds();
+        var x = Number(b && b.x || 0);
+        var y = Number(b && b.y || 0);
+        var w = Number(b && b.width || 0);
+        var h = Number(b && b.height || 0);
+        if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) {
+          return { x: x, y: y, width: w, height: h, maxX: x + w, maxY: y + h };
+        }
+      }
+    } catch (_) {}
+    try {
+      var lx = Number(child.x || 0);
+      var ly = Number(child.y || 0);
+      var lw = Number(child.width || 0);
+      var lh = Number(child.height || 0);
+      if (Number.isFinite(lx) && Number.isFinite(ly) && Number.isFinite(lw) && Number.isFinite(lh) && lw > 0 && lh > 0) {
+        return { x: lx, y: ly, width: lw, height: lh, maxX: lx + lw, maxY: ly + lh };
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  function inflateOcclusionBounds(bounds, px) {
+    if (!bounds) return null;
+    var p = Math.max(0, Number(px || 0));
+    return {
+      x: Number(bounds.x || 0) - p,
+      y: Number(bounds.y || 0) - p,
+      width: Number(bounds.width || 0) + p * 2,
+      height: Number(bounds.height || 0) + p * 2,
+      maxX: Number(bounds.maxX || (Number(bounds.x || 0) + Number(bounds.width || 0))) + p,
+      maxY: Number(bounds.maxY || (Number(bounds.y || 0) + Number(bounds.height || 0))) + p
+    };
+  }
+
+  function boundsOverlapForOcclusion(a, b) {
+    if (!a || !b) return false;
+    return Number(a.x || 0) < Number(b.maxX || 0)
+      && Number(a.maxX || 0) > Number(b.x || 0)
+      && Number(a.y || 0) < Number(b.maxY || 0)
+      && Number(a.maxY || 0) > Number(b.y || 0);
+  }
+
+  function restorePlayerOcclusionFadeAlphas(container) {
+    var restored = 0;
+    try {
+      var children = container && Array.isArray(container.children) ? container.children : [];
+      for (var i = 0; i < children.length; i++) {
+        var child = children[i];
+        if (!child || isPixiPlayerOcclusionPlayer(child)) continue;
+        if (child.__playerOcclusionFadeTouched === true) {
+          child.alpha = Number.isFinite(Number(child.__playerOcclusionFadeOriginalAlpha)) ? Number(child.__playerOcclusionFadeOriginalAlpha) : 1;
+          if (child.__playerOcclusionFadeOriginalBlendMode !== undefined) child.blendMode = child.__playerOcclusionFadeOriginalBlendMode;
+          if (child.__playerOcclusionFadeOriginalTint !== undefined && child.tint != null) child.tint = child.__playerOcclusionFadeOriginalTint;
+          child.__playerOcclusionFadeTouched = false;
+          restored += 1;
+        }
+      }
+    } catch (_) {}
+    return restored;
+  }
+
+  function emitPlayerOcclusionFadeTrace(summary, force) {
+    summary = summary || {};
+    state.lastPlayerOcclusionFadeSummary = summary;
+    var signature = '';
+    try {
+      signature = JSON.stringify({
+        enabled: summary.enabled === true,
+        reason: summary.reason || '',
+        playerFound: summary.playerFound === true,
+        playerSource: summary.playerSource || '',
+        candidateContainerFound: summary.candidateContainerFound === true,
+        staticRunContainerChildCount: summary.staticRunContainerChildCount || 0,
+        playerContainerChildCount: summary.playerContainerChildCount || 0,
+        checked: summary.checkedCount || 0,
+        checkedDemerged: summary.checkedDemergedCandidateCount || 0,
+        occluders: summary.fadedOccluderCount != null ? summary.fadedOccluderCount : (summary.occluderCount || 0),
+        restored: summary.restoredCount || 0,
+        candidateDemergePacketCount: summary.candidateDemergePacketCount || 0,
+        candidateDemergeDrawnGraphicsCount: summary.candidateDemergeDrawnGraphicsCount || 0,
+        notFadedBreakdown: summary.notFadedBreakdown || {},
+        skippedGroupTexture: summary.skippedGroupTextureCount || 0,
+        skippedLarge: summary.skippedLargeCount || 0,
+        alpha: summary.alpha,
+        inflatePx: summary.inflatePx,
+        samples: summary.occluderSamples || [],
+        nonFadedSamples: summary.nonFadedSamples || []
+      });
+    } catch (_) { signature = String(summary.occluderCount || 0) + '|' + String(summary.enabled); }
+    if (!force && signature === state.lastPlayerOcclusionFadeSignature) return;
+    state.lastPlayerOcclusionFadeSignature = signature;
+    try {
+      var line = '[PLAYER-OCCLUSION-FADE] ' + JSON.stringify(summary);
+      // pushLog is the exported debug-log path in this project. detailLog can be
+      // throttled/suppressed in performance mode, so call pushLog explicitly too.
+      var pushed = false;
+      if (typeof global.pushLog === 'function') { global.pushLog(line); pushed = true; }
+      if (typeof global.detailLog === 'function') {
+        try { global.detailLog(line); } catch (_) {}
+      }
+      if (!pushed && global.console && typeof global.console.log === 'function') global.console.log(line);
+    } catch (_) {}
+  }
+
+  function findPlayerOcclusionPlayerChild(candidateContainer) {
+    var out = { child: null, source: 'missing', staticRunContainerChildCount: 0, playerContainerChildCount: 0 };
+    try {
+      var staticChildren = candidateContainer && Array.isArray(candidateContainer.children) ? candidateContainer.children : [];
+      out.staticRunContainerChildCount = staticChildren.length;
+      for (var i = 0; i < staticChildren.length; i++) {
+        if (isPixiPlayerOcclusionPlayer(staticChildren[i])) {
+          out.child = staticChildren[i];
+          out.source = 'staticRunContainer';
+          return out;
+        }
+      }
+    } catch (_) {}
+    try {
+      var playerChildren = state.playerContainer && Array.isArray(state.playerContainer.children) ? state.playerContainer.children : [];
+      out.playerContainerChildCount = playerChildren.length;
+      for (var j = 0; j < playerChildren.length; j++) {
+        if (isPixiPlayerOcclusionPlayer(playerChildren[j])) {
+          out.child = playerChildren[j];
+          out.source = 'playerContainer';
+          return out;
+        }
+      }
+    } catch (_) {}
+    return out;
+  }
+
+
+
+  function normalizeOcclusionBounds(bounds) {
+    if (!bounds) return null;
+    var x = Number(bounds.x || 0);
+    var y = Number(bounds.y || 0);
+    var w = Number(bounds.width || 0);
+    var h = Number(bounds.height || 0);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) {
+      return null;
+    }
+    return {
+      x: x,
+      y: y,
+      width: w,
+      height: h,
+      maxX: x + w,
+      maxY: y + h
+    };
+  }
+
+  function makePlayerOcclusionBodyBounds(raw) {
+    if (!raw) return null;
+    var x = Number(raw.x || 0);
+    var y = Number(raw.y || 0);
+    var w = Math.max(1, Number(raw.width || 0));
+    var h = Math.max(1, Number(raw.height || 0));
+    // Use the upper/middle body, not the full sprite including feet/shadow.
+    // This prevents the support floor/top face under the actor from being
+    // treated as an occluder when the actor stands on the top.
+    return normalizeOcclusionBounds({
+      x: x + w * 0.10,
+      y: y + h * 0.03,
+      width: w * 0.80,
+      height: h * 0.50
+    });
+  }
+
+  function inflatePlayerOcclusionBodyBounds(raw, inflatePx) {
+    var body = makePlayerOcclusionBodyBounds(raw);
+    if (!body) return null;
+    var ix = Math.max(0, Number(inflatePx || 0));
+    var iy = Math.min(6, ix * 0.35);
+    return normalizeOcclusionBounds({
+      x: body.x - ix,
+      y: body.y - iy,
+      width: body.width + ix * 2,
+      height: body.height + iy * 2
+    });
+  }
+
+  function getPlayerOcclusionGroupKey(child) {
+    try {
+      if (!child) return '';
+      if (child.__pixiStaticWorldPacketGroupKey) return String(child.__pixiStaticWorldPacketGroupKey);
+      var packetId = String(child.__pixiStaticWorldPacketId || '');
+      if (packetId) return 'packet:' + (packetId.indexOf('::') >= 0 ? packetId.split('::')[0] : packetId);
+      var cellKey = String(child.__pixiStaticWorldPacketCellKey || '');
+      if (cellKey) return 'cell:' + cellKey;
+      return String(child.label || child.name || '');
+    } catch (_) {}
+    return '';
+  }
+
+  function getPlayerWorldForOcclusion() {
+    try {
+      var p = global.player || null;
+      if (!p) return null;
+      return {
+        x: Number(p.x || 0),
+        y: Number(p.y || 0),
+        z: Number(p.z != null ? p.z : (p.visualZ != null ? p.visualZ : 0))
+      };
+    } catch (_) {}
+    return null;
+  }
+
+  function getCandidateWorldBoxForOcclusion(child) {
+    try {
+      if (child && child.__pixiStaticWorldPacketWorldBox) return child.__pixiStaticWorldPacketWorldBox;
+      var key = child && child.__pixiStaticWorldPacketCellKey ? String(child.__pixiStaticWorldPacketCellKey) : '';
+      var parts = key.split(',').map(Number);
+      if (parts.length >= 3 && parts.every(function (n) { return Number.isFinite(n); })) {
+        return { x: parts[0], y: parts[1], z: parts[2], w: 1, d: 1, h: 1 };
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  function isLowTopFaceBelowPlayerBody(child, childBounds, playerBodyBounds) {
+    try {
+      if (!child || !childBounds || !playerBodyBounds) return false;
+      if (String(child.__pixiStaticWorldPacketSemanticFace || '') !== 'top') return false;
+      var cy = Number(childBounds.y || 0) + Number(childBounds.height || 0) * 0.5;
+      var bodyBottom = Number(playerBodyBounds.maxY != null ? playerBodyBounds.maxY : (Number(playerBodyBounds.y || 0) + Number(playerBodyBounds.height || 0)));
+      if (!Number.isFinite(cy) || !Number.isFinite(bodyBottom)) return false;
+      // Top faces whose visual center lies below the body-bottom are usually
+      // floor/support/top surfaces under the player, not actual foreground
+      // occluders. This is a 2D guard; it does not use world distance.
+      return cy > bodyBottom + 1;
+    } catch (_) {}
+    return false;
+  }
+
+
+  function isPlayerStandingOnCandidateTopFace(child) {
+    try {
+      if (!child) return false;
+      if (String(child.__pixiStaticWorldPacketSemanticFace || '') !== 'top') return false;
+      var box = getCandidateWorldBoxForOcclusion(child);
+      var p = getPlayerWorldForOcclusion();
+      if (!box || !p) return false;
+      var x = Number(box.x || 0);
+      var y = Number(box.y || 0);
+      var z = Number(box.z || 0);
+      var w = Math.max(0.0001, Number(box.w || 1));
+      var d = Math.max(0.0001, Number(box.d || 1));
+      var h = Math.max(0.0001, Number(box.h || 1));
+      var top = z + h;
+      if (Math.abs(Number(p.z || 0) - top) > 0.08) return false;
+      var eps = 0.0001;
+      return Number(p.x || 0) >= x - eps && Number(p.x || 0) < x + w - eps
+        && Number(p.y || 0) >= y - eps && Number(p.y || 0) < y + d - eps;
+    } catch (_) {}
+    return false;
+  }
+
+  function ensurePlayerOcclusionDebugGraphics(container) {
+    try {
+      if (!container) return null;
+      var Graphics = getPixiConstructor('Graphics');
+      if (typeof Graphics !== 'function') return null;
+      if (!state.playerOcclusionDebugGraphics) {
+        state.playerOcclusionDebugGraphics = new Graphics();
+        state.playerOcclusionDebugGraphics.label = 'pixi-player-occlusion-debug-bounds';
+        state.playerOcclusionDebugGraphics.zIndex = 2147483600;
+        try { state.playerOcclusionDebugGraphics.eventMode = 'none'; } catch (_) {}
+      }
+      if (state.playerOcclusionDebugGraphics.parent !== container && typeof container.addChild === 'function') {
+        container.addChild(state.playerOcclusionDebugGraphics);
+      }
+      try { container.sortableChildren = true; } catch (_) {}
+      return state.playerOcclusionDebugGraphics;
+    } catch (_) {}
+    return null;
+  }
+
+  function clearPlayerOcclusionDebugGraphics() {
+    try {
+      var g = state.playerOcclusionDebugGraphics;
+      if (g && typeof g.clear === 'function') g.clear();
+      if (g) g.visible = false;
+    } catch (_) {}
+  }
+
+  function drawOcclusionDebugRect(graphics, bounds, color, alpha, width) {
+    if (!graphics || !bounds) return;
+    var x = Number(bounds.x || 0);
+    var y = Number(bounds.y || 0);
+    var w = Number(bounds.width || 0);
+    var h = Number(bounds.height || 0);
+    if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return;
+    try {
+      if (typeof graphics.rect === 'function' && typeof graphics.stroke === 'function') {
+        graphics.rect(x, y, w, h).stroke({ color: color, alpha: alpha, width: width || 2 });
+        return;
+      }
+    } catch (_) {}
+    try {
+      if (typeof graphics.lineStyle === 'function') graphics.lineStyle(width || 2, color, alpha);
+      if (typeof graphics.moveTo === 'function') graphics.moveTo(x, y);
+      if (typeof graphics.lineTo === 'function') {
+        graphics.lineTo(x + w, y);
+        graphics.lineTo(x + w, y + h);
+        graphics.lineTo(x, y + h);
+        graphics.lineTo(x, y);
+      }
+    } catch (_) {}
+  }
+
+  function updatePlayerOcclusionDebugGraphics(container, cfg, rawBounds, bodyBounds, testBounds, fadedGroups) {
+    if (!cfg || cfg.debugBounds !== true) {
+      clearPlayerOcclusionDebugGraphics();
+      return { enabled: false };
+    }
+    var g = ensurePlayerOcclusionDebugGraphics(container);
+    if (!g) return { enabled: false, reason: 'graphics-unavailable' };
+    try {
+      if (typeof g.clear === 'function') g.clear();
+      g.visible = true;
+      g.zIndex = 2147483600;
+      // v1.15: the yellow raw sprite bounds are the actual occlusion detector.
+      // Do not draw blue/red auxiliary boxes; they caused confusion because
+      // they were no longer the effective trigger standard.
+      drawOcclusionDebugRect(g, rawBounds, 0xffd23f, 0.98, 3);
+      try { if (container && typeof container.sortChildren === 'function') container.sortChildren(); } catch (_) {}
+      return { enabled: true };
+    } catch (err) {
+      return { enabled: false, reason: err && err.message ? String(err.message) : 'draw-failed' };
+    }
+  }
+
+  function getPlayerOcclusionRenderableKind(item) {
+    try {
+      return String(item && (item.kind || item.type || item.renderableKind || item.dynamicKind || item.category) || '');
+    } catch (_) {}
+    return '';
+  }
+
+  function isPlayerOcclusionFramePlanPlayerItem(item) {
+    if (!item) return false;
+    try {
+      var kind = getPlayerOcclusionRenderableKind(item);
+      var id = String(item.id || item.key || item.label || item.name || '');
+      if (kind === 'player-avatar') return true;
+      if (id.indexOf('player-avatar') >= 0) return true;
+      if (item.playerAvatar === true || item.isPlayer === true) return true;
+    } catch (_) {}
+    return false;
+  }
+
+  function collectPlayerOcclusionFramePlanOrderItems(meta) {
+    var candidates = [];
+    try {
+      if (meta && Array.isArray(meta.order)) candidates.push(meta.order);
+      if (meta && meta.framePlan && Array.isArray(meta.framePlan.order)) candidates.push(meta.framePlan.order);
+      if (meta && meta.framePlan && Array.isArray(meta.framePlan.renderables)) candidates.push(meta.framePlan.renderables);
+      if (meta && Array.isArray(meta.renderables)) candidates.push(meta.renderables);
+      if (meta && meta.plan && Array.isArray(meta.plan.order)) candidates.push(meta.plan.order);
+    } catch (_) {}
+    for (var i = 0; i < candidates.length; i += 1) {
+      if (Array.isArray(candidates[i]) && candidates[i].length) return candidates[i];
+    }
+    return [];
+  }
+
+  function findPlayerOcclusionFramePlanOrderIndex(meta) {
+    var list = collectPlayerOcclusionFramePlanOrderItems(meta);
+    for (var i = 0; i < list.length; i += 1) {
+      if (isPlayerOcclusionFramePlanPlayerItem(list[i])) return i;
+    }
+    return NaN;
+  }
+
+  function getPlayerOcclusionDisplayOrderValue(child, fallbackIndex) {
+    try {
+      var explicit = Number(child && child.__pixiFramePlanOrderIndex);
+      if (Number.isFinite(explicit)) return explicit;
+    } catch (_) {}
+    try {
+      var z = Number(child && child.zIndex);
+      if (Number.isFinite(z)) return z;
+    } catch (_) {}
+    return Number.isFinite(Number(fallbackIndex)) ? Number(fallbackIndex) : NaN;
+  }
+
+
+  function getPlayerOcclusionContainerChildIndex(container, child) {
+    try {
+      if (!container || !child || !Array.isArray(container.children)) return NaN;
+      for (var i = 0; i < container.children.length; i += 1) {
+        if (container.children[i] === child) return i;
+      }
+    } catch (_) {}
+    return NaN;
+  }
+
+  function isPlayerOcclusionCandidateInFrontOfPlayer(childOrder, playerOrder) {
+    if (!Number.isFinite(Number(childOrder)) || !Number.isFinite(Number(playerOrder))) return false;
+    return Number(childOrder) > Number(playerOrder);
+  }
+
+
+  function isPlayerOcclusionTopFace(child) {
+    try {
+      return String(child && child.__pixiStaticWorldPacketSemanticFace || '') === 'top';
+    } catch (_) {}
+    return false;
+  }
+
+  function isPlayerOcclusionCandidateScreenForeground(child, childBounds, playerBodyBounds) {
+    try {
+      if (!child || !childBounds || !playerBodyBounds) return false;
+
+      // Do not let top faces trigger the fade by themselves. They are usually
+      // floors/support tops/upper surfaces. If a vertical face from the same
+      // object/cell triggers, the top face will still fade as part of group
+      // fade.
+      if (isPlayerOcclusionTopFace(child)) return false;
+
+      var face = String(child.__pixiStaticWorldPacketSemanticFace || '');
+      var isVertical = face && face !== 'top';
+      if (!isVertical) return false;
+
+      var by = Number(playerBodyBounds.y || 0);
+      var bh = Number(playerBodyBounds.height || 0);
+      var bodyTop = by;
+      var bodyBottom = Number(playerBodyBounds.maxY != null ? playerBodyBounds.maxY : by + bh);
+
+      var cy = Number(childBounds.y || 0) + Number(childBounds.height || 0) * 0.5;
+      var childBottom = Number(childBounds.y || 0) + Number(childBounds.height || 0);
+
+      if (!Number.isFinite(cy) || !Number.isFinite(childBottom) || !Number.isFinite(bodyTop) || !Number.isFinite(bodyBottom)) {
+        return false;
+      }
+
+      // 2D foreground rule: the candidate vertical face must actually enter the
+      // player body band on screen. This avoids using invalid per-packet zIndex
+      // while still rejecting faces entirely above the avatar body.
+      return childBottom >= bodyTop + 2 && cy <= bodyBottom + 8;
+    } catch (_) {}
+    return false;
+  }
+
+
+  function makePlayerOcclusionForegroundBand(bounds) {
+    bounds = normalizeOcclusionBounds(bounds);
+    if (!bounds) return null;
+    var top = bounds.y + bounds.height * 0.32;
+    var height = bounds.height * 0.68;
+    return normalizeOcclusionBounds({ x: bounds.x, y: top, width: bounds.width, height: height });
+  }
+
+  function boundsOverlapAreaForOcclusion(a, b) {
+    if (!a || !b) return 0;
+    var ax1 = Number(a.x || 0);
+    var ay1 = Number(a.y || 0);
+    var ax2 = ax1 + Number(a.width || 0);
+    var ay2 = ay1 + Number(a.height || 0);
+    var bx1 = Number(b.x || 0);
+    var by1 = Number(b.y || 0);
+    var bx2 = bx1 + Number(b.width || 0);
+    var by2 = by1 + Number(b.height || 0);
+    var w = Math.max(0, Math.min(ax2, bx2) - Math.max(ax1, bx1));
+    var h = Math.max(0, Math.min(ay2, by2) - Math.max(ay1, by1));
+    return w * h;
+  }
+
+  function isTerrainOcclusionCandidateGroup(child) {
+    try {
+      var g = String(getPlayerOcclusionGroupKey(child) || '');
+      if (g.indexOf('terrain-') >= 0) return true;
+      var id = String(child && child.__pixiStaticWorldPacketId || '');
+      if (id.indexOf('terrain-') >= 0) return true;
+      var cell = String(child && child.__pixiStaticWorldPacketCellKey || '');
+      if (cell && g.indexOf('instance:') !== 0 && g.indexOf('obj_') < 0) return true;
+    } catch (_) {}
+    return false;
+  }
+
+
+  function applyPlayerOcclusionFadePass(reason, options) {
+    options = options || {};
+    var cfg = getPlayerOcclusionFadeSettings();
+    var container = state.staticRunContainer || null;
+    var children = container && Array.isArray(container.children) ? container.children : [];
+    var restored = 0;
+    if (!cfg.enabled) {
+      restored = restorePlayerOcclusionFadeAlphas(container);
+      clearPlayerOcclusionDebugGraphics();
+      var disabledSummary = {
+        ok: true,
+        enabled: false,
+        reason: 'disabled',
+        restoredCount: restored,
+        framePlanId: String(options.framePlanId || ''),
+        source: reason || 'player-occlusion-fade-pass'
+      };
+      emitPlayerOcclusionFadeTrace(disabledSummary, restored > 0);
+      return disabledSummary;
+    }
+
+    var playerLookup = findPlayerOcclusionPlayerChild(container);
+    var playerChild = playerLookup.child || null;
+    if (!playerChild) {
+      restored = restorePlayerOcclusionFadeAlphas(container);
+      clearPlayerOcclusionDebugGraphics();
+      var missingSummary = {
+        ok: false,
+        enabled: true,
+        reason: 'player-pixi-child-missing',
+        playerFound: false,
+        candidateContainerFound: !!container,
+        childCount: children.length,
+        staticRunContainerChildCount: playerLookup.staticRunContainerChildCount || children.length,
+        playerContainerChildCount: playerLookup.playerContainerChildCount || 0,
+        playerSource: playerLookup.source || 'missing',
+        restoredCount: restored,
+        framePlanId: String(options.framePlanId || ''),
+        source: reason || 'player-occlusion-fade-pass'
+      };
+      emitPlayerOcclusionFadeTrace(missingSummary, true);
+      return missingSummary;
+    }
+
+    var playerBoundsRaw = getDisplayObjectBoundsForOcclusion(playerChild);
+    var playerBodyBounds = makePlayerOcclusionBodyBounds(playerBoundsRaw);
+    // v1.12: use the full player sprite/sheet bounds as the 2D occlusion
+    // trigger face. v1.11 used a cropped body box, which made real foreground
+    // faces appear as drawn-after-player-but-no-overlap. Top/support faces still
+    // do not trigger, so using the full sprite bounds does not re-enable floor
+    // top-face false positives.
+    // v1.15: use the yellow/raw player sprite bounds as the single source of
+    // truth for occlusion triggering. No blue body box, no red inflated box.
+    var playerBounds = normalizeOcclusionBounds(playerBoundsRaw);
+    var playerZ = Number(playerChild.zIndex || 0);
+    var playerFramePlanOrder = findPlayerOcclusionFramePlanOrderIndex(options.framePlan || null);
+    var playerPixiOrder = getPlayerOcclusionDisplayOrderValue(playerChild, NaN);
+    var playerContainerIndex = getPlayerOcclusionContainerChildIndex(container, playerChild);
+    var playerFrontOrder = Number.isFinite(playerContainerIndex) ? playerContainerIndex : (Number.isFinite(playerFramePlanOrder) ? playerFramePlanOrder : playerPixiOrder);
+    var playerFrontOrderSource = Number.isFinite(playerContainerIndex) ? 'staticRunContainer.children.index' : (Number.isFinite(playerFramePlanOrder) ? 'framePlan.order' : (Number.isFinite(playerPixiOrder) ? 'pixi-display-object' : 'missing'));
+    var candidateDemerge = getPlayerOcclusionCandidateDemergeSummary();
+
+    var checked = 0;
+    var demergeCandidateChecked = 0;
+    var genericCandidateChecked = 0;
+    var invalidBoundsCount = 0;
+    var skippedGroupTexture = 0;
+    var skippedLarge = 0;
+    var skippedOther = 0;
+    var skippedSupportTop = 0;
+    var skippedSamples = [];
+    var nonFadedSamples = [];
+    var candidateItems = [];
+    var groupMap = {};
+    var groupTriggers = {};
+    var groupProtected = {};
+    var frontOverlapFaceCount = 0;
+    var frontNoOverlapCount = 0;
+    var overlapBehindOrSameCount = 0;
+    var behindOrSameNoOverlapCount = 0;
+
+    for (var j = 0; j < children.length; j++) {
+      var child = children[j];
+      var skipReason = getPixiWorldOcclusionSkipReason(child);
+      if (skipReason) {
+        if (skipReason === 'group-render-texture') skippedGroupTexture += 1;
+        else skippedOther += 1;
+        if (child && child.__playerOcclusionFadeTouched === true) {
+          child.alpha = Number.isFinite(Number(child.__playerOcclusionFadeOriginalAlpha)) ? Number(child.__playerOcclusionFadeOriginalAlpha) : 1;
+          if (child.__playerOcclusionFadeOriginalBlendMode !== undefined) child.blendMode = child.__playerOcclusionFadeOriginalBlendMode;
+          if (child.__playerOcclusionFadeOriginalTint !== undefined && child.tint != null) child.tint = child.__playerOcclusionFadeOriginalTint;
+          child.__playerOcclusionFadeTouched = false;
+          restored += 1;
+        }
+        continue;
+      }
+
+      var isDemergeCandidate = isPlayerOcclusionDemergeCandidate(child);
+      checked += 1;
+      if (isDemergeCandidate) demergeCandidateChecked += 1;
+      else genericCandidateChecked += 1;
+
+      var childBounds = getDisplayObjectBoundsForOcclusion(child);
+      var childZ = Number(child.zIndex || 0);
+      var childContainerIndex = j;
+      var childFrontOrder = Number.isFinite(playerContainerIndex) ? childContainerIndex : getPlayerOcclusionDisplayOrderValue(child, j);
+      var groupKey = getPlayerOcclusionGroupKey(child) || ('child-' + j);
+      var childLabel = String(child.label || child.name || '');
+
+      if (!childBounds) {
+        invalidBoundsCount += 1;
+        if (nonFadedSamples.length < 6) nonFadedSamples.push({ reason: 'invalid-bounds', label: childLabel, zIndex: childZ, groupKey: groupKey, candidateKind: isDemergeCandidate ? 'demerged-face' : 'generic' });
+        if (child.__playerOcclusionFadeTouched === true) {
+          child.alpha = Number.isFinite(Number(child.__playerOcclusionFadeOriginalAlpha)) ? Number(child.__playerOcclusionFadeOriginalAlpha) : 1;
+          if (child.__playerOcclusionFadeOriginalBlendMode !== undefined) child.blendMode = child.__playerOcclusionFadeOriginalBlendMode;
+          if (child.__playerOcclusionFadeOriginalTint !== undefined && child.tint != null) child.tint = child.__playerOcclusionFadeOriginalTint;
+          child.__playerOcclusionFadeTouched = false;
+          restored += 1;
+        }
+        continue;
+      }
+
+      if (!isDemergeCandidate && isOcclusionCandidateTooLargeForPlayer(childBounds, playerBoundsRaw, cfg)) {
+        skippedLarge += 1;
+        if (skippedSamples.length < 6) skippedSamples.push({
+          reason: 'large-bounds',
+          label: childLabel,
+          zIndex: childZ,
+          frontOrder: Number.isFinite(childFrontOrder) ? childFrontOrder : null,
+          childContainerIndex: Number.isFinite(childContainerIndex) ? childContainerIndex : null,
+          playerContainerIndex: Number.isFinite(playerContainerIndex) ? playerContainerIndex : null,
+          playerFrontOrder: Number.isFinite(playerFrontOrder) ? playerFrontOrder : null,
+          screenForeground: !!isScreenForegroundFace,
+          renderOrderFront: !!isRenderOrderInFrontOfPlayer,
+          terrainCandidate: !!isTerrainCandidate,
+          overlapArea: roundDiag(overlapArea, 1),
+          yellowOverlapArea: roundDiag(foregroundOverlapArea, 1),
+          groupKey: groupKey,
+          candidateKind: isDemergeCandidate ? 'demerged-face' : 'generic',
+          bounds: { x: roundDiag(childBounds.x, 1), y: roundDiag(childBounds.y, 1), width: roundDiag(childBounds.width, 1), height: roundDiag(childBounds.height, 1) }
+        });
+        if (child.__playerOcclusionFadeTouched === true) {
+          child.alpha = Number.isFinite(Number(child.__playerOcclusionFadeOriginalAlpha)) ? Number(child.__playerOcclusionFadeOriginalAlpha) : 1;
+          if (child.__playerOcclusionFadeOriginalBlendMode !== undefined) child.blendMode = child.__playerOcclusionFadeOriginalBlendMode;
+          if (child.__playerOcclusionFadeOriginalTint !== undefined && child.tint != null) child.tint = child.__playerOcclusionFadeOriginalTint;
+          child.__playerOcclusionFadeTouched = false;
+          restored += 1;
+        }
+        continue;
+      }
+
+      var isSupportTop = isPlayerStandingOnCandidateTopFace(child);
+      var isLowTopBelowBody = isLowTopFaceBelowPlayerBody(child, childBounds, playerBodyBounds);
+      if (isSupportTop || isLowTopBelowBody) {
+        skippedSupportTop += 1;
+        groupProtected[groupKey] = true;
+      }
+
+      // v1.11: frontness is actual display order in the same Pixi container.
+      // This is the closest available runtime answer to "the face is drawn in
+      // front of the player face". Do not use zIndex alone: demerged packet
+      // zIndex is local and caused false negatives/false positives in v1.9/v1.10.
+      var isContainerOrderInFrontOfPlayer = isPlayerOcclusionCandidateInFrontOfPlayer(childFrontOrder, playerFrontOrder);
+      var isRenderOrderInFrontOfPlayer = isContainerOrderInFrontOfPlayer;
+      var overlapsPlayer = playerBounds ? boundsOverlapForOcclusion(childBounds, playerBounds) : false;
+
+      // Top faces do not trigger alone; if a same-group vertical face in front
+      // overlaps the player, the top face fades together with its group.
+      var isVerticalFace = !isPlayerOcclusionTopFace(child);
+      var isScreenForegroundFace = isVerticalFace;
+      var isInFrontOfPlayer = isContainerOrderInFrontOfPlayer;
+      // v1.15: correct occluder predicate.
+      // A face is an occluder only if it overlaps the yellow player sprite
+      // bounds AND is actually drawn after the player in the same Pixi world
+      // container. This prevents faces behind the player from fading.
+      // Terrain faces and object faces are treated identically; top faces may
+      // trigger unless they are the player's own support top.
+      var overlapArea = boundsOverlapAreaForOcclusion(childBounds, playerBounds);
+      var foregroundOverlapArea = overlapArea;
+      var overlapsForegroundBand = overlapsPlayer;
+      var isTerrainCandidate = isTerrainOcclusionCandidateGroup(child);
+      var isTriggerFace = isDemergeCandidate && !isSupportTop && overlapsPlayer && isRenderOrderInFrontOfPlayer;
+
+      var item = {
+        child: child,
+        childBounds: childBounds,
+        childZ: childZ,
+        childFrontOrder: childFrontOrder,
+        childContainerIndex: childContainerIndex,
+        groupKey: groupKey,
+        label: childLabel,
+        isDemergeCandidate: isDemergeCandidate,
+        isSupportTop: isSupportTop,
+        isLowTopBelowBody: isLowTopBelowBody,
+        isScreenForegroundFace: isScreenForegroundFace,
+        isRenderOrderInFrontOfPlayer: isRenderOrderInFrontOfPlayer,
+        isTerrainCandidate: isTerrainCandidate,
+        overlapArea: overlapArea,
+        yellowOverlapArea: foregroundOverlapArea,
+        overlapsForegroundBand: overlapsForegroundBand,
+        isInFrontOfPlayer: isInFrontOfPlayer,
+        overlapsPlayer: overlapsPlayer,
+        isTriggerFace: isTriggerFace
+      };
+      candidateItems.push(item);
+      if (!groupMap[groupKey]) groupMap[groupKey] = [];
+      groupMap[groupKey].push(item);
+
+      if (isTriggerFace) {
+        frontOverlapFaceCount += 1;
+        groupTriggers[groupKey] = true;
+      } else {
+        var notFadedReason = '';        if (isSupportTop) notFadedReason = 'support-top-under-player';
+        else if (overlapsPlayer && !isDemergeCandidate) { overlapBehindOrSameCount += 1; notFadedReason = 'screen-overlap-but-not-demerged-candidate'; }
+        else if (overlapsPlayer && !isRenderOrderInFrontOfPlayer) { overlapBehindOrSameCount += 1; notFadedReason = 'screen-overlap-but-drawn-before-player'; }
+        else if (!overlapsPlayer && isRenderOrderInFrontOfPlayer) { frontNoOverlapCount += 1; notFadedReason = 'drawn-after-player-but-no-yellow-bounds-overlap'; }
+        else if (!overlapsPlayer) { behindOrSameNoOverlapCount += 1; notFadedReason = 'no-yellow-bounds-overlap'; }
+        else { behindOrSameNoOverlapCount += 1; notFadedReason = '2d-overlap-but-filtered'; }
+        if (nonFadedSamples.length < 6) nonFadedSamples.push({
+          reason: notFadedReason,
+          label: childLabel,
+          zIndex: childZ,
+          playerZIndex: playerZ,
+          groupKey: groupKey,
+          candidateKind: isDemergeCandidate ? 'demerged-face' : 'generic',
+          overlap: overlapsPlayer,
+          inFront: isInFrontOfPlayer,
+          face: [child.__pixiStaticWorldPacketSemanticFace || '', child.__pixiStaticWorldPacketScreenFace || ''].join('/'),
+          bounds: { x: roundDiag(childBounds.x, 1), y: roundDiag(childBounds.y, 1), width: roundDiag(childBounds.width, 1), height: roundDiag(childBounds.height, 1) }
+        });
+      }
+    }
+
+    var fadedGroups = {};
+    var fadedGroupKeys = [];
+    var protectedGroupCount = 0;
+    Object.keys(groupTriggers).forEach(function (key) {
+      if (groupProtected[key] === true) protectedGroupCount += 1;
+      // v1.18: protected support/top faces do NOT cancel a group fade.
+      // They only prevent support/top faces from becoming trigger faces by
+      // themselves. If another face in the same cell/object overlaps the
+      // yellow player bounds and is drawn after the player, the whole group
+      // must still fade.
+      fadedGroups[key] = true;
+      fadedGroupKeys.push(key);
+    });
+
+    var fadedFaces = [];
+    var fadedFaceCount = 0;
+    for (var k = 0; k < candidateItems.length; k++) {
+      var it = candidateItems[k];
+      var c = it.child;
+      var originalAlpha = c.__playerOcclusionFadeTouched === true
+        ? Number(c.__playerOcclusionFadeOriginalAlpha)
+        : Number(c.alpha == null ? 1 : c.alpha);
+      if (!Number.isFinite(originalAlpha)) originalAlpha = 1;
+      var shouldFadeGroup = fadedGroups[it.groupKey] === true;
+      if (shouldFadeGroup) {
+        if (c.__playerOcclusionFadeTouched !== true) {
+          c.__playerOcclusionFadeOriginalAlpha = originalAlpha;
+          c.__playerOcclusionFadeOriginalBlendMode = c.blendMode;
+          if (c.tint != null) c.__playerOcclusionFadeOriginalTint = c.tint;
+        }
+        c.__playerOcclusionFadeTouched = true;
+        // Alpha-only fade. Do not tint or change blend mode: perceived darkening
+        // comes from seeing darker geometry/background behind the transparent
+        // face, not from an intentional darkening operation.
+        c.alpha = cfg.alpha;
+        fadedFaceCount += 1;
+        if (fadedFaces.length < 10) fadedFaces.push({
+          label: it.label,
+          zIndex: it.childZ,
+          frontOrder: Number.isFinite(it.childFrontOrder) ? it.childFrontOrder : null,
+          childContainerIndex: Number.isFinite(it.childContainerIndex) ? it.childContainerIndex : null,
+          playerContainerIndex: Number.isFinite(playerContainerIndex) ? playerContainerIndex : null,
+          playerFrontOrder: Number.isFinite(playerFrontOrder) ? playerFrontOrder : null,
+          screenForeground: !!it.isScreenForegroundFace,
+          renderOrderFront: !!it.isRenderOrderInFrontOfPlayer,
+          terrainCandidate: !!it.isTerrainCandidate,
+          overlapArea: roundDiag(it.overlapArea || 0, 1),
+          yellowOverlapArea: roundDiag(it.yellowOverlapArea || it.foregroundOverlapArea || 0, 1),
+          groupKey: it.groupKey,
+          candidateKind: it.isDemergeCandidate ? 'demerged-face' : 'generic',
+          triggerFace: it.isTriggerFace === true,
+          packetId: c.__pixiStaticWorldPacketId || null,
+          face: [c.__pixiStaticWorldPacketSemanticFace || '', c.__pixiStaticWorldPacketScreenFace || ''].join('/'),
+          bounds: it.childBounds ? { x: roundDiag(it.childBounds.x, 1), y: roundDiag(it.childBounds.y, 1), width: roundDiag(it.childBounds.width, 1), height: roundDiag(it.childBounds.height, 1) } : null
+        });
+      } else if (c.__playerOcclusionFadeTouched === true) {
+        c.alpha = Number.isFinite(Number(c.__playerOcclusionFadeOriginalAlpha)) ? Number(c.__playerOcclusionFadeOriginalAlpha) : 1;
+        c.__playerOcclusionFadeTouched = false;
+        restored += 1;
+      }
+    }
+
+    var debugSummary = updatePlayerOcclusionDebugGraphics(container, cfg, playerBoundsRaw, playerBodyBounds, playerBounds, fadedGroups);
+
+    var fadedTerrainGroupCount = 0;
+    var fadedObjectGroupCount = 0;
+    for (var fgIdx = 0; fgIdx < fadedGroupKeys.length; fgIdx += 1) {
+      var fg = String(fadedGroupKeys[fgIdx] || '');
+      if (fg.indexOf('terrain-') >= 0) fadedTerrainGroupCount += 1;
+      else fadedObjectGroupCount += 1;
+    }
+
+    var summary = {
+      ok: true,
+      enabled: true,
+      playerFound: true,
+      playerSource: playerLookup.source || 'unknown',
+      candidateContainerFound: !!container,
+      staticRunContainerChildCount: playerLookup.staticRunContainerChildCount || children.length,
+      playerContainerChildCount: playerLookup.playerContainerChildCount || 0,
+      framePlanId: String(options.framePlanId || ''),
+      alpha: cfg.alpha,
+      alphaNote: 'Alpha-only fade. No tint/blendMode darkening is applied. Default alpha raised to 0.75 to reduce perceived darkening over dark geometry.',
+      inflatePx: cfg.inflatePx,
+      debugBoundsEnabled: cfg.debugBounds === true,
+      debugBoundsSummary: debugSummary,
+      childCount: children.length,
+      candidateDemergeEnabled: candidateDemerge.candidateDemergeEnabled === true,
+      candidateDemergePacketCount: candidateDemerge.candidateDemergePacketCount,
+      candidateDemergeDrawnGraphicsCount: candidateDemerge.candidateDemergeDrawnGraphicsCount,
+      candidateDemergeMeaning: 'candidate-only; actual fade is grouped and uses yellow raw player sprite bounds overlap plus same-container draw-after-player frontness inside the demerged player chunk',
+      orderRunCacheDisabledForPlayerOcclusionFade: candidateDemerge.orderRunCacheDisabledForPlayerOcclusionFade === true,
+      orderRunCacheActive: candidateDemerge.orderRunCacheActive === true,
+      chunkRenderTextureCount: candidateDemerge.chunkRenderTextureCount,
+      orderRunRenderTextureCount: candidateDemerge.orderRunRenderTextureCount,
+      checkedCount: checked,
+      checkedCandidateCount: checked,
+      checkedDemergedCandidateCount: demergeCandidateChecked,
+      checkedGenericCandidateCount: genericCandidateChecked,
+      triggerMode: 'yellow-bounds-overlap-plus-same-container-draw-after-player-group-fade',
+      triggerBoundsMode: 'yellow-raw-player-sprite-bounds',
+      yellowTriggerBounds: playerBounds ? { x: roundDiag(playerBounds.x, 1), y: roundDiag(playerBounds.y, 1), width: roundDiag(playerBounds.width, 1), height: roundDiag(playerBounds.height, 1) } : null,
+      triggerFaceCount: frontOverlapFaceCount,
+      fadedOccluderGroupCount: fadedGroupKeys.length,
+      fadedTerrainGroupCount: fadedTerrainGroupCount,
+      fadedObjectGroupCount: fadedObjectGroupCount,
+      fadedOccluderFaceCount: fadedFaceCount,
+      occluderCount: fadedFaceCount,
+      fadedOccluderCount: fadedFaceCount,
+      restoredCount: restored,
+      skippedSupportTopCount: skippedSupportTop,
+      protectedSupportGroupCount: protectedGroupCount,
+      protectedSupportGroupDoesNotCancelFade: true,
+      notFadedCandidateCount: Math.max(0, checked - fadedFaceCount - invalidBoundsCount - skippedLarge),
+      notFadedBreakdown: {
+        triggerFacesFrontAndOverlap: frontOverlapFaceCount,
+        fadedGroups: fadedGroupKeys.length,
+        fadedFacesInGroups: fadedFaceCount,
+        noDetectorFrameOverlap: frontNoOverlapCount,
+        screenOverlapButDrawnBeforePlayer: overlapBehindOrSameCount,
+        noYellowOverlapAndDrawnBeforePlayer: behindOrSameNoOverlapCount,
+        supportOrLowTopFace: skippedSupportTop,
+        protectedSupportGroupCount: protectedGroupCount,
+        invalidBounds: invalidBoundsCount,
+        tooLarge: skippedLarge,
+        skippedGroupTexture: skippedGroupTexture,
+        skippedOther: skippedOther
+      },
+      actualFadePredicate: 'groupFade if any demerged same-chunk/cell/object face screenBoundsOverlap(childBounds, yellowPlayerSpriteBounds) AND candidateContainerIndex > playerContainerIndex; terrain and ordinary objects are treated the same; support top is excluded as a trigger but no longer cancels same-group fade',
+      renderOrderFrontnessDiagnosticOnly: false,
+      detectorFrameRule: 'demerged face overlaps yellow raw player sprite bounds',
+      frontnessRule: 'required: same Pixi container display order candidate child index > player child index',
+      playerContainerIndex: Number.isFinite(playerContainerIndex) ? playerContainerIndex : null,
+      skippedGroupTextureCount: skippedGroupTexture,
+      skippedLargeCount: skippedLarge,
+      skippedOtherCount: skippedOther,
+      skippedSamples: skippedSamples,
+      nonFadedSamples: nonFadedSamples,
+      playerZIndex: playerZ,
+      playerFrontOrder: Number.isFinite(playerFrontOrder) ? playerFrontOrder : null,
+      playerFrontOrderSource: playerFrontOrderSource,
+      playerContainerIndex: Number.isFinite(playerContainerIndex) ? playerContainerIndex : null,
+      playerFramePlanOrder: Number.isFinite(playerFramePlanOrder) ? playerFramePlanOrder : null,
+      playerPixiOrder: Number.isFinite(playerPixiOrder) ? playerPixiOrder : null,
+      playerBounds: playerBoundsRaw ? { x: roundDiag(playerBoundsRaw.x, 1), y: roundDiag(playerBoundsRaw.y, 1), width: roundDiag(playerBoundsRaw.width, 1), height: roundDiag(playerBoundsRaw.height, 1) } : null,
+      playerBodyBounds: playerBodyBounds ? { x: roundDiag(playerBodyBounds.x, 1), y: roundDiag(playerBodyBounds.y, 1), width: roundDiag(playerBodyBounds.width, 1), height: roundDiag(playerBodyBounds.height, 1) } : null,
+      playerTriggerBounds: playerBounds ? { x: roundDiag(playerBounds.x, 1), y: roundDiag(playerBounds.y, 1), width: roundDiag(playerBounds.width, 1), height: roundDiag(playerBounds.height, 1) } : null,
+      playerBodyTestBounds: playerBounds ? { x: roundDiag(playerBounds.x, 1), y: roundDiag(playerBounds.y, 1), width: roundDiag(playerBounds.width, 1), height: roundDiag(playerBounds.height, 1) } : null,
+      fadedGroupKeys: fadedGroupKeys.slice(0, 12),
+      occluderSamples: fadedFaces,
+      source: reason || 'player-occlusion-fade-pass'
+    };
+    emitPlayerOcclusionFadeTrace(summary, true);
+    return summary;
+  }
+
+
   function getStatus() {
     var snapshot = getBackendSnapshot();
     return {
@@ -2921,6 +4158,7 @@
       floorDrawCount: state.floorDrawCount,
       lastFloorSummary: state.lastFloorSummary,
       lastDynamicRenderableConsumerSummary: state.lastDynamicRenderableConsumerSummary,
+      lastPlayerOcclusionFadeSummary: state.lastPlayerOcclusionFadeSummary,
       rendererWidth: state.pixiRendererWidth,
       rendererHeight: state.pixiRendererHeight,
       canvasWidth: state.pixiCanvasWidth,
@@ -2959,6 +4197,8 @@
     getPixiRenderer: function getPixiRenderer() { return state.pixiApp && state.pixiApp.renderer || null; },
     getLastGpuDiagnostics: function getLastGpuDiagnostics() { return global.__PIXI_MIGRATION_LAST_GPU_DIAGNOSTICS__ || null; },
     getLastPixiStaticWorldPacketSummary: getLastPixiStaticWorldPacketSummary,
+    applyPlayerOcclusionFadePass: applyPlayerOcclusionFadePass,
+    getLastPlayerOcclusionFadeSummary: function getLastPlayerOcclusionFadeSummary() { return state.lastPlayerOcclusionFadeSummary || null; },
     getStatus: getStatus,
     summarizeCoverage: function summarizeCoverage() {
       return {

@@ -2770,6 +2770,19 @@
     return true;
   }
 
+
+  function isPlayerOcclusionFadeEnabledForStaticGraphics() {
+    try {
+      var settings = global.settings || null;
+      if (settings && settings.playerOcclusionFadeEnabled === true) return true;
+      if (global.localStorage) {
+        var raw = global.localStorage.getItem('playerOcclusionFadeEnabled');
+        if (raw === '1' || raw === 'true' || raw === 'on') return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
   function getOrderRunRenderTextureMinPacketCount() {
     var raw = null;
     try { if (global.localStorage) raw = global.localStorage.getItem('pixiStaticOrderRunRenderTextureMinPacketCount'); } catch (_) {}
@@ -3977,10 +3990,34 @@
 
   function applyPersistentGraphicsMetadata(graphics, packet, runStartIndex, packetIndex) {
     try {
+      var orderIndex = runStartIndex + packetIndex;
       graphics.__pixiStaticWorldPacketId = packet && packet.id || null;
       graphics.__pixiStaticWorldRunStartIndex = runStartIndex;
-      graphics.__pixiFramePlanOrderIndex = runStartIndex + packetIndex;
-      graphics.zIndex = runStartIndex + packetIndex;
+      graphics.__pixiFramePlanOrderIndex = orderIndex;
+      graphics.__pixiStaticWorldChunkKey = getPacketChunkKey(packet);
+      graphics.__pixiStaticWorldPacketSemanticFace = packet && packet.semanticFace || '';
+      graphics.__pixiStaticWorldPacketScreenFace = packet && packet.screenFace || '';
+      graphics.__pixiStaticWorldPacketCellKey = [packet && packet.cellX, packet && packet.cellY, packet && packet.cellZ].join(',');
+      try {
+        var packetBox = packet && (packet.box || packet.cell) || {};
+        var cellX = Number(packet && packet.cellX != null ? packet.cellX : (packetBox.x != null ? packetBox.x : 0));
+        var cellY = Number(packet && packet.cellY != null ? packet.cellY : (packetBox.y != null ? packetBox.y : 0));
+        var cellZ = Number(packet && packet.cellZ != null ? packet.cellZ : (packetBox.z != null ? packetBox.z : 0));
+        var cellW = Number(packet && packet.mergeWidth != null ? packet.mergeWidth : (packetBox.w != null ? packetBox.w : (packet && packet.w != null ? packet.w : 1)));
+        var cellD = Number(packet && packet.mergeHeight != null ? packet.mergeHeight : (packetBox.d != null ? packetBox.d : (packet && packet.d != null ? packet.d : 1)));
+        var cellH = Number(packetBox.h != null ? packetBox.h : (packet && packet.h != null ? packet.h : 1));
+        if (!Number.isFinite(cellW) || cellW <= 0) cellW = 1;
+        if (!Number.isFinite(cellD) || cellD <= 0) cellD = 1;
+        if (!Number.isFinite(cellH) || cellH <= 0) cellH = 1;
+        graphics.__pixiStaticWorldPacketWorldBox = { x: cellX, y: cellY, z: cellZ, w: cellW, d: cellD, h: cellH };
+        var packetId = packet && packet.id ? String(packet.id) : '';
+        var baseId = packetId.indexOf('::') >= 0 ? packetId.split('::')[0] : packetId;
+        var instanceId = packet && packet.instanceId != null ? String(packet.instanceId) : '';
+        graphics.__pixiStaticWorldPacketGroupKey = instanceId ? ('instance:' + instanceId) : (baseId ? ('packet:' + baseId) : ('cell:' + [cellX, cellY, cellZ].join(',')));
+      } catch (_) {}
+      graphics.__pixiPlayerOcclusionCandidateFace = isPlayerSensitiveDemergedPacket(packet);
+      graphics.__pixiPlayerOcclusionCandidateOnly = graphics.__pixiPlayerOcclusionCandidateFace === true;
+      graphics.zIndex = orderIndex;
       graphics.visible = true;
     } catch (_) {}
   }
@@ -5396,6 +5433,7 @@
     var playerSensitiveGraphicsItems = [];
     var orderRunActiveEnabled = false;
     var orderRunActiveReason = 'not-evaluated';
+    var playerOcclusionFadeForcesPerPacketGraphics = isPlayerOcclusionFadeEnabledForStaticGraphics();
     var evidenceStaticItemBuildStartedAt = nowMs();
     var evidenceProjectionLookupMs = 0;
     var evidencePacketSignatureBuildMs = 0;
@@ -5811,8 +5849,11 @@
       }
       if (chunkRenderTextureSummary && chunkRenderTextureSummary.ok === true) {
         playerSensitiveGraphicsItems = chunkEligibilitySplit.playerSensitiveItems;
-        orderRunActiveEnabled = isOrderRunRenderTextureCacheEnabled() && !!(orderRunCacheDiagnosticsSummary && orderRunCacheDiagnosticsSummary.eligibleForActiveOrderRunCache === true);
-        orderRunActiveReason = orderRunActiveEnabled ? 'active-order-run-rendertexture-cache' : (isOrderRunRenderTextureCacheEnabled() ? 'diagnostics-not-eligible' : 'disabled-by-localstorage');
+        var orderRunCacheEnabledBySettings = isOrderRunRenderTextureCacheEnabled();
+        orderRunActiveEnabled = !playerOcclusionFadeForcesPerPacketGraphics && orderRunCacheEnabledBySettings && !!(orderRunCacheDiagnosticsSummary && orderRunCacheDiagnosticsSummary.eligibleForActiveOrderRunCache === true);
+        orderRunActiveReason = playerOcclusionFadeForcesPerPacketGraphics
+          ? 'disabled-for-player-occlusion-fade-per-packet-graphics'
+          : (orderRunActiveEnabled ? 'active-order-run-rendertexture-cache' : (orderRunCacheEnabledBySettings ? 'diagnostics-not-eligible' : 'disabled-by-localstorage'));
         if (orderRunActiveEnabled && chunkEligibilitySplit.playerSensitiveItems.length > 0) {
           var orderRunRenderTextureStartedAt = nowMs();
           orderRunRenderTextureSummary = tryDrawOrderRunRenderTextureFrame(
@@ -6070,6 +6111,12 @@
       playerLocalFaceDemergeCellKey: getStableLocalDemergeLastState() && getStableLocalDemergeLastState().playerInteractionCellKey ? String(getStableLocalDemergeLastState().playerInteractionCellKey) : '',
       chunkRenderTexturePlayerSensitivePolicy: orderRunActiveEnabled ? 'external-chunks-chunk-key-only-player-chunk-order-run-cache-strict' : 'external-chunks-chunk-key-only-player-chunk-dynamic-strict',
       orderRunCacheDiagnosticsEnabled: true,
+      playerOcclusionFadeForcesPerPacketGraphics: playerOcclusionFadeForcesPerPacketGraphics === true,
+      orderRunCacheDisabledForPlayerOcclusionFade: playerOcclusionFadeForcesPerPacketGraphics === true,
+      playerOcclusionCandidateDemergeEnabled: playerOcclusionFadeForcesPerPacketGraphics === true,
+      playerOcclusionCandidateDemergeMeaning: 'candidate-only-not-transparent-unless-front-and-screen-overlap',
+      playerOcclusionCandidateDemergePacketCount: chunkEligibilitySplit && chunkEligibilitySplit.playerSensitivePacketCount != null ? chunkEligibilitySplit.playerSensitivePacketCount : 0,
+      playerOcclusionCandidateDemergeDrawnGraphicsCount: playerSensitiveDraw && playerSensitiveDraw.packetDrawCount != null ? playerSensitiveDraw.packetDrawCount : 0,
       orderRunCacheActive: orderRunActiveEnabled && orderRunCachedPacketCount > 0,
       orderRunCacheActiveReason: orderRunActiveReason,
       orderRunRenderTextureCount: orderRunRenderTextureSummary && orderRunRenderTextureSummary.orderRunRenderTextureCount != null ? orderRunRenderTextureSummary.orderRunRenderTextureCount : 0,

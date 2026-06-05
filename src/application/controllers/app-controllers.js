@@ -269,6 +269,7 @@
       recordTerrainDiagnostic: recordTerrainDiagnostic,
       isDetailedTerrainProfilingEnabledForController: isDetailedTerrainProfilingEnabledForController,
       notifyTerrainSceneChanged: function notifyTerrainSceneChangedForAppControllers() {
+        snapPlayerToCurrentSupportTopAfterTerrainChange('terrain-apply:scene-changed');
         if (typeof refreshInspectorPanels === 'function') { try { refreshInspectorPanels(); } catch (_) {} }
         if (typeof updatePreview === 'function') { try { updatePreview(); } catch (_) {} }
       }
@@ -322,6 +323,7 @@
       invalidateMainEditorTerrainRenderCaches: invalidateMainEditorTerrainRenderCaches,
       recordTerrainDiagnostic: recordTerrainDiagnostic,
       notifyTerrainSceneChanged: function notifyTerrainSceneChangedForAppControllers() {
+        snapPlayerToCurrentSupportTopAfterTerrainChange('terrain-clear:scene-changed');
         if (typeof refreshInspectorPanels === 'function') { try { refreshInspectorPanels(); } catch (_) {} }
         if (typeof updatePreview === 'function') { try { updatePreview(); } catch (_) {} }
       }
@@ -388,10 +390,111 @@
       emitTerrainGeneratorApplyDiagnostic: emitTerrainGeneratorApplyDiagnostic,
       emitTerrainGenerateProfile: emitTerrainGenerateProfile,
       notifyTerrainSceneChanged: function notifyTerrainSceneChangedForAppControllers() {
+        snapPlayerToCurrentSupportTopAfterTerrainChange('terrain-generate:scene-changed');
         if (typeof refreshInspectorPanels === 'function') { try { refreshInspectorPanels(); } catch (_) {} }
         if (typeof updatePreview === 'function') { try { updatePreview(); } catch (_) {} }
       }
     };
+  }
+
+
+  function terrainPlayerSnapNumber(value, fallback) {
+    var n = Number(value);
+    return Number.isFinite(n) ? n : (Number(fallback) || 0);
+  }
+
+  function terrainPlayerFootprint(playerRef, settingsRef) {
+    var p = playerRef && typeof playerRef === 'object' ? playerRef : {};
+    var s = settingsRef && typeof settingsRef === 'object' ? settingsRef : {};
+    var w = Math.max(0.001, terrainPlayerSnapNumber(s.playerProxyW, 0.32));
+    var d = Math.max(0.001, terrainPlayerSnapNumber(s.playerProxyD, 0.24));
+    var x = terrainPlayerSnapNumber(p.x, 0);
+    var y = terrainPlayerSnapNumber(p.y, 0);
+    return { x: x - w * 0.5, y: y - d * 0.5, w: w, d: d, centerX: x, centerY: y };
+  }
+
+  function terrainAabbOverlap2d(a, b) {
+    if (!a || !b) return false;
+    var ax = terrainPlayerSnapNumber(a.x, 0);
+    var ay = terrainPlayerSnapNumber(a.y, 0);
+    var aw = Math.max(0, terrainPlayerSnapNumber(a.w, 0));
+    var ad = Math.max(0, terrainPlayerSnapNumber(a.d, 0));
+    var bx = terrainPlayerSnapNumber(b.x, 0);
+    var by = terrainPlayerSnapNumber(b.y, 0);
+    var bw = Math.max(0, terrainPlayerSnapNumber(b.w, 0));
+    var bd = Math.max(0, terrainPlayerSnapNumber(b.d, 0));
+    return ax < bx + bw && ax + aw > bx && ay < by + bd && ay + ad > by;
+  }
+
+  function resolvePlayerSupportTopForTerrainSceneChange(playerRef, settingsRef, boxList) {
+    var fp = terrainPlayerFootprint(playerRef, settingsRef);
+    var list = Array.isArray(boxList) ? boxList : [];
+    var top = 0;
+    var supportBox = null;
+    var overlapCount = 0;
+    for (var i = 0; i < list.length; i++) {
+      var box = list[i];
+      if (!box) continue;
+      if (!terrainAabbOverlap2d(fp, box)) continue;
+      overlapCount += 1;
+      var candidateTop = terrainPlayerSnapNumber(box.z, 0) + Math.max(0, terrainPlayerSnapNumber(box.h, 1));
+      if (candidateTop >= top) {
+        top = candidateTop;
+        supportBox = box;
+      }
+    }
+    return { groundZ: top, supportBox: supportBox, overlapCount: overlapCount, footprint: fp };
+  }
+
+  function snapPlayerToCurrentSupportTopAfterTerrainChange(source) {
+    var requestSource = String(source || 'terrain:player-snap-after-scene-change');
+    var runtimeApi = getRuntimeStateApi();
+    var playerRef = runtimeApi && runtimeApi.player ? runtimeApi.player : (typeof window !== 'undefined' ? window.player : null);
+    if (!playerRef || typeof playerRef !== 'object') return { ok: false, reason: 'missing-player' };
+    var settingsRef = runtimeApi && runtimeApi.settings ? runtimeApi.settings : (typeof settings !== 'undefined' ? settings : null);
+    var boxList = readCurrentSceneBoxes();
+    var resolved = resolvePlayerSupportTopForTerrainSceneChange(playerRef, settingsRef, boxList);
+    var beforeZ = terrainPlayerSnapNumber(playerRef.z, 0);
+    var afterZ = terrainPlayerSnapNumber(resolved.groundZ, 0);
+    var changed = Math.abs(afterZ - beforeZ) > 1e-6;
+    if (changed) {
+      playerRef.z = afterZ;
+      playerRef.visualZ = afterZ;
+      playerRef.renderSortZ = afterZ;
+      if (playerRef.jump && typeof playerRef.jump === 'object') {
+        playerRef.jump.active = false;
+        playerRef.jump.fromZ = afterZ;
+        playerRef.jump.toZ = afterZ;
+        playerRef.jump.t = 0;
+      }
+    }
+    var payload = {
+      source: requestSource,
+      ok: true,
+      changed: changed,
+      beforeZ: Number(beforeZ.toFixed ? beforeZ.toFixed(3) : beforeZ),
+      afterZ: Number(afterZ.toFixed ? afterZ.toFixed(3) : afterZ),
+      deltaZ: Number((afterZ - beforeZ).toFixed ? (afterZ - beforeZ).toFixed(3) : (afterZ - beforeZ)),
+      player: { x: Number(terrainPlayerSnapNumber(playerRef.x, 0).toFixed ? terrainPlayerSnapNumber(playerRef.x, 0).toFixed(3) : terrainPlayerSnapNumber(playerRef.x, 0)), y: Number(terrainPlayerSnapNumber(playerRef.y, 0).toFixed ? terrainPlayerSnapNumber(playerRef.y, 0).toFixed(3) : terrainPlayerSnapNumber(playerRef.y, 0)) },
+      overlapCount: resolved.overlapCount,
+      supportBox: resolved.supportBox ? {
+        id: resolved.supportBox.id != null ? resolved.supportBox.id : null,
+        instanceId: resolved.supportBox.instanceId || null,
+        prefabId: resolved.supportBox.prefabId || null,
+        generatedBy: resolved.supportBox.generatedBy || null,
+        x: terrainPlayerSnapNumber(resolved.supportBox.x, 0),
+        y: terrainPlayerSnapNumber(resolved.supportBox.y, 0),
+        z: terrainPlayerSnapNumber(resolved.supportBox.z, 0),
+        h: terrainPlayerSnapNumber(resolved.supportBox.h, 1)
+      } : null
+    };
+    try {
+      var line = '[TERRAIN-PLAYER-SNAP] ' + JSON.stringify(payload);
+      if (typeof detailLog === 'function') detailLog(line);
+      else if (typeof pushLog === 'function') pushLog(line);
+      else if (window.console && typeof window.console.log === 'function') window.console.log(line);
+    } catch (_) {}
+    return payload;
   }
 
   function getTerrainGenerationControllerForAppControllers() {

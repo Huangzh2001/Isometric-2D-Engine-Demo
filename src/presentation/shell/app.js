@@ -1026,6 +1026,25 @@ safeListen(canvas, 'mousemove', (e) => {
   mouse.y = (e.clientY - rect.top) * (VIEW_H / rect.height);
   mouse.inside = true;
 
+  if (mouse.clickMovePending && e.buttons === 0) mouse.clickMovePending = false;
+
+  var __pathPreviewMode = (typeof getEditorMode === 'function') ? getEditorMode() : (editor && editor.mode || editorMode || settings.editorMode || 'view');
+  if (settings && settings.playerClickMoveEnabled && settings.playerPathDebugEnabled && __pathPreviewMode === 'view' && typeof requestPlayerPathPreviewToScreen === 'function') {
+    var now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    if (!window.__playerPathPreviewLastMs || now - window.__playerPathPreviewLastMs > 80) {
+      window.__playerPathPreviewLastMs = now;
+      try {
+        var previewResult = requestPlayerPathPreviewToScreen(mouse.x, mouse.y, 'hover-preview');
+        if (typeof pushLog === 'function' && (!window.__playerPathPreviewLogMs || now - window.__playerPathPreviewLogMs > 1000)) {
+          window.__playerPathPreviewLogMs = now;
+          pushLog('[PLAYER-PATH-DEBUG] preview ' + JSON.stringify({ ok: !!(previewResult && previewResult.ok), reason: previewResult && previewResult.reason || null, waypoints: previewResult && previewResult.waypoints ? previewResult.waypoints.length : null, mode: __pathPreviewMode }));
+        }
+      } catch (err) {
+        if (typeof pushLog === 'function') pushLog('player-path-preview:error ' + (err && err.message || err));
+      }
+    }
+  }
+
   if (lightState.dragAxis) {
     updateLightAxisDrag();
   } else {
@@ -1051,6 +1070,25 @@ safeListen(canvas, 'mouseenter', (e) => {
   mouse.x = (e.clientX - rect.left) * (VIEW_W / rect.width);
   mouse.y = (e.clientY - rect.top) * (VIEW_H / rect.height);
   mouse.inside = true;
+
+  if (mouse.clickMovePending && e.buttons === 0) mouse.clickMovePending = false;
+
+  var __pathPreviewMode = (typeof getEditorMode === 'function') ? getEditorMode() : (editor && editor.mode || editorMode || settings.editorMode || 'view');
+  if (settings && settings.playerClickMoveEnabled && settings.playerPathDebugEnabled && __pathPreviewMode === 'view' && typeof requestPlayerPathPreviewToScreen === 'function') {
+    var now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    if (!window.__playerPathPreviewLastMs || now - window.__playerPathPreviewLastMs > 80) {
+      window.__playerPathPreviewLastMs = now;
+      try {
+        var previewResult = requestPlayerPathPreviewToScreen(mouse.x, mouse.y, 'hover-preview');
+        if (typeof pushLog === 'function' && (!window.__playerPathPreviewLogMs || now - window.__playerPathPreviewLogMs > 1000)) {
+          window.__playerPathPreviewLogMs = now;
+          pushLog('[PLAYER-PATH-DEBUG] preview ' + JSON.stringify({ ok: !!(previewResult && previewResult.ok), reason: previewResult && previewResult.reason || null, waypoints: previewResult && previewResult.waypoints ? previewResult.waypoints.length : null, mode: __pathPreviewMode }));
+        }
+      } catch (err) {
+        if (typeof pushLog === 'function') pushLog('player-path-preview:error ' + (err && err.message || err));
+      }
+    }
+  }
   if (typeof updatePreview === 'function') {
     try { updatePreview(); } catch (_) {}
   }
@@ -1098,6 +1136,25 @@ safeListen(canvas, 'mousedown', (e) => {
   mouse.x = (e.clientX - rect.left) * (VIEW_W / rect.width);
   mouse.y = (e.clientY - rect.top) * (VIEW_H / rect.height);
   mouse.inside = true;
+
+  if (mouse.clickMovePending && e.buttons === 0) mouse.clickMovePending = false;
+
+  var __pathPreviewMode = (typeof getEditorMode === 'function') ? getEditorMode() : (editor && editor.mode || editorMode || settings.editorMode || 'view');
+  if (settings && settings.playerClickMoveEnabled && settings.playerPathDebugEnabled && __pathPreviewMode === 'view' && typeof requestPlayerPathPreviewToScreen === 'function') {
+    var now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    if (!window.__playerPathPreviewLastMs || now - window.__playerPathPreviewLastMs > 80) {
+      window.__playerPathPreviewLastMs = now;
+      try {
+        var previewResult = requestPlayerPathPreviewToScreen(mouse.x, mouse.y, 'hover-preview');
+        if (typeof pushLog === 'function' && (!window.__playerPathPreviewLogMs || now - window.__playerPathPreviewLogMs > 1000)) {
+          window.__playerPathPreviewLogMs = now;
+          pushLog('[PLAYER-PATH-DEBUG] preview ' + JSON.stringify({ ok: !!(previewResult && previewResult.ok), reason: previewResult && previewResult.reason || null, waypoints: previewResult && previewResult.waypoints ? previewResult.waypoints.length : null, mode: __pathPreviewMode }));
+        }
+      } catch (err) {
+        if (typeof pushLog === 'function') pushLog('player-path-preview:error ' + (err && err.message || err));
+      }
+    }
+  }
   if (typeof updatePreview === 'function' && (editor.mode === 'place' || editor.mode === 'drag' || editor.mode === 'delete')) {
     try { updatePreview(); } catch (_) {}
   }
@@ -1128,6 +1185,15 @@ safeListen(canvas, 'mousedown', (e) => {
   }
 
   if (editor.mode === 'view') {
+    if (e.button === 0 && settings && settings.playerClickMoveEnabled) {
+      mouse.draggingView = false;
+      mouse.clickMovePending = true;
+      mouse.viewDownX = mouse.x;
+      mouse.viewDownY = mouse.y;
+      pushLog(`mouse: click-move-pending at (${mouse.x.toFixed(1)},${mouse.y.toFixed(1)})`);
+      e.preventDefault();
+      return;
+    }
     startCameraInteractionProfile('drag');
     mouse.draggingView = true;
     mouse.panStartX = mouse.x;
@@ -1182,12 +1248,37 @@ safeListen(canvas, 'mousedown', (e) => {
   }
 }, 'canvas:mousedown');
 safeListen(window, 'mouseup', () => {
+  if (mouse.clickMovePending) {
+    var dxClickMove = mouse.x - (mouse.viewDownX || mouse.x);
+    var dyClickMove = mouse.y - (mouse.viewDownY || mouse.y);
+    mouse.clickMovePending = false;
+    var __clickMoveMode = (typeof getEditorMode === 'function') ? getEditorMode() : (editor && editor.mode || editorMode || settings.editorMode || 'view');
+    if (__clickMoveMode === 'view' && settings && settings.playerClickMoveEnabled && Math.hypot(dxClickMove, dyClickMove) < 8) {
+      if (typeof requestPlayerClickMoveToScreen === 'function') {
+        var pathResultClick = requestPlayerClickMoveToScreen(mouse.x, mouse.y, 'view-click');
+        pushLog('mouse: view-click pathfind ' + JSON.stringify({ ok: !!(pathResultClick && pathResultClick.ok), reason: pathResultClick && pathResultClick.reason || null, target: pathResultClick && pathResultClick.target || null, waypoints: pathResultClick && pathResultClick.waypoints ? pathResultClick.waypoints.length : null }));
+        refreshInspectorPanels();
+      } else {
+        pushLog('mouse: view-click pathfind unavailable');
+      }
+    } else {
+      pushLog('mouse: click-move-cancelled movement=' + Math.hypot(dxClickMove, dyClickMove).toFixed(1));
+    }
+    return;
+  }
+
   if (mouse.draggingView) {
     pushLog(`mouse: end-pan camera=(${camera.x.toFixed(1)},${camera.y.toFixed(1)})`);
     if (editor.mode === 'view' && !lightState.dragAxis) {
       var dx = mouse.x - (mouse.viewDownX || mouse.panStartX || mouse.x);
       var dy = mouse.y - (mouse.viewDownY || mouse.panStartY || mouse.y);
       if (Math.hypot(dx, dy) < 6) {
+        if (settings && settings.playerClickMoveEnabled && typeof requestPlayerClickMoveToScreen === 'function') {
+          var pathResult = requestPlayerClickMoveToScreen(mouse.x, mouse.y, 'view-click');
+          pushLog('mouse: view-click pathfind ' + JSON.stringify({ ok: !!(pathResult && pathResult.ok), reason: pathResult && pathResult.reason || null, target: pathResult && pathResult.target || null, waypoints: pathResult && pathResult.waypoints ? pathResult.waypoints.length : null }));
+          refreshInspectorPanels();
+          return;
+        }
         var picked = pickBoxAtScreen(mouse.x, mouse.y);
         var targetInst = picked ? callPlacementBridge('findInstanceForBox', [picked], { source: 'presentation.app:view-select-find-instance' }) : null;
         if (targetInst) {

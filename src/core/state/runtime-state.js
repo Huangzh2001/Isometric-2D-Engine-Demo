@@ -43,10 +43,20 @@ var settings = {
   playerProxyW: 0.32,
   playerProxyD: 0.24,
   playerMaxStepUpCells: 1,
+  playerAutoStepByHeightEnabled: true,
+  playerStepOverEnabled: true,
+  playerClickMoveEnabled: false,
+  playerPathDebugEnabled: false,
+  playerPathAlgorithm: 'astar',
+  playerPathStopDistanceCells: 0.08,
   playerJumpDurationSec: 0.18,
   playerJumpLiftCells: 0.35,
   playerDropDurationSec: 0.16,
   playerDropLiftCells: 0.16,
+  playerOcclusionFadeEnabled: true,
+  playerOcclusionFadeAlpha: 0.75,
+  playerOcclusionFadeInflatePx: 12,
+  playerOcclusionDebugBoundsEnabled: false,
   tileW: BASE_TILE_W,
   tileH: BASE_TILE_H,
   subTileGridEnabled: false,
@@ -74,6 +84,21 @@ var player = {
     t: 0,
     duration: 0.18,
     lift: 0.35,
+  },
+  path: {
+    active: false,
+    waypoints: [],
+    target: null,
+    status: 'idle',
+    stuckTime: 0,
+    debugPreview: {
+      active: false,
+      source: 'none',
+      target: null,
+      waypoints: [],
+      ok: false,
+      reason: 'idle'
+    }
   },
 };
 var editor = {

@@ -122,6 +122,15 @@ function applySettings() {
   settings.playerHeightCells = clamp(parseFloat(ui.playerHeightCells.value || '1.7'), 0.2, 6);
   settings.playerProxyW = clamp(parseFloat((ui.playerProxyW && ui.playerProxyW.value) || '0.32'), 0.15, 4);
   settings.playerProxyD = clamp(parseFloat((ui.playerProxyD && ui.playerProxyD.value) || '0.24'), 0.15, 4);
+  settings.playerOcclusionFadeEnabled = !!(ui.playerOcclusionFadeEnabled && ui.playerOcclusionFadeEnabled.checked);
+  settings.playerOcclusionFadeAlpha = clamp(parseFloat((ui.playerOcclusionFadeAlpha && ui.playerOcclusionFadeAlpha.value) || '0.75'), 0.10, 1.00);
+  settings.playerOcclusionFadeInflatePx = clamp(parseFloat((ui.playerOcclusionFadeInflatePx && ui.playerOcclusionFadeInflatePx.value) || '12'), 0, 64);
+  settings.playerOcclusionDebugBoundsEnabled = !!(ui.playerOcclusionDebugBoundsEnabled && ui.playerOcclusionDebugBoundsEnabled.checked);
+  settings.playerClickMoveEnabled = !!(ui.playerClickMoveEnabled && ui.playerClickMoveEnabled.checked);
+  settings.playerPathDebugEnabled = !!(ui.playerPathDebugEnabled && ui.playerPathDebugEnabled.checked);
+  settings.playerPathAlgorithm = (ui.playerPathAlgorithm && ui.playerPathAlgorithm.value) || 'astar';
+  settings.playerAutoStepByHeightEnabled = !!(ui.playerAutoStepByHeightEnabled && ui.playerAutoStepByHeightEnabled.checked);
+  settings.playerStepOverEnabled = ui.playerStepOverEnabled ? !!ui.playerStepOverEnabled.checked : true;
   applyWorldDisplayScale(requestedWorldDisplayScale, null, null, { source: 'ui:applySettings', forceApply: true });
   settings.originX = VIEW_W * 0.57;
   settings.originY = 150;
@@ -1403,7 +1412,14 @@ safeListen(ui.showHabboDebugOverlay, 'change', () => { pushLog('ui: showHabboDeb
 safeListen(ui.dumpScene, 'click', () => exportSceneJsonDownload());
 safeListen(ui.dumpCandidate, 'click', () => pushLog(`candidate-json: ${JSON.stringify(editor.preview || null)}`));
 safeListen(ui.applyPlayerSettings, 'click', applySettings);
-safeListen(ui.resetPlayerButton, 'click', () => { resetPlayer(); refreshInspectorPanels(); pushLog('ui: reset player'); });
+safeListen(ui.playerOcclusionFadeEnabled, 'change', () => { applySettings(); pushLog('ui: player occlusion fade enabled=' + (!!ui.playerOcclusionFadeEnabled.checked)); });
+safeListen(ui.playerOcclusionFadeAlpha, 'change', () => { applySettings(); pushLog('ui: player occlusion fade alpha=' + String(ui.playerOcclusionFadeAlpha.value)); });
+safeListen(ui.playerOcclusionFadeInflatePx, 'change', () => { applySettings(); pushLog('ui: player occlusion fade inflatePx=' + String(ui.playerOcclusionFadeInflatePx.value)); });
+safeListen(ui.playerOcclusionDebugBoundsEnabled, 'change', () => { applySettings(); pushLog('ui: player occlusion debug bounds=' + (!!ui.playerOcclusionDebugBoundsEnabled.checked)); });
+safeListen(ui.playerClickMoveEnabled, 'change', () => { applySettings(); if (!settings.playerClickMoveEnabled && typeof cancelPlayerPath === 'function') cancelPlayerPath('ui-disabled'); pushLog('ui: player click move enabled=' + (!!ui.playerClickMoveEnabled.checked)); });
+safeListen(ui.playerPathDebugEnabled, 'change', () => { applySettings(); if (!settings.playerPathDebugEnabled && typeof clearPlayerPathDebugPreview === 'function') clearPlayerPathDebugPreview('ui-disabled'); pushLog('ui: player path debug enabled=' + (!!ui.playerPathDebugEnabled.checked)); });
+safeListen(ui.playerAutoStepByHeightEnabled, 'change', () => { applySettings(); pushLog('ui: player auto step by height=' + (!!ui.playerAutoStepByHeightEnabled.checked)); });
+safeListen(ui.resetPlayerButton, 'click', () => { if (typeof cancelPlayerPath === 'function') cancelPlayerPath('reset-player'); resetPlayer(); refreshInspectorPanels(); pushLog('ui: reset player'); });
 safeListen(ui.saveScene, 'click', async () => { var dispatched = uiDispatchControllerCommand('scene', 'saveLocalScene', ['ui-save-local']); if (dispatched) await dispatched; else { var c = getUiSceneController(); if (c && typeof c.saveLocalScene === 'function') await c.saveLocalScene('ui-save-local'); else await uiSaveSceneTarget({ target: 'local', source: 'ui-save-local' }); } });
 safeListen(ui.loadScene, 'click', async () => { var dispatched = uiDispatchControllerCommand('scene', 'loadLocalScene', ['ui-load-local']); if (dispatched) await dispatched; else { var c = getUiSceneController(); if (c && typeof c.loadLocalScene === 'function') await c.loadLocalScene('ui-load-local'); else await uiLoadSceneTarget({ target: 'local', source: 'ui-load-local' }); } });
 safeListen(ui.saveSceneFile, 'click', async () => {
