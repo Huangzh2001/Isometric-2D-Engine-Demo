@@ -53,4 +53,14 @@ surface = api.buildVisibleSurfaceCache([
 faces = facesById(surface);
 assert(!faces.a.includes('east'), 'stale slopeDirection alone must not classify a normal cube as a slope/non-occluder');
 
+
+// Liquid occupancy regression: render-visible cube faces must not be hidden by
+// adjacent liquid cells, because liquid is visual material, not a solid occluder.
+const liquidOcc = api.buildStructuredVoxelOccupancy([
+  { x: 0, y: 0, z: 0, w: 1, d: 1, h: 1, prefabId: 'cube_1x1' },
+  { x: 1, y: 0, z: 0, w: 1, d: 1, h: 1, shapeKind: 'liquid_water', liquidType: 'water', prefabId: 'liquid_water_100' }
+]);
+const cubeFacesNextToLiquid = api.getVisibleFacesForVoxelCell({ x: 0, y: 0, z: 0, prefabId: 'cube_1x1' }, liquidOcc);
+assert(cubeFacesNextToLiquid.includes('east'), 'cube side face adjacent to liquid should remain visible');
+
 console.log('render-visibility-core.test.js PASS');

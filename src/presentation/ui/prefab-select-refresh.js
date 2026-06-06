@@ -92,20 +92,54 @@
     } catch (_) {}
     return 'unknown';
   }
+  function isFluidRenderPrefab(prefab) {
+    if (!prefab || typeof prefab !== 'object') return false;
+    var id = String(prefab.id || '').toLowerCase();
+    var shapeKind = String(prefab.shapeKind || '').toLowerCase();
+    var kind = String(prefab.kind || '').toLowerCase();
+    if (id.indexOf('liquid_water') === 0 || shapeKind === 'liquid_water' || kind === 'liquid_water') return true;
+    var voxels = Array.isArray(prefab.voxels) ? prefab.voxels : [];
+    return voxels.some(function (v) {
+      if (!v || typeof v !== 'object') return false;
+      var vk = String(v.shapeKind || v.kind || '').toLowerCase();
+      var lt = String(v.liquidType || v.fluidType || '').toLowerCase();
+      return vk === 'liquid_water' || lt === 'water';
+    });
+  }
+
+  function getObjectPrefabEntries(deps) {
+    var prototypes = getPrototypes(deps);
+    var entries = [];
+    for (var i = 0; i < prototypes.length; i++) {
+      if (isFluidRenderPrefab(prototypes[i])) continue;
+      entries.push({ prefab: prototypes[i], index: i });
+    }
+    return entries;
+  }
+
   function computePrefabSelectSignature(selectedIndex, deps) {
     deps = depsOrEmpty(deps);
     var prototypes = getPrototypes(deps);
-    var safeIndex = clampValue(deps, Number(selectedIndex) || 0, 0, Math.max(0, prototypes.length - 1));
-    var selectedPrefab = prototypes[safeIndex] || null;
+    var entries = getObjectPrefabEntries(deps);
+    var rawIndex = clampValue(deps, Number(selectedIndex) || 0, 0, Math.max(0, prototypes.length - 1));
+    var selectedPrefab = prototypes[rawIndex] || null;
     var selectedPrefabId = selectedPrefab ? String(selectedPrefab.id || '') : '';
+
+    // If the selected prefab belongs to the Fluid page, keep the hidden
+    // backing index but do not force it into the object select list.
+    var visibleSelected = entries.some(function (entry) { return entry.index === rawIndex; });
+    var selectValue = visibleSelected ? rawIndex : (entries.length ? entries[0].index : 0);
     return {
-      selectedIndex: safeIndex,
+      selectedIndex: rawIndex,
+      selectValue: selectValue,
       selectedPrefabId: selectedPrefabId,
       prototypeCount: prototypes.length,
-      optionCount: prototypes.length,
-      signature: [prototypes.length, prototypes.length, selectedPrefabId].join('|')
+      optionCount: entries.length,
+      visibleEntries: entries,
+      signature: [prototypes.length, entries.length, selectedPrefabId, selectValue].join('|')
     };
   }
+
   function logPrefabSelectSkip(kind, requestId, source, extra, deps) {
     deps = depsOrEmpty(deps);
     var now = Date.now();
@@ -183,7 +217,7 @@
     if (prefabSelectRefreshGuard.lastSignature === state.signature
         && ui.prefabSelect.options
         && ui.prefabSelect.options.length === state.optionCount
-        && String(ui.prefabSelect.value || '') === String(state.selectedIndex)) {
+        && String(ui.prefabSelect.value || '') === String(state.selectValue)) {
       logPrefabSelectSkip('same-signature', requestId, source, {
         signature: state.signature,
         count: prefabSelectRefreshGuard.sameSignatureSkipCount + 1,
@@ -205,7 +239,10 @@
       + ' beforeValue=' + JSON.stringify(beforeValue));
     try {
       ui.prefabSelect.innerHTML = '';
-      prototypes.forEach(function (prefab, idx) {
+      var visibleEntries = Array.isArray(state.visibleEntries) ? state.visibleEntries : getObjectPrefabEntries(deps);
+      visibleEntries.forEach(function (entry) {
+        var prefab = entry.prefab;
+        var idx = entry.index;
         try {
           var variant = typeof deps.prefabVariant === 'function' ? deps.prefabVariant(prefab, 0) : null;
           var doc = deps.document || global.document;
@@ -226,7 +263,7 @@
           ui.prefabSelect.appendChild(fallbackOpt);
         }
       });
-      ui.prefabSelect.value = String(state.selectedIndex);
+      ui.prefabSelect.value = String(state.selectValue);
       prefabSelectRefreshGuard.lastSignature = state.signature;
       prefabSelectRefreshGuard.lastSelectedPrefabId = state.selectedPrefabId;
       log(deps, '[prefab-select] refresh-done requestId=' + requestId

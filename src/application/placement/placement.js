@@ -998,6 +998,22 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
     }
     for (var i = 0; i < variant.voxels.length; i++) {
       var v = variant.voxels[i];
+      // Metadata preservation regression markers: liquidDepth: v.liquidDepth / waterAmount: v.waterAmount
+      var voxelShapeKind = v.shapeKind || prefab.shapeKind || null;
+      var voxelLiquidType = v.liquidType != null ? String(v.liquidType) : (v.fluidType != null ? String(v.fluidType) : null);
+      var isRuntimeLiquidVoxel = String(voxelShapeKind || '').toLowerCase() === 'liquid_water'
+        || String(voxelLiquidType || '').toLowerCase() === 'water'
+        || String(prefab.id || '').indexOf('liquid_water') === 0;
+      var instanceWaterAmount = instance && instance.waterAmount != null
+        ? Math.max(0, Math.min(1, Number(instance.waterAmount) || 0))
+        : (instance && instance.fluidAmount != null ? Math.max(0, Math.min(1, Number(instance.fluidAmount) || 0)) : null);
+      var instanceRenderLevel = instance && instance.renderWaterLevel != null
+        ? Math.max(0, Math.min(1, Number(instance.renderWaterLevel) || 0))
+        : (instance && instance.liquidDepth != null ? Math.max(0, Math.min(1, Number(instance.liquidDepth) || 0)) : instanceWaterAmount);
+      var voxelLiquidDepth = v.liquidDepth != null ? Math.max(0, Math.min(1, Number(v.liquidDepth) || 0)) : (v.waterAmount != null ? Math.max(0, Math.min(1, Number(v.waterAmount) || 0)) : null);
+      var voxelWaterAmount = v.waterAmount != null ? Math.max(0, Math.min(1, Number(v.waterAmount) || 0)) : voxelLiquidDepth;
+      var renderLevel = isRuntimeLiquidVoxel && instanceRenderLevel != null ? instanceRenderLevel : voxelLiquidDepth;
+      var logicalAmount = isRuntimeLiquidVoxel && instanceWaterAmount != null ? instanceWaterAmount : voxelWaterAmount;
       out.push({
         id: assignIds ? (nextBoxId + i) : i + 1,
         instanceId: instance.instanceId,
@@ -1008,9 +1024,17 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
         z: Number(instance.z || 0) + Number(v.z || 0),
         w: Math.max(0.001, Number(v.w != null ? v.w : 1) || 1),
         d: Math.max(0.001, Number(v.d != null ? v.d : 1) || 1),
-        h: Math.max(0.001, Number(v.h != null ? v.h : 1) || 1),
-        shapeKind: v.shapeKind || prefab.shapeKind || null,
+        h: isRuntimeLiquidVoxel && renderLevel != null ? Math.max(0.001, Number(renderLevel) || 0.001) : Math.max(0.001, Number(v.h != null ? v.h : 1) || 1),
+        shapeKind: voxelShapeKind,
         slopeDirection: v.slopeDirection || prefab.slopeDirection || null,
+        liquidType: voxelLiquidType,
+        fluidType: v.fluidType != null ? String(v.fluidType) : (v.liquidType != null ? String(v.liquidType) : null),
+        liquidDepth: renderLevel,
+        waterAmount: logicalAmount,
+        fluidAmount: isRuntimeLiquidVoxel && logicalAmount != null ? logicalAmount : (v.fluidAmount != null ? Math.max(0, Math.min(1, Number(v.fluidAmount) || 0)) : null),
+        renderWaterLevel: isRuntimeLiquidVoxel && renderLevel != null ? renderLevel : null,
+        fluidRuntimeAmount: isRuntimeLiquidVoxel && logicalAmount != null ? logicalAmount : null,
+        fluidRenderPrototype: v.fluidRenderPrototype === true,
         collisionPolygon2d: Array.isArray(v.collisionPolygon2d) ? v.collisionPolygon2d.map(function (pt) { return { x: Number(instance.x || 0) + Number(pt && pt.x || 0), y: Number(instance.y || 0) + Number(pt && pt.y || 0) }; }) : null,
         renderHidden: v.renderHidden === true,
         collisionOnly: v.collisionOnly === true,

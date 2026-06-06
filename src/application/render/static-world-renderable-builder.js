@@ -382,6 +382,210 @@
     });
   }
 
+  function getLiquidRenderCoreApi() {
+    try {
+      return (global && (global.__LIQUID_RENDER_CORE__ || (global.App && global.App.domain && global.App.domain.liquidRenderCore))) || null;
+    } catch (_) { return null; }
+  }
+
+  function getFluidRenderConfigCoreApi() {
+    try {
+      return (global && (global.__FLUID_RENDER_CONFIG_CORE__ || (global.App && global.App.domain && global.App.domain.fluidRenderConfigCore))) || null;
+    } catch (_) { return null; }
+  }
+
+  function getFluidSurfaceSubdivisions() {
+    var api = getFluidRenderConfigCoreApi();
+    if (api && typeof api.getSurfaceSubdivisions === 'function') {
+      try { return api.getSurfaceSubdivisions(); } catch (_) {}
+    }
+    return 2;
+  }
+
+  function getFluidEdgeCurveStrength() {
+    var api = getFluidRenderConfigCoreApi();
+    if (api && typeof api.getEdgeCurveStrength === 'function') {
+      try { return api.getEdgeCurveStrength(); } catch (_) {}
+    }
+    return 0;
+  }
+
+  function isLiquidLikeRenderBoxForStaticVisibility(box) {
+    if (!box || typeof box !== 'object') return false;
+    var shapeKind = String(box.shapeKind || '').toLowerCase();
+    var prefabId = String(box.prefabId || '').toLowerCase();
+    var kind = String(box.kind || '').toLowerCase();
+    var liquidType = String(box.liquidType || box.fluidType || '').toLowerCase();
+    return shapeKind === 'liquid_water'
+      || kind === 'liquid_water'
+      || prefabId.indexOf('liquid_water') === 0
+      || liquidType === 'water';
+  }
+
+  function containsLiquidLikeRenderBox(list) {
+    var boxes = Array.isArray(list) ? list : [];
+    for (var i = 0; i < boxes.length; i++) {
+      if (isLiquidLikeRenderBoxForStaticVisibility(boxes[i])) return true;
+    }
+    return false;
+  }
+
+  function buildVisibilityOccupancyWithoutLiquids(chunkBoxes, neighborBoxes, visibilityCore, fallbackReader) {
+    // Do not use scene-level render occupancy when liquid boxes are present.
+    // That global occupancy can include liquid cells, and liquid must not cull
+    // cube side faces.  Build a visibility-only structured occupancy through
+    // render-visibility-core; it deliberately excludes liquid-like cells.
+    var local = Array.isArray(chunkBoxes) ? chunkBoxes : [];
+    var neighbors = Array.isArray(neighborBoxes) ? neighborBoxes : [];
+    if (!containsLiquidLikeRenderBox(local) && !containsLiquidLikeRenderBox(neighbors)) return fallbackReader;
+    if (visibilityCore && typeof visibilityCore.buildStructuredVoxelOccupancy === 'function') {
+      try { return visibilityCore.buildStructuredVoxelOccupancy(local.concat(neighbors)); } catch (_) {}
+    }
+    return fallbackReader;
+  }
+
+  function liquidPacketFaceTie(face) {
+    var f = String(face || '');
+    if (f === 'top') return 0.004;
+    if (f === 'east') return 0.003;
+    if (f === 'south') return 0.0035;
+    return 0.002;
+  }
+
+  function liquidPacketSortOffset(face) {
+    // Liquid is not a separate under-object layer. It is a normal world packet:
+    // rules prevent same-cell solid overlap, and sorting follows the same
+    // voxel footprint order as ordinary static boxes.
+    return 0;
+  }
+
+  function averageWorldPoint(points) {
+    var pts = Array.isArray(points) ? points : [];
+    if (!pts.length) return { x: 0, y: 0, z: 0 };
+    var x = 0, y = 0, z = 0;
+    for (var i = 0; i < pts.length; i++) {
+      x += Number(pts[i] && pts[i].x || 0);
+      y += Number(pts[i] && pts[i].y || 0);
+      z += Number(pts[i] && pts[i].z || 0);
+    }
+    return { x: x / pts.length, y: y / pts.length, z: z / pts.length };
+  }
+
+  function getLiquidSortHeight(sortCell) {
+    var h = Number(sortCell && (sortCell.renderWaterLevel != null ? sortCell.renderWaterLevel : (sortCell.liquidDepth != null ? sortCell.liquidDepth : sortCell.h)));
+    if (!Number.isFinite(h) || h <= 0) h = 0.001;
+    return Math.max(0.001, Math.min(1, h));
+  }
+
+  function computeLiquidRenderableSortMeta(sortCell, currentViewRotation, computeViewAwareSortMeta, domainCore) {
+    var cellX = Number(sortCell && sortCell.x || 0);
+    var cellY = Number(sortCell && sortCell.y || 0);
+    var cellZ = Number(sortCell && sortCell.z || 0);
+    var h = getLiquidSortHeight(sortCell);
+    if (domainCore && typeof domainCore.computeVoxelRenderableSort === 'function') {
+      try {
+        return domainCore.computeVoxelRenderableSort({
+          cell: { x: cellX, y: cellY, z: cellZ, w: 1, d: 1, h: h },
+          x: cellX,
+          y: cellY,
+          z: cellZ,
+          w: 1,
+          d: 1,
+          h: h,
+          viewRotation: currentViewRotation
+        }) || {};
+      } catch (_) {}
+    }
+    if (typeof computeViewAwareSortMeta === 'function') {
+      try { return computeViewAwareSortMeta({ x: cellX, y: cellY, z: cellZ }, h, currentViewRotation) || {}; } catch (_) {}
+    }
+    return { sortKey: cellX + cellY + cellZ + h, tie: cellZ * 100000 + cellY * 100 + cellX };
+  }
+
+  function buildLiquidRenderPacketsForChunk(localBoxes, neighborBoxes, currentViewRotation, computeViewAwareSortMeta, domainCore) {
+    var api = getLiquidRenderCoreApi();
+    if (!api || typeof api.buildLiquidFaces !== 'function') return [];
+    var local = Array.isArray(localBoxes) ? localBoxes : [];
+    var all = local.concat(Array.isArray(neighborBoxes) ? neighborBoxes : []);
+    var faces = [];
+    try { faces = api.buildLiquidFaces(local, all, { currentViewRotation: currentViewRotation, surfaceSubdivisions: getFluidSurfaceSubdivisions(), edgeCurveStrength: getFluidEdgeCurveStrength() }) || []; } catch (_) { faces = []; }
+    var packets = [];
+    for (var i = 0; i < faces.length; i++) {
+      var face = faces[i] || {};
+      var cell = face.cell || null;
+      // liquid-render-core keeps cell as source-free face geometry; recover a stable
+      // cell anchor from the world face if no cell reference is carried.
+      var anchor = averageWorldPoint(face.worldPts || []);
+      var sortCell = cell || { x: Math.floor(Number(anchor.x || 0)), y: Math.floor(Number(anchor.y || 0)), z: Math.floor(Number(anchor.z || 0)) };
+      var orderMeta = computeLiquidRenderableSortMeta(sortCell, currentViewRotation, computeViewAwareSortMeta, domainCore);
+      orderMeta = orderMeta || {};
+      var semanticFace = String(face.semanticFace || 'top');
+      var screenFace = String(face.screenFace || semanticFace);
+      var cellX = Number(sortCell.x || 0);
+      var cellY = Number(sortCell.y || 0);
+      var cellZ = Number(sortCell.z || 0);
+      var edgeHint = String(face.edgeHint || 'none');
+      var id = 'liquid-water-' + cellX + '-' + cellY + '-' + cellZ + '-' + semanticFace + '-' + String(face.liquidFaceKind || 'face') + '-' + edgeHint;
+      packets.push({
+        id: id,
+        kind: 'static-world-face-packet',
+        liquidRenderPacket: true,
+        liquidFaceKind: face.liquidFaceKind || null,
+        edgeHint: face.edgeHint || null,
+        sortKey: Number(orderMeta.sortKey || ((cellX + cellY) * 100 + cellZ * 10)) + liquidPacketSortOffset(screenFace),
+        tie: Number(orderMeta.tie || 0) + liquidPacketFaceTie(screenFace),
+        sortViewRotation: currentViewRotation,
+        itemRotation: 0,
+        sortWorldAnchor: { x: cellX, y: cellY, z: cellZ, h: 1 },
+        sortRotatedPoint: orderMeta.rotatedPoint || null,
+        instanceId: sortCell.instanceId || null,
+        prefabId: sortCell.prefabId || null,
+        renderPath: 'liquid-render-v16-liquid-not-solid-occluder',
+        cacheViewRotation: currentViewRotation,
+        cacheContentType: 'world-face-packets',
+        chunkKey: null,
+        cameraIndependent: true,
+        usesScreenSpaceCache: false,
+        semanticFace: semanticFace,
+        screenFace: screenFace,
+        depthKey: semanticFace === 'top' ? 0 : 1,
+        fill: face.fill || 'rgba(66, 184, 255, 0.42)',
+        stroke: face.stroke || 'rgba(180, 235, 255, 0.52)',
+        texture: null,
+        textureColor: null,
+        semanticTextureSlot: null,
+        semanticTextureSlotColor: null,
+        width: face.width || 1,
+        worldPts: Array.isArray(face.worldPts) ? face.worldPts : [],
+        worldLoops: null,
+        worldOutlineSegments: null,
+        terrainBoundarySegmentsWorld: [],
+        terrainBoundaryStroke: null,
+        terrainBoundaryStrokeWidth: 0,
+        shadowOverlaysWorld: [],
+        box: sortCell || null,
+        cellX: cellX,
+        cellY: cellY,
+        cellZ: cellZ,
+        faceKey: id,
+        actorInteractionMemberFaceKeys: [],
+        actorInteractionMemberDescriptors: [],
+        packetNormal: face.normal || { x: 0, y: 0, z: 1 },
+        mergedFace: false,
+        mergedFaceCount: 1,
+        mergeWidth: 1,
+        mergeHeight: 1,
+        terrainMaterialMergeKey: null,
+        terrainMaterialId: null,
+        terrainMaterialLabel: null,
+        materialType: 'liquid-water',
+        terrainPatternDescriptor: null,
+        terrainPatternOpacity: null
+      });
+    }
+    return packets;
+  }
+
   function buildStaticWorldChunkRenderables(chunk, options, deps) {
     var __deps = deps && typeof deps === 'object' ? deps : {};
     var staticWorldFaceDescriptorBuilder = requireStaticWorldFaceDescriptorBuilder(__deps);
@@ -468,6 +672,7 @@
       neighborBoxes: neighborBoxes
     });
     var chunkOcc = occupancyResolution && occupancyResolution.reader ? occupancyResolution.reader : buildChunkLocalOccupancyMap(chunkBoxes, neighborBoxes);
+    var visibilityOcc = buildVisibilityOccupancyWithoutLiquids(chunkBoxes, neighborBoxes, visibilityCore, chunkOcc);
     var occupancyBuildMs = Math.max(0, perfNow() - occupancyStartAt);
     var usedGlobalOccupancy = occupancyResolution && occupancyResolution.source === 'global';
     var usedLocalOccupancyFallback = !usedGlobalOccupancy;
@@ -480,7 +685,7 @@
     var surfaceCache = visibilityCore && typeof visibilityCore.buildVisibleSurfaceCache === 'function'
       ? visibilityCore.buildVisibleSurfaceCache(chunkBoxes, {
           scope: null,
-          occupancy: chunkOcc,
+          occupancy: visibilityOcc,
           surfaceOnlyRenderingEnabled: cameraScope.surfaceOnlyRenderingEnabled !== false,
           classifyBox: function (box) {
             return {
@@ -914,6 +1119,13 @@
       var arrayPushStartAt = perfNow();
       packets.push(packet);
       step7ArrayPushMs += Math.max(0, perfNow() - arrayPushStartAt);
+    }
+    var liquidPackets = buildLiquidRenderPacketsForChunk(chunkBoxes, neighborBoxes, currentViewRotation, computeViewAwareSortMeta, domainCore);
+    if (liquidPackets.length) {
+      for (var lpi = 0; lpi < liquidPackets.length; lpi++) {
+        if (liquidPackets[lpi] && chunk && chunk.key) liquidPackets[lpi].chunkKey = String(chunk.key);
+        packets.push(liquidPackets[lpi]);
+      }
     }
     var step5BuildPacketsMs = Math.max(0, perfNow() - packetBuildStartAt);
     var staticRenderableBuildStartAt = perfNow();

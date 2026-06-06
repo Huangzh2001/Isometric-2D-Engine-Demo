@@ -16,6 +16,7 @@
       <div class="panelTabs">
         <button id="tabWorld" class="panelTab active">世界</button>
         <button id="tabItems" class="panelTab">物品</button>
+        <button id="tabFluid" class="panelTab">流体</button>
         <button id="tabLights" class="panelTab">灯光</button>
         <button id="tabCamera" class="panelTab">摄像头</button>
         <button id="tabRender" class="panelTab">渲染</button>
@@ -558,6 +559,66 @@
       </div>
       </section>
 
+      <section id="tabFluidPage" class="tabPage">
+      <div class="controls">
+        <div class="group">
+          <h2>流体 / 渲染</h2>
+          <div class="hintBox">当前流体页只管理“渲染原型”：水方块放置与水面显示。后续流体规则、扩散、压强、温度与相变会放到独立的“规则”子项目中。</div>
+          <label>水体分层数量
+            <input id="fluidRenderLayerCount" type="number" min="2" max="64" step="2" value="4">
+          </label>
+          <label>顶面细分数量
+            <input id="fluidRenderSurfaceSubdivisions" type="number" min="2" max="16" step="1" value="2">
+          </label>
+          <label>连线插值曲线强度
+            <input id="fluidRenderEdgeCurveStrength" type="number" min="0" max="1" step="0.05" value="0">
+          </label>
+          <label>水体渲染原型
+            <select id="fluidRenderPrefabSelect"></select>
+          </label>
+          <div class="rowButtons rowButtons2">
+            <button id="fluidRenderPlace" type="button">放置水体</button>
+            <button id="fluidRenderView" type="button">不编辑 / 拖动画面</button>
+          </div>
+          <div id="fluidRenderHint" class="hintBox">选择水体高度后点击“放置水体”，然后在网格上左键放置。这里暂时只验证水体渲染，不包含流动规则。</div>
+        </div>
+
+        <div class="group">
+          <h2>流体 / 规则</h2>
+          <label class="checkRow"><input id="fluidRulesEnabled" type="checkbox"> 启用自动流动</label>
+          <label>更新间隔（秒）
+            <input id="fluidRulesIntervalSec" type="number" min="0.05" max="10" step="0.05" value="0.25">
+          </label>
+          <label>流动速度 flowRate
+            <input id="fluidRulesFlowRate" type="number" min="0" max="1" step="0.01" value="0.20">
+          </label>
+          <label>单方向最大流量
+            <input id="fluidRulesMaxFlow" type="number" min="0" max="1" step="0.01" value="0.08">
+          </label>
+          <label>最小水位差
+            <input id="fluidRulesMinDiff" type="number" min="0" max="1" step="0.005" value="0.03">
+          </label>
+          <label class="checkRow"><input id="fluidRulesDiagonalEnabled" type="checkbox" checked> 允许对角流动</label>
+          <label>对角流动权重
+            <input id="fluidRulesDiagonalWeight" type="number" min="0" max="1" step="0.05" value="0.70">
+          </label>
+          <label class="checkRow"><input id="fluidRulesGravityEnabled" type="checkbox" checked> 启用重力优先下落</label>
+          <label>重力最大流量
+            <input id="fluidRulesGravityMaxFlow" type="number" min="0" max="1" step="0.01" value="1.00">
+          </label>
+          <label>删除阈值
+            <input id="fluidRulesDeleteBelow" type="number" min="0" max="0.25" step="0.001" value="0.005">
+          </label>
+          <div class="rowButtons rowButtons3">
+            <button id="fluidRulesStepOnce" type="button">单步执行</button>
+            <button id="fluidRulesStart" type="button">开始</button>
+            <button id="fluidRulesStop" type="button">停止</button>
+          </div>
+          <div id="fluidRulesStatus" class="hintBox">规则未运行。第一版只做同层 8 邻域守恒扩散；逻辑水量连续，渲染按当前“水体分层数量”量化。</div>
+        </div>
+      </div>
+      </section>
+
       <section id="tabLightsPage" class="tabPage">
       <div class="lightEditor">
         <div class="group">
@@ -831,6 +892,9 @@
   <script src="src/core/domain/static-world-face-merge-core.js"></script>
   <script src="src/core/domain/terrain-face-merge-core.js"></script>
   <script src="src/core/domain/terrain-render-core.js"></script>
+  <script src="src/core/domain/fluid-render-config-core.js"></script>
+  <script src="src/core/domain/liquid-render-core.js"></script>
+  <script src="src/core/domain/fluid-rules-core.js"></script>
   <script src="src/core/domain/render-order-core.js"></script>
   <script src="src/core/domain/player-step-core.js"></script>
   <script src="src/infrastructure/logging/item-rotation-diagnostic-log.js"></script>
@@ -874,6 +938,8 @@
   <script src="src/presentation/ui/ui-camera-render-panel.js"></script>
   <script src="src/presentation/ui/ui-terrain-panel-refresh.js"></script>
   <script src="src/presentation/ui/ui.js?v=20260605-pathfind-algos-v9"></script>
+  <script src="src/presentation/ui/ui-fluid-panel.js"></script>
+  <script src="src/presentation/ui/ui-fluid-rules-panel.js"></script>
   <script src="src/presentation/ui/pixi-backend-test-controls.js?v=20260517-pxm0718o5h1-overlay-toggle"></script>
   <script src="src/presentation/render/interaction/render-logic-interaction-boundary.js"></script>
   <script src="src/presentation/render/interaction/render-hit-test.js"></script>

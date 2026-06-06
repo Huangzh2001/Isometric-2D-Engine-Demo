@@ -174,4 +174,6 @@ assert.strictEqual(result.packets[0].renderPath, 'static-world-chunk-packet', 'r
 assert.strictEqual(result.stats.packetCount, 1, 'stats should include packet count');
 assert(emitted.some((entry) => entry.name === 'emitChunkRebuildDetail'), 'builder should emit chunk rebuild detail through injected hook');
 
+
+
 console.log('static-world-renderable-builder.test.js PASS');

@@ -58,4 +58,19 @@ const deps = { requireRenderOrderCoreForRender: () => orderCore, getDomainSceneC
 assert.strictEqual(api.compareRenderablesByDomain({ sortKey: 1 }, { sortKey: 2 }, deps), -1, 'adapter compare should delegate to order core');
 assert.deepStrictEqual(api.mergeSortedRenderables([{ id: 'a', sortKey: 1 }], [{ id: 'b', sortKey: 0 }], deps).map((x) => x.id), ['b', 'a'], 'adapter merge should use order-core merge');
 
+
+const recursionGuardSandbox = { window: {}, console, Math, Number, String, Object, Array, JSON, Date };
+vm.runInNewContext(source, recursionGuardSandbox, { filename: rel });
+const recursionGuardApi = recursionGuardSandbox.window.__RENDERABLE_ORDER_ADAPTER__;
+let globalWrapperCalls = 0;
+recursionGuardSandbox.window.getViewRotationCoreApi = () => {
+  globalWrapperCalls += 1;
+  throw new Error('global render.js wrapper must not be called by adapter fallback');
+};
+recursionGuardSandbox.window.__VIEW_ROTATION_CORE__ = {
+  computeRenderableSortMeta(args) { return { sortKey: 42, tie: Number(args && args.viewRotation || 0) }; }
+};
+assert.strictEqual(recursionGuardApi.getViewRotationCoreApi({}), recursionGuardSandbox.window.__VIEW_ROTATION_CORE__, 'adapter should read view-rotation core directly instead of global wrapper');
+assert.strictEqual(globalWrapperCalls, 0, 'adapter fallback must not call global getViewRotationCoreApi wrapper');
+
 console.log(JSON.stringify({ status: 'PASS', test: 'renderable-order-adapter-boundary' }, null, 2));

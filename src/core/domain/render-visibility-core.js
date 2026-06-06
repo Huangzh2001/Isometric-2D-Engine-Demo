@@ -115,6 +115,18 @@
       || String(box.kind || '') === 'slope_1x1';
   }
 
+  function isLiquidLikeRenderCell(box) {
+    if (!box || typeof box !== 'object') return false;
+    var shapeKind = String(box.shapeKind || '').toLowerCase();
+    var prefabId = String(box.prefabId || '').toLowerCase();
+    var kind = String(box.kind || '').toLowerCase();
+    var liquidType = String(box.liquidType || box.fluidType || '').toLowerCase();
+    return shapeKind === 'liquid_water'
+      || kind === 'liquid_water'
+      || prefabId.indexOf('liquid_water') === 0
+      || liquidType === 'water';
+  }
+
   function getInstanceOccupancyKey(box) {
     if (!box || typeof box !== 'object') return '';
     if (box.instanceId != null && String(box.instanceId)) return 'instance:' + String(box.instanceId);
@@ -152,6 +164,7 @@
       // occupancy voxel hides side faces of adjacent ordinary cubes and is the
       // source of the “placed cube loses faces” regression.
       if (isSlopeLikeRenderCell(box)) continue;
+      if (isLiquidLikeRenderCell(box)) continue;
       var key = voxelKey(box.x, box.y, box.z);
       occ.global.add(key);
       if (box.generatedBy === 'terrain-generator') occ.terrain.add(key);
@@ -177,6 +190,7 @@
       return occupancyHasKey(occupancy, key);
     }
     if (isSlopeLikeRenderCell(cell)) return false;
+    if (isLiquidLikeRenderCell(cell)) return false;
     var groupKey = getInstanceOccupancyKey(cell);
     if (groupKey && occupancy.byInstance && typeof occupancy.byInstance.get === 'function') {
       var set = occupancy.byInstance.get(groupKey);
@@ -240,6 +254,7 @@
     for (var i = 0; i < list.length; i++) {
       var box = list[i];
       if (!box || typeof box !== 'object') continue;
+      if (isLiquidLikeRenderCell(box)) continue;
       logicalVoxelCountEstimated += 1;
       var info = classifyBox(box) || {};
       if (info.isTerrain) {
@@ -481,6 +496,7 @@
     getRenderableWorldBounds: getRenderableWorldBounds,
     isWithinCameraScope: isWithinCameraScope,
     filterByCameraScope: filterByCameraScope,
+    isLiquidLikeRenderCell: isLiquidLikeRenderCell,
     buildStructuredVoxelOccupancy: buildStructuredVoxelOccupancy,
     getVisibleFacesForVoxelCell: getVisibleFacesForVoxelCell,
     buildVisibleFacesForVoxelStack: buildVisibleFacesForVoxelStack,

@@ -982,12 +982,25 @@
     return false;
   }
 
+  function isLiquidStaticWorldPacket(packet) {
+    if (!packet || typeof packet !== 'object') return false;
+    if (packet.liquidRenderPacket === true) return true;
+    if (String(packet.renderPath || '').indexOf('liquid-render-') === 0) return true;
+    if (String(packet.prefabId || '').indexOf('liquid_water') === 0) return true;
+    return false;
+  }
+
   function splitChunkTextureEligibleItems(items) {
     var out = { chunkItems: [], playerSensitiveItems: [], playerSensitivePacketCount: 0 };
     var list = Array.isArray(items) ? items : [];
     for (var i = 0; i < list.length; i += 1) {
       var item = list[i];
-      if (item && isPlayerSensitiveDemergedPacket(item.packet)) {
+      var packet = item && item.packet;
+      // Liquids are transparent and must interleave with solid voxel faces by
+      // normal packet order. Chunk render textures flatten all packets in a
+      // chunk into one sprite, which breaks water-vs-cube ordering across chunk
+      // and object boundaries. Keep liquid packets in the per-packet path.
+      if (item && (isLiquidStaticWorldPacket(packet) || isPlayerSensitiveDemergedPacket(packet))) {
         out.playerSensitiveItems.push(item);
         out.playerSensitivePacketCount += 1;
       } else {
@@ -1019,6 +1032,7 @@
     h = hashString32(h, p.actorInteractionStableLocalDemerge === true ? 'stable-local-demerge=1' : 'stable-local-demerge=0');
     h = hashString32(h, p.actorInteractionStableDemergeMode || '');
     h = hashString32(h, p.actorInteractionGroupFootprintMode || '');
+    h = hashString32(h, isLiquidStaticWorldPacket(p) ? 'liquid=1' : 'liquid=0');
     return h >>> 0;
   }
 

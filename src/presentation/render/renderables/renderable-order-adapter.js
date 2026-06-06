@@ -20,7 +20,12 @@
   }
 
   function getViewRotationCoreApi(deps) {
-    var getInjected = resolveFunction(deps, 'getViewRotationCoreApi', null);
+    // Do not resolve this through global.getViewRotationCoreApi: render.js keeps a
+    // compatibility wrapper with the same name, and falling back to that wrapper
+    // creates render.js -> adapter -> render.js recursion during renderable builds.
+    var getInjected = deps && typeof deps.getViewRotationCoreApi === 'function'
+      ? deps.getViewRotationCoreApi
+      : null;
     if (getInjected) {
       var injected = getInjected();
       if (injected) return injected;

@@ -61,6 +61,10 @@ function cloneVoxel(v) {
     base: safe.base || null,
     shapeKind: safe.shapeKind || null,
     slopeDirection: safe.slopeDirection != null ? String(safe.slopeDirection) : null,
+    liquidType: safe.liquidType != null ? String(safe.liquidType) : (safe.fluidType != null ? String(safe.fluidType) : null),
+    liquidDepth: safe.liquidDepth != null ? Math.max(0, Math.min(1, finiteNumber(safe.liquidDepth, 1))) : (safe.waterAmount != null ? Math.max(0, Math.min(1, finiteNumber(safe.waterAmount, 1))) : null),
+    waterAmount: safe.waterAmount != null ? Math.max(0, Math.min(1, finiteNumber(safe.waterAmount, 1))) : (safe.liquidDepth != null ? Math.max(0, Math.min(1, finiteNumber(safe.liquidDepth, 1))) : null),
+    fluidRenderPrototype: safe.fluidRenderPrototype === true,
     collisionPolygon2d: Array.isArray(safe.collisionPolygon2d) ? safe.collisionPolygon2d.map(function (pt) { return { x: finiteNumber(pt && pt.x, 0), y: finiteNumber(pt && pt.y, 0) }; }) : null,
     stairRole: safe.stairRole || null,
     stairStepIndex: safe.stairStepIndex != null ? finiteNumber(safe.stairStepIndex, 0) : null,
@@ -629,6 +633,90 @@ function makeVertexQuarterTriPrimitives(base) {
   ];
 }
 
+function makeLiquidWaterVoxel(depth) {
+  var d = Math.max(0.05, Math.min(1, finiteNumber(depth, 0.5)));
+  return {
+    x: 0, y: 0, z: 0, w: 1, d: 1, h: d,
+    solid: false, collidable: false, renderHidden: true,
+    base: '#42b8ff',
+    shapeKind: 'liquid_water',
+    liquidType: 'water',
+    liquidDepth: d,
+    waterAmount: d,
+    fluidRenderPrototype: true
+  };
+}
+
+function normalizeLiquidWaterLayerCount(layerCount) {
+  var n = Math.round(finiteNumber(layerCount, 4));
+  if (n < 2) n = 2;
+  if (n > 64) n = 64;
+  if (n % 2 !== 0) n += 1;
+  if (n > 64) n = 64;
+  return n;
+}
+
+function liquidWaterDepthForLayer(layerIndex, layerCount) {
+  var n = normalizeLiquidWaterLayerCount(layerCount);
+  var i = Math.max(1, Math.min(n, Math.round(finiteNumber(layerIndex, 1))));
+  return i / n;
+}
+
+function liquidWaterLayerPrefabId(layerIndex, layerCount) {
+  var n = normalizeLiquidWaterLayerCount(layerCount);
+  var i = Math.max(1, Math.min(n, Math.round(finiteNumber(layerIndex, 1))));
+  if (n === 4) {
+    if (i === 1) return 'liquid_water_025';
+    if (i === 2) return 'liquid_water_050';
+    if (i === 3) return 'liquid_water_075';
+    return 'liquid_water_100';
+  }
+  var pct = Math.round((i / n) * 1000);
+  return 'liquid_water_l' + n + '_' + String(pct).padStart(4, '0');
+}
+
+function makeLiquidWaterLayerPrefabDef(layerIndex, layerCount) {
+  var n = normalizeLiquidWaterLayerCount(layerCount);
+  var i = Math.max(1, Math.min(n, Math.round(finiteNumber(layerIndex, 1))));
+  var depth = liquidWaterDepthForLayer(i, n);
+  var percent = Math.round(depth * 100);
+  return {
+    key: 'fluid-water-' + n + '-' + i,
+    id: liquidWaterLayerPrefabId(i, n),
+    name: 'Water Render · ' + percent + '%',
+    kind: 'liquid_water',
+    base: '#42b8ff',
+    renderUpdateMode: 'static',
+    supportCells: [],
+    fluidRenderLayerCount: n,
+    fluidRenderLayerIndex: i,
+    fluidRenderDepth: depth,
+    voxels: [makeLiquidWaterVoxel(depth)]
+  };
+}
+
+function ensureLiquidWaterLayerPrefabs(layerCount, meta) {
+  meta = meta || {};
+  var n = normalizeLiquidWaterLayerCount(layerCount);
+  var result = [];
+  for (var i = 1; i <= n; i++) {
+    var def = makeLiquidWaterLayerPrefabDef(i, n);
+    var prefab = registerPrefab(def, { source: meta.source || 'ensureLiquidWaterLayerPrefabs' });
+    var idx = prototypes.findIndex(function (p) { return p && p.id === prefab.id; });
+    result.push({
+      prefab: prefab,
+      index: idx,
+      id: prefab.id,
+      depth: liquidWaterDepthForLayer(i, n),
+      layerIndex: i,
+      layerCount: n
+    });
+  }
+  prefabWrite('ensureLiquidWaterLayerPrefabs', { source: meta.source || 'unknown', layerCount: n, generated: result.length, prototypeCount: prototypes.length });
+  return result;
+}
+
+
 function makeMcStairStepVoxels(stepCount, stepLimit, base) {
   var n = Math.max(2, Math.round(Number(stepCount) || 2));
   var limit = Math.max(0, finiteNumber(stepLimit, Math.min(0.6, 1 / n + 0.1)));
@@ -658,6 +746,10 @@ var prototypes = [
   normalizePrefab({ key: '2', id: 'debug_rect_2x1_5faces', name: 'Debug Rect 2×1 · 5 Faces', base: '#d4bb90', renderUpdateMode: 'dynamic', spriteStrategyHint: 'single', itemRotationDebug: true, semanticTextureMap: DEBUG_5FACE_TEXTURE_MAP, semanticTextures: DEBUG_5FACE_TEXTURE_MAP, semanticFaceColors: { top: '#2F80ED', north: '#E74C3C', east: '#27AE60', south: '#F2C94C', west: '#9B51E0' }, voxels: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }] }),
   normalizePrefab({ key: '3', id: 'cube_1x1', name: 'Cube', base: '#c7b0df', renderUpdateMode: 'static', voxels: [{ x: 0, y: 0, z: 0 }] }),
   normalizePrefab({ key: '3s', id: 'slope_1x1', name: 'Slope · 1×1', kind: 'slope_1x1', base: '#79b35a', renderUpdateMode: 'static', supportCells: [{ x: 0, y: 0, localZ: 0 }], slopeDirection: 'east', voxels: [{ x: 0, y: 0, z: 0, solid: true, collidable: true, shapeKind: 'slope_1x1', slopeDirection: 'east' }] }),
+  normalizePrefab({ key: '3w25', id: 'liquid_water_025', name: 'Water Render · 25%', kind: 'liquid_water', base: '#42b8ff', renderUpdateMode: 'static', supportCells: [], voxels: [makeLiquidWaterVoxel(0.25)] }),
+  normalizePrefab({ key: '3w50', id: 'liquid_water_050', name: 'Water Render · 50%', kind: 'liquid_water', base: '#42b8ff', renderUpdateMode: 'static', supportCells: [], voxels: [makeLiquidWaterVoxel(0.50)] }),
+  normalizePrefab({ key: '3w75', id: 'liquid_water_075', name: 'Water Render · 75%', kind: 'liquid_water', base: '#42b8ff', renderUpdateMode: 'static', supportCells: [], voxels: [makeLiquidWaterVoxel(0.75)] }),
+  normalizePrefab({ key: '3w100', id: 'liquid_water_100', name: 'Water Render · 100%', kind: 'liquid_water', base: '#42b8ff', renderUpdateMode: 'static', supportCells: [], voxels: [makeLiquidWaterVoxel(1.00)] }),
   normalizePrefab({ key: '3a', id: 'stair_mc_2step', name: 'MC Stair · 2-step', kind: 'stair_mc', base: '#c99568', renderUpdateMode: 'dynamic', supportCells: [{ x: 0, y: 0, localZ: 0 }], voxels: makeMcStairStepVoxels(2, 0.6, '#c99568') }),
   normalizePrefab({ key: '3b', id: 'stair_mc_4step', name: 'MC Stair · 4-step', kind: 'stair_mc', base: '#c99568', renderUpdateMode: 'dynamic', supportCells: [{ x: 0, y: 0, localZ: 0 }], voxels: makeMcStairStepVoxels(4, 0.35, '#c99568') }),
   normalizePrefab({ key: '3c', id: 'stair_mc_8step', name: 'MC Stair · 8-step', kind: 'stair_mc', base: '#c99568', renderUpdateMode: 'dynamic', supportCells: [{ x: 0, y: 0, localZ: 0 }], voxels: makeMcStairStepVoxels(8, 0.2, '#c99568') }),
@@ -892,6 +984,10 @@ var PREFAB_REGISTRY_API = {
   summarize: summarizePrefabRegistry,
   getPrefabById: getPrefabById,
   prefabVariant: prefabVariant,
+  normalizeLiquidWaterLayerCount: normalizeLiquidWaterLayerCount,
+  liquidWaterLayerPrefabId: liquidWaterLayerPrefabId,
+  makeLiquidWaterLayerPrefabDef: makeLiquidWaterLayerPrefabDef,
+  ensureLiquidWaterLayerPrefabs: ensureLiquidWaterLayerPrefabs,
   getPrototypeCount: function () { return prototypes.length; },
   getBuiltInCount: function () { return prototypes.filter(function (p) { return !p.custom && !p.assetManaged && !p.externalManaged; }).length; },
   getPrototypes: function () { return prototypes; }
