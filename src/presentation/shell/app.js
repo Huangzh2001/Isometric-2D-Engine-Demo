@@ -1285,10 +1285,12 @@ safeListen(window, 'mouseup', () => {
           setSelectedInstance(targetInst.instanceId);
           setActivePanelTab('items');
           refreshInspectorPanels();
+          try { if (window.__SELECTION_HIGHLIGHT_PANEL__ && typeof window.__SELECTION_HIGHLIGHT_PANEL__.refreshStatus === 'function') window.__SELECTION_HIGHLIGHT_PANEL__.refreshStatus(); } catch (_) {}
           pushLog(`inspect: selected ${targetInst.instanceId}:${getPrefabById(targetInst.prefabId).name}`);
         } else {
           clearSelectedInstance();
           refreshInspectorPanels();
+          try { if (window.__SELECTION_HIGHLIGHT_PANEL__ && typeof window.__SELECTION_HIGHLIGHT_PANEL__.refreshStatus === 'function') window.__SELECTION_HIGHLIGHT_PANEL__.refreshStatus(); } catch (_) {}
           pushLog('inspect: cleared selection');
         }
       }

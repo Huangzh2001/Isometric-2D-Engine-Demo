@@ -1014,6 +1014,14 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
       var voxelWaterAmount = v.waterAmount != null ? Math.max(0, Math.min(1, Number(v.waterAmount) || 0)) : voxelLiquidDepth;
       var renderLevel = isRuntimeLiquidVoxel && instanceRenderLevel != null ? instanceRenderLevel : voxelLiquidDepth;
       var logicalAmount = isRuntimeLiquidVoxel && instanceWaterAmount != null ? instanceWaterAmount : voxelWaterAmount;
+      var isTerrainHeightSurfaceVoxel = String(voxelShapeKind || '').toLowerCase() === 'terrain_height_surface'
+        || String(prefab.kind || '').toLowerCase() === 'terrain_height_surface'
+        || String(prefab.id || '').indexOf('terrain_height_') === 0;
+      var instanceTerrainHeight = instance && instance.terrainHeight != null
+        ? Math.max(0.05, Math.min(2, Number(instance.terrainHeight) || 1))
+        : (instance && instance.terrainSurfaceHeight != null ? Math.max(0.05, Math.min(2, Number(instance.terrainSurfaceHeight) || 1)) : null);
+      var voxelTerrainHeight = v.terrainHeight != null ? Math.max(0.05, Math.min(2, Number(v.terrainHeight) || 1)) : (v.terrainSurfaceHeight != null ? Math.max(0.05, Math.min(2, Number(v.terrainSurfaceHeight) || 1)) : null);
+      var terrainHeightValue = isTerrainHeightSurfaceVoxel ? (instanceTerrainHeight != null ? instanceTerrainHeight : (voxelTerrainHeight != null ? voxelTerrainHeight : Math.max(0.05, Math.min(2, Number(v.h != null ? v.h : 1) || 1)))) : null;
       out.push({
         id: assignIds ? (nextBoxId + i) : i + 1,
         instanceId: instance.instanceId,
@@ -1024,7 +1032,7 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
         z: Number(instance.z || 0) + Number(v.z || 0),
         w: Math.max(0.001, Number(v.w != null ? v.w : 1) || 1),
         d: Math.max(0.001, Number(v.d != null ? v.d : 1) || 1),
-        h: isRuntimeLiquidVoxel && renderLevel != null ? Math.max(0.001, Number(renderLevel) || 0.001) : Math.max(0.001, Number(v.h != null ? v.h : 1) || 1),
+        h: isTerrainHeightSurfaceVoxel && terrainHeightValue != null ? Math.max(0.05, Number(terrainHeightValue) || 1) : (isRuntimeLiquidVoxel && renderLevel != null ? Math.max(0.001, Number(renderLevel) || 0.001) : Math.max(0.001, Number(v.h != null ? v.h : 1) || 1)),
         shapeKind: voxelShapeKind,
         slopeDirection: v.slopeDirection || prefab.slopeDirection || null,
         liquidType: voxelLiquidType,
@@ -1034,6 +1042,9 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
         fluidAmount: isRuntimeLiquidVoxel && logicalAmount != null ? logicalAmount : (v.fluidAmount != null ? Math.max(0, Math.min(1, Number(v.fluidAmount) || 0)) : null),
         renderWaterLevel: isRuntimeLiquidVoxel && renderLevel != null ? renderLevel : null,
         fluidRuntimeAmount: isRuntimeLiquidVoxel && logicalAmount != null ? logicalAmount : null,
+        terrainHeight: isTerrainHeightSurfaceVoxel && terrainHeightValue != null ? terrainHeightValue : (v.terrainHeight != null ? Number(v.terrainHeight) : null),
+        terrainSurfaceHeight: isTerrainHeightSurfaceVoxel && terrainHeightValue != null ? terrainHeightValue : (v.terrainSurfaceHeight != null ? Number(v.terrainSurfaceHeight) : null),
+        terrainHeightSurfacePrototype: isTerrainHeightSurfaceVoxel || v.terrainHeightSurfacePrototype === true,
         fluidRenderPrototype: v.fluidRenderPrototype === true,
         collisionPolygon2d: Array.isArray(v.collisionPolygon2d) ? v.collisionPolygon2d.map(function (pt) { return { x: Number(instance.x || 0) + Number(pt && pt.x || 0), y: Number(instance.y || 0) + Number(pt && pt.y || 0) }; }) : null,
         renderHidden: v.renderHidden === true,

@@ -67,6 +67,26 @@
           <input id="sceneImportFileInput" type="file" accept=".json,application/json" style="display:none">
           <div id="sceneFileStatus" class="hintBox">场景文件：未连接默认文件。</div>
         </div>
+
+        <div class="group">
+          <h2>世界 / 多场景文件</h2>
+          <label>选择世界
+            <select id="worldSceneSelect"></select>
+          </label>
+          <label>新世界文件名
+            <input id="worldSceneName" type="text" placeholder="fluid_demo.json">
+          </label>
+          <div class="rowButtons rowButtons3">
+            <button id="refreshWorldScenes" type="button">刷新列表</button>
+            <button id="loadWorldScene" type="button">加载选择</button>
+            <button id="saveWorldScene" type="button">保存当前</button>
+          </div>
+          <div class="rowButtons rowButtons2">
+            <button id="saveWorldSceneAs" type="button">另存为新世界</button>
+            <button id="newWorldScene" type="button">新建空世界并保存</button>
+          </div>
+          <div id="worldSceneStatus" class="hintBox">多世界：读取中。每个世界保存为 assets/scenes/ 下的一个 JSON 文件。</div>
+        </div>
       </div>
       </section>
 
@@ -75,6 +95,16 @@
         <div class="group inspectorGroup">
           <h2>测试 / Diagnostics</h2>
           <div id="worldRendererEngineStatus" class="hintBox">当前世界渲染引擎：读取中。</div>
+        </div>
+
+        <div class="group">
+          <h2>Debug / 选择高光</h2>
+          <label><input id="selectedInstanceEdgeHighlightEnabled" type="checkbox" checked> 显示选中方块蓝色虚线边缘</label>
+          <div class="rowButtons rowButtons2">
+            <button id="clearSelectedInstanceHighlight" type="button">清除选择</button>
+            <button id="focusSelectedInstanceDebug" type="button">聚焦到选中方块</button>
+          </div>
+          <div id="selectedInstanceHighlightStatus" class="hintBox">选择高光：未选择。切到“不编辑 / 拖动画面”后单击物体进行选择。</div>
         </div>
 
         <div class="group checks">
@@ -477,6 +507,27 @@
         </div>
 
         <div class="group inspectorGroup">
+          <h2>地形高度曲面 / Height Surface V0</h2>
+          <div class="hintBox">实验性：每格仍然是离散占位，但渲染顶面按连续 terrainHeight 生成曲面。这里只影响渲染和放置，不做连续人物行走，也不启用流体规则。</div>
+          <label class="checkRow"><input id="terrainHeightSurfaceEnabled" type="checkbox" checked> 启用高度曲面渲染</label>
+          <label>自动连接高度差阈值
+            <input id="terrainHeightSurfaceConnectThreshold" type="number" min="0" max="2" step="0.05" value="0.35">
+          </label>
+          <label>顶面细分数量
+            <input id="terrainHeightSurfaceSubdivisions" type="number" min="1" max="16" step="1" value="4">
+          </label>
+          <label class="checkRow"><input id="terrainHeightSurfaceTopLinesEnabled" type="checkbox"> 显示顶面分割线</label>
+          <label>高度曲面原型
+            <select id="terrainHeightSurfacePrefabSelect"></select>
+          </label>
+          <div class="rowButtons rowButtons2">
+            <button id="terrainHeightSurfacePlace" type="button">放置高度地形</button>
+            <button id="terrainHeightSurfaceView" type="button">不编辑 / 拖动画面</button>
+          </div>
+          <div id="terrainHeightSurfaceStatus" class="hintBox">高度曲面：选择高度后放置。相邻高度差 ≤ 阈值时渲染上自动连接，大于阈值时形成断层侧面。</div>
+        </div>
+
+        <div class="group inspectorGroup">
           <h2>调试显示 / Debug</h2>
           <label><input id="terrainDebugFaceColorsEnabled" type="checkbox"> Terrain Semantic Edge Colors</label>
           <div class="hintBox">开启后，terrain 使用原方块语义面的调试颜色；关闭后恢复自然地形颜色。</div>
@@ -570,6 +621,7 @@
           <label>顶面细分数量
             <input id="fluidRenderSurfaceSubdivisions" type="number" min="2" max="16" step="1" value="2">
           </label>
+          <label class="checkRow"><input id="fluidRenderTopSubdivisionLinesEnabled" type="checkbox" checked> 显示顶面分割线</label>
           <label>连线插值曲线强度
             <input id="fluidRenderEdgeCurveStrength" type="number" min="0" max="1" step="0.05" value="0">
           </label>
@@ -893,6 +945,8 @@
   <script src="src/core/domain/terrain-face-merge-core.js"></script>
   <script src="src/core/domain/terrain-render-core.js"></script>
   <script src="src/core/domain/fluid-render-config-core.js"></script>
+  <script src="src/core/domain/terrain-height-surface-config-core.js"></script>
+  <script src="src/core/domain/terrain-height-surface-render-core.js"></script>
   <script src="src/core/domain/liquid-render-core.js"></script>
   <script src="src/core/domain/fluid-rules-core.js"></script>
   <script src="src/core/domain/render-order-core.js"></script>
@@ -928,6 +982,7 @@
   <script src="src/application/controllers/terrain-clear-controller.js"></script>
   <script src="src/application/controllers/terrain-generation-controller.js"></script>
   <script src="src/application/controllers/app-controllers.js"></script>
+  <script src="src/application/world/world-file-controller.js"></script>
   <script src="src/infrastructure/legacy/placement-legacy-bridge.js"></script>
   <script src="src/infrastructure/self-check/self-check.js"></script>
   <script src="src/application/player/player.js?v=20260605-pathfind-algos-v9"></script>
@@ -937,7 +992,10 @@
   <script src="src/presentation/ui/ui-habbo-library.js"></script>
   <script src="src/presentation/ui/ui-camera-render-panel.js"></script>
   <script src="src/presentation/ui/ui-terrain-panel-refresh.js"></script>
+  <script src="src/presentation/ui/ui-terrain-height-surface-panel.js"></script>
   <script src="src/presentation/ui/ui.js?v=20260605-pathfind-algos-v9"></script>
+  <script src="src/presentation/ui/ui-selection-highlight-panel.js"></script>
+  <script src="src/presentation/ui/ui-world-files-panel.js"></script>
   <script src="src/presentation/ui/ui-fluid-panel.js"></script>
   <script src="src/presentation/ui/ui-fluid-rules-panel.js"></script>
   <script src="src/presentation/ui/pixi-backend-test-controls.js?v=20260517-pxm0718o5h1-overlay-toggle"></script>

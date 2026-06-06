@@ -3,6 +3,7 @@
   var SAVE_URL = '/api/scenes/save';
   var LOAD_URL = '/api/scenes/load';
   var DEFAULT_URL = '/api/scenes/default';
+  var INDEX_URL = '/api/scenes/index';
 
   function serviceLog(name, detail) {
     var suffix = detail ? (' ' + String(detail)) : '';
@@ -50,11 +51,17 @@
     return await requestJson('load-default-scene', DEFAULT_URL, { cache: 'no-store' });
   }
 
+  async function listScenes(options) {
+    options = options || {};
+    return await requestJson('list-scenes', INDEX_URL, { cache: 'no-store' });
+  }
+
   var sceneApi = {
     owner: OWNER,
     saveScene: saveScene,
     loadScene: loadScene,
     loadDefaultScene: loadDefaultScene,
+    listScenes: listScenes,
   };
   if (window.__APP_NAMESPACE && typeof window.__APP_NAMESPACE.bind === 'function') {
     window.__APP_NAMESPACE.bind('services.sceneApi', sceneApi, { owner: OWNER, legacy: [], phase: 'P2-C' });

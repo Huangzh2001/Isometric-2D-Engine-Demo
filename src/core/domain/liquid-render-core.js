@@ -2,7 +2,7 @@
   if (typeof window === 'undefined') return;
 
   var OWNER = 'src/core/domain/liquid-render-core.js';
-  var PHASE = 'LIQUID-RENDER-V10-NATIVE-CURVED-SUBFACE-EDGES';
+  var PHASE = 'LIQUID-RENDER-V18-TOP-LINES-OFF-PRESERVED';
   var EPS = 1e-6;
   var FULL_DEPTH = 0.8;
   var DIRS = [
@@ -43,6 +43,10 @@
 
   function normalizeEdgeCurveStrength(value) {
     return Math.max(0, Math.min(1, toNumber(value, 0)));
+  }
+
+  function normalizeTopSubdivisionLinesEnabled(value) {
+    return value !== false;
   }
 
   function isLiquidRenderCell(cell) {
@@ -293,10 +297,11 @@
     return pts;
   }
 
-  function makeTopFaces(cell, samples, currentViewRotation, surfaceSubdivisions, edgeCurveStrength) {
+  function makeTopFaces(cell, samples, currentViewRotation, surfaceSubdivisions, edgeCurveStrength, topSubdivisionLinesEnabled) {
     var n = normalizeSurfaceSubdivisions(surfaceSubdivisions);
     var curve = normalizeEdgeCurveStrength(edgeCurveStrength);
     var edgeSegments = Math.max(2, n * 2);
+    var linesEnabled = normalizeTopSubdivisionLinesEnabled(topSubdivisionLinesEnabled);
     var faces = [];
     for (var iy = 0; iy < n; iy++) {
       for (var ix = 0; ix < n; ix++) {
@@ -308,14 +313,15 @@
           cell,
           buildCurvedSubfaceBoundary(samples, u0, v0, u1, v1, curve, edgeSegments),
           currentViewRotation,
-          'top-native-curve-' + n + 'x' + n + '-' + Math.round(curve * 100) + '-' + ix + '-' + iy
+          'top-native-curve-' + n + 'x' + n + '-' + Math.round(curve * 100) + '-' + ix + '-' + iy,
+          linesEnabled
         ));
       }
     }
     return faces;
   }
 
-  function makeTopSubFace(cell, pts, currentViewRotation, edgeHint) {
+  function makeTopSubFace(cell, pts, currentViewRotation, edgeHint, topSubdivisionLinesEnabled) {
     var c = getDepthColor(cell);
     return {
       kind: 'liquid-water-face',
@@ -327,8 +333,8 @@
       worldPts: pts,
       normal: getNormal('top'),
       fill: rgba(c, c.topA),
-      stroke: 'rgba(210, 246, 255, ' + c.strokeA.toFixed(3) + ')',
-      width: 0.75
+      stroke: normalizeTopSubdivisionLinesEnabled(topSubdivisionLinesEnabled) ? 'rgba(210, 246, 255, ' + c.strokeA.toFixed(3) + ')' : '',
+      width: normalizeTopSubdivisionLinesEnabled(topSubdivisionLinesEnabled) ? 0.75 : 0
     };
   }
 
@@ -384,13 +390,14 @@
     var currentViewRotation = Number(opts.currentViewRotation || 0);
     var surfaceSubdivisions = normalizeSurfaceSubdivisions(opts.surfaceSubdivisions);
     var edgeCurveStrength = normalizeEdgeCurveStrength(opts.edgeCurveStrength);
+    var topSubdivisionLinesEnabled = normalizeTopSubdivisionLinesEnabled(opts.topSubdivisionLinesEnabled);
     if (!isLiquidRenderCell(cell)) return [];
     var depth = getLiquidDepth(cell);
     if (depth <= EPS) return [];
 
     var faces = [];
     var samples = getTopSamples(cell, index);
-    faces = faces.concat(makeTopFaces(cell, samples, currentViewRotation, surfaceSubdivisions, edgeCurveStrength));
+    faces = faces.concat(makeTopFaces(cell, samples, currentViewRotation, surfaceSubdivisions, edgeCurveStrength, topSubdivisionLinesEnabled));
 
     var x = toNumber(cell.x, 0);
     var y = toNumber(cell.y, 0);
@@ -411,7 +418,7 @@
     var out = [];
     for (var i = 0; i < list.length; i++) {
       if (!isLiquidRenderCell(list[i])) continue;
-      out = out.concat(buildLiquidFacesForCell(list[i], { index: allIndex, currentViewRotation: options && options.currentViewRotation, surfaceSubdivisions: options && options.surfaceSubdivisions, edgeCurveStrength: options && options.edgeCurveStrength }));
+      out = out.concat(buildLiquidFacesForCell(list[i], { index: allIndex, currentViewRotation: options && options.currentViewRotation, surfaceSubdivisions: options && options.surfaceSubdivisions, edgeCurveStrength: options && options.edgeCurveStrength, topSubdivisionLinesEnabled: options && options.topSubdivisionLinesEnabled }));
     }
     return out;
   }
@@ -430,6 +437,7 @@
     getTopHeights: getTopHeights,
     normalizeSurfaceSubdivisions: normalizeSurfaceSubdivisions,
     normalizeEdgeCurveStrength: normalizeEdgeCurveStrength,
+    normalizeTopSubdivisionLinesEnabled: normalizeTopSubdivisionLinesEnabled,
     buildCurvedSubfaceBoundary: buildCurvedSubfaceBoundary,
     easeInOut01: easeInOut01,
     curveCoord: curveCoord,

@@ -9,7 +9,7 @@ const builder = fs.readFileSync(path.join(root, 'src/application/render/static-w
 assert(consumer.includes('function isLiquidStaticWorldPacket'), 'consumer should expose a liquid packet classifier internally');
 assert(consumer.includes('packet.liquidRenderPacket === true'), 'consumer should identify liquidRenderPacket');
 assert(consumer.includes('isLiquidStaticWorldPacket(packet) || isPlayerSensitiveDemergedPacket(packet)'), 'liquid packets should be routed to per-packet path');
-assert(builder.includes('liquid-render-v16-liquid-not-solid-occluder'), 'builder should mark liquid render path v16');
+assert(builder.includes('liquid-render-v18-top-lines-off-preserved'), 'builder should mark liquid render path v18');
 assert(builder.includes('computeLiquidRenderableSortMeta'), 'liquid packets should still use normal world ordering metadata');
 
 console.log('liquid-pixi-ordering-boundary.test.js PASS');

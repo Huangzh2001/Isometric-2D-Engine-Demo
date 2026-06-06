@@ -717,6 +717,94 @@ function ensureLiquidWaterLayerPrefabs(layerCount, meta) {
 }
 
 
+function normalizeTerrainHeightSurfaceLayerCount(value) {
+  var n = Math.round(finiteNumber(value, 4));
+  if (n < 2) n = 2;
+  if (n > 64) n = 64;
+  if (n % 2 !== 0) n += 1;
+  if (n > 64) n = 64;
+  return n;
+}
+
+function terrainHeightSurfaceHeightForLayer(index, layerCount) {
+  var n = normalizeTerrainHeightSurfaceLayerCount(layerCount);
+  var i = Math.max(1, Math.min(n, Math.round(finiteNumber(index, 1))));
+  return i / n;
+}
+
+function terrainHeightSurfaceLayerPrefabId(index, layerCount) {
+  var n = normalizeTerrainHeightSurfaceLayerCount(layerCount);
+  var i = Math.max(1, Math.min(n, Math.round(finiteNumber(index, 1))));
+  if (n === 4) {
+    if (i === 1) return 'terrain_height_025';
+    if (i === 2) return 'terrain_height_050';
+    if (i === 3) return 'terrain_height_075';
+    return 'terrain_height_100';
+  }
+  var pct = Math.round((i / n) * 1000);
+  return 'terrain_height_l' + n + '_' + String(pct).padStart(4, '0');
+}
+
+function makeTerrainHeightSurfaceVoxel(height) {
+  var h = Math.max(0.05, Math.min(2, finiteNumber(height, 1)));
+  return {
+    x: 0,
+    y: 0,
+    z: 0,
+    w: 1,
+    d: 1,
+    h: h,
+    base: '#79b35a',
+    solid: true,
+    collidable: true,
+    shapeKind: 'terrain_height_surface',
+    terrainHeight: h,
+    terrainSurfaceHeight: h
+  };
+}
+
+function makeTerrainHeightSurfaceLayerPrefabDef(index, layerCount) {
+  var n = normalizeTerrainHeightSurfaceLayerCount(layerCount);
+  var i = Math.max(1, Math.min(n, Math.round(finiteNumber(index, 1))));
+  var height = terrainHeightSurfaceHeightForLayer(i, n);
+  var percent = Math.round(height * 100);
+  return {
+    key: '3th' + n + '_' + i,
+    id: terrainHeightSurfaceLayerPrefabId(i, n),
+    name: 'Terrain Height Surface · ' + percent + '%',
+    kind: 'terrain_height_surface',
+    base: '#79b35a',
+    renderUpdateMode: 'static',
+    supportCells: [{ x: 0, y: 0, localZ: 0 }],
+    terrainHeightSurfaceLayerCount: n,
+    terrainHeightSurfaceLayerIndex: i,
+    terrainHeight: height,
+    voxels: [makeTerrainHeightSurfaceVoxel(height)]
+  };
+}
+
+function ensureTerrainHeightSurfaceLayerPrefabs(layerCount, meta) {
+  meta = meta || {};
+  var n = normalizeTerrainHeightSurfaceLayerCount(layerCount);
+  var result = [];
+  for (var i = 1; i <= n; i++) {
+    var def = makeTerrainHeightSurfaceLayerPrefabDef(i, n);
+    var prefab = registerPrefab(def, { source: meta.source || 'ensureTerrainHeightSurfaceLayerPrefabs' });
+    var idx = prototypes.findIndex(function (p) { return p && p.id === prefab.id; });
+    result.push({
+      prefab: prefab,
+      index: idx,
+      id: prefab.id,
+      height: terrainHeightSurfaceHeightForLayer(i, n),
+      layerIndex: i,
+      layerCount: n
+    });
+  }
+  prefabWrite('ensureTerrainHeightSurfaceLayerPrefabs', { source: meta.source || 'unknown', layerCount: n, generated: result.length, prototypeCount: prototypes.length });
+  return result;
+}
+
+
 function makeMcStairStepVoxels(stepCount, stepLimit, base) {
   var n = Math.max(2, Math.round(Number(stepCount) || 2));
   var limit = Math.max(0, finiteNumber(stepLimit, Math.min(0.6, 1 / n + 0.1)));
@@ -750,6 +838,10 @@ var prototypes = [
   normalizePrefab({ key: '3w50', id: 'liquid_water_050', name: 'Water Render · 50%', kind: 'liquid_water', base: '#42b8ff', renderUpdateMode: 'static', supportCells: [], voxels: [makeLiquidWaterVoxel(0.50)] }),
   normalizePrefab({ key: '3w75', id: 'liquid_water_075', name: 'Water Render · 75%', kind: 'liquid_water', base: '#42b8ff', renderUpdateMode: 'static', supportCells: [], voxels: [makeLiquidWaterVoxel(0.75)] }),
   normalizePrefab({ key: '3w100', id: 'liquid_water_100', name: 'Water Render · 100%', kind: 'liquid_water', base: '#42b8ff', renderUpdateMode: 'static', supportCells: [], voxels: [makeLiquidWaterVoxel(1.00)] }),
+  normalizePrefab({ key: '3th25', id: 'terrain_height_025', name: 'Terrain Height Surface · 25%', kind: 'terrain_height_surface', base: '#79b35a', renderUpdateMode: 'static', supportCells: [{ x: 0, y: 0, localZ: 0 }], terrainHeight: 0.25, voxels: [makeTerrainHeightSurfaceVoxel(0.25)] }),
+  normalizePrefab({ key: '3th50', id: 'terrain_height_050', name: 'Terrain Height Surface · 50%', kind: 'terrain_height_surface', base: '#79b35a', renderUpdateMode: 'static', supportCells: [{ x: 0, y: 0, localZ: 0 }], terrainHeight: 0.50, voxels: [makeTerrainHeightSurfaceVoxel(0.50)] }),
+  normalizePrefab({ key: '3th75', id: 'terrain_height_075', name: 'Terrain Height Surface · 75%', kind: 'terrain_height_surface', base: '#79b35a', renderUpdateMode: 'static', supportCells: [{ x: 0, y: 0, localZ: 0 }], terrainHeight: 0.75, voxels: [makeTerrainHeightSurfaceVoxel(0.75)] }),
+  normalizePrefab({ key: '3th100', id: 'terrain_height_100', name: 'Terrain Height Surface · 100%', kind: 'terrain_height_surface', base: '#79b35a', renderUpdateMode: 'static', supportCells: [{ x: 0, y: 0, localZ: 0 }], terrainHeight: 1.00, voxels: [makeTerrainHeightSurfaceVoxel(1.00)] }),
   normalizePrefab({ key: '3a', id: 'stair_mc_2step', name: 'MC Stair · 2-step', kind: 'stair_mc', base: '#c99568', renderUpdateMode: 'dynamic', supportCells: [{ x: 0, y: 0, localZ: 0 }], voxels: makeMcStairStepVoxels(2, 0.6, '#c99568') }),
   normalizePrefab({ key: '3b', id: 'stair_mc_4step', name: 'MC Stair · 4-step', kind: 'stair_mc', base: '#c99568', renderUpdateMode: 'dynamic', supportCells: [{ x: 0, y: 0, localZ: 0 }], voxels: makeMcStairStepVoxels(4, 0.35, '#c99568') }),
   normalizePrefab({ key: '3c', id: 'stair_mc_8step', name: 'MC Stair · 8-step', kind: 'stair_mc', base: '#c99568', renderUpdateMode: 'dynamic', supportCells: [{ x: 0, y: 0, localZ: 0 }], voxels: makeMcStairStepVoxels(8, 0.2, '#c99568') }),
@@ -988,6 +1080,10 @@ var PREFAB_REGISTRY_API = {
   liquidWaterLayerPrefabId: liquidWaterLayerPrefabId,
   makeLiquidWaterLayerPrefabDef: makeLiquidWaterLayerPrefabDef,
   ensureLiquidWaterLayerPrefabs: ensureLiquidWaterLayerPrefabs,
+  normalizeTerrainHeightSurfaceLayerCount: normalizeTerrainHeightSurfaceLayerCount,
+  terrainHeightSurfaceLayerPrefabId: terrainHeightSurfaceLayerPrefabId,
+  makeTerrainHeightSurfaceLayerPrefabDef: makeTerrainHeightSurfaceLayerPrefabDef,
+  ensureTerrainHeightSurfaceLayerPrefabs: ensureTerrainHeightSurfaceLayerPrefabs,
   getPrototypeCount: function () { return prototypes.length; },
   getBuiltInCount: function () { return prototypes.filter(function (p) { return !p.custom && !p.assetManaged && !p.externalManaged; }).length; },
   getPrototypes: function () { return prototypes; }

@@ -3275,25 +3275,98 @@ function drawItemFacingPrototypeOverlay() {
   return requireProjectionDebugOverlayForRender().drawItemFacingPrototypeOverlay.apply(null, arguments);
 }
 
+function selectedInstanceEdgeHighlightEnabledForRender() {
+  try {
+    if (settings && settings.selectedInstanceEdgeHighlightEnabled === false) return false;
+    if (typeof ui !== 'undefined' && ui && ui.selectedInstanceEdgeHighlightEnabled) return !!ui.selectedInstanceEdgeHighlightEnabled.checked;
+  } catch (_) {}
+  return true;
+}
+
+function worldCuboidEdgeSegmentsForBox(b) {
+  var x0 = Number(b && b.x || 0);
+  var y0 = Number(b && b.y || 0);
+  var z0 = Number(b && b.z || 0);
+  var x1 = x0 + Math.max(0.001, Number(b && (b.w != null ? b.w : 1)) || 1);
+  var y1 = y0 + Math.max(0.001, Number(b && (b.d != null ? b.d : 1)) || 1);
+  var z1 = z0 + Math.max(0.001, Number(b && (b.h != null ? b.h : 1)) || 1);
+  var p000 = { x: x0, y: y0, z: z0 };
+  var p100 = { x: x1, y: y0, z: z0 };
+  var p110 = { x: x1, y: y1, z: z0 };
+  var p010 = { x: x0, y: y1, z: z0 };
+  var p001 = { x: x0, y: y0, z: z1 };
+  var p101 = { x: x1, y: y0, z: z1 };
+  var p111 = { x: x1, y: y1, z: z1 };
+  var p011 = { x: x0, y: y1, z: z1 };
+  return [
+    [p000, p100], [p100, p110], [p110, p010], [p010, p000],
+    [p001, p101], [p101, p111], [p111, p011], [p011, p001],
+    [p000, p001], [p100, p101], [p110, p111], [p010, p011]
+  ];
+}
+
+function drawWorldDashedEdgeSegment(a, b, stroke, width, dash) {
+  if (!a || !b) return;
+  var pa = iso(a.x, a.y, a.z);
+  var pb = iso(b.x, b.y, b.z);
+  ctx.beginPath();
+  ctx.moveTo(pa.x, pa.y);
+  ctx.lineTo(pb.x, pb.y);
+  ctx.stroke();
+}
+
+function drawSelectedInstanceDashedEdges(targetBoxes) {
+  if (!targetBoxes || !targetBoxes.length) return;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(43, 157, 255, 0.98)';
+  ctx.lineWidth = 2.25;
+  ctx.setLineDash([7, 4]);
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.shadowColor = 'rgba(43, 157, 255, 0.45)';
+  ctx.shadowBlur = 6;
+  for (var i = 0; i < targetBoxes.length; i++) {
+    var edges = worldCuboidEdgeSegmentsForBox(targetBoxes[i]);
+    for (var e = 0; e < edges.length; e++) drawWorldDashedEdgeSegment(edges[e][0], edges[e][1]);
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.80)';
+  ctx.lineWidth = 0.9;
+  ctx.setLineDash([2, 5]);
+  for (var j = 0; j < targetBoxes.length; j++) {
+    var innerEdges = worldCuboidEdgeSegmentsForBox(targetBoxes[j]);
+    for (var k = 0; k < innerEdges.length; k++) drawWorldDashedEdgeSegment(innerEdges[k][0], innerEdges[k][1]);
+  }
+  ctx.restore();
+}
+
 function drawSelectedInstanceHighlight() {
   var inst = getSelectedInstance();
   if (!inst) return;
+  if (!selectedInstanceEdgeHighlightEnabledForRender()) return;
   var targetBoxes = boxes.filter(function (b) { return b.instanceId === inst.instanceId; });
   if (!targetBoxes.length) return;
-  var occ = buildOccupancy(targetBoxes);
-  for (const cell of occ.values()) {
-    drawVoxelCell({ x: cell.x, y: cell.y, z: cell.z, base: '#6fb7ff' }, occ, 0.18);
-  }
+
+  drawSelectedInstanceDashedEdges(targetBoxes);
+
   var top = targetBoxes.reduce(function (best, b) {
-    var score = b.x + b.y + b.z + b.h;
+    var score = Number(b.x || 0) + Number(b.y || 0) + Number(b.z || 0) + Number(b.h || 1);
     if (!best || score > best.score) return { box: b, score: score };
     return best;
   }, null);
   if (top && top.box) {
-    var topPt = iso(top.box.x, top.box.y, top.box.z + top.box.h);
-    ctx.fillStyle = 'rgba(120,190,255,.95)';
+    var topPt = iso(top.box.x, top.box.y, top.box.z + (Number(top.box.h || 1)));
+    ctx.save();
+    ctx.fillStyle = 'rgba(43,157,255,.98)';
+    ctx.strokeStyle = 'rgba(0,40,90,.75)';
+    ctx.lineWidth = 3;
     ctx.font = '13px sans-serif';
-    ctx.fillText(`选中: ${inst.instanceId} / ${getPrefabById(inst.prefabId).name}`, topPt.x + 8, topPt.y - 8);
+    var label = '选中: ' + String(inst.instanceId || '') + ' / ' + String((getPrefabById(inst.prefabId) || {}).name || inst.prefabId || '');
+    ctx.strokeText(label, topPt.x + 8, topPt.y - 8);
+    ctx.fillText(label, topPt.x + 8, topPt.y - 8);
+    ctx.restore();
   }
 }
 

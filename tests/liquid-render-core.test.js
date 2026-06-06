@@ -19,7 +19,7 @@ function assertClose(actual, expected, msg) {
   assert(Math.abs(actual - expected) < 0.001, `${msg}: expected ${expected}, got ${actual}`);
 }
 
-assert.strictEqual(api.phase, 'LIQUID-RENDER-V10-NATIVE-CURVED-SUBFACE-EDGES', 'phase should identify native curved subface edges');
+assert.strictEqual(api.phase, 'LIQUID-RENDER-V18-TOP-LINES-OFF-PRESERVED', 'phase should identify preserved hidden top lines');
 assert.strictEqual(api.normalizeSurfaceSubdivisions(1), 2, 'surface subdivisions should clamp to minimum 2');
 assert.strictEqual(api.normalizeSurfaceSubdivisions(3), 3, 'surface subdivisions should accept 3 for 9 top faces');
 assert.strictEqual(api.normalizeSurfaceSubdivisions(99), 16, 'surface subdivisions should clamp to maximum 16');
@@ -122,5 +122,29 @@ const linearNativeFaces = api.buildLiquidFaces(
 assert(linearNativeFaces.every(f => Array.isArray(f.worldPts) && f.worldPts.length === 4), 'curve strength 0 should preserve four-corner straight subfaces');
 
 
+
+
+// Top subdivision line toggle regression: surface remains subdivided but top
+// strokes can be hidden independently from the actual top-subface geometry.
+const noLineCell = { x: 40, y: 0, z: 0, shapeKind: 'liquid_water', liquidDepth: 1, liquidType: 'water' };
+const noLineFaces = api.buildLiquidFaces([noLineCell], [noLineCell], {
+  currentViewRotation: 0,
+  surfaceSubdivisions: 4,
+  edgeCurveStrength: 0,
+  topSubdivisionLinesEnabled: false
+});
+const noLineTopFaces = noLineFaces.filter(f => f.liquidFaceKind === 'top-subface');
+assert.strictEqual(noLineTopFaces.length, 16, 'hiding top subdivision lines should not change 4×4 top subface count');
+assert(noLineTopFaces.every(f => f.stroke === '' && Number(f.width || 0) === 0), 'top subface strokes should be explicitly disabled with empty stroke when the toggle is off');
+
+const withLineFaces = api.buildLiquidFaces([noLineCell], [noLineCell], {
+  currentViewRotation: 0,
+  surfaceSubdivisions: 4,
+  edgeCurveStrength: 0,
+  topSubdivisionLinesEnabled: true
+});
+const withLineTopFaces = withLineFaces.filter(f => f.liquidFaceKind === 'top-subface');
+assert.strictEqual(withLineTopFaces.length, 16, 'showing top subdivision lines should preserve top subface count');
+assert(withLineTopFaces.every(f => !!f.stroke && Number(f.width || 0) > 0), 'top subface strokes should be visible when the toggle is on');
 
 console.log('liquid-render-core.test.js PASS');

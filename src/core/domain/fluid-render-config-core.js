@@ -5,6 +5,7 @@
   var PHASE = 'FLUID-RENDER-CONFIG-V1';
   var config = {
     surfaceSubdivisions: 2,
+    topSubdivisionLinesEnabled: true,
     edgeCurveStrength: 0
   };
 
@@ -24,6 +25,10 @@
     return Math.max(0, Math.min(1, toNumber(value, 0)));
   }
 
+  function normalizeTopSubdivisionLinesEnabled(value) {
+    return value !== false;
+  }
+
   function setSurfaceSubdivisions(value, meta) {
     var next = normalizeSurfaceSubdivisions(value);
     var prev = config.surfaceSubdivisions;
@@ -38,6 +43,22 @@
 
   function getSurfaceSubdivisions() {
     return normalizeSurfaceSubdivisions(config.surfaceSubdivisions);
+  }
+
+  function setTopSubdivisionLinesEnabled(value, meta) {
+    var next = normalizeTopSubdivisionLinesEnabled(value);
+    var prev = config.topSubdivisionLinesEnabled;
+    config.topSubdivisionLinesEnabled = next;
+    return {
+      ok: true,
+      previous: prev,
+      value: next,
+      source: meta && meta.source ? String(meta.source) : 'unknown'
+    };
+  }
+
+  function getTopSubdivisionLinesEnabled() {
+    return normalizeTopSubdivisionLinesEnabled(config.topSubdivisionLinesEnabled);
   }
 
   function setEdgeCurveStrength(value, meta) {
@@ -61,6 +82,7 @@
       owner: OWNER,
       phase: PHASE,
       surfaceSubdivisions: getSurfaceSubdivisions(),
+      topSubdivisionLinesEnabled: getTopSubdivisionLinesEnabled(),
       edgeCurveStrength: getEdgeCurveStrength()
     };
   }
@@ -70,8 +92,11 @@
     phase: PHASE,
     normalizeSurfaceSubdivisions: normalizeSurfaceSubdivisions,
     normalizeEdgeCurveStrength: normalizeEdgeCurveStrength,
+    normalizeTopSubdivisionLinesEnabled: normalizeTopSubdivisionLinesEnabled,
     setSurfaceSubdivisions: setSurfaceSubdivisions,
     getSurfaceSubdivisions: getSurfaceSubdivisions,
+    setTopSubdivisionLinesEnabled: setTopSubdivisionLinesEnabled,
+    getTopSubdivisionLinesEnabled: getTopSubdivisionLinesEnabled,
     setEdgeCurveStrength: setEdgeCurveStrength,
     getEdgeCurveStrength: getEdgeCurveStrength,
     summarize: summarize

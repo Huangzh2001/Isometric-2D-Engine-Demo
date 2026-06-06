@@ -56,6 +56,35 @@
     return n;
   }
 
+  function readTopSubdivisionLinesEnabled() {
+    var u = getUi();
+    var api = getFluidRenderConfigCoreApi();
+    var fallback = api && typeof api.getTopSubdivisionLinesEnabled === 'function' ? api.getTopSubdivisionLinesEnabled() : true;
+    var enabled = u && u.fluidRenderTopSubdivisionLinesEnabled ? !!u.fluidRenderTopSubdivisionLinesEnabled.checked : fallback !== false;
+    if (api && typeof api.setTopSubdivisionLinesEnabled === 'function') api.setTopSubdivisionLinesEnabled(enabled, { source: 'fluid-ui:readTopSubdivisionLinesEnabled' });
+    return enabled;
+  }
+
+  function applyTopSubdivisionLinesEnabled(source) {
+    var enabled = readTopSubdivisionLinesEnabled();
+    var api = getFluidRenderConfigCoreApi();
+    if (api && typeof api.setTopSubdivisionLinesEnabled === 'function') api.setTopSubdivisionLinesEnabled(enabled, { source: source || 'fluid-ui' });
+    try {
+      if (typeof invalidateStaticWorldRenderCache === 'function') invalidateStaticWorldRenderCache(source || 'fluid-ui:top-subdivision-lines-change');
+    } catch (_) {}
+    try {
+      if (typeof invalidateRenderCache === 'function') invalidateRenderCache(source || 'fluid-ui:top-subdivision-lines-change');
+    } catch (_) {}
+    try { if (typeof requestRender === 'function') requestRender(); } catch (_) {}
+    var u = getUi();
+    if (u && u.fluidRenderHint) {
+      var sub = readSurfaceSubdivisions();
+      u.fluidRenderHint.textContent = '流体 / 渲染：顶面仍由 ' + sub + '×' + sub + ' 个面片组成；顶面分割线=' + (enabled ? '显示' : '隐藏') + '。隐藏只影响线条，不改变面片结构。';
+    }
+    log('top-subdivision-lines=' + (enabled ? 'on' : 'off') + ' source=' + String(source || 'unknown'));
+    return enabled;
+  }
+
   function applySurfaceSubdivisions(source) {
     var n = readSurfaceSubdivisions();
     var api = getFluidRenderConfigCoreApi();
@@ -209,6 +238,7 @@
 
     var layerCount = readLayerCount();
     var surfaceSubdivisions = readSurfaceSubdivisions();
+    var topSubdivisionLinesEnabled = readTopSubdivisionLinesEnabled();
     var edgeCurveStrength = readEdgeCurveStrength();
     var entries = ensureLayerPrefabs(layerCount, 'fluid-ui:refresh:' + String(reason || 'unknown'));
     u.fluidRenderPrefabSelect.innerHTML = '';
@@ -230,7 +260,7 @@
 
     if (u.fluidRenderHint) {
       u.fluidRenderHint.textContent = entries.length
-        ? '流体 / 渲染：当前分层=' + layerCount + '，顶面细分=' + surfaceSubdivisions + '×' + surfaceSubdivisions + '（每格最多 ' + (surfaceSubdivisions * surfaceSubdivisions) + ' 个顶面片），连线插值曲线强度=' + Number(edgeCurveStrength.toFixed(2)) + '，可放置 ' + entries.map(function (e) { return Math.round((e.depth || 0) * 100) + '%'; }).join(' / ') + '。这里只改变渲染放置档位，不启动流体规则。'
+        ? '流体 / 渲染：当前分层=' + layerCount + '，顶面细分=' + surfaceSubdivisions + '×' + surfaceSubdivisions + '（每格最多 ' + (surfaceSubdivisions * surfaceSubdivisions) + ' 个顶面片），顶面分割线=' + (topSubdivisionLinesEnabled ? '显示' : '隐藏') + '，连线插值曲线强度=' + Number(edgeCurveStrength.toFixed(2)) + '，可放置 ' + entries.map(function (e) { return Math.round((e.depth || 0) * 100) + '%'; }).join(' / ') + '。这里只改变渲染放置档位，不启动流体规则。'
         : '流体 / 渲染：没有找到 water render prefab。';
     }
 
@@ -310,6 +340,13 @@
       });
     }
 
+    if (u.fluidRenderTopSubdivisionLinesEnabled && !u.fluidRenderTopSubdivisionLinesEnabled.__fluidPanelBound) {
+      u.fluidRenderTopSubdivisionLinesEnabled.__fluidPanelBound = true;
+      u.fluidRenderTopSubdivisionLinesEnabled.addEventListener('change', function () {
+        applyTopSubdivisionLinesEnabled('ui.fluidRenderTopSubdivisionLinesEnabled.change');
+      });
+    }
+
     if (u.fluidRenderEdgeCurveStrength && !u.fluidRenderEdgeCurveStrength.__fluidPanelBound) {
       u.fluidRenderEdgeCurveStrength.__fluidPanelBound = true;
       u.fluidRenderEdgeCurveStrength.addEventListener('change', function () {
@@ -355,6 +392,8 @@
     owner: OWNER,
     clampEvenLayerCount: clampEvenLayerCount,
     clampSurfaceSubdivisions: clampSurfaceSubdivisions,
+    readTopSubdivisionLinesEnabled: readTopSubdivisionLinesEnabled,
+    applyTopSubdivisionLinesEnabled: applyTopSubdivisionLinesEnabled,
     clampEdgeCurveStrength: clampEdgeCurveStrength,
     applyEdgeCurveStrength: applyEdgeCurveStrength,
     applySurfaceSubdivisions: applySurfaceSubdivisions,

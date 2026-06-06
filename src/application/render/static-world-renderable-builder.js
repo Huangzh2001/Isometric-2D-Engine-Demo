@@ -388,6 +388,61 @@
     } catch (_) { return null; }
   }
 
+  function getTerrainHeightSurfaceRenderCoreApi() {
+    try {
+      return (global && (global.__TERRAIN_HEIGHT_SURFACE_RENDER_CORE__ || (global.App && global.App.domain && global.App.domain.terrainHeightSurfaceRenderCore))) || null;
+    } catch (_) { return null; }
+  }
+
+  function getTerrainHeightSurfaceConfigCoreApi() {
+    try {
+      return (global && (global.__TERRAIN_HEIGHT_SURFACE_CONFIG_CORE__ || (global.App && global.App.domain && global.App.domain.terrainHeightSurfaceConfigCore))) || null;
+    } catch (_) { return null; }
+  }
+
+  function isTerrainHeightSurfaceEnabled() {
+    var api = getTerrainHeightSurfaceConfigCoreApi();
+    if (api && typeof api.getEnabled === 'function') {
+      try { return api.getEnabled() !== false; } catch (_) {}
+    }
+    return true;
+  }
+
+  function getTerrainHeightSurfaceConnectThreshold() {
+    var api = getTerrainHeightSurfaceConfigCoreApi();
+    if (api && typeof api.getConnectThreshold === 'function') {
+      try { return api.getConnectThreshold(); } catch (_) {}
+    }
+    return 0.35;
+  }
+
+  function getTerrainHeightSurfaceSubdivisions() {
+    var api = getTerrainHeightSurfaceConfigCoreApi();
+    if (api && typeof api.getSurfaceSubdivisions === 'function') {
+      try { return api.getSurfaceSubdivisions(); } catch (_) {}
+    }
+    return 4;
+  }
+
+  function getTerrainHeightSurfaceTopLinesEnabled() {
+    var api = getTerrainHeightSurfaceConfigCoreApi();
+    if (api && typeof api.getTopLinesEnabled === 'function') {
+      try { return api.getTopLinesEnabled(); } catch (_) {}
+    }
+    return false;
+  }
+
+  function isTerrainHeightSurfaceBox(box) {
+    if (!box || typeof box !== 'object') return false;
+    var shapeKind = String(box.shapeKind || '').toLowerCase();
+    var kind = String(box.kind || '').toLowerCase();
+    var prefabId = String(box.prefabId || '').toLowerCase();
+    return shapeKind === 'terrain_height_surface'
+      || kind === 'terrain_height_surface'
+      || prefabId.indexOf('terrain_height_') === 0
+      || box.terrainHeightSurfacePrototype === true;
+  }
+
   function getFluidRenderConfigCoreApi() {
     try {
       return (global && (global.__FLUID_RENDER_CONFIG_CORE__ || (global.App && global.App.domain && global.App.domain.fluidRenderConfigCore))) || null;
@@ -408,6 +463,14 @@
       try { return api.getEdgeCurveStrength(); } catch (_) {}
     }
     return 0;
+  }
+
+  function getFluidTopSubdivisionLinesEnabled() {
+    var api = getFluidRenderConfigCoreApi();
+    if (api && typeof api.getTopSubdivisionLinesEnabled === 'function') {
+      try { return api.getTopSubdivisionLinesEnabled(); } catch (_) {}
+    }
+    return true;
   }
 
   function isLiquidLikeRenderBoxForStaticVisibility(box) {
@@ -508,7 +571,7 @@
     var local = Array.isArray(localBoxes) ? localBoxes : [];
     var all = local.concat(Array.isArray(neighborBoxes) ? neighborBoxes : []);
     var faces = [];
-    try { faces = api.buildLiquidFaces(local, all, { currentViewRotation: currentViewRotation, surfaceSubdivisions: getFluidSurfaceSubdivisions(), edgeCurveStrength: getFluidEdgeCurveStrength() }) || []; } catch (_) { faces = []; }
+    try { faces = api.buildLiquidFaces(local, all, { currentViewRotation: currentViewRotation, surfaceSubdivisions: getFluidSurfaceSubdivisions(), edgeCurveStrength: getFluidEdgeCurveStrength(), topSubdivisionLinesEnabled: getFluidTopSubdivisionLinesEnabled() }) || []; } catch (_) { faces = []; }
     var packets = [];
     for (var i = 0; i < faces.length; i++) {
       var face = faces[i] || {};
@@ -540,7 +603,7 @@
         sortRotatedPoint: orderMeta.rotatedPoint || null,
         instanceId: sortCell.instanceId || null,
         prefabId: sortCell.prefabId || null,
-        renderPath: 'liquid-render-v16-liquid-not-solid-occluder',
+        renderPath: 'liquid-render-v18-top-lines-off-preserved',
         cacheViewRotation: currentViewRotation,
         cacheContentType: 'world-face-packets',
         chunkKey: null,
@@ -550,12 +613,12 @@
         screenFace: screenFace,
         depthKey: semanticFace === 'top' ? 0 : 1,
         fill: face.fill || 'rgba(66, 184, 255, 0.42)',
-        stroke: face.stroke || 'rgba(180, 235, 255, 0.52)',
+        stroke: face.stroke !== undefined ? face.stroke : 'rgba(180, 235, 255, 0.52)',
         texture: null,
         textureColor: null,
         semanticTextureSlot: null,
         semanticTextureSlotColor: null,
-        width: face.width || 1,
+        width: face.width !== undefined ? face.width : 1,
         worldPts: Array.isArray(face.worldPts) ? face.worldPts : [],
         worldLoops: null,
         worldOutlineSegments: null,
@@ -585,6 +648,98 @@
     }
     return packets;
   }
+
+  function buildTerrainHeightSurfacePacketsForChunk(localBoxes, neighborBoxes, currentViewRotation, computeViewAwareSortMeta, domainCore) {
+    if (!isTerrainHeightSurfaceEnabled()) return [];
+    var api = getTerrainHeightSurfaceRenderCoreApi();
+    if (!api || typeof api.buildTerrainHeightSurfaceFaces !== 'function') return [];
+    var local = Array.isArray(localBoxes) ? localBoxes : [];
+    var all = local.concat(Array.isArray(neighborBoxes) ? neighborBoxes : []);
+    var faces = [];
+    try {
+      faces = api.buildTerrainHeightSurfaceFaces(local, all, {
+        connectThreshold: getTerrainHeightSurfaceConnectThreshold(),
+        surfaceSubdivisions: getTerrainHeightSurfaceSubdivisions(),
+        topLinesEnabled: getTerrainHeightSurfaceTopLinesEnabled()
+      }) || [];
+    } catch (_) {
+      faces = [];
+    }
+    var packets = [];
+    for (var i = 0; i < faces.length; i++) {
+      var face = faces[i] || {};
+      var cell = face.cell || null;
+      var anchor = averageWorldPoint(face.worldPts || []);
+      var sortCell = cell || { x: Math.floor(Number(anchor.x || 0)), y: Math.floor(Number(anchor.y || 0)), z: Math.floor(Number(anchor.z || 0)) };
+      var orderMeta = computeLiquidRenderableSortMeta(sortCell, currentViewRotation, computeViewAwareSortMeta, domainCore);
+      orderMeta = orderMeta || {};
+      var semanticFace = String(face.semanticFace || 'top');
+      var screenFace = String(face.screenFace || semanticFace);
+      var cellX = Number(sortCell.x || 0);
+      var cellY = Number(sortCell.y || 0);
+      var cellZ = Number(sortCell.z || 0);
+      var edgeHint = String(face.edgeHint || 'none');
+      var id = 'terrain-height-surface-' + cellX + '-' + cellY + '-' + cellZ + '-' + semanticFace + '-' + String(face.terrainHeightSurfaceFaceKind || 'face') + '-' + edgeHint;
+      packets.push({
+        id: id,
+        kind: 'static-world-face-packet',
+        terrainHeightSurfacePacket: true,
+        terrainHeightSurfaceFaceKind: face.terrainHeightSurfaceFaceKind || null,
+        edgeHint: face.edgeHint || null,
+        sortKey: Number(orderMeta.sortKey || ((cellX + cellY) * 100 + cellZ * 10)),
+        tie: Number(orderMeta.tie || 0) + liquidPacketFaceTie(screenFace),
+        sortViewRotation: currentViewRotation,
+        itemRotation: 0,
+        sortWorldAnchor: { x: cellX, y: cellY, z: cellZ, h: Number(sortCell.h || sortCell.terrainHeight || 1) },
+        sortRotatedPoint: orderMeta.rotatedPoint || null,
+        instanceId: sortCell.instanceId || null,
+        prefabId: sortCell.prefabId || null,
+        renderPath: 'terrain-height-surface-render-v0',
+        cacheViewRotation: currentViewRotation,
+        cacheContentType: 'world-face-packets',
+        chunkKey: null,
+        cameraIndependent: true,
+        usesScreenSpaceCache: false,
+        semanticFace: semanticFace,
+        screenFace: screenFace,
+        depthKey: semanticFace === 'top' ? 0 : 1,
+        fill: face.fill || 'rgba(112, 166, 82, 0.98)',
+        stroke: face.stroke !== undefined ? face.stroke : 'rgba(55, 91, 42, 0.45)',
+        texture: null,
+        textureColor: null,
+        semanticTextureSlot: null,
+        semanticTextureSlotColor: null,
+        width: face.width !== undefined ? face.width : 1,
+        worldPts: Array.isArray(face.worldPts) ? face.worldPts : [],
+        worldLoops: null,
+        worldOutlineSegments: null,
+        terrainBoundarySegmentsWorld: [],
+        terrainBoundaryStroke: null,
+        terrainBoundaryStrokeWidth: 0,
+        shadowOverlaysWorld: [],
+        box: sortCell || null,
+        cellX: cellX,
+        cellY: cellY,
+        cellZ: cellZ,
+        faceKey: id,
+        actorInteractionMemberFaceKeys: [],
+        actorInteractionMemberDescriptors: [],
+        packetNormal: face.normal || { x: 0, y: 0, z: 1 },
+        mergedFace: false,
+        mergedFaceCount: 1,
+        mergeWidth: 1,
+        mergeHeight: 1,
+        terrainMaterialMergeKey: 'terrain-height-surface',
+        terrainMaterialId: 'terrain-height-surface',
+        terrainMaterialLabel: 'Terrain Height Surface',
+        materialType: 'terrain-height-surface',
+        terrainPatternDescriptor: null,
+        terrainPatternOpacity: null
+      });
+    }
+    return packets;
+  }
+
 
   function buildStaticWorldChunkRenderables(chunk, options, deps) {
     var __deps = deps && typeof deps === 'object' ? deps : {};
@@ -682,8 +837,9 @@
     var step3ResolveOccupancyMs = occupancyBuildMs;
     var step3BuildLocalOccupancyMs = usedLocalOccupancyFallback ? occupancyBuildMs : 0;
     var visibleSurfaceStartAt = perfNow();
+    var visibilityChunkBoxes = isTerrainHeightSurfaceEnabled() ? chunkBoxes.filter(function (box) { return !isTerrainHeightSurfaceBox(box); }) : chunkBoxes;
     var surfaceCache = visibilityCore && typeof visibilityCore.buildVisibleSurfaceCache === 'function'
-      ? visibilityCore.buildVisibleSurfaceCache(chunkBoxes, {
+      ? visibilityCore.buildVisibleSurfaceCache(visibilityChunkBoxes, {
           scope: null,
           occupancy: visibilityOcc,
           surfaceOnlyRenderingEnabled: cameraScope.surfaceOnlyRenderingEnabled !== false,
@@ -696,7 +852,7 @@
           }
         })
       : {
-          surfaceCells: chunkBoxes.map(function (box) { return { box: box, visibleFaces: ['top', 'east', 'south'] }; }),
+          surfaceCells: visibilityChunkBoxes.map(function (box) { return { box: box, visibleFaces: ['top', 'east', 'south'] }; }),
           logicalVoxelCountEstimated: chunkBoxes.length,
           visibleTopFaceCount: 0,
           visibleSideFaceCount: 0,
@@ -1121,10 +1277,17 @@
       step7ArrayPushMs += Math.max(0, perfNow() - arrayPushStartAt);
     }
     var liquidPackets = buildLiquidRenderPacketsForChunk(chunkBoxes, neighborBoxes, currentViewRotation, computeViewAwareSortMeta, domainCore);
+    var terrainHeightSurfacePackets = buildTerrainHeightSurfacePacketsForChunk(chunkBoxes, neighborBoxes, currentViewRotation, computeViewAwareSortMeta, domainCore);
     if (liquidPackets.length) {
       for (var lpi = 0; lpi < liquidPackets.length; lpi++) {
         if (liquidPackets[lpi] && chunk && chunk.key) liquidPackets[lpi].chunkKey = String(chunk.key);
         packets.push(liquidPackets[lpi]);
+      }
+    }
+    if (terrainHeightSurfacePackets.length) {
+      for (var thpi = 0; thpi < terrainHeightSurfacePackets.length; thpi++) {
+        if (terrainHeightSurfacePackets[thpi] && chunk && chunk.key) terrainHeightSurfacePackets[thpi].chunkKey = String(chunk.key);
+        packets.push(terrainHeightSurfacePackets[thpi]);
       }
     }
     var step5BuildPacketsMs = Math.max(0, perfNow() - packetBuildStartAt);

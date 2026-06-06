@@ -60,12 +60,12 @@ assert(html.includes('id="fluidRulesGravityMaxFlow"'), 'Fluid / Rules should exp
 
 const staticBuilder = fs.readFileSync(path.join(root, 'src/application/render/static-world-renderable-builder.js'), 'utf8');
 assert(staticBuilder.includes('liquidPacketSortOffset'), 'liquid packets should use normal world-cell sort offset');
-assert(staticBuilder.includes('liquid-render-v16-liquid-not-solid-occluder'), 'liquid render path should identify normal voxel world ordering');
+assert(staticBuilder.includes('liquid-render-v18-top-lines-off-preserved'), 'liquid render path should identify preserved hidden top lines');
 
 const liquidSortBuilder = fs.readFileSync(path.join(root, 'src/application/render/static-world-renderable-builder.js'), 'utf8');
 assert(liquidSortBuilder.includes('computeLiquidRenderableSortMeta'), 'liquid packets should compute order through normal voxel sorting');
 assert(liquidSortBuilder.includes('domainCore.computeVoxelRenderableSort'), 'liquid packets should reuse domainCore.computeVoxelRenderableSort');
-assert(liquidSortBuilder.includes('liquid-render-v16-liquid-not-solid-occluder'), 'liquid render path should identify per-packet transparent liquid ordering');
+assert(liquidSortBuilder.includes('liquid-render-v18-top-lines-off-preserved'), 'liquid render path should identify per-packet transparent liquid ordering');
 
 const pixiConsumer = fs.readFileSync(path.join(root, 'src/presentation/render/optimization/shared-render-optimization-pixi-static-world-packet-consumer.js'), 'utf8');
 assert(pixiConsumer.includes('isLiquidStaticWorldPacket'), 'Pixi static packet consumer should classify liquid packets');
@@ -75,4 +75,10 @@ assert(pixiConsumer.includes('isLiquidStaticWorldPacket(packet) || isPlayerSensi
 const staticBuilderVisibility = fs.readFileSync(path.join(root, 'src/application/render/static-world-renderable-builder.js'), 'utf8');
 assert(staticBuilderVisibility.includes('buildVisibilityOccupancyWithoutLiquids'), 'static builder should build visibility-only occupancy without liquid occluders');
 assert(staticBuilderVisibility.includes('visibilityCore.buildStructuredVoxelOccupancy'), 'static builder should use render-visibility-core occupancy to exclude liquids');
-assert(staticBuilderVisibility.includes('liquid-render-v16-liquid-not-solid-occluder'), 'liquid render path should identify non-occluding liquid visibility fix');
+assert(staticBuilderVisibility.includes('liquid-render-v18-top-lines-off-preserved'), 'liquid render path should identify non-occluding liquid visibility fix');
+
+
+assert(html.includes('id="fluidRenderTopSubdivisionLinesEnabled"'), 'Fluid / Render should expose a top subdivision line toggle');
+assert(dom.includes('fluidRenderTopSubdivisionLinesEnabled:'), 'dom registry should expose fluidRenderTopSubdivisionLinesEnabled');
+assert(fluidPanel.includes('applyTopSubdivisionLinesEnabled'), 'fluid panel should bind top subdivision line toggle');
+assert(configCore.includes('topSubdivisionLinesEnabled'), 'fluid render config core should store top subdivision line toggle');

@@ -57,6 +57,7 @@ var settings = {
   playerOcclusionFadeAlpha: 0.75,
   playerOcclusionFadeInflatePx: 12,
   playerOcclusionDebugBoundsEnabled: false,
+  selectedInstanceEdgeHighlightEnabled: true,
   tileW: BASE_TILE_W,
   tileH: BASE_TILE_H,
   subTileGridEnabled: false,

@@ -46,6 +46,7 @@ P0_ROUTE_REGISTRY = {
         '/api/habbo/library/icon',
         '/api/habbo/file',
         '/api/scenes/default',
+        '/api/scenes/index',
         '/api/scenes/load',
     ],
     'POST': [
@@ -211,6 +212,57 @@ def write_default_scene_filename(filename: str) -> str:
         encoding='utf-8',
     )
     return filename
+
+
+def summarize_scene_file(path: Path, default_file: str = '') -> dict:
+    name = path.name
+    item = {
+        'file': name,
+        'path': str(path.relative_to(ROOT)),
+        'isDefault': name == str(default_file or ''),
+        'sizeBytes': 0,
+        'modifiedAt': 0,
+        'modifiedAtIso': '',
+        'instances': 0,
+        'boxes': 0,
+        'lights': 0,
+        'label': name,
+        'ok': True,
+    }
+    try:
+        stat = path.stat()
+        item['sizeBytes'] = int(stat.st_size)
+        item['modifiedAt'] = float(stat.st_mtime)
+        item['modifiedAtIso'] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(stat.st_mtime))
+    except Exception:
+        pass
+    try:
+        data = json.loads(path.read_text(encoding='utf-8'))
+        if isinstance(data, dict):
+            item['instances'] = len(data.get('instances') or []) if isinstance(data.get('instances'), list) else 0
+            item['boxes'] = len(data.get('boxes') or []) if isinstance(data.get('boxes'), list) else 0
+            item['lights'] = len(data.get('lights') or []) if isinstance(data.get('lights'), list) else 0
+            label = str(data.get('worldName') or data.get('name') or data.get('title') or '').strip()
+            if label:
+                item['label'] = label
+    except Exception as exc:
+        item['ok'] = False
+        item['error'] = str(exc)
+    return item
+
+
+def list_scene_files() -> list[dict]:
+    SCENE_DIR.mkdir(parents=True, exist_ok=True)
+    default_file = read_default_scene_filename()
+    items = []
+    for path in SCENE_DIR.glob('*.json'):
+        if path.name == DEFAULT_SCENE_META.name:
+            continue
+        if not path.is_file():
+            continue
+        items.append(summarize_scene_file(path, default_file))
+    items.sort(key=lambda item: (not item.get('isDefault', False), -float(item.get('modifiedAt') or 0), str(item.get('file') or '')))
+    return items
 
 
 def normalize_habbo_root(value: str) -> Path:
@@ -1311,6 +1363,18 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(404, {'ok': False, 'error': str(exc)})
             payload = target.read_bytes()
             return self._bytes(200, payload, 'application/x-shockwave-flash')
+
+        if parsed.path == '/api/scenes/index':
+            SCENE_DIR.mkdir(parents=True, exist_ok=True)
+            default_file = read_default_scene_filename()
+            scenes = list_scene_files()
+            return self._json(200, {
+                'ok': True,
+                'sceneDir': str(SCENE_DIR.relative_to(ROOT)),
+                'defaultFile': default_file,
+                'count': len(scenes),
+                'scenes': scenes,
+            })
 
         if parsed.path == '/api/scenes/default':
             SCENE_DIR.mkdir(parents=True, exist_ok=True)
