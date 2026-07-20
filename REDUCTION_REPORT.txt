@@ -1,0 +1,16 @@
+Runtime compact reduction report
+
+Scope:
+- Count excludes tests/, docs/, logs/.
+- The reduction is not obtained by deleting tests/docs/logs.
+- The original src/*.js runtime modules were bundled into dist/bundles/*.bundle.js and the HTML entry files now load those bundles.
+- This is a runtime-compact package, not a developer-source refactor.
+
+Main numbers:
+- Runtime entry-loaded source before: 212 files, 107,226 lines.
+- Runtime entry-loaded source after: 13 files, 2,812 lines.
+- Line reduction: about 97.4%.
+
+Important note:
+- Visible behavior is intended to remain the same because the bundles are generated from the same ordered scripts referenced by the original HTML entries.
+- The original unbundled src/ development modules are removed from this compact package, so old source-level tests/check scripts are not included.
