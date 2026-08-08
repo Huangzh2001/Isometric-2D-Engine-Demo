@@ -62,7 +62,8 @@
       var ctx = getValue(deps, 'getContext', null);
       if (debugState) debugState.renderStep = 'hud';
       call(deps, 'refreshInspectorPanels');
-      if (!ctx) return;
+      var showCanvasDebugText = !!getValue(deps, 'getShowCanvasDebugText', false);
+      if (!ctx || !showCanvasDebugText) return;
       ctx.fillStyle = 'rgba(255,255,255,.92)';
       ctx.font = '14px sans-serif';
 

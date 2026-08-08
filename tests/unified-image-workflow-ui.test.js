@@ -1,0 +1,16 @@
+const assert=require('assert');
+const fs=require('fs');
+const html=fs.readFileSync('START_V18_ONLY.html','utf8');
+const css=fs.readFileSync('styles/editor-v18.css','utf8');
+const editor=fs.readFileSync('src/presentation/editor/pixel-art-editor.js','utf8');
+const main=fs.readFileSync('src/presentation/editor/editor-unified-v18.js','utf8');
+['editorStepImage','editorStepVoxel','editorStepBehavior','editorStepSave','imageArtworkWorkspace','pixelArtCanvas','pixelFacingGrid','pixelLayerList','exportUnifiedMaterial'].forEach(id=>assert(html.includes(`id="${id}"`),`missing ${id}`));
+assert(html.includes('编辑图片')&&html.includes('编辑体素')&&html.includes('编辑行为')&&html.includes('导出'),'four workflow steps missing');
+assert(html.includes('src/core/domain/pixel-art-core.js'),'core script missing');
+assert(html.includes('src/application/assets/pixel-art-workflow-controller.js'),'application script missing');
+assert(html.includes('src/infrastructure/assets/unified-material-export.js'),'infrastructure script missing');
+assert(html.includes('src/presentation/editor/pixel-art-editor.js'),'presentation script missing');
+assert(css.includes('.workflowTopbar')&&css.includes('.pixelLayerList'),'new editor styles missing');
+assert(editor.includes("format:'hzh-unified-material-v1'"),'compressed unified material export missing');
+assert(main.includes('applyArtworkDocument')&&main.includes('artwork: cloneSerializable(state.artworkDocument)'),'prefab artwork integration missing');
+console.log('unified-image-workflow-ui.test.js: OK');

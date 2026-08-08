@@ -481,6 +481,7 @@
       getPlayer: function () { return (typeof player !== 'undefined' && player) ? player : {}; },
       getShowPlayer: function () { return (typeof SHOW_PLAYER !== 'undefined') ? !!SHOW_PLAYER : false; },
       getShowDebug: function () { return (typeof showDebug !== 'undefined') ? !!showDebug : false; },
+      getShowCanvasDebugText: function () { return !!(typeof ui !== 'undefined' && ui && ui.showCanvasDebugText && ui.showCanvasDebugText.checked); },
       getLightTypeLabels: function () { return (typeof LIGHT_TYPE_LABELS !== 'undefined' && LIGHT_TYPE_LABELS) ? LIGHT_TYPE_LABELS : {}; },
       getActiveLightId: function () { return (typeof activeLightId !== 'undefined') ? activeLightId : null; },
       getLightingRenderLights: function () { return (typeof getLightingRenderLights === 'function') ? (getLightingRenderLights() || []) : []; },

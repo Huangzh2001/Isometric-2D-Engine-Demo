@@ -498,6 +498,12 @@ function summarizeHabboDebugPayload(event, payload) {
       proxyDims: safe.habboMeta.proxyDims || null,
       logicDirections: safe.habboMeta.logicDirections || [],
       visualDirections: safe.habboMeta.visualDirections || [],
+      sourceVisualDirections: safe.habboMeta.sourceVisualDirections || [],
+      sourceDirectionCount: Number(safe.habboMeta.sourceDirectionCount || 0),
+      selectedSourceDirections: safe.habboMeta.selectedSourceDirections || [],
+      ignoredSourceDirections: safe.habboMeta.ignoredSourceDirections || [],
+      generatedFacingStrategy: safe.habboMeta.generatedFacingStrategy || '',
+      directionMap: safe.habboMeta.directionMap || [],
       visualization: safe.habboMeta.visualization || '',
       logic: safe.habboMeta.logic || '',
       scutiReference: safe.habboMeta.scutiReference || null,
@@ -528,13 +534,68 @@ function pushHabboDebug(event, payload) {
   return entry;
 }
 
+
+function buildHabboFacingDiagnosticsSnapshot() {
+  var facingApi = null;
+  try { facingApi = window.__ITEM_FACING_CORE__ || (window.App && window.App.domain && window.App.domain.itemFacingCore) || null; } catch (_) {}
+  var list = [];
+  try { if (typeof prototypes !== 'undefined' && Array.isArray(prototypes)) list = prototypes; } catch (_) {}
+  var prefabs = list.filter(function (prefab) { return prefab && (prefab.kind === 'habbo_import' || prefab.habboMeta); }).map(function (prefab) {
+    var keys = Object.keys(prefab.habboLayerDirections || prefab.spriteDirections || {}).sort();
+    var layerDirections = {};
+    keys.forEach(function (key) {
+      var layers = prefab.habboLayerDirections && prefab.habboLayerDirections[key];
+      if (Array.isArray(layers)) {
+        layerDirections[key] = {
+          layerCount: layers.length,
+          sourceDirections: layers.map(function (layer) { return Number(layer && layer.direction || 0); }).filter(function (value, index, arr) { return arr.indexOf(value) === index; }),
+          mirroredLayerCount: layers.filter(function (layer) { return !!(layer && layer.flipX); }).length,
+          layers: layers.map(function (layer) { return { name: layer.name || '', kind: layer.kind || '', source: layer.source || '', direction: Number(layer.direction || 0), logicalDirectionKey: String(layer.logicalDirectionKey == null ? key : layer.logicalDirectionKey), flipX: !!layer.flipX, offsetPx: layer.offsetPx || null, width: Number(layer.width || 0), height: Number(layer.height || 0) }; })
+        };
+      } else {
+        var sprite = prefab.spriteDirections && prefab.spriteDirections[key];
+        layerDirections[key] = { sprite: sprite ? { sourceDirection: sprite.sourceDirection == null ? null : Number(sprite.sourceDirection), logicalDirectionKey: String(sprite.logicalDirectionKey == null ? key : sprite.logicalDirectionKey), width: Number(sprite.width || 0), height: Number(sprite.height || 0), offsetPx: sprite.offsetPx || null, flipX: !!sprite.flipX } : null };
+      }
+    });
+    var matrix = [0, 1, 2, 3].map(function (rotation) {
+      var resolved = facingApi && typeof facingApi.resolveSpriteFacing === 'function' ? facingApi.resolveSpriteFacing(prefab, rotation) : null;
+      var footprint = facingApi && typeof facingApi.getRotatedFootprint === 'function' ? facingApi.getRotatedFootprint(prefab, rotation) : null;
+      return { rotation: rotation, resolved: resolved, footprint: footprint };
+    });
+    return {
+      id: prefab.id || '',
+      name: prefab.name || '',
+      asset: prefab.asset || '',
+      dimensions: { w: Number(prefab.w || 0), d: Number(prefab.d || 0), h: Number(prefab.h || 0) },
+      anchor: prefab.anchor || null,
+      availableDirectionKeys: keys,
+      habboMeta: prefab.habboMeta || null,
+      rotationMatrix: matrix,
+      directionPayloads: layerDirections
+    };
+  });
+  var current = null;
+  try {
+    var proto = typeof currentProto === 'function' ? currentProto() : null;
+    current = { prefabId: proto && proto.id || null, editorMode: typeof editor !== 'undefined' && editor ? editor.mode || null : null, previewRotation: typeof editor !== 'undefined' && editor ? Number(editor.previewRotation != null ? editor.previewRotation : editor.rotation || 0) : null };
+  } catch (_) {}
+  return { current: current, prefabCount: prefabs.length, prefabs: prefabs };
+}
+
 function exportHabboDebug() {
-  pushHabboDebug('export', { entries: habboDebugFrames.length });
-  var blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), entries: habboDebugFrames }, null, 2)], { type: 'application/json;charset=utf-8' });
+  var facingDiagnostics = buildHabboFacingDiagnosticsSnapshot();
+  pushHabboDebug('export', { entries: habboDebugFrames.length, prefabCount: facingDiagnostics.prefabCount, current: facingDiagnostics.current });
+  var payload = {
+    format: 'habbo-rotation-diagnostics-v2',
+    exportedAt: new Date().toISOString(),
+    facingDiagnostics: facingDiagnostics,
+    entries: habboDebugFrames
+  };
+  var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
   a.href = url;
-  a.download = 'habbo-debug-' + Date.now() + '.json';
+  a.download = 'habbo-rotation-debug-' + Date.now() + '.json';
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -583,6 +644,36 @@ function buildLogExportHeader() {
     if (typeof window !== 'undefined' && window.__PIXI_MIGRATION_LAST_PIXI_FLOOR_SUMMARY__) {
       parts.push('# lastPixiFloorSummary=' + JSON.stringify(window.__PIXI_MIGRATION_LAST_PIXI_FLOOR_SUMMARY__));
     }
+  } catch (err) {}
+  try {
+    if (typeof window !== 'undefined' && window.__DYNAMIC_SPRITE_CAMERA_CULLING_LAST__) {
+      parts.push('# dynamicSpriteCameraCulling=' + JSON.stringify(window.__DYNAMIC_SPRITE_CAMERA_CULLING_LAST__));
+    }
+  } catch (err) {}
+  try {
+    if (typeof getLightingRadiusDiagnosticsSnapshot === 'function') {
+      parts.push('# lightingRadius=' + JSON.stringify(getLightingRadiusDiagnosticsSnapshot()));
+    }
+  } catch (err) {}
+  try {
+    if (typeof ui !== 'undefined' && ui && ui.showHabboDebugOverlay) {
+      parts.push('# canvasDebugTextEnabled=' + String(!!(ui.showCanvasDebugText && ui.showCanvasDebugText.checked)));
+      parts.push('# habboDebugOverlayEnabled=' + String(!!ui.showHabboDebugOverlay.checked));
+      parts.push('# itemFacingDebugEnabled=' + String(!!(ui.showItemFacingDebug && ui.showItemFacingDebug.checked)));
+      parts.push('# pixiPlayerChunkDebugOverlayEnabled=' + String(!!(typeof window !== 'undefined' && window.__PIXI_PLAYER_CHUNK_DEBUG_OVERLAY__ === true)));
+    }
+  } catch (err) {}
+  try {
+    if (typeof window !== 'undefined' && window.__HABBO_FINAL_PLACEMENT_FIX__) parts.push('# habboFinalPlacementFix=' + stringifyCompactForLog('export-header-habboFinalPlacementFix', window.__HABBO_FINAL_PLACEMENT_FIX__));
+  } catch (err) {}
+  try {
+    if (typeof window !== 'undefined' && window.__DYNAMIC_INSTANCE_SPLIT_LAST__) parts.push('# dynamicInstanceSplit=' + stringifyCompactForLog('export-header-dynamicInstanceSplit', window.__DYNAMIC_INSTANCE_SPLIT_LAST__));
+  } catch (err) {}
+  try {
+    if (typeof window !== 'undefined' && window.__HABBO_VIEW_FACING_LAST__) parts.push('# habboViewFacing=' + stringifyCompactForLog('export-header-habboViewFacing', window.__HABBO_VIEW_FACING_LAST__));
+  } catch (err) {}
+  try {
+    if (typeof window !== 'undefined' && window.__PREFAB_SPRITE_VIEW_FACING_LAST__) parts.push('# prefabSpriteViewFacing=' + stringifyCompactForLog('export-header-prefabSpriteViewFacing', window.__PREFAB_SPRITE_VIEW_FACING_LAST__));
   } catch (err) {}
   parts.push('');
   return parts.join('\n');

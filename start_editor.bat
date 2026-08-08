@@ -4,10 +4,10 @@ if not exist "%~dp0logs" mkdir "%~dp0logs"
 set LOGFILE=%~dp0logs\server-editor.log
 call :pick_port
 if errorlevel 1 goto :port_failed
-start "Isometric Room Editor Server" /min cmd /c ""%~dp0server\run_server.bat" %PORT% editor"
+start "Unified Material Editor Server" /min cmd /c ""%~dp0server\run_server.bat" %PORT% editor"
 call :wait_ready
 if errorlevel 1 goto :server_failed
-start "" "http://127.0.0.1:%PORT%/START_V18_ONLY.html?v=20260321-v18-entry-log"
+start "" "http://127.0.0.1:%PORT%/START_V18_ONLY.html?v=20260807-behavior-v1"
 exit /b
 
 :pick_port

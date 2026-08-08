@@ -11,7 +11,7 @@ if errorlevel 1 goto :server_failed
 if not "%QUERY_SUFFIX%"=="" (
   start "" "http://127.0.0.1:%PORT%/index.html%QUERY_SUFFIX%"
 ) else (
-  start "" "http://127.0.0.1:%PORT%/index.html?v=20260323P-ui-button-iconfix"
+  start "" "http://127.0.0.1:%PORT%/index.html?v=20260807-pixi-stable-resize-zoom-v8"
 )
 exit /b
 

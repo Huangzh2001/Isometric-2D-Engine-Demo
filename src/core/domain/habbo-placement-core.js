@@ -102,23 +102,73 @@
     return getHabboProxyVisualShift(prefab, instance && instance.rotation || 0, metrics);
   }
 
+  function normalizeFacing(rotation) {
+    return (((Math.round(toFiniteNumber(rotation, 0)) % 4) + 4) % 4);
+  }
+
+  function getHabboBaseDimensions(prefab) {
+    var metaDims = prefab && prefab.habboMeta && (prefab.habboMeta.proxyDims || prefab.habboMeta.dimensions);
+    return {
+      w: toRoundedPositiveInt(metaDims && (metaDims.x != null ? metaDims.x : metaDims.w), prefab && prefab.w || 1),
+      d: toRoundedPositiveInt(metaDims && (metaDims.y != null ? metaDims.y : metaDims.d), prefab && prefab.d || 1),
+      h: toRoundedPositiveInt(metaDims && (metaDims.z != null ? metaDims.z : metaDims.h), prefab && prefab.h || 1)
+    };
+  }
+
+  function getHabboRotatedAnchorCell(prefab, rotation, anchor) {
+    var dims = getHabboBaseDimensions(prefab);
+    var src = anchor && typeof anchor === 'object' ? anchor : (prefab && prefab.anchor || {});
+    var ax = Math.max(0, Math.round(toFiniteNumber(src.x, 0)));
+    var ay = Math.max(0, Math.round(toFiniteNumber(src.y, 0)));
+    var az = toFiniteNumber(src.z, 0);
+    switch (normalizeFacing(rotation)) {
+      case 1: return { x: ay, y: Math.max(0, dims.w - 1 - ax), z: az };
+      case 2: return { x: Math.max(0, dims.w - 1 - ax), y: Math.max(0, dims.d - 1 - ay), z: az };
+      case 3: return { x: Math.max(0, dims.d - 1 - ay), y: ax, z: az };
+      default: return { x: ax, y: ay, z: az };
+    }
+  }
+
+  function getHabboRoomAnchorCells(prefab, rotation, anchor) {
+    var meta = prefab && prefab.habboMeta || {};
+    var explicit = meta.roomAnchorCells && typeof meta.roomAnchorCells === 'object' ? meta.roomAnchorCells : null;
+    if (explicit) {
+      return {
+        x: toFiniteNumber(explicit.x, 0.5),
+        y: toFiniteNumber(explicit.y, 0.5),
+        z: toFiniteNumber(explicit.z, 0)
+      };
+    }
+    var rotated = getHabboRotatedAnchorCell(prefab, rotation, anchor);
+    // Habbo registration coordinates are relative to the centre of the
+    // object's position tile. Engine instance coordinates represent the
+    // north-west corner of that tile, so add half a cell on both floor axes.
+    return {
+      x: rotated.x + 0.5,
+      y: rotated.y + 0.5,
+      z: rotated.z
+    };
+  }
+
   function getHabboRoomOrigin(prefab, origin, anchor, rotation, metrics, projectIso, options) {
     var safeOrigin = origin && typeof origin === 'object' ? origin : {};
-    var safeAnchor = anchor && typeof anchor === 'object' ? anchor : {};
-    var ox = toFiniteNumber(safeOrigin.x, 0) + toFiniteNumber(safeAnchor.x, 0);
-    var oy = toFiniteNumber(safeOrigin.y, 0) + toFiniteNumber(safeAnchor.y, 0);
-    var oz = toFiniteNumber(safeOrigin.z, 0) + toFiniteNumber(safeAnchor.z, 0);
+    var roomAnchor = getHabboRoomAnchorCells(prefab, rotation, anchor);
+    var ox = toFiniteNumber(safeOrigin.x, 0) + roomAnchor.x;
+    var oy = toFiniteNumber(safeOrigin.y, 0) + roomAnchor.y;
+    var oz = toFiniteNumber(safeOrigin.z, 0) + roomAnchor.z;
     var foot = typeof projectIso === 'function'
       ? projectIso(ox, oy, oz)
       : { x: 0, y: 0 };
     var info = getHabboPlacementDecomposition(prefab, rotation, metrics);
     var shift = info && info.residualShift ? info.residualShift : { x: 0, y: 0 };
     var floorBaselineOffset = options && options.floorBaselineOffset != null
-      ? toFiniteNumber(options.floorBaselineOffset, 20)
-      : 20;
+      ? toFiniteNumber(options.floorBaselineOffset, 0)
+      : 0;
     return {
       x: Math.round(toFiniteNumber(foot && foot.x, 0) + (shift.x || 0)),
-      y: Math.round(toFiniteNumber(foot && foot.y, 0) + (shift.y || 0) + floorBaselineOffset)
+      y: Math.round(toFiniteNumber(foot && foot.y, 0) + (shift.y || 0) + floorBaselineOffset),
+      roomAnchorCells: roomAnchor,
+      worldAnchor: { x: ox, y: oy, z: oz }
     };
   }
 
@@ -160,6 +210,9 @@
     getHabboPlacementCellShift: getHabboPlacementCellShift,
     getHabboProxyVisualShift: getHabboProxyVisualShift,
     getHabboInstanceVisualShift: getHabboInstanceVisualShift,
+    getHabboBaseDimensions: getHabboBaseDimensions,
+    getHabboRotatedAnchorCell: getHabboRotatedAnchorCell,
+    getHabboRoomAnchorCells: getHabboRoomAnchorCells,
     getHabboRoomOrigin: getHabboRoomOrigin,
     getHabboLayerLocalBox: getHabboLayerLocalBox
   };

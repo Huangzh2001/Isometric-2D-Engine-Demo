@@ -1,8 +1,9 @@
 (function () {
   'use strict';
 
-  const BUILD_VERSION = '20260320-v18-box-occlusion';
+  const BUILD_VERSION = '20260807-behavior-v1';
   const MAX_LOGS = 600;
+  const beforeExportHooks = [];
   const PREVIEW_LOG_LIMIT = 120;
   const EDITOR_VERBOSE_LOG = false;
 
@@ -15,8 +16,9 @@
   const previewCanvas = document.getElementById('previewCanvas');
   const previewCtx = previewCanvas.getContext('2d');
 
+  const editorNamespaceApi = { owner: 'src/presentation/editor/editor-unified-v18.js', build: BUILD_VERSION, entryFile: 'START_V18_ONLY.html' };
   if (window.__APP_NAMESPACE && typeof window.__APP_NAMESPACE.bind === 'function') {
-    window.__APP_NAMESPACE.bind('editor.unifiedV18', { owner: 'src/presentation/editor/editor-unified-v18.js', build: BUILD_VERSION, entryFile: 'START_V18_ONLY.html' }, { owner: 'src/presentation/editor/editor-unified-v18.js', legacy: [], phase: 'P2-A' });
+    window.__APP_NAMESPACE.bind('editor.unifiedV18', editorNamespaceApi, { owner: 'src/presentation/editor/editor-unified-v18.js', legacy: [], phase: 'P2-A' });
   }
 
   const __editorHealthReporter = (window.__EDITOR_V18_DIAGNOSTICS__ && typeof window.__EDITOR_V18_DIAGNOSTICS__.createHealthReporter === 'function')
@@ -55,6 +57,12 @@
     spriteScale: document.getElementById('spriteScale'),
     spriteOffsetX: document.getElementById('spriteOffsetX'),
     spriteOffsetY: document.getElementById('spriteOffsetY'),
+    spriteSourceFacing: document.getElementById('spriteSourceFacing'),
+    spriteFlipX: document.getElementById('spriteFlipX'),
+    spriteFlipY: document.getElementById('spriteFlipY'),
+    resetFacingImageTransform: document.getElementById('resetFacingImageTransform'),
+    copyFacingImageTransform: document.getElementById('copyFacingImageTransform'),
+    pasteFacingImageTransform: document.getElementById('pasteFacingImageTransform'),
     spriteThumb: document.getElementById('spriteThumb'),
     spriteThumbPlaceholder: document.getElementById('spriteThumbPlaceholder'),
     interactionModeSummary: document.getElementById('interactionModeSummary'),
@@ -114,9 +122,11 @@
     voxelCountText: document.getElementById('voxelCountText'),
     editorStepImage: document.getElementById('editorStepImage'),
     editorStepVoxel: document.getElementById('editorStepVoxel'),
+    editorStepBehavior: document.getElementById('editorStepBehavior'),
     editorStepSave: document.getElementById('editorStepSave'),
     editorPageImage: document.getElementById('editorPageImage'),
     editorPageVoxel: document.getElementById('editorPageVoxel'),
+    editorPageBehavior: document.getElementById('editorPageBehavior'),
     editorPageSave: document.getElementById('editorPageSave'),
   };
 
@@ -157,18 +167,61 @@
     const seed = makeUniqueSeed();
     return { id: `custom_prefab_${seed}`, name: `Custom Prefab ${seed.toUpperCase()}` };
   }
+  function defaultBehaviorDefinition() {
+    return {
+      version: 'hzh-behavior-v1',
+      language: 'lua',
+      script: '',
+      capabilities: [],
+      publicApi: { commands: [], events: [] },
+      properties: [],
+      references: []
+    };
+  }
+  function normalizeBehaviorDefinition(raw) {
+    const base = defaultBehaviorDefinition();
+    const value = raw && typeof raw === 'object' ? cloneSerializable(raw) || {} : {};
+    const publicApi = value.publicApi && typeof value.publicApi === 'object' ? value.publicApi : {};
+    const normalizeApiList = (items) => (Array.isArray(items) ? items : []).map((item) => {
+      if (typeof item === 'string') return { name: item, args: '', description: '' };
+      return {
+        name: String(item && item.name || '').trim(),
+        args: String(item && item.args || '').trim(),
+        description: String(item && item.description || '').trim()
+      };
+    }).filter((item) => item.name);
+    return {
+      version: String(value.version || base.version),
+      language: String(value.language || base.language),
+      script: String(value.script || ''),
+      capabilities: Array.isArray(value.capabilities) ? value.capabilities.map((x) => String(x || '').trim()).filter(Boolean) : [],
+      publicApi: {
+        commands: normalizeApiList(publicApi.commands || value.commands),
+        events: normalizeApiList(publicApi.events || value.events)
+      },
+      properties: Array.isArray(value.properties) ? value.properties : [],
+      references: Array.isArray(value.references) ? value.references : []
+    };
+  }
 
   const initialIdentity = defaultPrefabIdentity();
   const state = {
     id: initialIdentity.id,
     name: initialIdentity.name,
+    assetSource: 'blank',
+    importMetadata: null,
+    habboCalibration: null,
+    artworkDocument: null,
+    materialStateBundle: null,
+    behavior: defaultBehaviorDefinition(),
+    activeFacing: 0,
     kind: 'custom',
     asset: '',
     base: '#c7b0df',
     renderMode: 'voxel',
     interactionMode: 'sprite',
-    sprite: { image: '', imageExport: '', objectUrl: '', fileName: '', scale: 1, offsetX: 0, offsetY: 0, previewOpacity: 1 },
-    spriteFit: { footprintCols: 1, footprintRows: 1, detectionMode: 'full', sampleYNormalized: 1, sampleBandPx: 1, guidesVisible: true, lockHorizontal: true, pickSampleActive: false },
+    sprite: { image: '', imageExport: '', objectUrl: '', fileName: '', scale: 1, offsetX: 0, offsetY: 0, sourceFacing: 0, flipX: false, flipY: false, previewOpacity: 1, facingTransforms: [] },
+    spriteFit: { footprintCols: 1, footprintRows: 1, detectionMode: 'full', sampleYNormalized: 1, sampleBandPx: 1, guidesVisible: true, lockHorizontal: false, pickSampleActive: false },
     anchor: { x: 0, y: 0, z: 0 },
     gridW: 10,
     gridH: 10,
@@ -194,6 +247,126 @@
     spriteResize: { active: false, startClientX: 0, startClientY: 0, startScale: 1, startDrawW: 1, startDrawH: 1 },
     sidebarStep: 'image',
   };
+
+  const VOXEL_FACING_NAMES = ['北', '东', '南', '西'];
+  function normalizeFacing(value) { return Math.max(0, Math.min(3, Math.round(Number(value) || 0))); }
+  function defaultFacingTransform(facing = state.activeFacing) {
+    const targetFacing = normalizeFacing(facing);
+    return {
+      scale: Number(state.sprite.scale) || 1,
+      offsetX: Number(state.sprite.offsetX) || 0,
+      offsetY: Number(state.sprite.offsetY) || 0,
+      sourceFacing: normalizeFacing(state.sprite.sourceFacing == null ? targetFacing : state.sprite.sourceFacing),
+      flipX: !!state.sprite.flipX,
+      flipY: !!state.sprite.flipY,
+    };
+  }
+  function freshFacingTransform(facing) {
+    const targetFacing = normalizeFacing(facing);
+    return {
+      scale: Number(state.sprite.scale) || 1,
+      offsetX: Number(state.sprite.offsetX) || 0,
+      offsetY: Number(state.sprite.offsetY) || 0,
+      sourceFacing: targetFacing,
+      flipX: false,
+      flipY: false,
+    };
+  }
+  function normalizeFacingTransform(raw, facing, fallback) {
+    const base = fallback || freshFacingTransform(facing);
+    const item = raw && typeof raw === 'object' ? raw : {};
+    return {
+      scale: Math.max(0.1, Math.min(8, Number(item.scale) || Number(base.scale) || 1)),
+      offsetX: Number(item.offsetX ?? (item.offsetPx && item.offsetPx.x) ?? base.offsetX) || 0,
+      offsetY: Number(item.offsetY ?? (item.offsetPx && item.offsetPx.y) ?? base.offsetY) || 0,
+      sourceFacing: normalizeFacing(item.sourceFacing == null ? (base.sourceFacing == null ? facing : base.sourceFacing) : item.sourceFacing),
+      flipX: item.flipX == null ? !!base.flipX : !!item.flipX,
+      flipY: item.flipY == null ? !!base.flipY : !!item.flipY,
+    };
+  }
+  function ensureFacingTransforms() {
+    if (!Array.isArray(state.sprite.facingTransforms)) state.sprite.facingTransforms = [];
+    for (let i = 0; i < 4; i += 1) {
+      if (!state.sprite.facingTransforms[i]) state.sprite.facingTransforms[i] = freshFacingTransform(i);
+      else state.sprite.facingTransforms[i] = normalizeFacingTransform(state.sprite.facingTransforms[i], i, freshFacingTransform(i));
+    }
+    return state.sprite.facingTransforms;
+  }
+  function persistActiveFacingTransform() {
+    ensureFacingTransforms();
+    state.sprite.facingTransforms[normalizeFacing(state.activeFacing)] = defaultFacingTransform(state.activeFacing);
+  }
+  function restoreFacingTransform(facing, fallback) {
+    const targetFacing = normalizeFacing(facing);
+    const transforms = ensureFacingTransforms();
+    const selected = normalizeFacingTransform(transforms[targetFacing], targetFacing, fallback || freshFacingTransform(targetFacing));
+    state.sprite.scale = selected.scale;
+    state.sprite.offsetX = selected.offsetX;
+    state.sprite.offsetY = selected.offsetY;
+    state.sprite.sourceFacing = selected.sourceFacing;
+    state.sprite.flipX = selected.flipX;
+    state.sprite.flipY = selected.flipY;
+    transforms[targetFacing] = defaultFacingTransform(targetFacing);
+  }
+  function refreshActiveFacingSpriteImage(reason = 'facing-transform') {
+    if (!state.artworkDocument) return false;
+    const sourceFacing = normalizeFacing(state.sprite.sourceFacing == null ? state.activeFacing : state.sprite.sourceFacing);
+    const dataUrl = artworkFacingDataUrl(sourceFacing);
+    if (!dataUrl) return false;
+    state.sprite.image = dataUrl;
+    state.sprite.imageExport = dataUrl;
+    state.sprite.objectUrl = '';
+    state.sprite.fileName = `artwork-facing-${state.activeFacing}-source-${sourceFacing}.png`;
+    ensureEditorSpriteImage(dataUrl);
+    resetSpriteExportPromise();
+    invalidateEditorSpriteRenderCache();
+    detailEditorLog(`sprite-source-facing:refresh target=${state.activeFacing} source=${sourceFacing} reason=${reason}`);
+    return true;
+  }
+  function artworkFacingDataUrl(facing) {
+    const core = typeof window !== 'undefined' ? window.__HZH_PIXEL_ART_CORE__ : null;
+    if (!core || !state.artworkDocument || typeof core.deserializeDocument !== 'function' || typeof core.compositeFacing !== 'function') return '';
+    try {
+      const doc = core.deserializeDocument(state.artworkDocument);
+      const pixels = core.compositeFacing(doc, normalizeFacing(facing));
+      const canvas = document.createElement('canvas');
+      canvas.width = doc.width; canvas.height = doc.height;
+      const ctx = canvas.getContext('2d');
+      ctx.putImageData(new ImageData(new Uint8ClampedArray(pixels), doc.width, doc.height), 0, 0);
+      return canvas.toDataURL('image/png');
+    } catch (err) {
+      detailEditorLog(`facing:composite-error facing=${facing} error=${err?.message || err}`);
+      return '';
+    }
+  }
+  function setVoxelViewFacing(facing, reason = 'voxel-ui') {
+    const next = normalizeFacing(facing);
+    if (next === state.activeFacing) {
+      try { window.dispatchEvent(new CustomEvent('unified-asset-editor:facing-changed', { detail: { facing: next, reason } })); } catch (_) {}
+      rerender();
+      return next;
+    }
+    persistActiveFacingTransform();
+    state.activeFacing = next;
+    if (state.artworkDocument) state.artworkDocument.activeFacing = next;
+    restoreFacingTransform(next, freshFacingTransform(next));
+    refreshActiveFacingSpriteImage('voxel-facing-change');
+    syncStateToForm();
+    updateSpriteThumb();
+    detailEditorLog(`voxel-facing:set facing=${next} label=${VOXEL_FACING_NAMES[next]} reason=${reason}`);
+    setStatus(`已切换到${VOXEL_FACING_NAMES[next]}方向：voxel 与方向 ${next} 图片共同检查`);
+    try { window.dispatchEvent(new CustomEvent('unified-asset-editor:facing-changed', { detail: { facing: next, reason } })); } catch (_) {}
+    rerender();
+    return next;
+  }
+
+  function emitAssetSourceChanged(reason) {
+    try {
+      window.dispatchEvent(new CustomEvent('unified-asset-editor:source-changed', {
+        detail: { sourceType: state.assetSource || 'blank', reason: String(reason || 'unknown'), prefabId: state.id }
+      }));
+    } catch (_) {}
+  }
 
   const editorLogs = [];
   let lastEvent = 'boot';
@@ -228,7 +401,7 @@
     const preserveGuides = options.preserveGuides !== false;
     const preserveLock = options.preserveLock !== false;
     const guidesVisible = preserveGuides && state.spriteFit ? !!state.spriteFit.guidesVisible : true;
-    const lockHorizontal = preserveLock && state.spriteFit ? !!state.spriteFit.lockHorizontal : true;
+    const lockHorizontal = preserveLock && state.spriteFit ? !!state.spriteFit.lockHorizontal : false;
     state.spriteFit = {
       footprintCols: 1,
       footprintRows: 1,
@@ -246,6 +419,7 @@
     return [
       { step: 'image', button: ui.editorStepImage, page: ui.editorPageImage },
       { step: 'voxel', button: ui.editorStepVoxel, page: ui.editorPageVoxel },
+      { step: 'behavior', button: ui.editorStepBehavior, page: ui.editorPageBehavior },
       { step: 'save', button: ui.editorStepSave, page: ui.editorPageSave },
     ];
   }
@@ -257,18 +431,22 @@
     }
   }
   function setSidebarStep(step, reason = 'ui') {
-    const nextStep = ['image', 'voxel', 'save'].includes(step) ? step : 'image';
+    const nextStep = ['image', 'voxel', 'behavior', 'save'].includes(step) ? step : 'image';
     const previousStep = state.sidebarStep;
     state.sidebarStep = nextStep;
     applySidebarStepUi();
     if (nextStep === 'image') setInteractionMode('sprite', `step:${reason}`);
     else if (nextStep === 'voxel') setInteractionMode('voxel', `step:${reason}`);
-    if (previousStep !== nextStep) detailEditorLog(`sidebar:step step=${nextStep} reason=${reason}`);
+    if (previousStep !== nextStep) {
+      detailEditorLog(`sidebar:step step=${nextStep} reason=${reason}`);
+      try { window.dispatchEvent(new CustomEvent('unified-asset-editor:step-changed', { detail: { step: nextStep, previousStep, reason } })); } catch (_) {}
+    }
   }
   function bindSidebarStepTabs() {
     const mapping = [
       ['image', ui.editorStepImage],
       ['voxel', ui.editorStepVoxel],
+      ['behavior', ui.editorStepBehavior],
       ['save', ui.editorStepSave],
     ];
     for (const [step, button] of mapping) {
@@ -309,6 +487,10 @@
     return (!state.sprite.objectUrl && state.sprite.image) ? state.sprite.image : '';
   }
   async function createPrefabObjectForExport() {
+    for (const hook of beforeExportHooks.slice()) {
+      try { await hook(); }
+      catch (error) { detailEditorLog(`export-hook:error ${error?.message || error}`); }
+    }
     await ensureSpriteExportImageReady();
     return createPrefabObject({ includeSpriteImageData: true });
   }
@@ -486,11 +668,16 @@
     const bounds = getSpriteSampleBounds(profile);
     if (!rect || !profile || !bounds) return null;
     const drawScale = rect.scale;
-    const imageLeftX = rect.x + bounds.left * drawScale;
-    const imageRightX = rect.x + bounds.right * drawScale;
-    const imageTopY = rect.y + bounds.top * drawScale;
-    const imageBottomY = rect.y + (bounds.bottom + 1) * drawScale;
-    const sampleCenterY = rect.y + bounds.centerY * drawScale;
+    const displayLeft = state.sprite.flipX ? (profile.width - 1 - bounds.right) : bounds.left;
+    const displayRight = state.sprite.flipX ? (profile.width - 1 - bounds.left) : bounds.right;
+    const displayTop = state.sprite.flipY ? (profile.height - 1 - bounds.bottom) : bounds.top;
+    const displayBottom = state.sprite.flipY ? (profile.height - 1 - bounds.top) : bounds.bottom;
+    const displayCenterY = state.sprite.flipY ? (profile.height - 1 - bounds.centerY) : bounds.centerY;
+    const imageLeftX = rect.x + displayLeft * drawScale;
+    const imageRightX = rect.x + displayRight * drawScale;
+    const imageTopY = rect.y + displayTop * drawScale;
+    const imageBottomY = rect.y + (displayBottom + 1) * drawScale;
+    const sampleCenterY = rect.y + displayCenterY * drawScale;
     return {
       rect,
       profile,
@@ -534,7 +721,8 @@
   function setSpriteSampleFromPreviewClient(clientX, clientY, options = {}) {
     const hit = spriteHitFromClient(clientX, clientY);
     if (!hit) return false;
-    const normalized = clampNumber((hit.localY - hit.y) / Math.max(1, hit.drawH), 0, 1);
+    const displayNormalized = clampNumber((hit.localY - hit.y) / Math.max(1, hit.drawH), 0, 1);
+    const normalized = state.sprite.flipY ? (1 - displayNormalized) : displayNormalized;
     state.spriteFit.detectionMode = 'sample-band';
     state.spriteFit.sampleYNormalized = normalized;
     state.spriteFit.pickSampleActive = false;
@@ -578,12 +766,14 @@
     const drawScale = targetWidth / naturalWidth;
     const nextScale = clampNumber(drawScale / Math.max(1e-6, unit), 0.1, 8);
     state.sprite.scale = nextScale;
-    const boundaryCenterRelative = (((overlay.bounds.left + overlay.bounds.right) / 2) - (overlay.profile.width / 2)) * drawScale;
+    const sourceBoundaryCenter = (((overlay.bounds.left + overlay.bounds.right) / 2) - (overlay.profile.width / 2));
+    const boundaryCenterRelative = (state.sprite.flipX ? -sourceBoundaryCenter : sourceBoundaryCenter) * drawScale;
     const offsetXScaled = footprint.centerX - overlay.rect.anchor.x - boundaryCenterRelative;
     state.sprite.offsetX = Math.round(offsetXScaled / Math.max(1e-6, unit));
     invalidateEditorSpriteRenderCache();
     syncStateToForm();
     scheduleJsonPreviewUpdate(false);
+    persistActiveFacingTransform();
     detailEditorLog(`sprite-fit:auto reason=${reason} footprint=${state.spriteFit.footprintCols}x${state.spriteFit.footprintRows} mode=${state.spriteFit.detectionMode} scale=${state.sprite.scale.toFixed(3)} offsetX=${state.sprite.offsetX}`);
     setStatus(`已自动适配占地 ${state.spriteFit.footprintCols}×${state.spriteFit.footprintRows}：以图片左右边界为检测源，按 footprint 宽度自动回算 scale=${state.sprite.scale.toFixed(2)}，offsetX=${state.sprite.offsetX}`);
     rerender();
@@ -594,7 +784,7 @@
     const has = !!state.sprite.image;
     if (ui.spriteThumb) {
       ui.spriteThumb.style.display = has ? 'block' : 'none';
-      if (has) ui.spriteThumb.src = state.sprite.image;
+      if (has) { ui.spriteThumb.src = state.sprite.image; ui.spriteThumb.style.transform = `scale(${state.sprite.flipX ? -1 : 1}, ${state.sprite.flipY ? -1 : 1})`; }
     }
     if (ui.spriteThumbPlaceholder) ui.spriteThumbPlaceholder.style.display = has ? 'none' : 'block';
     if (ui.spriteThumbPlaceholder && !has) ui.spriteThumbPlaceholder.textContent = '未导入图片';
@@ -919,7 +1109,11 @@
     state.sprite.scale = Math.max(0.1, Math.min(8, Number(ui.spriteScale.value) || 1));
     state.sprite.offsetX = Number(ui.spriteOffsetX.value) || 0;
     state.sprite.offsetY = Number(ui.spriteOffsetY.value) || 0;
+    state.sprite.sourceFacing = normalizeFacing(ui.spriteSourceFacing ? ui.spriteSourceFacing.value : state.activeFacing);
+    state.sprite.flipX = !!(ui.spriteFlipX && ui.spriteFlipX.checked);
+    state.sprite.flipY = !!(ui.spriteFlipY && ui.spriteFlipY.checked);
     state.sprite.previewOpacity = Math.max(0.05, Math.min(1, Number(ui.spritePreviewOpacity && ui.spritePreviewOpacity.value) || (Number(ui.spritePreviewOpacityNumber && ui.spritePreviewOpacityNumber.value) / 100) || 1));
+    persistActiveFacingTransform();
     state.spriteFit.footprintCols = sanitizeFootprintValue(ui.footprintCols && ui.footprintCols.value);
     state.spriteFit.footprintRows = sanitizeFootprintValue(ui.footprintRows && ui.footprintRows.value);
     state.spriteFit.sampleBandPx = sanitizeSampleBandPx(ui.spriteSampleBand && ui.spriteSampleBand.value);
@@ -944,6 +1138,9 @@
     if (ui.spriteScale) ui.spriteScale.value = String(state.sprite.scale || 1);
     if (ui.spriteOffsetX) ui.spriteOffsetX.value = String(state.sprite.offsetX || 0);
     if (ui.spriteOffsetY) ui.spriteOffsetY.value = String(state.sprite.offsetY || 0);
+    if (ui.spriteSourceFacing) ui.spriteSourceFacing.value = String(normalizeFacing(state.sprite.sourceFacing == null ? state.activeFacing : state.sprite.sourceFacing));
+    if (ui.spriteFlipX) ui.spriteFlipX.checked = !!state.sprite.flipX;
+    if (ui.spriteFlipY) ui.spriteFlipY.checked = !!state.sprite.flipY;
     if (ui.spritePreviewOpacity) ui.spritePreviewOpacity.value = String(state.sprite.previewOpacity || 1);
     if (ui.spritePreviewOpacityNumber) ui.spritePreviewOpacityNumber.value = String(Math.round((state.sprite.previewOpacity || 1) * 100));
     if (ui.spritePreviewOpacityValue) ui.spritePreviewOpacityValue.textContent = `${Math.round((state.sprite.previewOpacity || 1) * 100)}%`;
@@ -1008,9 +1205,117 @@
     return Array.from(out.values()).sort((a, b) => a.z - b.z || a.y - b.y || a.x - b.x);
   }
 
+  function cloneSerializable(value) {
+    if (value == null) return null;
+    try { return JSON.parse(JSON.stringify(value)); } catch (_) { return null; }
+  }
+
+
+  function buildTranslationInvariantVoxelAlignment(exportVoxels) {
+    const voxels = Array.isArray(exportVoxels) ? exportVoxels.filter((v) => v && Number.isFinite(Number(v.x)) && Number.isFinite(Number(v.y)) && Number.isFinite(Number(v.z))) : [];
+    if (!voxels.length) return null;
+    const baseZ = Math.min(...voxels.map((v) => Number(v.z) || 0));
+    const baseCells = voxels.filter((v) => (Number(v.z) || 0) === baseZ);
+    if (!baseCells.length) return null;
+    const minX = Math.min(...baseCells.map((v) => Number(v.x) || 0));
+    const minY = Math.min(...baseCells.map((v) => Number(v.y) || 0));
+    const normalizedCells = baseCells.map((v) => ({ x: (Number(v.x) || 0) - minX, y: (Number(v.y) || 0) - minY }))
+      .sort((a, b) => a.y - b.y || a.x - b.x);
+    const maxX = Math.max(...normalizedCells.map((v) => v.x));
+    const maxY = Math.max(...normalizedCells.map((v) => v.y));
+    const anchorLocal = {
+      x: (Number(state.anchor && state.anchor.x) || 0) - minX,
+      y: (Number(state.anchor && state.anchor.y) || 0) - minY,
+      z: (Number(state.anchor && state.anchor.z) || 0) - baseZ,
+    };
+    const artwork = state.artworkDocument || {};
+    const artworkWidth = Math.max(1, Number(artwork.width) || 1);
+    const artworkHeight = Math.max(1, Number(artwork.height) || 1);
+    const registration = artwork.metadata && artwork.metadata.registrationPx
+      ? artwork.metadata.registrationPx
+      : { x: artworkWidth / 2, y: artworkHeight };
+    function rotate(x, y, facing) {
+      const f = normalizeFacing(facing);
+      if (f === 1) return { x: -y, y: x };
+      if (f === 2) return { x: -x, y: -y };
+      if (f === 3) return { x: y, y: -x };
+      return { x, y };
+    }
+    function inverseRotate(x, y, facing) {
+      const f = normalizeFacing(facing);
+      if (f === 1) return { x: y, y: -x };
+      if (f === 2) return { x: -x, y: -y };
+      if (f === 3) return { x: -y, y: x };
+      return { x, y };
+    }
+    function projectTranslation(x, y, facing) {
+      const p = rotate(x, y, facing);
+      return { x: (p.x - p.y) * 32, y: (p.x + p.y) * 16 };
+    }
+    function inverseProject(screenX, screenY, facing) {
+      const viewX = Number(screenX) / 64 + Number(screenY) / 32;
+      const viewY = Number(screenY) / 32 - Number(screenX) / 64;
+      return inverseRotate(viewX, viewY, facing);
+    }
+    return {
+      version: 'translation-invariant-registration-point-alignment-v2',
+      baseLayerZ: baseZ,
+      removedEditorTranslation: { x: minX, y: minY },
+      normalizedCells,
+      localBounds: { w: maxX + 1, d: maxY + 1 },
+      normalizedAnchorCell: anchorLocal,
+      artwork: {
+        width: artworkWidth,
+        height: artworkHeight,
+        registrationPx: { x: Number(registration.x) || 0, y: Number(registration.y) || 0 },
+      },
+      canonicalTile: { width: 64, height: 32 },
+      facingTransforms: ensureFacingTransforms().map((transform, facing) => {
+        if (!transform) return null;
+        const scale = Number(transform.scale) || 1;
+        const spriteOffsetPx = {
+          x: Number(transform.offsetX) || 0,
+          y: Number(transform.offsetY) || 0,
+        };
+        // Sprite offsets are applied to the image's bottom-centre. Convert them
+        // to the actual authored registration point before comparing samples.
+        const registrationDeltaX = (((Number(registration.x) || 0) - artworkWidth / 2) * (transform.flipX ? -1 : 1)) * scale;
+        const registrationDeltaY = (transform.flipY
+          ? (-(Number(registration.y) || 0))
+          : ((Number(registration.y) || 0) - artworkHeight)) * scale;
+        const registrationFromAnchorPx = {
+          x: spriteOffsetPx.x + registrationDeltaX,
+          y: spriteOffsetPx.y + registrationDeltaY,
+        };
+        const anchorFromFootprintOriginPx = projectTranslation(anchorLocal.x, anchorLocal.y, facing);
+        const registrationFromFootprintOriginPx = {
+          x: anchorFromFootprintOriginPx.x + registrationFromAnchorPx.x,
+          y: anchorFromFootprintOriginPx.y + registrationFromAnchorPx.y,
+        };
+        const localEstimate = inverseProject(registrationFromFootprintOriginPx.x, registrationFromFootprintOriginPx.y, facing);
+        return {
+          facing,
+          scale,
+          sourceFacing: normalizeFacing(transform.sourceFacing == null ? facing : transform.sourceFacing),
+          flipX: !!transform.flipX,
+          flipY: !!transform.flipY,
+          spriteOffsetPx,
+          registrationFromAnchorPx,
+          registrationFromFootprintOriginPx,
+          // Kept for older analysis consumers; its semantics are now explicit:
+          // registration point relative to the normalized footprint origin.
+          offsetPx: registrationFromFootprintOriginPx,
+          anchorLocalEstimate: { x: localEstimate.x, y: localEstimate.y, z: anchorLocal.z },
+        };
+      }),
+      note: 'voxel absolute translation is removed; image comparison uses the authored registration point rather than raw bottom-centre sprite offsets',
+    };
+  }
+
   function createPrefabObject(options = {}) {
     const { includeSpriteImageData = true } = options;
     syncFormToState();
+    persistActiveFacingTransform();
     const spriteImageForExport = state.sprite.imageExport || (!state.sprite.objectUrl ? state.sprite.image : '');
     const spriteVisible = hasSpriteImage();
     const exportVoxels = collectExportVoxels({ spriteVisible });
@@ -1019,6 +1324,13 @@
       name: state.name,
       kind: state.kind,
       asset: state.asset,
+      sourceType: state.assetSource || (spriteVisible ? 'image' : 'blank'),
+      importMetadata: cloneSerializable(state.importMetadata),
+      habboCalibration: cloneSerializable(state.habboCalibration),
+      artwork: cloneSerializable(state.artworkDocument),
+      materialStates: cloneSerializable(state.materialStateBundle),
+      behavior: normalizeBehaviorDefinition(state.behavior),
+      activeStateId: state.materialStateBundle && state.materialStateBundle.activeStateId ? String(state.materialStateBundle.activeStateId) : 'state_0',
       base: state.base,
       renderMode: spriteVisible ? (state.renderMode || 'sprite_proxy') : 'voxel',
       renderUpdateMode: spriteVisible ? 'dynamic' : 'static',
@@ -1031,7 +1343,13 @@
         fileName: state.sprite.fileName || '',
         scale: state.sprite.scale || 1,
         offsetPx: { x: state.sprite.offsetX || 0, y: state.sprite.offsetY || 0 },
+        sourceFacing: normalizeFacing(state.sprite.sourceFacing == null ? state.activeFacing : state.sprite.sourceFacing),
+        flipX: !!state.sprite.flipX,
+        flipY: !!state.sprite.flipY,
         previewOpacity: state.sprite.previewOpacity || 1,
+        activeFacing: normalizeFacing(state.activeFacing),
+        facingTransforms: ensureFacingTransforms().map((transform, facing) => transform ? { facing, sourceFacing: normalizeFacing(transform.sourceFacing == null ? facing : transform.sourceFacing), flipX: !!transform.flipX, flipY: !!transform.flipY, scale: Number(transform.scale) || 1, offsetPx: { x: Number(transform.offsetX) || 0, y: Number(transform.offsetY) || 0 } } : null),
+        relativeVoxelAlignment: buildTranslationInvariantVoxelAlignment(exportVoxels),
         anchorMode: 'bottom-center',
         sortMode: 'box_occlusion'
       } : null,
@@ -1054,11 +1372,11 @@
   function updateSummaryPanels() {
     const prefab = createPrefabObject({ includeSpriteImageData: false });
     ui.voxelCountText.textContent = `体素数：${prefab.voxels.length}${state.voxels.size === 0 && state.selection.cells.length ? '（保存时将自动并入当前选区）' : ''}${hasSpriteImage() ? ' · JSON 预览已省略内嵌图片数据' : ''}`;
-    ui.gridSummary.textContent = `当前层 L=${state.currentLayer} · 网格 ${state.gridW}×${state.gridH}`;
+    ui.gridSummary.textContent = `${VOXEL_FACING_NAMES[normalizeFacing(state.activeFacing)]}向 · 当前层 L=${state.currentLayer} · 逻辑网格 ${state.gridW}×${state.gridH}`;
     const maxX = prefab.voxels.length ? Math.max(...prefab.voxels.map(v => v.x)) + 1 : 0;
     const maxY = prefab.voxels.length ? Math.max(...prefab.voxels.map(v => v.y)) + 1 : 0;
     const maxZ = prefab.voxels.length ? Math.max(...prefab.voxels.map(v => v.z)) + 1 : 0;
-    ui.previewSummary.textContent = `build=${BUILD_VERSION} · 基准层 L=${state.currentLayer} · 当前层体素=${countLayerVoxels(state.currentLayer)} · 总尺寸 ${maxX}×${maxY}×${maxZ} · 交互=${state.interactionMode === 'sprite' ? '图片模式' : 'voxel 模式'} · 自动占地=${sanitizeFootprintValue(state.spriteFit.footprintCols)}×${sanitizeFootprintValue(state.spriteFit.footprintRows)}`;
+    ui.previewSummary.textContent = `${VOXEL_FACING_NAMES[normalizeFacing(state.activeFacing)]}向 · 图片源=${VOXEL_FACING_NAMES[normalizeFacing(state.sprite.sourceFacing == null ? state.activeFacing : state.sprite.sourceFacing)]}${state.sprite.flipX ? ' · 水平镜像' : ''}${state.sprite.flipY ? ' · 垂直镜像' : ''} · build=${BUILD_VERSION} · 基准层 L=${state.currentLayer} · 当前层体素=${countLayerVoxels(state.currentLayer)} · 总尺寸 ${maxX}×${maxY}×${maxZ} · 交互=${state.interactionMode === 'sprite' ? '图片模式' : 'voxel 模式'} · 自动占地=${sanitizeFootprintValue(state.spriteFit.footprintCols)}×${sanitizeFootprintValue(state.spriteFit.footprintRows)}`;
     const sel = selectionBounds(state.selection.cells);
     ui.modeSummary.textContent = sel
       ? `build=${BUILD_VERSION} · 选区 ${sel.x1 - sel.x0 + 1}×${sel.y1 - sel.y0 + 1}×${sel.z1 - sel.z0 + 1} · cells=${sel.count} · 规则：z>=L 可选，z<L 灰显禁编`
@@ -1095,9 +1413,9 @@ function updateInteractionModeUi() {
     if (isSpriteInteractionMode()) {
       const sampleHint = state.spriteFit.pickSampleActive ? ' · 当前处于“点取参考高度”模式：点击图片本体会按该高度自动重算左右边界。' : '';
       const lockHint = state.spriteFit.lockHorizontal ? ' · 已锁定水平拖拽。' : '';
-      ui.interactionModeSummary.textContent = `当前交互：图片模式（由步骤页自动切换） · 右侧允许拖拽 / 缩放图片；左侧 voxel 网格和右侧 voxel 选区都会被锁定${lockHint}${sampleHint}`;
+      ui.interactionModeSummary.textContent = `当前交互：图片对齐模式 · 在等距组合预览中拖动图片，拖动右下角手柄缩放；voxel 编辑暂时锁定${lockHint}${sampleHint}`;
     } else {
-      ui.interactionModeSummary.textContent = '当前交互：voxel 模式（由步骤页自动切换） · 右侧负责选区，左侧局部网格负责体素精修。';
+      ui.interactionModeSummary.textContent = '当前交互：体素编辑模式 · 左侧俯视层精修，右侧等距视图建立选区。';
     }
   }
   const cursor = isSpriteInteractionMode() ? (state.spriteDrag.active ? 'grabbing' : (state._spriteScreenRect ? 'grab' : 'default')) : 'crosshair';
@@ -1112,7 +1430,8 @@ function setInteractionMode(mode, reason = 'ui') {
   state.interactionMode = next;
   state.spriteDrag.active = false;
   detailEditorLog(`interaction-mode:set mode=${next} reason=${reason}`);
-  setStatus(next === 'sprite' ? '已切换到图片模式：现在只能操作图片' : '已切换到 voxel 模式：现在可以编辑选区和 voxel');
+  setStatus(next === 'sprite' ? '已切换到图片对齐模式：可在等距预览中拖动和缩放图片' : '已切换到体素编辑模式：可编辑选区和 voxel');
+  try { window.dispatchEvent(new CustomEvent('unified-asset-editor:interaction-mode-changed', { detail: { mode: next, reason } })); } catch (_) {}
   rerender();
 }
 
@@ -1153,7 +1472,29 @@ function setInteractionMode(mode, reason = 'ui') {
     const b = Math.round(b1 + (b2 - b1) * m);
     return `rgb(${r},${g},${b})`;
   }
-  function isoRaw(x, y, z, tileW, tileH) { return { x: (x - y) * tileW / 2, y: (x + y) * tileH / 2 - z * tileH }; }
+  function viewPoint(x, y, facing = state.activeFacing) {
+    const f = normalizeFacing(facing);
+    if (f === 1) return { x: state.gridH - y, y: x };
+    if (f === 2) return { x: state.gridW - x, y: state.gridH - y };
+    if (f === 3) return { x: y, y: state.gridW - x };
+    return { x, y };
+  }
+  function viewCell(x, y, facing = state.activeFacing) {
+    const f = normalizeFacing(facing);
+    if (f === 1) return { x: state.gridH - 1 - y, y: x, w: state.gridH, h: state.gridW };
+    if (f === 2) return { x: state.gridW - 1 - x, y: state.gridH - 1 - y, w: state.gridW, h: state.gridH };
+    if (f === 3) return { x: y, y: state.gridW - 1 - x, w: state.gridH, h: state.gridW };
+    return { x, y, w: state.gridW, h: state.gridH };
+  }
+  function logicalCellFromView(vx, vy, facing = state.activeFacing) {
+    const f = normalizeFacing(facing);
+    if (f === 1) return { x: vy, y: state.gridH - 1 - vx };
+    if (f === 2) return { x: state.gridW - 1 - vx, y: state.gridH - 1 - vy };
+    if (f === 3) return { x: state.gridW - 1 - vy, y: vx };
+    return { x: vx, y: vy };
+  }
+  function isoRaw(x, y, z, tileW, tileH) { const p = viewPoint(x, y); return { x: (p.x - p.y) * tileW / 2, y: (p.x + p.y) * tileH / 2 - z * tileH }; }
+  function viewDepth(v) { const p = viewCell(v.x, v.y); return p.x + p.y + v.z; }
   function iso(x, y, z, tileW, tileH, ox, oy) {
     const p = isoRaw(x, y, z, tileW, tileH); return { x: ox + p.x, y: oy + p.y };
   }
@@ -1310,13 +1651,16 @@ function setInteractionMode(mode, reason = 'ui') {
     const metrics = configureCanvas(gridCanvas, gridCtx, 560, 560);
     const { w, h } = metrics;
     gridCtx.clearRect(0, 0, w, h); gridCtx.fillStyle = '#0d1320'; gridCtx.fillRect(0, 0, w, h);
-    const cell = Math.min((w - 40) / state.gridW, (h - 40) / state.gridH);
-    const ox = Math.round((w - cell * state.gridW) / 2), oy = Math.round((h - cell * state.gridH) / 2);
-    state._gridMetrics = { cell, ox, oy, w, h };
+    const rotated = viewCell(0, 0);
+    const viewW = rotated.w, viewH = rotated.h;
+    const cell = Math.min((w - 40) / viewW, (h - 40) / viewH);
+    const ox = Math.round((w - cell * viewW) / 2), oy = Math.round((h - cell * viewH) / 2);
+    state._gridMetrics = { cell, ox, oy, w, h, viewW, viewH, facing: normalizeFacing(state.activeFacing) };
     const selectedSet = new Set(state.selection.cells.map(c => vkey(c.x, c.y, c.z)));
     for (let y = 0; y < state.gridH; y++) {
       for (let x = 0; x < state.gridW; x++) {
-        const px = ox + x * cell, py = oy + y * cell;
+        const view = viewCell(x, y);
+        const px = ox + view.x * cell, py = oy + view.y * cell;
         const onLayer = hasVoxel(x, y, state.currentLayer);
         let below = false, above = false;
         for (const key of state.voxels.keys()) {
@@ -1335,9 +1679,11 @@ function setInteractionMode(mode, reason = 'ui') {
     const rect = gridCanvas.getBoundingClientRect();
     const mx = e.clientX - rect.left, my = e.clientY - rect.top;
     const m = state._gridMetrics; if (!m) return null;
-    const x = Math.floor((mx - m.ox) / m.cell), y = Math.floor((my - m.oy) / m.cell);
-    if (!withinGrid(x, y)) return null;
-    return { x, y, z: state.currentLayer };
+    const vx = Math.floor((mx - m.ox) / m.cell), vy = Math.floor((my - m.oy) / m.cell);
+    if (vx < 0 || vy < 0 || vx >= m.viewW || vy >= m.viewH) return null;
+    const logical = logicalCellFromView(vx, vy, m.facing);
+    if (!withinGrid(logical.x, logical.y)) return null;
+    return { x: logical.x, y: logical.y, z: state.currentLayer };
   }
 
   function drawBaseZeroGrid(ctx, m) {
@@ -1447,7 +1793,9 @@ function drawEditorSpriteOverlay(ctx, m) {
   ctx.globalAlpha = (state.sprite.previewOpacity || 1) * (state.renderMode === 'hybrid' ? 0.92 : 1);
   ctx.imageSmoothingEnabled = true;
   const spriteCanvas = getCachedEditorSpriteCanvas(r.img, r.drawW, r.drawH);
-  ctx.drawImage(spriteCanvas || r.img, r.x, r.y, r.drawW, r.drawH);
+  ctx.translate(r.x + (state.sprite.flipX ? r.drawW : 0), r.y + (state.sprite.flipY ? r.drawH : 0));
+  ctx.scale(state.sprite.flipX ? -1 : 1, state.sprite.flipY ? -1 : 1);
+  ctx.drawImage(spriteCanvas || r.img, 0, 0, r.drawW, r.drawH);
   ctx.restore();
   const overlay = (state.spriteFit.guidesVisible || state.spriteFit.pickSampleActive) ? getSpriteGuideOverlay(m) : null;
   if (overlay) {
@@ -1501,7 +1849,7 @@ function drawPreviewScene() {
     previewCtx.clearRect(0, 0, m.w, m.h);
     previewCtx.fillStyle = '#0d1320'; previewCtx.fillRect(0, 0, m.w, m.h);
 
-    const all = sortedVoxels().sort((a, b) => (a.x + a.y + a.z) - (b.x + b.y + b.z) || a.z - b.z || a.y - b.y || a.x - b.x);
+    const all = sortedVoxels().sort((a, b) => viewDepth(a) - viewDepth(b) || a.z - b.z || viewCell(a.x,a.y).y - viewCell(b.x,b.y).y || viewCell(a.x,a.y).x - viewCell(b.x,b.y).x);
     const below = all.filter(v => v.z < state.currentLayer);
     const active = all.filter(v => v.z >= state.currentLayer);
     const liveSelectionCells = getLiveSelectionCells();
@@ -1546,7 +1894,7 @@ function drawPreviewScene() {
     };
 
     if (state.tool === 'single') {
-      const voxels = sortedVoxels().filter(v => v.z >= state.currentLayer).slice().sort((a, b) => (b.x + b.y + b.z) - (a.x + a.y + a.z) || b.z - a.z || b.y - a.y || b.x - a.x);
+      const voxels = sortedVoxels().filter(v => v.z >= state.currentLayer).slice().sort((a, b) => viewDepth(b) - viewDepth(a) || b.z - a.z || viewCell(b.x,b.y).y - viewCell(a.x,a.y).y || viewCell(b.x,b.y).x - viewCell(a.x,a.y).x);
       for (const v of voxels) {
         const poly = voxelTopPolygon(v, m.tileW, m.tileH, m.ox, m.oy);
         if (pointInPolygon(localX, localY, poly)) return { type: 'voxel-top', x: v.x, y: v.y, z: v.z, localX, localY, poly, occupied: true };
@@ -1743,11 +2091,11 @@ function drawPreviewScene() {
 
   function resetEmptyPrefab() {
     const ident = defaultPrefabIdentity();
-    state.id = ident.id; state.name = ident.name; state.kind = 'custom'; state.asset = ''; state.base = '#c7b0df'; state.renderMode = 'voxel'; state.sidebarStep = 'image'; state.interactionMode = 'sprite'; releaseCurrentSpriteObjectUrl(); state.sprite = { image: '', imageExport: '', objectUrl: '', fileName: '', scale: 1, offsetX: 0, offsetY: 0, previewOpacity: 1 }; resetSpriteFitRuntime(); clearEditorSpriteImageCache(); scheduleJsonPreviewUpdate(true);
+    state.id = ident.id; state.name = ident.name; state.kind = 'custom'; state.asset = ''; state.base = '#c7b0df'; state.renderMode = 'voxel'; state.assetSource = 'blank'; state.importMetadata = null; state.habboCalibration = null; state.artworkDocument = null; state.materialStateBundle = null; state.behavior = defaultBehaviorDefinition(); state.activeFacing = 0; state.sidebarStep = 'image'; state.interactionMode = 'sprite'; releaseCurrentSpriteObjectUrl(); state.sprite = { image: '', imageExport: '', objectUrl: '', fileName: '', scale: 1, offsetX: 0, offsetY: 0, sourceFacing: 0, flipX: false, flipY: false, previewOpacity: 1, facingTransforms: [] }; resetSpriteFitRuntime(); clearEditorSpriteImageCache(); scheduleJsonPreviewUpdate(true);
     state.anchor = { x: 0, y: 0, z: 0 }; state.gridW = 10; state.gridH = 10; state.currentLayer = 0; state.previewScale = 1;
     state.voxels = new Map(); state.tool = 'single'; state.hoverCell = null; state.previewPointer = null;
     clearSelectionState('reset-empty-prefab');
-    syncStateToForm(); applySidebarStepUi(); updateInteractionModeUi(); setStatus('已新建空 Prefab'); detailEditorLog(`prefab:new id=${state.id} name=${JSON.stringify(state.name)}`); rerender();
+    syncStateToForm(); applySidebarStepUi(); updateInteractionModeUi(); setStatus('已新建空 Prefab'); detailEditorLog(`prefab:new id=${state.id} name=${JSON.stringify(state.name)}`); emitAssetSourceChanged('new-prefab'); rerender();
   }
   function loadPrefabObject(obj, msg) {
     state.id = String(obj.id || 'imported_prefab');
@@ -1755,6 +2103,13 @@ function drawPreviewScene() {
     state.kind = String(obj.kind || 'custom');
     state.asset = String(obj.asset || '');
     state.base = String(obj.base || '#c7b0df');
+    state.assetSource = String(obj.sourceType || (obj.habboCalibration ? 'habbo' : ((obj.sprite && obj.sprite.image) ? 'image' : 'blank')));
+    state.importMetadata = cloneSerializable(obj.importMetadata);
+    state.habboCalibration = cloneSerializable(obj.habboCalibration);
+    state.artworkDocument = cloneSerializable(obj.artwork);
+    state.materialStateBundle = cloneSerializable(obj.materialStates || obj.stateBundle || null);
+    state.behavior = normalizeBehaviorDefinition(obj.behavior || obj.behaviors || null);
+    state.activeFacing = normalizeFacing((obj.sprite && obj.sprite.activeFacing) ?? (obj.artwork && obj.artwork.activeFacing) ?? 0);
     state.renderMode = String((obj.sprite && obj.sprite.image) ? (obj.renderMode || 'sprite_proxy') : 'voxel');
     releaseCurrentSpriteObjectUrl();
     state.sprite = {
@@ -1765,8 +2120,13 @@ function drawPreviewScene() {
       scale: Math.max(0.1, Math.min(8, Number(obj.sprite && obj.sprite.scale) || 1)),
       offsetX: Number(obj.sprite && obj.sprite.offsetPx && obj.sprite.offsetPx.x) || 0,
       offsetY: Number(obj.sprite && obj.sprite.offsetPx && obj.sprite.offsetPx.y) || 0,
+      sourceFacing: normalizeFacing(obj.sprite && obj.sprite.sourceFacing != null ? obj.sprite.sourceFacing : state.activeFacing),
+      flipX: !!(obj.sprite && obj.sprite.flipX),
+      flipY: !!(obj.sprite && obj.sprite.flipY),
       previewOpacity: Math.max(0.05, Math.min(1, Number(obj.sprite && (obj.sprite.previewOpacity ?? obj.sprite.opacity)) || 1)),
+      facingTransforms: Array.isArray(obj.sprite && obj.sprite.facingTransforms) ? obj.sprite.facingTransforms.map((item, facing) => item ? normalizeFacingTransform(item, facing, freshFacingTransform(facing)) : null) : [],
     };
+    restoreFacingTransform(state.activeFacing, defaultFacingTransform());
     resetSpriteFitRuntime();
     resetSpriteExportPromise();
     if (state.sprite.image) ensureEditorSpriteImage(state.sprite.image); else clearEditorSpriteImageCache();
@@ -1779,7 +2139,262 @@ function drawPreviewScene() {
       maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
     }
     state.gridW = Math.max(4, Math.min(64, maxX + 3)); state.gridH = Math.max(4, Math.min(64, maxY + 3)); state.tool = 'single'; state.sidebarStep = state.sprite.image ? 'image' : 'voxel'; state.interactionMode = state.sprite.image ? 'sprite' : 'voxel';
-    clearSelectionState('load-prefab'); syncStateToForm(); applySidebarStepUi(); updateInteractionModeUi(); setStatus(msg || `已载入 ${state.name}`); detailEditorLog(`prefab:load id=${state.id} voxels=${state.voxels.size}`); rerender();
+    clearSelectionState('load-prefab'); syncStateToForm(); applySidebarStepUi(); updateInteractionModeUi(); setStatus(msg || `已载入 ${state.name}`); detailEditorLog(`prefab:load id=${state.id} voxels=${state.voxels.size}`); emitAssetSourceChanged('load-prefab'); rerender();
+  }
+
+  function getVoxelSnapshotForAssetFeature() {
+    const voxels = Array.from(state.voxels.entries()).map(([key, value]) => {
+      const point = parseKey(key);
+      return { x: point.x, y: point.y, z: point.z, solid: value && value.solid !== false, collidable: value && value.collidable !== false };
+    }).sort((a, b) => a.z - b.z || a.y - b.y || a.x - b.x);
+    const maxX = voxels.length ? Math.max(...voxels.map((v) => v.x)) : 0;
+    const maxY = voxels.length ? Math.max(...voxels.map((v) => v.y)) : 0;
+    const maxZ = voxels.length ? Math.max(...voxels.map((v) => v.z)) : 0;
+    return {
+      anchor: { ...state.anchor },
+      voxels,
+      bounds: { w: maxX + 1, d: maxY + 1, h: maxZ + 1 },
+      grid: { w: state.gridW, h: state.gridH },
+      currentLayer: state.currentLayer,
+      sourceType: state.assetSource || 'blank'
+    };
+  }
+
+  function applyVoxelSnapshotForAssetFeature(snapshot = {}, reason = 'material-state') {
+    const anchor = snapshot.anchor || {};
+    state.anchor = { x: Number(anchor.x) || 0, y: Number(anchor.y) || 0, z: Number(anchor.z) || 0 };
+    state.voxels = new Map();
+    let maxX = 0, maxY = 0;
+    for (const raw of (Array.isArray(snapshot.voxels) ? snapshot.voxels : [])) {
+      const x = Math.round(Number(raw && raw.x) || 0);
+      const y = Math.round(Number(raw && raw.y) || 0);
+      const z = Math.round(Number(raw && raw.z) || 0);
+      state.voxels.set(vkey(x, y, z), { solid: !raw || raw.solid !== false, collidable: !raw || raw.collidable !== false });
+      maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+    }
+    state.gridW = Math.max(4, Math.min(64, Math.round(Number(snapshot.grid && snapshot.grid.w) || maxX + 3 || 10)));
+    state.gridH = Math.max(4, Math.min(64, Math.round(Number(snapshot.grid && snapshot.grid.h) || maxY + 3 || 10)));
+    state.currentLayer = Math.max(0, Math.min(256, Math.round(Number(snapshot.currentLayer) || 0)));
+    if (snapshot.sourceType) state.assetSource = String(snapshot.sourceType);
+    clearSelectionState('voxel-state-apply:' + reason);
+    syncStateToForm();
+    scheduleJsonPreviewUpdate(true);
+    detailEditorLog(`material-state:voxel-apply reason=${reason} voxels=${state.voxels.size}`);
+    rerender();
+    return true;
+  }
+
+  function getSpriteStateSnapshotForAssetFeature() {
+    persistActiveFacingTransform();
+    return {
+      activeFacing: normalizeFacing(state.activeFacing),
+      previewOpacity: Number(state.sprite.previewOpacity) || 1,
+      facingTransforms: ensureFacingTransforms().map((transform, facing) => ({
+        facing,
+        sourceFacing: normalizeFacing(transform.sourceFacing == null ? facing : transform.sourceFacing),
+        flipX: !!transform.flipX,
+        flipY: !!transform.flipY,
+        scale: Number(transform.scale) || 1,
+        offsetPx: { x: Number(transform.offsetX) || 0, y: Number(transform.offsetY) || 0 }
+      }))
+    };
+  }
+
+  function applySpriteStateSnapshotForAssetFeature(snapshot = {}, reason = 'material-state') {
+    const transforms = Array.isArray(snapshot.facingTransforms) ? snapshot.facingTransforms : [];
+    state.sprite.facingTransforms = [0, 1, 2, 3].map((facing) => normalizeFacingTransform(transforms[facing] || {}, facing, freshFacingTransform(facing)));
+    state.activeFacing = normalizeFacing(snapshot.activeFacing == null ? state.activeFacing : snapshot.activeFacing);
+    state.sprite.previewOpacity = Math.max(0.05, Math.min(1, Number(snapshot.previewOpacity) || 1));
+    restoreFacingTransform(state.activeFacing, freshFacingTransform(state.activeFacing));
+    if (state.artworkDocument) refreshActiveFacingSpriteImage('material-state:' + reason);
+    syncStateToForm();
+    scheduleJsonPreviewUpdate(false);
+    detailEditorLog(`material-state:sprite-apply reason=${reason} facing=${state.activeFacing}`);
+    rerender();
+    return true;
+  }
+
+  function applyImportedHabboAsset(payload = {}) {
+    const footprint = payload.footprint || {};
+    const width = Math.max(1, Math.round(Number(footprint.w) || 1));
+    const depth = Math.max(1, Math.round(Number(footprint.d) || 1));
+    const height = Math.max(1, Math.round(Number(footprint.h) || 1));
+    state.id = String(payload.id || `habbo_${makeUniqueSeed()}`);
+    state.name = String(payload.name || state.id);
+    state.kind = String(payload.kind || 'habbo');
+    state.asset = String(payload.fileName || payload.asset || '');
+    state.base = String(payload.base || state.base || '#c7b0df');
+    state.assetSource = 'habbo';
+    state.importMetadata = cloneSerializable(payload.importMetadata) || { sourceType: 'habbo-swf', fileName: state.asset, importedAt: new Date().toISOString() };
+    state.habboCalibration = cloneSerializable(payload.calibration);
+    state.activeFacing = normalizeFacing(payload.activeFacing ?? 0);
+    state.renderMode = 'sprite_proxy';
+    releaseCurrentSpriteObjectUrl();
+    state.sprite = {
+      image: String(payload.dataUrl || ''),
+      imageExport: String(payload.dataUrl || ''),
+      objectUrl: '',
+      fileName: String(payload.spriteFileName || `${state.name}-facing-0.png`),
+      scale: Math.max(0.05, Number(payload.spriteScale) || 1),
+      offsetX: Number(payload.offsetX) || 0,
+      offsetY: Number(payload.offsetY) || 0,
+      sourceFacing: normalizeFacing(payload.sourceFacing == null ? state.activeFacing : payload.sourceFacing),
+      flipX: !!payload.flipX,
+      flipY: !!payload.flipY,
+      previewOpacity: 1,
+      facingTransforms: Array.isArray(payload.facingTransforms) ? payload.facingTransforms.map((item, facing) => item ? normalizeFacingTransform(item, facing, freshFacingTransform(facing)) : null) : []
+    };
+    restoreFacingTransform(state.activeFacing, { scale: state.sprite.scale, offsetX: state.sprite.offsetX, offsetY: state.sprite.offsetY });
+    persistActiveFacingTransform();
+    resetSpriteExportPromise();
+    if (state.sprite.image) ensureEditorSpriteImage(state.sprite.image); else clearEditorSpriteImageCache();
+    state.spriteFit.footprintCols = width;
+    state.spriteFit.footprintRows = depth;
+    state.anchor = { x: Number(payload.prefabAnchor?.x) || 0, y: Number(payload.prefabAnchor?.y) || 0, z: Number(payload.prefabAnchor?.z) || 0 };
+    state.voxels = new Map();
+    const sourceCells = Array.isArray(footprint.cells) && footprint.cells.length
+      ? footprint.cells
+      : Array.from({ length: width * depth }, (_, index) => ({ x: index % width, y: Math.floor(index / width) }));
+    for (const cell of sourceCells) {
+      const x = Math.max(0, Math.round(Number(cell.x) || 0));
+      const y = Math.max(0, Math.round(Number(cell.y) || 0));
+      for (let z = 0; z < height; z += 1) state.voxels.set(vkey(x, y, z), { solid: true, collidable: true });
+    }
+    state.gridW = Math.max(4, Math.min(64, width + 3));
+    state.gridH = Math.max(4, Math.min(64, depth + 3));
+    state.currentLayer = 0;
+    state.sidebarStep = 'image';
+    state.interactionMode = 'sprite';
+    clearSelectionState('habbo-import');
+    syncStateToForm();
+    applySidebarStepUi();
+    updateInteractionModeUi();
+    updateSpriteThumb();
+    invalidateEditorSpriteRenderCache();
+    scheduleJsonPreviewUpdate(true);
+    setStatus(`已通过统一素材流程导入 Habbo：${state.name}`);
+    detailEditorLog(`asset-import:habbo id=${state.id} footprint=${width}x${depth}x${height}`);
+    emitAssetSourceChanged('habbo-import');
+    rerender();
+  }
+
+  function updateImportedHabboComposite(payload = {}) {
+    if (payload.dataUrl) {
+      state.sprite.image = String(payload.dataUrl);
+      state.sprite.imageExport = String(payload.dataUrl);
+      state.sprite.objectUrl = '';
+      state.activeFacing = normalizeFacing(payload.activeFacing ?? state.activeFacing);
+      state.sprite.fileName = String(payload.spriteFileName || state.sprite.fileName || `habbo-facing-${state.activeFacing}.png`);
+      state.sprite.scale = Math.max(0.05, Number(payload.spriteScale) || state.sprite.scale || 1);
+      state.sprite.offsetX = Number(payload.offsetX) || 0;
+      state.sprite.offsetY = Number(payload.offsetY) || 0;
+      if (payload.sourceFacing != null) state.sprite.sourceFacing = normalizeFacing(payload.sourceFacing);
+      if (payload.flipX != null) state.sprite.flipX = !!payload.flipX;
+      if (payload.flipY != null) state.sprite.flipY = !!payload.flipY;
+      persistActiveFacingTransform();
+      ensureEditorSpriteImage(state.sprite.image);
+      resetSpriteExportPromise();
+      invalidateEditorSpriteRenderCache();
+      updateSpriteThumb();
+    }
+    if (payload.calibration) state.habboCalibration = cloneSerializable(payload.calibration);
+    state.assetSource = 'habbo';
+    scheduleJsonPreviewUpdate(false);
+    syncStateToForm();
+    rerender();
+  }
+
+  function applyArtworkDocument(payload = {}) {
+    const documentPayload = cloneSerializable(payload.document || payload.artwork);
+    const incomingFacing = normalizeFacing(payload.activeFacing ?? (documentPayload && documentPayload.activeFacing) ?? state.activeFacing);
+    persistActiveFacingTransform();
+    if (documentPayload) state.artworkDocument = documentPayload;
+    state.activeFacing = incomingFacing;
+    if (state.artworkDocument) state.artworkDocument.activeFacing = incomingFacing;
+    if (payload.compositeDataUrl) {
+      releaseCurrentSpriteObjectUrl();
+      state.sprite.image = String(payload.compositeDataUrl);
+      state.sprite.imageExport = String(payload.compositeDataUrl);
+      state.sprite.objectUrl = '';
+      state.sprite.fileName = String(payload.fileName || state.sprite.fileName || `artwork-facing-${incomingFacing}.png`);
+      const fallback = { scale: Math.max(0.05, Number(payload.spriteScale) || 1), offsetX: Number(payload.offsetX) || 0, offsetY: Number(payload.offsetY) || 0, sourceFacing: incomingFacing, flipX: false, flipY: false };
+      restoreFacingTransform(incomingFacing, fallback);
+      state.sprite.previewOpacity = 1;
+      ensureEditorSpriteImage(state.sprite.image);
+      resetSpriteExportPromise();
+      invalidateEditorSpriteRenderCache();
+      updateSpriteThumb();
+    }
+    if (state.artworkDocument) refreshActiveFacingSpriteImage('artwork-document-update');
+    state.assetSource = String(payload.sourceType || 'artwork');
+    state.importMetadata = Object.assign({}, cloneSerializable(state.importMetadata) || {}, {
+      sourceType: state.assetSource,
+      artworkVersion: documentPayload && documentPayload.version ? documentPayload.version : '',
+      updatedAt: new Date().toISOString()
+    });
+    state.renderMode = hasSpriteImage() ? 'sprite_proxy' : state.renderMode;
+    scheduleJsonPreviewUpdate(false);
+    syncStateToForm();
+    rerender();
+    emitAssetSourceChanged('artwork-update');
+    try { window.dispatchEvent(new CustomEvent('unified-asset-editor:facing-changed', { detail: { facing: state.activeFacing, reason: 'artwork-update' } })); } catch (_) {}
+    return true;
+  }
+
+  function installUnifiedAssetEditorApi() {
+    Object.assign(editorNamespaceApi, {
+      applyImportedHabboAsset,
+      updateImportedHabboComposite,
+      applyArtworkDocument,
+      getArtworkDocument: () => cloneSerializable(state.artworkDocument),
+      getVoxelSnapshot: getVoxelSnapshotForAssetFeature,
+      applyVoxelSnapshot: applyVoxelSnapshotForAssetFeature,
+      getSpriteStateSnapshot: getSpriteStateSnapshotForAssetFeature,
+      applySpriteStateSnapshot: applySpriteStateSnapshotForAssetFeature,
+      setMaterialStateBundle: (bundle) => { state.materialStateBundle = cloneSerializable(bundle); scheduleJsonPreviewUpdate(false); return true; },
+      getMaterialStateBundle: () => cloneSerializable(state.materialStateBundle),
+      setBehaviorDraft: (behavior) => { state.behavior = normalizeBehaviorDefinition(behavior); scheduleJsonPreviewUpdate(false); return cloneSerializable(state.behavior); },
+      getBehaviorDraft: () => cloneSerializable(state.behavior),
+      getPrefabDraft: () => createPrefabObject({ includeSpriteImageData: true }),
+      loadPrefabDraft: (prefab, message) => loadPrefabObject(prefab || {}, message || '已载入统一素材'),
+      setStatus,
+      detailLog: detailEditorLog,
+      requestRender: rerender,
+      setSidebarStep,
+      setInteractionMode,
+      getInteractionMode: () => state.interactionMode,
+      setVoxelViewFacing,
+      getVoxelViewFacing: () => normalizeFacing(state.activeFacing),
+      getSpriteTransform: () => ({
+        scale: Number(state.sprite.scale) || 1,
+        offsetX: Number(state.sprite.offsetX) || 0,
+        offsetY: Number(state.sprite.offsetY) || 0,
+        sourceFacing: normalizeFacing(state.sprite.sourceFacing == null ? state.activeFacing : state.sprite.sourceFacing),
+        flipX: !!state.sprite.flipX,
+        flipY: !!state.sprite.flipY,
+        previewOpacity: Number(state.sprite.previewOpacity) || 1,
+        hasImage: hasSpriteImage(),
+        fileName: state.sprite.fileName || '',
+        activeFacing: normalizeFacing(state.activeFacing),
+        facingTransforms: cloneSerializable(ensureFacingTransforms())
+      }),
+      getSpriteScreenRect: () => state._spriteScreenRect ? ({
+        x: state._spriteScreenRect.x, y: state._spriteScreenRect.y,
+        right: state._spriteScreenRect.right, bottom: state._spriteScreenRect.bottom,
+        drawW: state._spriteScreenRect.drawW, drawH: state._spriteScreenRect.drawH,
+        pixelScale: state._spriteScreenRect.pixelScale
+      }) : null,
+      getSourceType: () => state.assetSource || 'blank',
+      registerBeforeExportHook: (hook) => {
+        if (typeof hook !== 'function') return () => {};
+        beforeExportHooks.push(hook);
+        return () => {
+          const index = beforeExportHooks.indexOf(hook);
+          if (index >= 0) beforeExportHooks.splice(index, 1);
+        };
+      }
+    });
+    try { window.dispatchEvent(new CustomEvent('unified-asset-editor:api-ready', { detail: { build: BUILD_VERSION } })); } catch (_) {}
   }
 
   function isServerMode() { return /^https?:$/i.test(window.location.protocol); }
@@ -2039,6 +2654,7 @@ window.addEventListener('mouseup', (e) => {
     if (isSpriteInteractionMode() && state.sprite.image && (e.ctrlKey || e.metaKey)) {
       state.sprite.scale = Math.max(0.1, Math.min(8, (Number(state.sprite.scale) || 1) + delta * 0.05));
       invalidateEditorSpriteRenderCache();
+      persistActiveFacingTransform();
       detailEditorLog(`sprite:scale-wheel scale=${state.sprite.scale.toFixed(2)}`);
       setStatus(`图片模式：sprite.scale=${state.sprite.scale.toFixed(2)}`);
       rerender(); e.preventDefault(); return;
@@ -2052,8 +2668,15 @@ window.addEventListener('mouseup', (e) => {
   }, { passive: false });
   previewCanvas.addEventListener('contextmenu', (e) => { detailEditorLog(`preview:contextmenu target=${safeTargetLabel(e.target)}`); e.preventDefault(); });
 
-  const formInputs = [ui.prefabId, ui.prefabName, ui.prefabKind, ui.prefabAsset, ui.prefabBase, ui.renderMode, ui.spriteImageName, ui.spriteScale, ui.spriteOffsetX, ui.spriteOffsetY, ui.footprintCols, ui.footprintRows, ui.spriteSampleBand, ui.spriteFitMode, ui.spriteSampleYPercent, ui.anchorX, ui.anchorY, ui.anchorZ, ui.editorGridW, ui.editorGridH, ui.previewScale, ui.spritePreviewOpacityNumber];
-  formInputs.forEach((el) => el && el.addEventListener('input', () => { lastEvent = `input:${el.id}`; detailEditorLog(`form:input id=${el.id} value=${el.value}`); syncFormToState(); if (['spriteScale','spriteOffsetX','spriteOffsetY','previewScale','renderMode'].includes(el.id)) invalidateEditorSpriteRenderCache(); rerender(); }));
+  const formInputs = [ui.prefabId, ui.prefabName, ui.prefabKind, ui.prefabAsset, ui.prefabBase, ui.renderMode, ui.spriteImageName, ui.spriteScale, ui.spriteOffsetX, ui.spriteOffsetY, ui.spriteSourceFacing, ui.spriteFlipX, ui.spriteFlipY, ui.footprintCols, ui.footprintRows, ui.spriteSampleBand, ui.spriteFitMode, ui.spriteSampleYPercent, ui.anchorX, ui.anchorY, ui.anchorZ, ui.editorGridW, ui.editorGridH, ui.previewScale, ui.spritePreviewOpacityNumber];
+  formInputs.forEach((el) => el && el.addEventListener('input', () => {
+    lastEvent = `input:${el.id}`;
+    detailEditorLog(`form:input id=${el.id} value=${el.type === 'checkbox' ? el.checked : el.value}`);
+    syncFormToState();
+    if (['spriteScale','spriteOffsetX','spriteOffsetY','spriteFlipX','spriteFlipY','previewScale','renderMode'].includes(el.id)) invalidateEditorSpriteRenderCache();
+    if (el.id === 'spriteSourceFacing') refreshActiveFacingSpriteImage('source-facing-input');
+    rerender();
+  }));
   ui.currentLayer.addEventListener('input', () => { lastEvent = 'input:currentLayer'; setCurrentLayer(Number(ui.currentLayer.value) || 0, 'manual-input'); });
 
   ui.layerDown.addEventListener('click', () => { lastEvent = 'button:layerDown'; setCurrentLayer(state.currentLayer - 1, 'button-layerDown'); });
@@ -2064,6 +2687,46 @@ window.addEventListener('mouseup', (e) => {
     detailEditorLog(`layer:clear z=${state.currentLayer} removed=${removed}`); setStatus(`已清空第 ${state.currentLayer} 层，共删除 ${removed} 个 voxel`); rerender();
   });
 
+
+let copiedFacingImageTransform = null;
+if (ui.spriteSourceFacing) ui.spriteSourceFacing.addEventListener('change', () => {
+  syncFormToState();
+  refreshActiveFacingSpriteImage('source-facing-change');
+  syncStateToForm();
+  setStatus(`当前${VOXEL_FACING_NAMES[state.activeFacing]}方向改用${VOXEL_FACING_NAMES[state.sprite.sourceFacing]}方向图片`);
+  rerender();
+});
+if (ui.spriteFlipX) ui.spriteFlipX.addEventListener('change', () => {
+  syncFormToState(); invalidateEditorSpriteRenderCache();
+  setStatus(`当前方向水平镜像：${state.sprite.flipX ? '开' : '关'}`); rerender();
+});
+if (ui.spriteFlipY) ui.spriteFlipY.addEventListener('change', () => {
+  syncFormToState(); invalidateEditorSpriteRenderCache();
+  setStatus(`当前方向垂直镜像：${state.sprite.flipY ? '开' : '关'}`); rerender();
+});
+if (ui.resetFacingImageTransform) ui.resetFacingImageTransform.addEventListener('click', () => {
+  const facing = normalizeFacing(state.activeFacing);
+  const reset = { scale: 1, offsetX: 0, offsetY: 0, sourceFacing: facing, flipX: false, flipY: false };
+  state.sprite.facingTransforms[facing] = reset;
+  restoreFacingTransform(facing, reset);
+  refreshActiveFacingSpriteImage('reset-facing-transform');
+  syncStateToForm(); invalidateEditorSpriteRenderCache();
+  setStatus(`已重置${VOXEL_FACING_NAMES[facing]}方向的图片选择、镜像、偏移和缩放`); rerender();
+});
+if (ui.copyFacingImageTransform) ui.copyFacingImageTransform.addEventListener('click', () => {
+  persistActiveFacingTransform();
+  copiedFacingImageTransform = cloneSerializable(defaultFacingTransform(state.activeFacing));
+  setStatus(`已复制${VOXEL_FACING_NAMES[state.activeFacing]}方向图片变换`);
+});
+if (ui.pasteFacingImageTransform) ui.pasteFacingImageTransform.addEventListener('click', () => {
+  if (!copiedFacingImageTransform) { setStatus('尚未复制图片变换', false); return; }
+  const facing = normalizeFacing(state.activeFacing);
+  state.sprite.facingTransforms[facing] = normalizeFacingTransform(copiedFacingImageTransform, facing, freshFacingTransform(facing));
+  restoreFacingTransform(facing, state.sprite.facingTransforms[facing]);
+  refreshActiveFacingSpriteImage('paste-facing-transform');
+  syncStateToForm(); invalidateEditorSpriteRenderCache();
+  setStatus(`已将复制的图片变换粘贴到${VOXEL_FACING_NAMES[facing]}方向`); rerender();
+});
 
 if (ui.spritePreviewOpacity) {
   const onOpacityRange = () => { lastEvent = 'input:spritePreviewOpacity'; applySpritePreviewOpacity(ui.spritePreviewOpacity.value, 'range'); rerender(); };
@@ -2135,7 +2798,13 @@ if (ui.spritePreviewOpacityNumber) {
   ui.clearSpriteImage.addEventListener('click', () => {
     lastEvent = 'button:clearSprite';
     releaseCurrentSpriteObjectUrl();
-    state.sprite = { image: '', imageExport: '', objectUrl: '', fileName: '', scale: state.sprite.scale || 1, offsetX: 0, offsetY: 0, previewOpacity: 1 };
+    state.sprite = { image: '', imageExport: '', objectUrl: '', fileName: '', scale: state.sprite.scale || 1, offsetX: 0, offsetY: 0, sourceFacing: 0, flipX: false, flipY: false, previewOpacity: 1, facingTransforms: [] };
+    state.assetSource = 'blank';
+    state.importMetadata = null;
+    state.habboCalibration = null;
+    state.artworkDocument = null;
+    state.activeFacing = 0;
+    emitAssetSourceChanged('clear-image');
     resetSpriteFitRuntime({ preserveGuides: true, preserveLock: true });
     if (ui.spriteImageName) ui.spriteImageName.value = '';
     clearEditorSpriteImageCache();
@@ -2155,6 +2824,14 @@ if (ui.spritePreviewOpacityNumber) {
       state.sprite.imageExport = '';
       state.sprite.objectUrl = objectUrl;
       state.sprite.fileName = file.name;
+      state.assetSource = 'image';
+      state.importMetadata = { sourceType: 'image', fileName: file.name, fileSize: Number(file.size) || 0, importedAt: new Date().toISOString() };
+      state.habboCalibration = null;
+      state.artworkDocument = null;
+      state.activeFacing = 0;
+      state.sprite.facingTransforms = [];
+      persistActiveFacingTransform();
+      emitAssetSourceChanged('image-import');
       if (ui.spriteImageName) ui.spriteImageName.value = file.name;
       if (!ui.renderMode.value || ui.renderMode.value === 'voxel') { ui.renderMode.value = 'sprite_proxy'; state.renderMode = 'sprite_proxy'; }
       ensureEditorSpriteImage(objectUrl);
@@ -2195,9 +2872,17 @@ if (ui.spritePreviewOpacityNumber) {
     catch (err) { setStatus(`导入失败：${err?.message || err}`, false); detailEditorLog(`import:error ${err?.message || err}`); }
     finally { ui.importFile.value = ''; }
   });
-  ui.openMain.addEventListener('click', () => {
+  ui.openMain.addEventListener('click', async () => {
     lastEvent = 'button:openMain';
-    const prefab = createPrefabObject();
+    // Returning to the main program must use the exact prefab currently being edited,
+    // including Behavior/States. Persist it first so the main asset rescan cannot pick
+    // an older copy with an empty script.
+    const saved = await saveToAssetFolder();
+    if (!saved) {
+      setStatus('打开主程序前保存当前素材失败；为避免主程序载入旧版本，已取消跳转。', false);
+      return;
+    }
+    const prefab = await createPrefabObjectForExport();
     navigateBackToMain('open-main', { kind: 'open-main', prefabId: prefab.id, prefabName: prefab.name, voxels: Array.isArray(prefab.voxels) ? prefab.voxels.length : 0 });
   });
   ui.exportEditorLogs.addEventListener('click', () => { lastEvent = 'button:exportLogs'; detailEditorLog(`button:exportLogs typeofLocal=${typeof exportEditorLogs} typeofGlobal=${typeof window.__editorExportLogs}`); exportEditorLogs(); });
@@ -2252,6 +2937,7 @@ if (ui.spritePreviewOpacityNumber) {
   logEditorP2NamespaceBootstrap();
   logReady = true;
   bindSidebarStepTabs();
+  installUnifiedAssetEditorApi();
   resetEmptyPrefab();
   pushEditorLog(`editor:ready build=${BUILD_VERSION}`);
   pushEditorP0('INVARIANT', 'runtime-counts editor-ready', {

@@ -1,0 +1,58 @@
+{
+  "version": "habbo-position-tile-registration-evidence-v2",
+  "samples": [
+    {
+      "name": "army_c15_bed",
+      "dimensions": { "x": 1, "y": 3, "z": 1.3 },
+      "selectedDirections": [0, 2],
+      "observedShadowCenterFromRegistrationCells": { "x": 0.008, "y": 1.148 },
+      "expectedFromPositionTile": { "x": 0.0, "y": 1.0 },
+      "errorCells": 0.148,
+      "confidence": "high"
+    },
+    {
+      "name": "bed_silo_two",
+      "dimensions": { "x": 2, "y": 3, "z": 1.9 },
+      "selectedDirectionsFallback": [0, 2],
+      "observedShadowCenterFromRegistrationCells": { "x": 0.531, "y": 1.031 },
+      "expectedFromPositionTile": { "x": 0.5, "y": 1.0 },
+      "errorCells": 0.044,
+      "confidence": "high"
+    },
+    {
+      "name": "shelves_silo",
+      "dimensions": { "x": 2, "y": 1, "z": 1.0 },
+      "selectedDirections": [0, 2, 4, 6],
+      "observedShadowCenterFromRegistrationCells": { "x": 0.531, "y": -0.031 },
+      "expectedFromPositionTile": { "x": 0.5, "y": 0.0 },
+      "errorCells": 0.044,
+      "confidence": "high"
+    },
+    {
+      "name": "val11_present",
+      "dimensions": { "x": 1, "y": 1, "z": 1.2 },
+      "selectedDirections": [0],
+      "manualFacingLocalRegistrationEstimates": [
+        { "facing": 0, "x": 0.531, "y": 0.531 },
+        { "facing": 1, "x": 0.547, "y": 0.547 },
+        { "facing": 2, "x": 0.375, "y": 0.375 },
+        { "facing": 3, "x": 0.547, "y": 0.484 }
+      ],
+      "expectedPositionTileCenter": { "x": 0.5, "y": 0.5 },
+      "confidence": "high-except-approximate-facing-2"
+    },
+    {
+      "name": "bling_bed",
+      "dimensions": { "x": 2, "y": 3, "z": 1.6 },
+      "selectedDirections": [2, 4],
+      "globalDirections": [0, 2, 4],
+      "finding": "selected visualization directions must be authoritative; global direction 0 is a fallback/placeholder and must not override size-64 artwork",
+      "confidence": "high"
+    }
+  ],
+  "limitations": [
+    "manual .hzhmat positions are approximate visual references",
+    "old samples may contain transforms produced before registration-point normalization",
+    "no-shadow assets use the position-tile convention without shadow validation"
+  ]
+}

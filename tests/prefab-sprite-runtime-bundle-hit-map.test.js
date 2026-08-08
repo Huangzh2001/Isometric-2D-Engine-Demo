@@ -1,0 +1,22 @@
+const fs = require('fs');
+const vm = require('vm');
+function assert(cond,msg){ if(!cond) throw new Error(msg); }
+const bundle=fs.readFileSync('dist/bundles/main-2.bundle.js','utf8');
+const marker='// P12a-4: Prefab sprite renderer owner.';
+const start=bundle.indexOf(marker);
+const next=bundle.indexOf(";(function(global){'use strict';var PLAYER_VISUAL_BASE_HEIGHT=1.7;", start);
+assert(start>=0 && next>start,'must isolate bundled prefab sprite renderer');
+const code=bundle.slice(start,next);
+const window={};
+const context={window,globalThis:window,console,Math,Number,String,Object,Array,JSON,Map,Uint8Array};
+vm.createContext(context);
+vm.runInContext(code,context,{filename:'main-2.prefab-sprite.bundle.js'});
+const api=window.__PREFAB_SPRITE_RENDERER__;
+assert(api && typeof api.mapSpriteScreenPointToSourcePixel==='function','bundle must expose exact source-pixel hit mapper');
+let p=api.mapSpriteScreenPointToSourcePixel({x:10,y:20,width:100,height:50},10,20,10,5,false);
+assert(p.x===0&&p.y===0,'bundle mapper top-left');
+p=api.mapSpriteScreenPointToSourcePixel({x:10,y:20,width:100,height:50},109.9,69.9,10,5,false);
+assert(p.x===9&&p.y===4,'bundle mapper bottom-right');
+p=api.mapSpriteScreenPointToSourcePixel({x:10,y:20,width:100,height:50},10,20,10,5,true);
+assert(p.x===9&&p.y===0,'bundle mapper flipX');
+console.log('prefab-sprite-runtime-bundle-hit-map.test.js: OK');

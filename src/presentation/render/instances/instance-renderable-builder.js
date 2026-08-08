@@ -6,6 +6,31 @@
 var __renderDynamicInstanceCache = { source: null, length: 0, dynamicInstances: [], staticInstances: [] };
 var __visibleInstanceSummaryCache = { signature: '', at: 0, summary: { visibleInstances: 0, visibleDynamicInstances: 0, staticSkippedByDynamicLoop: 0 } };
 
+var __renderPrefabSnapshotCache = new Map();
+
+function getExactPrefabForRender(prefabId) {
+  var id = String(prefabId || '').trim();
+  if (!id) return null;
+  var registryApi = (typeof window !== 'undefined' && window.App && window.App.state && window.App.state.prefabRegistry) ? window.App.state.prefabRegistry : null;
+  var prefab = null;
+  try {
+    if (registryApi && typeof registryApi.getPrefabByIdExact === 'function') prefab = registryApi.getPrefabByIdExact(id);
+  } catch (_) {}
+  try {
+    if (!prefab && typeof getPrefabById === 'function') {
+      var candidate = getPrefabById(id);
+      if (candidate && String(candidate.id) === id) prefab = candidate;
+    }
+  } catch (_) {}
+  try {
+    if (!prefab && Array.isArray(prototypes)) {
+      prefab = prototypes.find(function (candidate) { return candidate && String(candidate.id) === id; }) || null;
+    }
+  } catch (_) {}
+  if (prefab) __renderPrefabSnapshotCache.set(id, prefab);
+  return prefab || __renderPrefabSnapshotCache.get(id) || null;
+}
+
 function normalizeRenderUpdateModeForRender(mode, fallback) {
   if (mode === 'dynamic') return 'dynamic';
   if (mode === 'static') return 'static';
@@ -13,6 +38,10 @@ function normalizeRenderUpdateModeForRender(mode, fallback) {
 }
 
 function getPrefabRenderUpdateModeForRender(prefab, instanceOrOverride) {
+  // A sprite is camera-dependent even when an old instance snapshot says
+  // renderUpdateMode=static. Treating it as static makes it disappear from the
+  // dynamic consumer after prefab registration or a view change.
+  if (prefab && prefabHasSprite(prefab)) return 'dynamic';
   var registryApi = (typeof window !== 'undefined' && window.App && window.App.state && window.App.state.prefabRegistry) ? window.App.state.prefabRegistry : null;
   if (registryApi && typeof registryApi.getPrefabRenderUpdateMode === 'function') {
     return normalizeRenderUpdateModeForRender(registryApi.getPrefabRenderUpdateMode(prefab, instanceOrOverride), prefabHasSprite(prefab) ? 'dynamic' : 'static');
@@ -30,6 +59,7 @@ function getPrefabRenderUpdateModeForRender(prefab, instanceOrOverride) {
 }
 
 function isInstanceDynamicRenderableForFrame(inst, prefab) {
+  if (prefab && prefabHasSprite(prefab)) return true;
   return getPrefabRenderUpdateModeForRender(prefab, inst) === 'dynamic';
 }
 
@@ -39,7 +69,7 @@ function buildInstanceRenderUpdateModeIndex(sourceInstances) {
   for (var i = 0; i < list.length; i++) {
     var inst = list[i];
     if (!inst || !inst.instanceId) continue;
-    var prefab = getPrefabById(inst.prefabId);
+    var prefab = getExactPrefabForRender(inst.prefabId);
     out.set(String(inst.instanceId), getPrefabRenderUpdateModeForRender(prefab, inst));
   }
   return out;
@@ -47,15 +77,15 @@ function buildInstanceRenderUpdateModeIndex(sourceInstances) {
 
 function getDynamicInstanceSplitForRender(sourceInstances) {
   var list = Array.isArray(sourceInstances) ? sourceInstances : [];
-  if (__renderDynamicInstanceCache.source === list && __renderDynamicInstanceCache.length === list.length) {
-    return __renderDynamicInstanceCache;
-  }
+  // Do not reuse a split based only on array identity and length. Prefabs are
+  // imported/replaced asynchronously, so the same instances array can change
+  // from voxel-only to sprite-backed without changing either value.
   var dynamicInstances = [];
   var staticInstances = [];
   for (var i = 0; i < list.length; i++) {
     var inst = list[i];
     if (!inst) continue;
-    var prefab = getPrefabById(inst.prefabId);
+    var prefab = getExactPrefabForRender(inst.prefabId);
     if (isInstanceDynamicRenderableForFrame(inst, prefab)) dynamicInstances.push(inst);
     else staticInstances.push(inst);
   }
@@ -65,6 +95,16 @@ function getDynamicInstanceSplitForRender(sourceInstances) {
     dynamicInstances: dynamicInstances,
     staticInstances: staticInstances
   };
+  try {
+    if (typeof window !== 'undefined') window.__DYNAMIC_INSTANCE_SPLIT_LAST__ = {
+      version: 'dynamic-instance-split-sprite-stable-v2',
+      inputCount: list.length,
+      dynamicCount: dynamicInstances.length,
+      staticCount: staticInstances.length,
+      dynamicIds: dynamicInstances.map(function (inst) { return String(inst && inst.instanceId || ''); }),
+      spriteDynamicIds: dynamicInstances.filter(function (inst) { var prefab = getExactPrefabForRender(inst && inst.prefabId); return !!(prefab && prefabHasSprite(prefab)); }).map(function (inst) { return String(inst && inst.instanceId || ''); })
+    };
+  } catch (_) {}
   return __renderDynamicInstanceCache;
 }
 
@@ -136,7 +176,7 @@ function getVisibleInstanceSummaryForRender(scope, visibleDynamicInstances, dyna
 
 
 function drawInstanceProxyBoxes(instance, alpha) {
-  var prefab = getPrefabById(instance.prefabId);
+  var prefab = getExactPrefabForRender(instance.prefabId);
   var shift = getHabboInstanceVisualShift(instance, prefab);
   var instanceBoxes = boxes.filter(function (b) { return b.instanceId === instance.instanceId; });
   withScreenTranslate(shift, function () {

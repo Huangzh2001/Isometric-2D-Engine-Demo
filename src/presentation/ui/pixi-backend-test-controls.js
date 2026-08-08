@@ -175,29 +175,31 @@
     return null;
   }
 
+  var PLAYER_CHUNK_DEBUG_STORAGE_KEY = 'pixiPlayerChunkDebugOverlayV2';
+
   function readPlayerChunkDebugOverlayEnabled() {
     try {
       if (global.__PIXI_PLAYER_CHUNK_DEBUG_OVERLAY__ === true) return true;
       if (global.__PIXI_PLAYER_CHUNK_DEBUG_OVERLAY__ === false) return false;
       if (global.localStorage) {
-        var raw = global.localStorage.getItem('pixiPlayerChunkDebugOverlay');
+        var raw = global.localStorage.getItem(PLAYER_CHUNK_DEBUG_STORAGE_KEY);
         if (raw === '0' || raw === 'false' || raw === 'off') return false;
         if (raw === '1' || raw === 'true' || raw === 'on') return true;
       }
     } catch (_) {}
-    return true;
+    return false;
   }
 
   function setPlayerChunkDebugOverlayEnabled(enabled, source) {
     var next = enabled !== false;
     try { global.__PIXI_PLAYER_CHUNK_DEBUG_OVERLAY__ = next; } catch (_) {}
     try {
-      if (global.localStorage) global.localStorage.setItem('pixiPlayerChunkDebugOverlay', next ? '1' : '0');
+      if (global.localStorage) global.localStorage.setItem(PLAYER_CHUNK_DEBUG_STORAGE_KEY, next ? '1' : '0');
     } catch (_) {}
     emit('ui-control', {
       action: 'set-pixi-player-chunk-debug-overlay',
       enabled: next,
-      storageKey: 'pixiPlayerChunkDebugOverlay',
+      storageKey: PLAYER_CHUNK_DEBUG_STORAGE_KEY,
       source: source || 'ui-control'
     });
     setStatus(next

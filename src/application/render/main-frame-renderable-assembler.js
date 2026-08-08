@@ -83,6 +83,223 @@ function buildUnifiedVertexSquarePrimitiveRenderList(primitives, inst, prefab) {
     };
   }
 
+function spriteShadowPolygonSignedArea(points) {
+  var list = Array.isArray(points) ? points : [];
+  var area = 0;
+  for (var i = 0; i < list.length; i++) {
+    var a = list[i] || {};
+    var b = list[(i + 1) % list.length] || {};
+    area += Number(a.x || 0) * Number(b.y || 0) - Number(b.x || 0) * Number(a.y || 0);
+  }
+  return area * 0.5;
+}
+
+function clipSpriteShadowPolygonToReceiver(subjectPoints, receiverPoints) {
+  var output = (Array.isArray(subjectPoints) ? subjectPoints : []).map(function (p) {
+    return { x: Number(p && p.x || 0), y: Number(p && p.y || 0) };
+  });
+  var clip = (Array.isArray(receiverPoints) ? receiverPoints : []).map(function (p) {
+    return { x: Number(p && p.x || 0), y: Number(p && p.y || 0) };
+  });
+  if (output.length < 3 || clip.length < 3) return [];
+  var orientation = spriteShadowPolygonSignedArea(clip) >= 0 ? 1 : -1;
+  var eps = 1e-7;
+  function inside(p, a, b) {
+    var cross = (Number(b.x || 0) - Number(a.x || 0)) * (Number(p.y || 0) - Number(a.y || 0))
+      - (Number(b.y || 0) - Number(a.y || 0)) * (Number(p.x || 0) - Number(a.x || 0));
+    return orientation * cross >= -eps;
+  }
+  function intersection(s, e, a, b) {
+    var sx = Number(s.x || 0), sy = Number(s.y || 0);
+    var ex = Number(e.x || 0), ey = Number(e.y || 0);
+    var ax = Number(a.x || 0), ay = Number(a.y || 0);
+    var bx = Number(b.x || 0), by = Number(b.y || 0);
+    var rx = ex - sx, ry = ey - sy;
+    var qx = bx - ax, qy = by - ay;
+    var denom = rx * qy - ry * qx;
+    if (Math.abs(denom) <= eps) return { x: ex, y: ey };
+    var t = ((ax - sx) * qy - (ay - sy) * qx) / denom;
+    return { x: sx + t * rx, y: sy + t * ry };
+  }
+  for (var ci = 0; ci < clip.length; ci++) {
+    var a = clip[ci];
+    var b = clip[(ci + 1) % clip.length];
+    var input = output;
+    output = [];
+    if (!input.length) break;
+    var s = input[input.length - 1];
+    for (var pi = 0; pi < input.length; pi++) {
+      var e = input[pi];
+      var eInside = inside(e, a, b);
+      var sInside = inside(s, a, b);
+      if (eInside) {
+        if (!sInside) output.push(intersection(s, e, a, b));
+        output.push(e);
+      } else if (sInside) {
+        output.push(intersection(s, e, a, b));
+      }
+      s = e;
+    }
+  }
+  return output.length >= 3 ? output : [];
+}
+
+function getSpriteShadowReceiverVisibleWorldFaces(viewRotation) {
+  // Receiver geometry belongs to the world voxel, not to the artwork facing.
+  // Therefore choose camera-visible WORLD faces using itemFacing=0. The sprite
+  // artwork may rotate independently, but its invisible occupancy must not lose
+  // a receiver side merely because the image facing changed.
+  var mapping = getVisibleSemanticMappingForRender(0, viewRotation) || {};
+  var screenFaces = mapping.screenFaces || mapping.visibleFacesByScreenPosition || {};
+  var faces = ['top'];
+  var left = screenFaces.lowerLeft || 'south';
+  var right = screenFaces.lowerRight || 'east';
+  if (faces.indexOf(left) < 0) faces.push(left);
+  if (faces.indexOf(right) < 0) faces.push(right);
+  return faces;
+}
+
+function buildSpriteShadowReceiverFaces(cell, occ, viewRotation) {
+  var semanticFaces = getSpriteShadowReceiverVisibleWorldFaces(viewRotation);
+  var result = [];
+  for (var i = 0; i < semanticFaces.length; i++) {
+    var semanticFace = String(semanticFaces[i] || '');
+    if (!semanticFace) continue;
+    var delta = getSemanticFaceNeighborDeltaForRender(semanticFace);
+    if (delta && occ.has(`${cell.x + Number(delta.x || 0)},${cell.y + Number(delta.y || 0)},${cell.z + Number(delta.z || 0)}`)) continue;
+    var worldPts = getSlopeAwareFaceWorldPolygon(cell, semanticFace);
+    if (!Array.isArray(worldPts) || worldPts.length < 3) continue;
+    var screenPts = screenPointsFromWorldFace(worldPts);
+    if (!Array.isArray(screenPts) || screenPts.length < 3) continue;
+    var normal = getSemanticFaceNormal(semanticFace);
+    result.push({
+      semanticFace: semanticFace,
+      worldPts: worldPts,
+      screenPts: screenPts,
+      normal: normal,
+      shadowOverlays: buildVoxelFaceShadowOverlays(worldPts, normal, cell && cell.box ? cell.box.instanceId : null)
+    });
+  }
+  return result;
+}
+
+function buildSpriteShadowReceiverOverlayRenderables(inst, prefab, viewRotation, spriteSortMeta) {
+  if (!inst || !prefab || !prefabHasSprite(prefab)) return [];
+
+  // The sprite replaces only the voxel VISUAL. The authored voxel remains the
+  // receiver geometry. It stays out of static-world injection and is evaluated
+  // here against the existing shadow projector.
+  var sourceBoxes = Array.isArray(boxes) ? boxes.filter(function (box) {
+    return !!(box && box.instanceId === inst.instanceId);
+  }) : [];
+  if (!sourceBoxes.length) return [];
+
+  var occ = buildOccupancy(sourceBoxes);
+  if (!occ || typeof occ.values !== 'function') return [];
+  var sortMeta = spriteSortMeta || computeSpriteRenderableSort(inst, prefab) || { sortKey: 0, tie: 0 };
+  var out = [];
+  var overlayObjectCount = 0;
+  var polygonCount = 0;
+  var clippedOutPolygonCount = 0;
+  var faceStats = {};
+
+  for (const cell of occ.values()) {
+    var faces = buildSpriteShadowReceiverFaces(cell, occ, viewRotation);
+    for (var faceIndex = 0; faceIndex < faces.length; faceIndex++) {
+      var face = faces[faceIndex] || {};
+      var semanticFace = String(face.semanticFace || 'unknown');
+      if (!faceStats[semanticFace]) faceStats[semanticFace] = { faceCount: 0, overlayCount: 0, polygonCount: 0, clippedOutCount: 0 };
+      faceStats[semanticFace].faceCount += 1;
+      var overlays = Array.isArray(face.shadowOverlays) ? face.shadowOverlays : [];
+      for (var shadowIndex = 0; shadowIndex < overlays.length; shadowIndex++) {
+        var overlay = overlays[shadowIndex] || {};
+        overlayObjectCount += 1;
+        faceStats[semanticFace].overlayCount += 1;
+        var polys = Array.isArray(overlay.polys) ? overlay.polys : [];
+        var alpha = Math.max(0, Math.min(0.95, Number(overlay.alpha != null ? overlay.alpha : overlay.baseAlpha) || 0));
+        if (!alpha || !polys.length) continue;
+        var fill = (typeof shadowFillCss === 'function') ? shadowFillCss(alpha) : ('rgba(0,0,0,' + String(alpha) + ')');
+        // IMPORTANT: each dynamic shadow segment is clipped to THIS receiver.
+        // Anything outside belongs to the floor or another receiver and must stay
+        // in that receiver's own depth layer rather than being lifted above sprite.
+        var receiverClip = (Array.isArray(overlay.clipPoly) && overlay.clipPoly.length >= 3)
+          ? overlay.clipPoly
+          : face.screenPts;
+
+        for (var polyIndex = 0; polyIndex < polys.length; polyIndex++) {
+          var projected = Array.isArray(polys[polyIndex]) ? polys[polyIndex].map(function (pt) {
+            return { x: Number(pt && pt.x || 0), y: Number(pt && pt.y || 0) };
+          }) : [];
+          if (projected.length < 3) continue;
+          var points = clipSpriteShadowPolygonToReceiver(projected, receiverClip);
+          if (points.length < 3) {
+            clippedOutPolygonCount += 1;
+            faceStats[semanticFace].clippedOutCount += 1;
+            continue;
+          }
+          polygonCount += 1;
+          faceStats[semanticFace].polygonCount += 1;
+          var localPolygonIndex = polygonCount;
+          var id = 'sprite-shadow-receiver-' + String(inst.instanceId || 'unknown') + '-' + semanticFace + '-' + String(localPolygonIndex);
+          out.push({
+            id: id,
+            kind: 'debug-cuboid-face',
+            dynamic: true,
+            shadowReceiverOverlayOnly: true,
+            sortKey: Number(sortMeta.sortKey || 0),
+            tie: Number(sortMeta.tie || 0) + 0.5 + localPolygonIndex * 0.000001,
+            instanceId: inst.instanceId || null,
+            prefabId: prefab.id || null,
+            receiverSemanticFace: semanticFace,
+            receiverKind: overlay.receiverKind || semanticFace,
+            receiverClipPoints: receiverClip,
+            sourceComp: overlay.sourceComp || null,
+            renderPath: 'sprite-shadow-receiver-overlay-v17',
+            points: points,
+            fill: fill,
+            stroke: null,
+            width: 0,
+            worldBounds: getInstanceWorldBoundsForRender(inst),
+            drawScreenPosition: deriveRenderableDrawPosition({ debugFoot: iso(Number(inst.x || 0) + 0.5, Number(inst.y || 0) + 0.5, Number(inst.z || 0)) }),
+            worldX: Number(inst.x || 0) + 0.5,
+            worldY: Number(inst.y || 0) + 0.5,
+            draw: (function (drawPoints, drawFill) {
+              return function () { drawPoly(drawPoints, drawFill, null, 0); };
+            })(points, fill)
+          });
+        }
+      }
+    }
+  }
+
+  var diag = {
+    version: 'sprite-shadow-receiver-segmented-depth-v17',
+    instanceId: inst.instanceId || null,
+    prefabId: prefab.id || null,
+    viewRotation: normalizeMainEditorViewRotationValue(viewRotation),
+    visibleWorldFaces: getSpriteShadowReceiverVisibleWorldFaces(viewRotation),
+    sourceBoxCount: sourceBoxes.length,
+    hiddenSourceBoxCount: sourceBoxes.filter(function (box) { return box && box.renderHidden === true; }).length,
+    overlayObjectCount: overlayObjectCount,
+    polygonRenderableCount: out.length,
+    clippedOutPolygonCount: clippedOutPolygonCount,
+    bySemanticFace: faceStats,
+    sortKey: Number(sortMeta.sortKey || 0),
+    tie: Number(sortMeta.tie || 0),
+    staticWorldInjection: false,
+    receiverAwareLayering: true
+  };
+  try {
+    global.__SPRITE_SHADOW_RECEIVER_LAST__ = diag;
+    var sig = [diag.instanceId, diag.viewRotation, diag.sourceBoxCount, diag.hiddenSourceBoxCount, diag.overlayObjectCount, diag.polygonRenderableCount, JSON.stringify(diag.bySemanticFace)].join('|');
+    if (global.__SPRITE_SHADOW_RECEIVER_LAST_LOG_SIG__ !== sig) {
+      global.__SPRITE_SHADOW_RECEIVER_LAST_LOG_SIG__ = sig;
+      if (typeof pushLog === 'function') pushLog('[sprite-shadow-receiver-v17] ' + JSON.stringify(diag));
+    }
+  } catch (_) {}
+  return out;
+}
+
 function buildRenderablesForMainFrameAssembler() {
   const faceMergeControlState = getStaticWorldFaceMergeControlStateSnapshotForRender();
   beginRenderFrameDiagnosticState();
@@ -295,6 +512,9 @@ function buildRenderablesForMainFrameAssembler() {
         spriteRenderableBuildMs += Math.max(0, perfNow() - spriteRenderableStartAt);
       }
       spriteSortBuildMs += Math.max(0, perfNow() - spriteSortStartAt);
+      const receiverSortMeta = computeSpriteRenderableSort(inst, prefab);
+      const receiverShadowRenderables = buildSpriteShadowReceiverOverlayRenderables(inst, prefab, normalizeMainEditorViewRotationValue(viewRotationInfo.viewRotation), receiverSortMeta);
+      for (let receiverShadowIndex = 0; receiverShadowIndex < receiverShadowRenderables.length; receiverShadowIndex++) dynamicRenderables.push(receiverShadowRenderables[receiverShadowIndex]);
     }
   }
 
@@ -784,6 +1004,9 @@ function buildMainFrameRenderablesForMainFrameAssembler() {
 
   var api = {
     summarizeBoundary: summarizeBoundary,
+    clipSpriteShadowPolygonToReceiver: clipSpriteShadowPolygonToReceiver,
+    getSpriteShadowReceiverVisibleWorldFaces: getSpriteShadowReceiverVisibleWorldFaces,
+    buildSpriteShadowReceiverOverlayRenderables: buildSpriteShadowReceiverOverlayRenderables,
     buildRenderables: buildRenderablesForMainFrameAssembler,
     buildMainFrameRenderables: buildMainFrameRenderablesForMainFrameAssembler
   };

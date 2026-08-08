@@ -10,6 +10,8 @@
 
 本文档描述的是**推荐的架构视图**，并不要求当前代码已经完全达到该结构。后续重构应以此为方向逐步推进，并坚持“小步重构、行为不变、逐步验证”的原则。
 
+> 关于未来 Prefab 自带 Material / Capability / Interface / Lua Behavior、事件驱动运行时与 Scene Logic 的上层目标架构，参见 `EMERGENT_ASSET_SYSTEM_DEVELOPMENT_GUIDE.zh-CN.md`。该文档是后续涌现式素材系统的重要参考。
+
 ---
 
 ## 2. 项目定位

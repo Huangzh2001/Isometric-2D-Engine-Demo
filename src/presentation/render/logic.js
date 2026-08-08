@@ -758,8 +758,33 @@ return offsets;
 }
 
 
+function getCanonicalLightingTileWidth() {
+var currentTileW = Math.max(1, Number(settings && settings.tileW) || Number(typeof BASE_TILE_W !== 'undefined' ? BASE_TILE_W : 80) || 80);
+var displayScale = Math.max(0.05, Number(settings && settings.worldDisplayScale) || 1);
+return currentTileW / displayScale;
+}
+
 function worldRadiusFromPixels(px) {
-return px / Math.max(52, settings.tileW * 0.85);
+return px / Math.max(52, getCanonicalLightingTileWidth() * 0.85);
+}
+
+function getLightingRadiusDiagnosticsSnapshot() {
+var list = [];
+try { list = typeof getLightingRenderLights === 'function' ? getLightingRenderLights() || [] : []; } catch (_) { list = []; }
+return {
+  version: 'lighting-radius-world-invariant-v1',
+  tileW: Number(settings && settings.tileW) || 0,
+  worldDisplayScale: Number(settings && settings.worldDisplayScale) || 1,
+  canonicalTileW: getCanonicalLightingTileWidth(),
+  lights: list.map(function (light) {
+    return {
+      id: light && light.id != null ? light.id : null,
+      type: String(light && light.type || 'point'),
+      radiusPx: Number(light && light.radius) || 0,
+      radiusWorld: worldRadiusFromPixels(Number(light && light.radius) || 0)
+    };
+  })
+};
 }
 
 function distanceAttenuation(light, point) {

@@ -51,4 +51,46 @@ const slopeVoxels = api.rotateVoxelList({ w: 1, d: 1, h: 1, voxels: [{ x: 0, y: 
 assert(slopeVoxels[0].shapeKind === 'slope_1x1', 'rotated slope voxel should keep shape kind');
 assert(slopeVoxels[0].slopeDirection === 'north', 'rotated slope voxel should carry rotated slope direction');
 
+
+
+const singlePlan = api.buildHabboFacingPlan([2]);
+assert(singlePlan.strategy === 'single-mirror', 'one Habbo source direction should use single-mirror');
+assert(singlePlan.directionMap.map(entry => entry.mirrorX).join(',') === 'false,true,false,true', 'single-mirror should alternate original and horizontal mirror');
+const twoPlan = api.buildHabboFacingPlan([0, 2]);
+assert(twoPlan.strategy === 'two-mirror', 'two Habbo source directions should use two-mirror');
+assert(twoPlan.selectedSourceDirections.join(',') === '0,2', 'two direction plan should preserve the orthogonal native pair');
+const fourPlan = api.buildHabboFacingPlan([0, 1, 2, 3, 4, 5, 6, 7]);
+assert(fourPlan.strategy === 'four-native', 'four or more Habbo source directions should use four native views');
+assert(fourPlan.selectedSourceDirections.join(',') === '0,2,4,6', 'eight-direction Habbo assets should select the four cardinal views');
+
+const singleHabboPrefab = {
+  id: 'single_habbo', kind: 'habbo_import', w: 1, d: 2, h: 1,
+  habboLayerDirections: { '0': [{ name: 'single' }] },
+  habboMeta: {
+    generatedFacingStrategy: singlePlan.strategy,
+    sourceDirectionCount: singlePlan.sourceDirectionCount,
+    sourceVisualDirections: singlePlan.sourceDirections,
+    directionMap: singlePlan.directionMap
+  }
+};
+const singleMatrix = api.buildSpriteFacingMatrix(singleHabboPrefab);
+assert(singleMatrix.map(entry => entry.directionKey).join(',') === '0,0,0,0', 'single Habbo view should always reuse the only native direction key');
+assert(singleMatrix.map(entry => entry.mirrorX).join(',') === 'false,true,false,true', 'single Habbo view should mirror odd rotations');
+assert(api.getRotatedFootprint(singleHabboPrefab, 0).w === 1 && api.getRotatedFootprint(singleHabboPrefab, 0).d === 2, 'single Habbo footprint should keep 1x2 at rotation 0');
+assert(api.getRotatedFootprint(singleHabboPrefab, 1).w === 2 && api.getRotatedFootprint(singleHabboPrefab, 1).d === 1, 'single Habbo footprint should become 2x1 at rotation 1');
+
+const fourHabboPrefab = {
+  id: 'four_habbo', kind: 'habbo_import', w: 1, d: 2, h: 1,
+  habboLayerDirections: { '0': [{}], '1': [{}], '2': [{}], '3': [{}] },
+  habboMeta: {
+    generatedFacingStrategy: fourPlan.strategy,
+    sourceDirectionCount: fourPlan.sourceDirectionCount,
+    sourceVisualDirections: fourPlan.sourceDirections,
+    directionMap: fourPlan.directionMap
+  }
+};
+const fourMatrix = api.buildSpriteFacingMatrix(fourHabboPrefab);
+assert(fourMatrix.map(entry => entry.directionKey).join(',') === '0,1,2,3', 'four-native should use a different native direction for every rotation');
+assert(fourMatrix.every(entry => entry.mirrorX === false), 'four-native should not add generated mirrors');
+
 console.log('item-facing-core.test.js: OK');

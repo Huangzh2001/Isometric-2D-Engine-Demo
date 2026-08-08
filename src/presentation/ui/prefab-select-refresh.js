@@ -111,7 +111,7 @@
     var prototypes = getPrototypes(deps);
     var entries = [];
     for (var i = 0; i < prototypes.length; i++) {
-      if (isFluidRenderPrefab(prototypes[i])) continue;
+      if (isFluidRenderPrefab(prototypes[i]) || (prototypes[i] && prototypes[i].runtimeHiddenFromPalette === true)) continue;
       entries.push({ prefab: prototypes[i], index: i });
     }
     return entries;

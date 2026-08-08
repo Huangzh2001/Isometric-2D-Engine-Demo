@@ -122,6 +122,13 @@ function normalizeSpriteInfo(sprite) {
     width: Number(sprite.width) || 0,
     height: Number(sprite.height) || 0,
     visualSize: Number(sprite.visualSize) || 0,
+    sourceFacing: Number.isFinite(Number(sprite.sourceFacing)) ? Number(sprite.sourceFacing) : null,
+    flipY: !!sprite.flipY,
+    previewOpacity: sprite.previewOpacity == null ? 1 : Number(sprite.previewOpacity),
+    activeFacing: Number.isFinite(Number(sprite.activeFacing)) ? Number(sprite.activeFacing) : null,
+    facingTransforms: Array.isArray(sprite.facingTransforms) ? cloneJsonSafe(sprite.facingTransforms) : null,
+    registrationPx: sprite.registrationPx ? cloneJsonSafe(sprite.registrationPx) : null,
+    relativeVoxelAlignment: sprite.relativeVoxelAlignment ? cloneJsonSafe(sprite.relativeVoxelAlignment) : null,
   };
 }
 
@@ -829,6 +836,25 @@ function makeMcStairStepVoxels(stepCount, stepLimit, base) {
   return voxels;
 }
 
+var prefabRuntimeSnapshots = new Map();
+
+function retainPrefabRuntimeSnapshot(prefab, meta) {
+  meta = meta || {};
+  if (!prefab || !prefab.id) return null;
+  var id = String(prefab.id);
+  var previous = prefabRuntimeSnapshots.get(id) || null;
+  prefabRuntimeSnapshots.set(id, prefab);
+  if (previous !== prefab) {
+    prefabWrite('retainPrefabRuntimeSnapshot', { source: meta.source || 'unknown', prefabId: id, snapshotCount: prefabRuntimeSnapshots.size });
+  }
+  return prefab;
+}
+
+function getPrefabRuntimeSnapshot(prefabId) {
+  var id = String(prefabId || '').trim();
+  return id ? (prefabRuntimeSnapshots.get(id) || null) : null;
+}
+
 var prototypes = [
   normalizePrefab({ key: '1', id: 'debug_cube_5faces', name: 'Debug Cube · 5 Faces', base: '#c7b0df', renderUpdateMode: 'dynamic', spriteStrategyHint: 'single', itemRotationDebug: true, semanticTextureMap: DEBUG_5FACE_TEXTURE_MAP, semanticTextures: DEBUG_5FACE_TEXTURE_MAP, semanticFaceColors: { top: '#2F80ED', north: '#E74C3C', east: '#27AE60', south: '#F2C94C', west: '#9B51E0' }, voxels: [{ x: 0, y: 0, z: 0 }] }),
   normalizePrefab({ key: '2', id: 'debug_rect_2x1_5faces', name: 'Debug Rect 2×1 · 5 Faces', base: '#d4bb90', renderUpdateMode: 'dynamic', spriteStrategyHint: 'single', itemRotationDebug: true, semanticTextureMap: DEBUG_5FACE_TEXTURE_MAP, semanticTextures: DEBUG_5FACE_TEXTURE_MAP, semanticFaceColors: { top: '#2F80ED', north: '#E74C3C', east: '#27AE60', south: '#F2C94C', west: '#9B51E0' }, voxels: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }] }),
@@ -919,6 +945,7 @@ function ensurePrefabRegistered(def) {
     tracePrefabRegister(found.id, 'ensure', { builtIn: false, voxels: found.voxels.length });
     prefabWrite('registerPrefab', { source: 'ensurePrefabRegistered', prefabId: found.id, action: 'append-new', prototypeCount: prototypes.length });
   }
+  retainPrefabRuntimeSnapshot(found, { source: 'ensurePrefabRegistered' });
   return found;
 }
 
@@ -930,11 +957,13 @@ function registerPrefab(def, meta) {
     prototypes[existingIndex] = normalized;
     tracePrefabRegister(normalized.id, meta.source || 'registerPrefab', { builtIn: false, voxels: normalized.voxels.length, action: 'update-existing' });
     prefabWrite('registerPrefab', { source: meta.source || 'unknown', prefabId: normalized.id, action: 'update-existing', prototypeIndex: existingIndex, prototypeCount: prototypes.length });
+    retainPrefabRuntimeSnapshot(prototypes[existingIndex], { source: meta.source || 'registerPrefab:update-existing' });
     return prototypes[existingIndex];
   }
   prototypes.push(normalized);
   tracePrefabRegister(normalized.id, meta.source || 'registerPrefab', { builtIn: false, voxels: normalized.voxels.length, action: 'append-new' });
   prefabWrite('registerPrefab', { source: meta.source || 'unknown', prefabId: normalized.id, action: 'append-new', prototypeIndex: prototypes.length - 1, prototypeCount: prototypes.length });
+  retainPrefabRuntimeSnapshot(prototypes[prototypes.length - 1], { source: meta.source || 'registerPrefab:append-new' });
   return prototypes[prototypes.length - 1];
 }
 
@@ -948,6 +977,7 @@ function replacePrefabById(prefabId, nextDef, meta) {
   prototypes[existingIndex] = normalized;
   tracePrefabRegister(normalized.id, meta.source || 'replacePrefabById', { builtIn: false, voxels: normalized.voxels.length, action: 'replace-existing' });
   prefabWrite('replacePrefabById', { source: meta.source || 'unknown', prefabId: id, prototypeIndex: existingIndex, prototypeCount: prototypes.length });
+  retainPrefabRuntimeSnapshot(prototypes[existingIndex], { source: meta.source || 'replacePrefabById' });
   return prototypes[existingIndex];
 }
 
@@ -983,14 +1013,29 @@ function refreshPrototypeSelection(meta) {
   return summarizePrefabRegistry();
 }
 
-function getPrefabById(id) {
-  var found = prototypes.find(function (p) { return p.id === id; }) || null;
+function getPrefabByIdExact(id) {
+  var key = String(id || '').trim();
+  if (!key) return null;
+  var found = prototypes.find(function (p) { return p && String(p.id) === key; }) || null;
   if (found) {
-    tracePrefabLookup(id, true, { name: found.name, custom: !!found.custom, voxels: Array.isArray(found.voxels) ? found.voxels.length : 0 });
+    retainPrefabRuntimeSnapshot(found, { source: 'getPrefabByIdExact:registry-hit' });
+    tracePrefabLookup(key, true, { name: found.name, custom: !!found.custom, voxels: Array.isArray(found.voxels) ? found.voxels.length : 0, exact: true });
     return found;
   }
+  var retained = getPrefabRuntimeSnapshot(key);
+  if (retained) {
+    tracePrefabLookup(key, true, { name: retained.name, custom: !!retained.custom, voxels: Array.isArray(retained.voxels) ? retained.voxels.length : 0, exact: true, retainedSnapshot: true });
+    return retained;
+  }
+  tracePrefabLookup(key, false, { fallbackId: null, exact: true });
+  return null;
+}
+
+function getPrefabById(id) {
+  var found = getPrefabByIdExact(id);
+  if (found) return found;
   var fallback = prototypes[0] || null;
-  tracePrefabLookup(id, false, { fallbackId: fallback ? fallback.id : null });
+  tracePrefabLookup(id, false, { fallbackId: fallback ? fallback.id : null, exact: false });
   return fallback;
 }
 
@@ -1041,6 +1086,9 @@ function prefabVariant(prefab, rotation) {
   var rotatedAnchor = facingApi && typeof facingApi.getRotatedAnchor === 'function'
     ? facingApi.getRotatedAnchor(prefab, r)
     : (prefab.anchor ? { x: Number(prefab.anchor.x) || 0, y: Number(prefab.anchor.y) || 0, z: Number(prefab.anchor.z) || 0 } : { x: 0, y: 0, z: 0 });
+  var rotatedFootprint = facingApi && typeof facingApi.getRotatedFootprint === 'function'
+    ? facingApi.getRotatedFootprint(prefab, r)
+    : null;
   var facingPrototype = facingApi && typeof facingApi.buildFacingPrototype === 'function'
     ? facingApi.buildFacingPrototype(prefab, r, null)
     : null;
@@ -1049,9 +1097,9 @@ function prefabVariant(prefab, rotation) {
     facing: r,
     voxels: voxels,
     primitives: primitives,
-    w: Math.max(1, maxX),
-    d: Math.max(1, maxY),
-    h: Math.max(1, maxZ),
+    w: Math.max(1, rotatedFootprint && Number(rotatedFootprint.w) || 0, maxX),
+    d: Math.max(1, rotatedFootprint && Number(rotatedFootprint.d) || 0, maxY),
+    h: Math.max(1, rotatedFootprint && Number(rotatedFootprint.h) || 0, maxZ),
     supportCells: supportCells,
     anchor: rotatedAnchor,
     itemFacingPrototype: facingPrototype
@@ -1059,6 +1107,10 @@ function prefabVariant(prefab, rotation) {
   prefab._variantCache.set(r, variant);
   tracePrefabVariant(prefab.id, r, { voxels: voxels.length, primitives: primitives.length, w: variant.w, d: variant.d, h: variant.h, anchor: rotatedAnchor });
   return variant;
+}
+
+for (var __prefabSnapshotSeedIndex = 0; __prefabSnapshotSeedIndex < prototypes.length; __prefabSnapshotSeedIndex++) {
+  retainPrefabRuntimeSnapshot(prototypes[__prefabSnapshotSeedIndex], { source: 'prefab-registry:initial-seed' });
 }
 
 var PREFAB_REGISTRY_API = {
@@ -1074,7 +1126,10 @@ var PREFAB_REGISTRY_API = {
   refreshPrototypeSelection: refreshPrototypeSelection,
   getSelectedPrototypeIndex: getSelectedPrototypeIndex,
   summarize: summarizePrefabRegistry,
+  getPrefabByIdExact: getPrefabByIdExact,
   getPrefabById: getPrefabById,
+  retainPrefabRuntimeSnapshot: retainPrefabRuntimeSnapshot,
+  getPrefabRuntimeSnapshot: getPrefabRuntimeSnapshot,
   prefabVariant: prefabVariant,
   normalizeLiquidWaterLayerCount: normalizeLiquidWaterLayerCount,
   liquidWaterLayerPrefabId: liquidWaterLayerPrefabId,

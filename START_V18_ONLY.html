@@ -1,12 +1,14 @@
-<!doctype html>
+<!DOCTYPE html>
+
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>RUN_ME_V18｜物品编辑器 v18（box occlusion 排序修复）</title>
-  <link rel="stylesheet" href="styles/editor-v18.css?v=20260321-v18-entry-log" />
-  <script>window.__APP_ENTRY_INFO={kind:"editor",label:"编辑器",entryFile:"START_V18_ONLY.html",launcherHint:"start_editor.bat",build:"20260320-v18-box-occlusion"};</script>
-  <script>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>统一素材编辑器｜编辑图片 → 编辑体素 → 编辑行为 → 导出</title>
+<link href="styles/editor-v18.css?v=20260806-relative-registration-unbounded-v7" rel="stylesheet"/>
+<link href="styles/editor-flat-v4.css?v=20260806-relative-registration-unbounded-v7" rel="stylesheet"/>
+<script>window.__APP_ENTRY_INFO={kind:"editor",label:"统一素材编辑器",entryFile:"START_V18_ONLY.html",launcherHint:"start_editor.bat",build:"20260807-behavior-v1"};</script>
+<script>
     (function(){
       try {
         var params = new URLSearchParams(window.location.search || '');
@@ -78,260 +80,478 @@
     })();
   </script>
 </head>
-<body>
-  <div style="position:fixed;top:8px;right:12px;z-index:99999;padding:10px 14px;border:2px solid #ff7070;background:#2a1212;color:#ffd7d7;font:700 14px/1.2 system-ui;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.35)">RUNNING BUILD 20260320-v18-box-occlusion</div>
-  <div style="position:fixed;top:8px;left:12px;z-index:99999;padding:10px 14px;border:2px solid #70b7ff;background:#0d1a2a;color:#d8ecff;font:700 14px/1.2 system-ui;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.35)">ENTRY: START_V18_ONLY.html</div>
+<body data-editor-step="image">
+<script src="dist/bundles/editor-1.bundle.js?v=20260806-relative-registration-unbounded-v7"></script>
+<header class="workflowTopbar proAppTopbar">
+<div class="workflowBrand proAppIdentity">
+<div aria-hidden="true" class="proAppMark"><span></span><span></span><span></span></div>
+<div>
+<h1>统一素材编辑器</h1>
+<div class="workflowSubtitle" id="pixelDocumentSummary">32 × 32 px · 方向 0 · 1 个图层</div>
+</div>
+</div>
+<nav aria-label="素材制作流程" class="workflowStepTabs proSegmentedControl">
+<button class="workflowStepTab activeStepTab" data-step="image" id="editorStepImage" type="button"><span>1</span><strong>编辑图片</strong></button>
+<button class="workflowStepTab" data-step="voxel" id="editorStepVoxel" type="button"><span>2</span><strong>编辑体素</strong></button>
+<button class="workflowStepTab" data-step="behavior" id="editorStepBehavior" type="button"><span>3</span><strong>编辑行为</strong></button>
+<button class="workflowStepTab" data-step="save" id="editorStepSave" type="button"><span>4</span><strong>导出</strong></button>
+</nav>
+<div class="workflowBuild proAppState"><span aria-hidden="true" class="saveStateLamp"></span><strong>素材工程</strong><small id="pixelTopState">就绪</small></div>
+</header>
+<section class="materialStateBar" id="materialStateBar" aria-label="素材状态">
+  <div class="materialStateIdentity"><strong>状态</strong><span id="materialStateSummary">1 个状态 · 当前：状态 0</span></div>
+  <div class="materialStateTabs" id="materialStateTabs" role="tablist" aria-label="素材状态列表"></div>
+  <div class="materialStateActions" role="toolbar" aria-label="状态操作">
+    <button id="materialStateAdd" type="button" title="新建空白图片状态；体素从当前状态复制">＋ 状态</button>
+    <button id="materialStateDuplicate" type="button" title="复制当前状态的图片、体素和对齐参数">复制状态</button>
+    <button id="materialStateRename" type="button" title="重命名当前状态">重命名</button>
+    <button id="materialStateMoveLeft" type="button" title="状态左移">←</button>
+    <button id="materialStateMoveRight" type="button" title="状态右移">→</button>
+    <button class="dangerQuietButton" id="materialStateDelete" type="button" title="删除当前状态">删除</button>
+  </div>
+  <div class="materialStateTransfer" aria-label="跨状态复制">
+    <button id="materialStateCopyLayer" type="button" title="复制当前图层">复制图层</button>
+    <select id="materialStateTarget" aria-label="目标状态"></select>
+    <select id="materialStateTargetFacing" aria-label="目标方向">
+      <option value="0">北</option><option value="1">东</option><option value="2">南</option><option value="3">西</option>
+    </select>
+    <button id="materialStatePasteLayer" type="button" title="把已复制图层粘贴到目标状态与方向">粘贴图层</button>
+    <button id="materialStateCopyFacing" type="button" title="把当前方向全部图层复制到目标状态与方向">复制本方向</button>
+  </div>
+</section>
+<div class="editorLayout unifiedDesktopEditor">
+<aside class="editorSidebar legacyCompatibilitySurface" hidden aria-hidden="true">
+<section class="sidebarPage" data-step="image" id="editorPageImage"></section>
+<section class="sidebarPage isHiddenStep" data-step="voxel" id="editorPageVoxel"></section>
+<section class="sidebarPage isHiddenStep" data-step="behavior" id="editorPageBehavior"></section>
+<section class="sidebarPage isHiddenStep" data-step="save" id="editorPageSave"></section>
+</aside>
+<main class="editorMain unifiedWorkspaceMain">
+<section class="imageArtworkWorkspace proImageEditor flatImageEditor" id="imageArtworkWorkspace">
+<div aria-label="图片编辑命令" class="imageToolbar proToolbar" role="toolbar">
+<div class="toolCluster fileCommandCluster">
+<button class="toolbarButton" id="pixelNewDocument" title="新建空白图片" type="button"><span aria-hidden="true" class="toolbarGlyph glyphDocument"></span><span>新建</span></button>
+<button class="toolbarButton primaryToolbarButton" id="pixelImportImage" title="导入普通图片并像素化" type="button"><span aria-hidden="true" class="toolbarGlyph glyphImage"></span><span>导入图片</span></button>
+<button class="toolbarButton" id="importHabboSwf" title="导入 Habbo SWF；图层会进入通用图层列表" type="button"><span aria-hidden="true" class="toolbarGlyph glyphPackage"></span><span>导入 SWF</span></button>
+<button class="toolbarButton" id="pixelOpenProject" title="打开 .hzhmat 或图片工程" type="button"><span aria-hidden="true" class="toolbarGlyph glyphFolder"></span><span>打开</span></button>
+<input accept="image/png,image/webp,image/jpeg,image/*" hidden="" id="pixelImportFile" type="file"/>
+<input accept=".swf,application/x-shockwave-flash" hidden="" id="habboSwfFile" type="file"/>
+<input accept=".json,.hzhmat,application/json,application/gzip" hidden="" id="pixelProjectFile" type="file"/>
+</div>
+<div aria-hidden="true" class="toolbarDivider"></div>
+<div class="toolCluster historyCluster">
+<button class="iconToolbarButton" id="pixelUndo" title="撤销 Ctrl+Z" type="button"><span aria-hidden="true" class="toolbarGlyph glyphUndo"></span></button>
+<button class="iconToolbarButton" id="pixelRedo" title="重做 Ctrl+Shift+Z" type="button"><span aria-hidden="true" class="toolbarGlyph glyphRedo"></span></button>
+</div>
+<div aria-label="四方向" class="directionCommandGroup">
+<div class="pixelFacingGrid proDirectionSegment" id="pixelFacingGrid">
+<button class="facingCard activeFacingCard" data-facing="0" title="方向 0 · 北" type="button"><canvas height="32" width="32"></canvas><span>北</span><kbd>0</kbd></button>
+<button class="facingCard" data-facing="1" title="方向 1 · 东" type="button"><canvas height="32" width="32"></canvas><span>东</span><kbd>1</kbd></button>
+<button class="facingCard" data-facing="2" title="方向 2 · 南" type="button"><canvas height="32" width="32"></canvas><span>南</span><kbd>2</kbd></button>
+<button class="facingCard" data-facing="3" title="方向 3 · 西" type="button"><canvas height="32" width="32"></canvas><span>西</span><kbd>3</kbd></button>
+</div>
+<div class="directionCopyControl">
+<select aria-label="复制到方向" id="pixelCopyFacingTarget"><option value="1">东</option><option value="2">南</option><option value="3">西</option></select>
+<button class="iconToolbarButton" id="pixelCopyFacing" title="复制当前方向" type="button"><span aria-hidden="true" class="toolbarGlyph glyphCopy"></span></button>
+</div>
+</div>
+<div class="toolbarSpacer"></div>
+<div class="toolCluster viewCluster">
+<button aria-pressed="true" class="iconToolbarButton toggled" id="pixelGridToggle" title="显示像素网格" type="button"><span aria-hidden="true" class="toolbarGlyph glyphGrid"></span></button>
+<button aria-pressed="true" class="iconToolbarButton toggled" id="pixelOriginToggle" title="显示素材注册点" type="button"><span aria-hidden="true" class="toolbarGlyph glyphTarget"></span></button>
+<button class="toolbarButton compactToolbarButton" id="pixelCenterView" title="适应画布" type="button"><span aria-hidden="true" class="toolbarGlyph glyphFit"></span><span>适应</span></button>
+<output id="pixelZoomLabel">100%</output>
+<button class="iconToolbarButton" id="pixelFocusMode" title="专注模式 Tab" type="button"><span aria-hidden="true" class="toolbarGlyph glyphFocus"></span></button>
+</div>
+</div>
+<div class="imageWorkspaceShell" data-left-dock="expanded" data-right-dock="expanded" id="pixelWorkspaceShell">
+<aside aria-label="绘图工具" class="imageToolDock proDock" id="pixelToolDock">
+<div class="dockHeader"><strong>工具</strong><button class="dockCollapseButton" id="pixelToggleLeftDock" title="收起工具栏" type="button"><span aria-hidden="true">◀</span></button></div>
+<div class="toolButtonStack">
+<button class="pixelTool activeTool" data-pixel-tool="pencil" title="铅笔 B" type="button"><span aria-hidden="true" class="toolGlyph toolPencil"></span><span class="toolLabel">铅笔</span><kbd>B</kbd></button>
+<button class="pixelTool" data-pixel-tool="eraser" title="橡皮 E" type="button"><span aria-hidden="true" class="toolGlyph toolEraser"></span><span class="toolLabel">橡皮</span><kbd>E</kbd></button>
+<button class="pixelTool" data-pixel-tool="fill" title="填充 G" type="button"><span aria-hidden="true" class="toolGlyph toolFill"></span><span class="toolLabel">填充</span><kbd>G</kbd></button>
+<button class="pixelTool" data-pixel-tool="picker" title="取色 I" type="button"><span aria-hidden="true" class="toolGlyph toolPicker"></span><span class="toolLabel">取色</span><kbd>I</kbd></button>
+<button class="pixelTool" data-pixel-tool="line" title="直线 L" type="button"><span aria-hidden="true" class="toolGlyph toolLine"></span><span class="toolLabel">直线</span><kbd>L</kbd></button>
+<button class="pixelTool" data-pixel-tool="rect" title="矩形 R" type="button"><span aria-hidden="true" class="toolGlyph toolRect"></span><span class="toolLabel">矩形</span><kbd>R</kbd></button>
+<button class="pixelTool" data-pixel-tool="move" title="移动当前图层 M" type="button"><span aria-hidden="true" class="toolGlyph toolMove"></span><span class="toolLabel">移动图层</span><kbd>M</kbd></button>
+</div>
+<div class="dockDivider"></div>
+<div class="toolOptionPanel">
+<div class="toolOptionTitle" id="pixelActiveToolName">铅笔</div>
+<div class="toolOptionHint" id="pixelActiveToolHint">逐像素绘制；右键使用副色。</div>
+<div class="dockColorPair" title="主色与副色"><span id="pixelDockPrimary"></span><span id="pixelDockSecondary"></span></div>
+</div>
+</aside>
+<button class="dockEdgeHandle leftEdgeHandle" id="pixelRestoreLeftDock" title="显示工具栏" type="button">▶</button>
+<section class="pixelCanvasPanel proCanvasPanel">
+<div aria-hidden="true" class="canvasRuler horizontalRuler"></div>
+<div class="pixelCanvasViewport" id="pixelCanvasViewport"><canvas height="720" id="pixelArtCanvas" width="900"></canvas></div>
+<div class="pixelStatusBar proStatusBar"><span id="pixelCursorStatus">像素：—</span><span id="pixelCanvasStatus">32 × 32 px</span><span id="pixelSourceSummary">来源：空白素材</span><span>左键主色 · 右键副色 · Space 平移</span></div>
+</section>
+<button class="dockEdgeHandle rightEdgeHandle" id="pixelRestoreRightDock" title="显示检查器" type="button">◀</button>
+<aside aria-label="图层、颜色和属性" class="imageInspector proDock" id="pixelInspector">
+<div class="dockHeader inspectorDockHeader">
+<div class="inspectorTabs proMiniSegment" role="tablist">
+<button aria-selected="true" class="activeInspectorTab" data-inspector-tab="layers" role="tab" type="button">图层</button>
+<button aria-selected="false" data-inspector-tab="colors" role="tab" type="button">颜色</button>
+<button aria-selected="false" data-inspector-tab="properties" role="tab" type="button">属性</button>
+</div>
+<button class="dockCollapseButton" id="pixelToggleRightDock" title="收起检查器" type="button"><span aria-hidden="true">▶</span></button>
+</div>
+<section class="inspectorTabPanel activeInspectorPanel" data-inspector-panel="layers" role="tabpanel">
+<div class="layerActions proIconStrip">
+<button id="pixelAddLayer" title="新建图层" type="button">＋</button>
+<button id="pixelDuplicateLayer" title="复制图层" type="button"><span aria-hidden="true" class="toolbarGlyph glyphCopy"></span></button>
+<button id="pixelLayerUp" title="图层上移" type="button">↑</button>
+<button id="pixelLayerDown" title="图层下移" type="button">↓</button>
+<button class="dangerQuietButton" id="pixelDeleteLayer" title="删除图层" type="button">⌫</button>
+<span class="layerCountBadge"><span id="pixelLayerCount">1</span> 层</span>
+</div>
+<div class="pixelLayerList" id="pixelLayerList"></div>
+<div class="inspectorForm compactInspectorForm">
+<label>名称<input id="pixelLayerName" type="text" value="图层 1"/></label>
+<label>不透明度 <output id="pixelLayerOpacityLabel">100%</output><input id="pixelLayerOpacity" max="100" min="0" type="range" value="100"/></label>
+</div>
+</section>
+<section class="inspectorTabPanel" data-inspector-panel="colors" role="tabpanel">
+<div class="colorWellPanel">
+<div class="colorEditorRow"><input aria-label="主色" id="pixelPrimaryColor" type="color" value="#ffffff"/><div class="colorSwatch" id="pixelPrimarySwatch"></div><button id="pixelSwapColors" title="交换主色与副色" type="button">⇄</button><input aria-label="副色" id="pixelSecondaryColor" type="color" value="#000000"/></div>
+<div class="colorReadout"><strong id="pixelColorHex">#FFFFFF</strong><span>RGBA</span></div>
+</div>
+<label class="rangeField">主色透明度 <output id="pixelAlphaLabel">255</output><input id="pixelAlpha" max="255" min="0" type="range" value="255"/></label>
+<div class="panelSubheading">素材调色板</div>
+<div class="pixelPalette" id="pixelPalette"></div>
+</section>
+<section class="inspectorTabPanel" data-inspector-panel="properties" role="tabpanel">
+<div class="inspectorSection">
+<div class="panelSubheading">图像</div>
+<div class="twoCol"><label>宽度<input id="pixelCanvasWidth" max="512" min="1" type="number" value="32"/></label><label>高度<input id="pixelCanvasHeight" max="512" min="1" type="number" value="32"/></label></div>
+<label>颜色数量<select id="pixelPaletteLimit"><option value="0">不限制</option><option value="8">8 色</option><option value="16">16 色</option><option selected="" value="32">32 色</option><option value="64">64 色</option><option value="128">128 色</option></select></label>
+<div class="rowButtons rowButtons2"><button class="primaryAction" id="pixelResizeDocument" type="button">调整分辨率</button><button id="pixelReimportImage" type="button">重新导入</button></div>
+</div>
+<details class="proDisclosure" open="">
+<summary>显示</summary>
+<label class="compactCheck"><input checked="" id="pixelPropertyShowGrid" type="checkbox"/>像素网格</label>
+<label class="compactCheck"><input checked="" id="pixelPropertyShowOrigin" type="checkbox"/>素材注册点</label>
+</details>
+<details class="proDisclosure">
+<summary>导入来源</summary>
+<div class="sourceMetadata" id="pixelSourceMetadata">当前素材尚未从外部文件导入。</div>
+</details>
+<details class="proDisclosure">
+<summary>快捷键</summary>
+<div class="shortcutGrid"><span>工具</span><kbd>B E G I L R M</kbd><span>撤销</span><kbd>Ctrl Z</kbd><span>专注模式</span><kbd>Tab</kbd><span>平移</span><kbd>Space</kbd></div>
+</details>
+</section>
+</aside>
+</div>
+</section>
 
-  
-  
-  
-  
-    <script src="dist/bundles/editor-1.bundle.js"></script>
+<section class="voxelWorkspace flatVoxelEditor" id="voxelWorkspace" aria-label="体素与图片对齐编辑器">
+  <div class="voxelToolbar flatWorkspaceToolbar" role="toolbar" aria-label="体素编辑命令">
+    <div class="flatToolGroup">
+      <button class="flatIconTextButton" id="newPrefab" type="button" title="新建空 Prefab">新建</button>
+      <button class="flatIconButton" id="loadSampleStair" type="button" title="载入阶梯示例">阶</button>
+      <button class="flatIconButton" id="loadSampleT" type="button" title="载入 T 形示例">T</button>
+    </div>
+    <div class="flatToolbarDivider"></div>
+    <div class="flatToolGroup voxelModeSegment" aria-label="编辑模式">
+      <button class="activeMode" id="voxelEditMode" type="button">编辑体素</button>
+      <button id="voxelAlignImageMode" type="button">对齐图片</button>
+    </div>
+    <div class="flatToolbarDivider"></div>
+    <output class="voxelActiveStateLabel" id="voxelActiveStateLabel">当前状态：状态 0</output>
+    <div class="flatToolbarDivider"></div>
+    <div class="voxelFacingControl" id="voxelFacingControl" aria-label="四方向对齐检查">
+      <span class="voxelFacingLabel">观察方向</span>
+      <div class="voxelFacingSegment" role="group" aria-label="选择 voxel 观察方向">
+        <button class="activeVoxelFacing" data-voxel-facing="0" type="button" title="北方向 · Alt+0">北</button>
+        <button data-voxel-facing="1" type="button" title="东方向 · Alt+1">东</button>
+        <button data-voxel-facing="2" type="button" title="南方向 · Alt+2">南</button>
+        <button data-voxel-facing="3" type="button" title="西方向 · Alt+3">西</button>
+      </div>
+      <output id="voxelFacingStatus">北 · 方向 0</output>
+    </div>
+    <div class="flatToolbarDivider"></div>
+    <div class="flatToolGroup layerToolbarGroup">
+      <button class="flatIconButton" id="layerDown" type="button" title="下降一层">−</button>
+      <label class="inlineNumberField">层 <input id="currentLayer" min="0" step="1" type="number" value="0"/></label>
+      <button class="flatIconButton" id="layerUp" type="button" title="上升一层">＋</button>
+      <button class="flatQuietButton" id="clearLayer" type="button">清空当前层</button>
+    </div>
+    <div class="flatToolbarSpacer"></div>
+    <div class="flatToolGroup">
+      <button class="flatIconButton toggled" id="voxelShowImageToggle" type="button" title="显示图片">图</button>
+      <button class="flatIconButton" id="voxelFitView" type="button" title="适应视图">适应</button>
+    </div>
+  </div>
 
-  <div class="editorLayout">
-    <aside class="editorSidebar">
-      <div class="sidebarTop">
-        <h1>RUN_ME_V18｜物品编辑器 v18（box occlusion 排序修复）</h1>
-        <div class="buildBadge">BUILD: 20260320-v18-box-occlusion</div>
-        <p class="lead">左侧改成按工作流切换的三步页签：<strong>编辑图片</strong>、<strong>编辑 voxel</strong>、<strong>保存相关</strong>。一次只看当前步骤，右侧仍保持统一主编辑视图；图片和 voxel 继续共用同一个 prefab 数据，不改主程序协议。</p>
+  <div class="voxelWorkspaceShell" data-left-dock="expanded" data-right-dock="expanded" id="voxelWorkspaceShell">
+    <aside class="voxelToolDock flatDock" id="voxelToolDock" aria-label="体素工具">
+      <div class="flatDockHeader"><strong>工具</strong><button class="flatDockToggle" id="voxelToggleLeftDock" type="button" title="收起工具栏">◀</button></div>
+      <div class="voxelToolStack">
+        <button class="voxelToolButton activeTool" id="toolPaint" type="button" title="单格选区 1"><span class="voxelToolIcon">•</span><span>单格</span><kbd>1</kbd></button>
+        <button class="voxelToolButton" id="toolErase" type="button" title="清除选区 2"><span class="voxelToolIcon">⌫</span><span>清除</span><kbd>2</kbd></button>
+        <button class="voxelToolButton" id="toolRect" type="button" title="矩形选区 3"><span class="voxelToolIcon">▭</span><span>矩形</span><kbd>3</kbd></button>
+        <button class="voxelToolButton" id="toolVolume" type="button" title="体积选区 4"><span class="voxelToolIcon">▱</span><span>体积</span><kbd>4</kbd></button>
+      </div>
+      <div class="flatDockDivider"></div>
+      <div class="voxelActionStack">
+        <button class="primaryFlatButton" id="modeBuild" type="button">填充选区</button>
+        <button class="flatQuietButton" id="modeFocus" type="button">删除选区</button>
+        <button class="flatQuietButton" id="clearSelection" type="button">清空选区</button>
+      </div>
+      <div class="flatDockDivider"></div>
+      <div class="compactDockStatus" id="toolStatusLine">当前工具：单格选区</div>
+      <div class="compactDockStatus" id="selectionSummary">当前选区：无</div>
+      <button class="dangerFlatButton" id="clearAll" type="button">清空全部体素</button>
+    </aside>
+    <button class="flatEdgeHandle left" id="voxelRestoreLeftDock" type="button" title="显示工具栏">▶</button>
+
+    <section class="voxelDualViewport" id="voxelDualViewport">
+      <article class="voxelViewPane topdownVoxelPane" id="voxelGridCard">
+        <header class="voxelPaneHeader"><div><strong>俯视层编辑</strong><span id="voxelTopdownFacingHint">北向俯视 · 精确修改当前高度层</span></div><output id="gridSummary"></output></header>
+        <div class="voxelCanvasStage topdownStage"><canvas height="620" id="gridCanvas" width="720"></canvas></div>
+        <footer class="voxelPaneFooter">左键切换体素 · 右键删除 · 当前层使用蓝色标识</footer>
+      </article>
+      <div class="voxelSplitHandle" id="voxelSplitHandle" role="separator" aria-orientation="vertical" aria-label="调整双视图宽度"></div>
+      <article class="voxelViewPane compositeVoxelPane" id="voxelPreviewCard">
+        <header class="voxelPaneHeader"><div><strong>等距组合预览</strong><span id="voxelPreviewFacingHint">北向图片、锚点与碰撞体共同显示</span></div><output id="previewSummary"></output></header>
+        <div class="voxelCanvasStage compositeStage"><canvas height="720" id="previewCanvas" width="980"></canvas></div>
+        <footer class="voxelPaneFooter" id="voxelInteractionHint">编辑体素模式：在等距视图中建立选区。切换“对齐图片”后可直接拖动图片。</footer>
+      </article>
+    </section>
+
+    <button class="flatEdgeHandle right" id="voxelRestoreRightDock" type="button" title="显示检查器">◀</button>
+    <aside class="voxelInspector flatDock" id="voxelInspector" aria-label="体素检查器">
+      <div class="flatDockHeader inspectorHeader">
+        <div class="flatInspectorTabs" role="tablist">
+          <button class="activeInspectorTab" data-voxel-tab="shape" type="button">形体</button>
+          <button data-voxel-tab="alignment" type="button">对齐</button>
+          <button data-voxel-tab="display" type="button">显示</button>
+        </div>
+        <button class="flatDockToggle" id="voxelToggleRightDock" type="button" title="收起检查器">▶</button>
       </div>
 
-      <nav class="sidebarStepTabs" aria-label="编辑器步骤">
-        <button id="editorStepImage" class="sidebarStepTab activeStepTab" data-step="image" type="button">1. 编辑图片</button>
-        <button id="editorStepVoxel" class="sidebarStepTab" data-step="voxel" type="button">2. 编辑 voxel</button>
-        <button id="editorStepSave" class="sidebarStepTab" data-step="save" type="button">3. 保存相关</button>
-      </nav>
-
-      <section id="editorPageImage" class="sidebarSection sidebarPage sidebarSectionImage" data-step="image">
-        <div class="sidebarSectionHeader">
-          <div>
-            <div class="sectionIndex">1. 编辑图片</div>
-            <h2>Sprite 导入、对齐与显示</h2>
+      <section class="voxelInspectorPanel activeVoxelInspectorPanel" data-voxel-panel="shape">
+        <div class="flatInspectorSection">
+          <h3>锚点</h3>
+          <div class="threeFieldGrid">
+            <label>X<input id="anchorX" step="1" type="number" value="0"/></label>
+            <label>Y<input id="anchorY" step="1" type="number" value="0"/></label>
+            <label>Z<input id="anchorZ" step="1" type="number" value="0"/></label>
           </div>
-          <div class="sectionHint">先把图片对到 footprint，再微调上下位置</div>
         </div>
-        <div class="sidebarSectionBody">
-          <div class="group compactGroup">
-            <h3>显示模式 / 图片文件</h3>
-            <label>renderMode
-              <select id="renderMode">
-                <option value="voxel">voxel（只显示体素）</option>
-                <option value="sprite_proxy">sprite_proxy（显示图片，体素只作代理）</option>
-                <option value="hybrid">hybrid（图片 + 体素）</option>
-              </select>
-            </label>
-            <div class="spritePanel">
-              <div class="spriteThumbWrap" id="spriteThumbWrap">
-                <div class="spriteThumbPlaceholder" id="spriteThumbPlaceholder">未导入图片</div>
-                <img id="spriteThumb" alt="sprite preview" style="display:none">
-              </div>
-              <div>
-                <div class="rowButtons rowButtons2">
-                  <button id="importSpriteImage">导入等距 PNG</button>
-                  <button id="clearSpriteImage">清除图片</button>
-                </div>
-                <input id="spriteImageFile" type="file" accept="image/png,image/webp,image/*" hidden>
-                <label>sprite 文件名 <input id="spriteImageName" type="text" value="" placeholder="未导入图片"></label>
-              </div>
-            </div>
-          </div>
-
-          <div class="group compactGroup">
-            <h3>图片变换</h3>
-            <div class="triple">
-              <label>sprite.scale <input id="spriteScale" type="number" min="0.1" max="8" step="0.05" value="1.0"></label>
-              <label>offsetX(px) <input id="spriteOffsetX" type="number" step="1" value="0"></label>
-              <label>offsetY(px) <input id="spriteOffsetY" type="number" step="1" value="0"></label>
-            </div>
-            <div id="interactionModeSummary" class="toolStatusLine">当前步骤会自动切换交互：进入“编辑图片”即为图片模式，进入“编辑 voxel”即为 voxel 模式。</div>
-            <label>编辑器图片透明度
-              <div class="rangeRow rangeRowWide">
-                <input id="spritePreviewOpacity" type="range" min="0.05" max="1" step="0.05" value="1">
-                <input id="spritePreviewOpacityNumber" type="number" min="5" max="100" step="5" value="100" class="opacityNumber">
-                <span id="spritePreviewOpacityValue" class="rangeValue">100%</span>
-              </div>
-            </label>
-            <div class="smallMuted">点击上方“编辑图片”步骤会自动进入图片模式：在右侧画布中直接拖拽图片；拖拽图片右下角的小手柄可缩放；按住 Ctrl + 滚轮也可缩放。这个透明度只用于编辑器里描 proxy，不影响主程序最终显示。</div>
-          </div>
-
-          <div class="group compactGroup spriteAssistGroup">
-            <h3>自动占地适配</h3>
-            <div class="triple">
-              <label>footprint.m（x 方向格数）<input id="footprintCols" type="number" min="1" max="64" step="1" value="1"></label>
-              <label>footprint.n（y 方向格数）<input id="footprintRows" type="number" min="1" max="64" step="1" value="1"></label>
-              <label>sample band(px)<input id="spriteSampleBand" type="number" min="1" max="128" step="1" value="1"></label>
-            </div>
-            <label>左右边界检测
-              <select id="spriteFitMode">
-                <option value="full">全图最左 / 最右</option>
-                <option value="sample-band">取鼠标指定高度的左右像素</option>
-              </select>
-            </label>
-            <div class="triple">
-              <label>sampleY(%)<input id="spriteSampleYPercent" type="number" min="0" max="100" step="1" value="100"></label>
-              <label>当前 anchor.x <input id="footprintAnchorReadX" type="text" value="0" readonly></label>
-              <label>当前 anchor.y <input id="footprintAnchorReadY" type="text" value="0" readonly></label>
-            </div>
-            <div class="rowButtons rowButtons3">
-              <button id="swapFootprint">交换 m / n</button>
-              <button id="applySelectionFootprint">用当前选区设占地</button>
-              <button id="autoFitSpriteFootprint">自动适配占地</button>
-            </div>
-            <div class="rowButtons rowButtons3">
-              <button id="pickSpriteSampleLine">在预览图上点取参考高度</button>
-              <button id="toggleSpriteFitGuides">显示辅助线</button>
-              <button id="toggleSpriteLockX">锁定水平移动</button>
-            </div>
-            <div id="spriteFitSummary" class="toolStatusLine">自动占地：1×1 · 检测=全图最左/最右 · 可切到图片模式后在预览图上点取参考高度</div>
-            <div class="smallMuted">逻辑：以 anchor(x,y,z) 作为最深处起始格，自动把图片左右参考线对齐到 m×n footprint 的左右外侧角竖线；默认只锁定水平拖拽，自由缩放仍保留。</div>
-          </div>
+        <div class="flatInspectorSection">
+          <h3>编辑网格</h3>
+          <div class="twoFieldGrid"><label>列数<input id="editorGridW" max="64" min="4" step="1" type="number" value="10"/></label><label>行数<input id="editorGridH" max="64" min="4" step="1" type="number" value="10"/></label></div>
+        </div>
+        <div class="flatInspectorSection">
+          <h3>占地</h3>
+          <div class="twoFieldGrid"><label>宽度<input id="footprintCols" min="1" max="64" type="number" value="1"/></label><label>深度<input id="footprintRows" min="1" max="64" type="number" value="1"/></label></div>
+          <div class="flatButtonRow"><button id="applySelectionFootprint" type="button">使用当前选区</button><button id="swapFootprint" type="button">交换宽深</button></div>
+          <div class="readoutGrid"><label>锚格 X<input id="footprintAnchorReadX" readonly type="text"/></label><label>锚格 Y<input id="footprintAnchorReadY" readonly type="text"/></label></div>
         </div>
       </section>
 
-      <section id="editorPageVoxel" class="sidebarSection sidebarPage sidebarSectionVoxel isHiddenStep" data-step="voxel">
-        <div class="sidebarSectionHeader">
-          <div>
-            <div class="sectionIndex">2. 编辑 voxel</div>
-            <h2>网格、选区、层级与占地</h2>
-          </div>
-          <div class="sectionHint">图片对齐依赖这里的 anchor / 选区 / footprint</div>
+      <section class="voxelInspectorPanel" data-voxel-panel="alignment">
+        <div class="flatInspectorSection alignmentIntro">
+          <h3>图片与 voxel 对齐</h3>
+          <p>先在顶部选择北、东、南或西。voxel 会按观察方向旋转，并自动切换该方向的图片；每个方向可分别拖动和缩放。</p>
+          <div class="voxelFacingInspectorSummary" id="voxelFacingInspectorSummary">当前：北 · 使用北方向图片 · 对齐参数独立保存</div>
+          <div id="interactionModeSummary"></div>
         </div>
-        <div class="sidebarSectionBody">
-          <div class="group compactGroup">
-            <h3>锚点 / 基准层 / 预览尺度</h3>
-            <div class="triple">
-              <label>anchor.x <input id="anchorX" type="number" step="1" value="0"></label>
-              <label>anchor.y <input id="anchorY" type="number" step="1" value="0"></label>
-              <label>anchor.z <input id="anchorZ" type="number" step="1" value="0"></label>
-            </div>
-            <div class="rowButtons rowButtons3">
-              <button id="layerDown">下降一层</button>
-              <button id="layerUp">上升一层</button>
-              <button id="clearLayer">清空当前层</button>
-            </div>
-            <label>当前基准层 L（最底层固定为 0）<input id="currentLayer" type="number" min="0" step="1" value="0"></label>
-            <div class="triple">
-              <label>网格列数 <input id="editorGridW" type="number" min="4" max="64" step="1" value="10"></label>
-              <label>网格行数 <input id="editorGridH" type="number" min="4" max="64" step="1" value="10"></label>
-              <label>预览缩放 <input id="previewScale" type="number" min="0.5" max="2.5" step="0.1" value="1.0"></label>
-            </div>
+        <div class="spriteMiniPreview"><div id="spriteThumbWrap"><div id="spriteThumbPlaceholder">尚未导入图片</div><img alt="当前合成图片" id="spriteThumb" style="display:none"/></div><div><strong id="spriteImageNameDisplay">当前图片</strong><small id="spriteFacingTransformHint">当前方向使用独立对齐参数</small></div></div>
+        <input id="spriteImageName" type="hidden"/><input accept="image/*" hidden id="spriteImageFile" type="file"/>
+        <button hidden id="importSpriteImage" type="button"></button><button hidden id="clearSpriteImage" type="button"></button>
+        <div class="flatInspectorSection">
+          <h3>变换</h3>
+          <label>使用图片方向<select id="spriteSourceFacing"><option value="0">北 · 方向 0</option><option value="1">东 · 方向 1</option><option value="2">南 · 方向 2</option><option value="3">西 · 方向 3</option></select></label>
+          <label>缩放<input id="spriteScale" min="0.1" max="8" step="0.05" type="number" value="1"/></label>
+          <div class="twoFieldGrid"><label>水平偏移<input id="spriteOffsetX" step="1" type="number" value="0"/></label><label>垂直偏移<input id="spriteOffsetY" step="1" type="number" value="0"/></label></div>
+          <div class="spriteMirrorControls" role="group" aria-label="当前方向图片镜像">
+            <label class="flatCheckButton"><input id="spriteFlipX" type="checkbox"/><span>水平镜像</span></label>
+            <label class="flatCheckButton"><input id="spriteFlipY" type="checkbox"/><span>垂直镜像</span></label>
           </div>
-
-          <div class="group compactGroup">
-            <h3>右侧选区工具</h3>
-            <div class="rowButtons rowButtons4">
-              <button id="toolPaint">1 单格选区</button>
-              <button id="toolErase">2 清除选区</button>
-              <button id="toolRect">3 矩形选区</button>
-              <button id="toolVolume">4 体积选区</button>
-            </div>
-            <div id="toolStatusLine" class="toolStatusLine">当前工具：单格选区</div>
-            <div id="selectionSummary" class="selectionSummary">当前选区：无</div>
-            <div class="rowButtons rowButtons3">
-              <button id="modeBuild">填充选区</button>
-              <button id="modeFocus">删除选区</button>
-              <button id="clearSelection">清空选区</button>
-            </div>
-            <ul class="smallList compactList">
-              <li>右侧滚轮：切换当前基准层 <strong>L</strong>；图片模式下按住 <strong>Ctrl</strong> 再滚轮可缩放图片。</li>
-              <li>显示规则：<code>z = L</code> 蓝色高亮，<code>z &gt; L</code> 正常颜色，<code>z &lt; L</code> 灰色半透明仅参考；矩形/体积工具在点下第一个起点后才会进入实时预览。</li>
-              <li>单格选区：可选第 L 层空格，或选择已有 voxel 的顶面（只限 <code>z &gt;= L</code>）。</li>
-              <li>矩形选区：在第 L 层选一个二维矩形。</li>
-              <li>体积选区：先选底面矩形，再上下移动鼠标定高度，最后点一下或按 Enter 确认选区。</li>
-              <li>右侧只负责“选区”，真正生成/删除由左侧按钮执行；Esc 清空当前选区流程。</li>
-            </ul>
-          </div>
-
-          <div class="group compactGroup">
-            <h3>voxel 内容操作</h3>
-            <div class="rowButtons rowButtons2">
-              <button id="newPrefab">新建空 Prefab</button>
-              <button id="clearAll">清空全部体素</button>
-            </div>
-            <div class="rowButtons rowButtons2">
-              <button id="loadSampleStair">载入阶梯示例</button>
-              <button id="loadSampleT">载入 T 形示例</button>
-            </div>
-          </div>
+          <label>预览透明度 <output id="spritePreviewOpacityValue">100%</output><input id="spritePreviewOpacity" max="1" min="0.05" step="0.05" type="range" value="1"/></label>
+          <input id="spritePreviewOpacityNumber" min="5" max="100" step="1" type="number" value="100"/>
+          <div class="flatButtonRow"><button id="autoFitSpriteFootprint" type="button">自动适配占地</button><button id="resetFacingImageTransform" type="button">重置当前方向</button></div>
+          <div class="flatButtonRow"><button id="copyFacingImageTransform" type="button">复制当前变换</button><button id="pasteFacingImageTransform" type="button">粘贴到当前方向</button></div>
+          <div class="flatButtonRow"><button id="toggleSpriteLockX" type="button">锁定水平：关</button></div>
         </div>
+        <details class="flatDisclosure">
+          <summary>高级取样</summary>
+          <label>取样带宽<input id="spriteSampleBand" min="1" max="128" type="number" value="1"/></label>
+          <label>拟合方式<select id="spriteFitMode"><option value="full">完整图像</option><option value="sample-band">取样带</option></select></label>
+          <label>取样高度<input id="spriteSampleYPercent" min="0" max="100" type="number" value="100"/></label>
+          <div class="flatButtonRow"><button id="pickSpriteSampleLine" type="button">在图片上取样</button><button id="toggleSpriteFitGuides" type="button">显示辅助线</button></div>
+          <div id="spriteFitSummary"></div>
+        </details>
       </section>
 
-      <section id="editorPageSave" class="sidebarSection sidebarPage sidebarSectionSave isHiddenStep" data-step="save">
-        <div class="sidebarSectionHeader">
-          <div>
-            <div class="sectionIndex">3. 保存相关</div>
-            <h2>Prefab 信息、导入导出与状态</h2>
-          </div>
-          <div class="sectionHint">整理名字、保存 JSON、查看状态和日志</div>
-        </div>
-        <div class="sidebarSectionBody">
-          <div class="group compactGroup">
-            <h3>Prefab 基本信息</h3>
-            <label>ID <input id="prefabId" type="text" value="custom_prefab_01"></label>
-            <label>名称 <input id="prefabName" type="text" value="Custom Prefab"></label>
-            <label>类型 kind <input id="prefabKind" type="text" value="custom"></label>
-            <label>素材文件名 <input id="prefabAsset" type="text" value=""></label>
-            <label>基础颜色 <input id="prefabBase" type="color" value="#c7b0df"></label>
-          </div>
-
-          <div class="group compactGroup">
-            <h3>导入 / 导出</h3>
-            <div class="rowButtons rowButtons2">
-              <button id="saveLibrary">保存到 assets/prefabs</button>
-              <button id="downloadJson">下载 JSON</button>
-            </div>
-            <div class="rowButtons rowButtons2">
-              <button id="importJson">导入 JSON</button>
-              <button id="openMain">打开主程序</button>
-            </div>
-            <div class="rowButtons rowButtons2">
-              <button id="exportEditorLogs">导出编辑器日志</button>
-              <button id="clearEditorLogs">清空编辑器日志</button>
-            </div>
-            <input id="importFile" type="file" accept=".json,application/json" hidden>
-          </div>
-
-          <div class="group compactGroup">
-            <h3>状态</h3>
-            <div id="modeSummary" class="modeSummary">build=20260320-v18-box-occlusion · 单图 sprite 导入 + voxel proxy 保存</div>
-            <div id="editorStatus" class="statusBox">就绪</div>
-            <textarea id="editorLogPreview" class="logPreview" readonly></textarea>
-          </div>
+      <section class="voxelInspectorPanel" data-voxel-panel="display">
+        <div class="flatInspectorSection">
+          <h3>预览</h3>
+          <label>等距视图缩放<input id="previewScale" max="2.5" min="0.5" step="0.1" type="number" value="1"/></label>
+          <label>显示模式<select id="renderMode"><option value="voxel">仅 voxel</option><option value="sprite_proxy">图片 + voxel</option><option value="hybrid">混合预览</option></select></label>
+          <div class="flatCheckList"><label><input checked id="voxelInspectorShowImage" type="checkbox"/>显示图片</label></div>
         </div>
       </section>
     </aside>
+  </div>
+  <div class="voxelWorkspaceStatus"><span id="modeSummary">统一体素编辑器</span><span id="voxelFacingInline">方向：北</span><span id="voxelCountInline">体素：0</span><span>同一份 voxel · 四方向旋转检查 · 对齐参数按方向保存</span></div>
+</section>
 
-    <main class="editorMain">
-      <section class="canvasCard">
-        <div class="cardHeader">
-          <strong>局部 voxel 网格（当前层精修）</strong>
-          <span id="gridSummary"></span>
-        </div>
-        <canvas id="gridCanvas" width="560" height="560"></canvas>
-      </section>
+<section class="behaviorWorkspace" id="behaviorWorkspace" aria-label="物品行为与脚本编辑器">
+  <div class="behaviorToolbar" role="toolbar" aria-label="行为编辑命令">
+    <div class="behaviorToolbarTitle"><span class="behaviorEyebrow">步骤 3</span><strong>行为 / Behavior</strong><small id="behaviorPrefabIdentity">当前 Prefab</small></div>
+    <div class="behaviorToolbarActions">
+      <button id="behaviorFormatTemplate" type="button" title="插入一个基础 Lua 行为模板">插入模板</button>
+      <button id="behaviorSaveDraft" class="behaviorPrimaryButton" type="button" title="把当前行为同步到 Prefab 草稿 · Ctrl+S">保存行为</button>
+    </div>
+  </div>
+  <div class="behaviorShell">
+    <aside class="behaviorPanel behaviorApiPanel">
+      <header><div><strong>当前物品公开接口</strong><small>其他素材可以搜索并调用这些 Command</small></div></header>
+      <div class="behaviorPanelBody">
+        <section class="behaviorSection">
+          <div class="behaviorSectionTitle"><span>Commands</span><button id="behaviorAddCommand" type="button">＋</button></div>
+          <div id="behaviorCommandList" class="behaviorList"></div>
+        </section>
+        <section class="behaviorSection">
+          <div class="behaviorSectionTitle"><span>Events</span><button id="behaviorAddEvent" type="button">＋</button></div>
+          <div id="behaviorEventList" class="behaviorList"></div>
+        </section>
+        <section class="behaviorSection">
+          <label class="behaviorFieldLabel">Capabilities</label>
+          <input id="behaviorCapabilities" class="behaviorTextInput" type="text" placeholder="例如：Damageable, Flammable, Sleepable"/>
+          <small class="behaviorFieldHint">逗号分隔。这里先保存声明，运行时组件系统将在后续阶段实现。</small>
+        </section>
+      </div>
+    </aside>
 
-      <section class="canvasCard buildCard">
-        <div class="cardHeader">
-          <strong>主编辑视图（步骤页自动切换交互模式）</strong>
-          <span id="previewSummary"></span>
-        </div>
-        <canvas id="previewCanvas" width="980" height="720"></canvas>
-      </section>
+    <section class="behaviorCodePanel">
+      <header class="behaviorCodeHeader">
+        <div><strong>default.lua</strong><small>Prefab 自带行为代码</small></div>
+        <div class="behaviorCodeMeta"><span>Lua</span><span id="behaviorCursorStatus">Ln 1, Col 1</span></div>
+      </header>
+      <div class="behaviorEditorSurface">
+        <div class="behaviorLineNumbers" id="behaviorLineNumbers" aria-hidden="true">1</div>
+        <textarea id="behaviorScript" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Lua 行为脚本" placeholder="-- 在这里编写 Prefab 的局部行为。
+-- Ctrl+Space 打开补全；右侧搜索素材并点击公开接口可直接插入调用。"></textarea>
+        <div class="behaviorAutocomplete" id="behaviorAutocomplete" hidden></div>
+      </div>
+      <footer class="behaviorEditorStatus">
+        <span id="behaviorSyncStatus">已同步</span>
+        <span>Tab = 2 空格</span>
+        <span>Ctrl+Space = 补全</span>
+        <span>Ctrl+S = 保存行为</span>
+      </footer>
+    </section>
 
-      <section class="dataCard">
-        <div class="cardHeader">
-          <strong>当前 Prefab JSON</strong>
-          <span id="voxelCountText"></span>
-        </div>
-        <textarea id="jsonPreview" readonly></textarea>
+    <aside class="behaviorPanel behaviorLibraryPanel">
+      <header><div><strong>素材库 / API</strong><small>搜索其他 Prefab 暴露出来的接口</small></div><button id="behaviorRefreshLibrary" type="button" title="重新扫描 assets/prefabs">刷新</button></header>
+      <div class="behaviorLibrarySearchRow"><input id="behaviorLibrarySearch" type="search" placeholder="搜索素材名称或 ID…"/><kbd>⌘K</kbd></div>
+      <div id="behaviorLibraryStatus" class="behaviorLibraryStatus">尚未读取素材库</div>
+      <div id="behaviorLibraryResults" class="behaviorLibraryResults"></div>
+      <section class="behaviorTargetApi" id="behaviorTargetApi">
+        <header><div><strong id="behaviorTargetTitle">选择一个素材</strong><small id="behaviorTargetMeta">查看它公开的 Commands / Events</small></div></header>
+        <div id="behaviorTargetInterfaces" class="behaviorTargetInterfaces"><div class="behaviorEmptyState">搜索并选择素材后，其公开接口会显示在这里。</div></div>
       </section>
-    </main>
+      <section class="behaviorGameApi">
+        <header><div><strong>游戏公开 API</strong><small>点击即可插入调用模板</small></div></header>
+        <div id="behaviorGameApiList" class="behaviorTargetInterfaces"></div>
+      </section>
+    </aside>
   </div>
 
-  <script>window.__EXPECTED_BUILD='20260320-v18-box-occlusion';</script>
-  
-  
-  
-    <script src="dist/bundles/editor-2.bundle.js"></script>
+  <section class="behaviorTestWorld" id="behaviorTestWorld" aria-label="行为脚本测试世界">
+    <header class="behaviorTestHeader">
+      <div><strong>TestWorld · 主游戏实机测试</strong><small>这里直接嵌入 start.bat 的主场景。摆放、旋转、选择、碰撞、路径与人物移动全部走主游戏现有逻辑。</small></div>
+      <div class="behaviorTestHeaderActions">
+        <button id="behaviorTestSyncCurrent" type="button">同步当前素材</button>
+        <button id="behaviorTestReset" type="button">↻ 重置测试场景</button>
+      </div>
+    </header>
+    <div class="behaviorTestLibraryBar">
+      <div class="behaviorTestLibraryPathRow">
+        <input id="behaviorTestLibraryPath" type="text" placeholder="独立素材库文件夹，例如 E:\HZH-Asset-Library"/>
+        <button id="behaviorTestConnectLibrary" type="button">连接素材库</button>
+        <button id="behaviorTestChooseFolder" type="button">浏览器读取文件夹</button>
+        <input id="behaviorTestFolderInput" type="file" accept=".hzhmat,.json" multiple webkitdirectory directory hidden/>
+      </div>
+      <small id="behaviorTestLibraryStatus">未配置外部素材库</small>
+      <input id="behaviorTestAssetSearch" class="behaviorTextInput" type="search" placeholder="搜索素材库；点击结果会载入下方主编辑器并切换到“建立物件”模式…"/>
+      <div id="behaviorTestAssetList" class="behaviorTestAssetList behaviorTestAssetStrip"></div>
+    </div>
+    <div class="behaviorMainTestFrameWrap">
+      <iframe id="behaviorMainTestFrame" title="主游戏 TestWorld" src="index.html?embeddedBehaviorTest=1" loading="eager"></iframe>
+      <div class="behaviorMainTestFrameLoading" id="behaviorMainTestFrameLoading">正在载入主游戏运行环境…</div>
+    </div>
+    <div class="behaviorTestFooter">
+      <strong>TestWorld 日志</strong>
+      <span id="behaviorTestSelected">当前素材尚未同步</span>
+      <div id="behaviorTestConsole" class="behaviorTestConsole"></div>
+    </div>
+  </section>
+</section>
+
+<section class="saveWorkspace flatSaveWorkspace" id="saveWorkspace" aria-label="导出素材">
+  <div class="saveWorkspaceHeader"><div><span class="saveEyebrow">步骤 4</span><h2>检查并导出素材</h2><p>图片、图层、voxel、碰撞、对齐参数与 Behavior 会保存到同一个素材包。</p></div><div class="saveReadyBadge"><span></span><strong>可以导出</strong></div></div>
+  <div class="saveWorkspaceGrid">
+    <section class="savePanel metadataPanel">
+      <header><h3>素材信息</h3><p>用于资源库、搜索和运行时识别。</p></header>
+      <div class="saveFormGrid">
+        <label>ID<input id="prefabId" type="text" value="custom_prefab_01"/></label>
+        <label>名称<input id="prefabName" type="text" value="Custom Prefab"/></label>
+        <label>类型<input id="prefabKind" type="text" value="custom"/></label>
+        <label>素材文件名<input id="prefabAsset" type="text" value=""/></label>
+        <label>基础颜色<input id="prefabBase" type="color" value="#c7b0df"/></label>
+      </div>
+    </section>
+    <section class="savePanel reviewPanel">
+      <header><h3>内容检查</h3><p>导出前快速确认素材是否完整。</p></header>
+      <div class="saveReviewList">
+        <div><span class="reviewIcon">图</span><div><strong>四方向分层图片</strong><small id="saveArtworkSummary">等待图片数据</small></div></div>
+        <div><span class="reviewIcon">体</span><div><strong>碰撞与占地</strong><small id="voxelCountText">体素数：0</small></div></div>
+        <div><span class="reviewIcon">准</span><div><strong>图片对齐</strong><small id="saveAlignmentSummary">偏移 0, 0 · 缩放 1.00</small></div></div>
+        <div><span class="reviewIcon">码</span><div><strong>行为与公开接口</strong><small id="saveBehaviorSummary">Lua：0 行 · Commands：0</small></div></div>
+      </div>
+    </section>
+    <section class="savePanel primaryExportPanel">
+      <header><h3>统一素材</h3><p>推荐格式。图层像素先使用 RLE，再对整个素材包 gzip 压缩。</p></header>
+      <button class="largePrimaryExport" id="exportUnifiedMaterial" type="button"><strong>导出 .hzhmat</strong><span>完整保留四方向、图层、voxel、对齐与 Behavior</span></button>
+      <button class="secondaryExport" id="importUnifiedMaterial" type="button">导入已有 .hzhmat</button>
+      <input accept=".hzhmat,.json,application/gzip,application/json" hidden id="unifiedMaterialFile" type="file"/>
+      <div class="saveSummaryLine" id="unifiedExportSummary">统一素材包尚未导出。</div>
+    </section>
+    <section class="savePanel compatibilityPanel">
+      <header><h3>兼容与项目操作</h3><p>仅在兼容旧流程或直接写入项目时使用。</p></header>
+      <div class="saveActionGrid"><button id="saveLibrary" type="button">保存到 assets/prefabs</button><button id="downloadJson" type="button">下载 Prefab JSON</button><button id="importJson" type="button">导入 JSON</button><button id="openMain" type="button">打开主程序</button></div>
+      <input accept=".json,application/json" hidden id="importFile" type="file"/>
+    </section>
+  </div>
+  <details class="saveDiagnostics">
+    <summary>诊断与原始数据</summary>
+    <div class="saveDiagnosticsGrid"><div><div class="statusBox" id="editorStatus">就绪</div><div class="flatButtonRow"><button id="exportEditorLogs" type="button">导出日志</button><button id="clearEditorLogs" type="button">清空日志</button></div><textarea class="logPreview" id="editorLogPreview" readonly></textarea></div><div><textarea id="jsonPreview" readonly></textarea></div></div>
+  </details>
+</section>
+</main>
+</div>
+<script>window.__EXPECTED_BUILD='20260807-behavior-v1';</script>
+<script src="dist/bundles/editor-2.bundle.js?v=20260807-testworld-v1"></script>
+<script src="src/core/domain/pixel-art-core.js?v=20260807-material-states-v1"></script>
+<script src="src/core/domain/material-state-core.js?v=20260807-material-states-v1"></script>
+<script src="src/application/assets/pixel-art-workflow-controller.js?v=20260807-material-states-v1"></script>
+<script src="src/application/assets/material-state-workflow-controller.js?v=20260807-material-states-v1"></script>
+<script src="src/infrastructure/assets/unified-material-export.js?v=20260806-v2"></script>
+<script src="src/infrastructure/assets/emergent-asset-library-service.js?v=20260807-testworld-v1"></script>
+<script src="src/infrastructure/habbo-calibration/habbo-swf-calibration-runtime.js?v=20260806-v2"></script>
+<script src="src/presentation/editor/habbo-import-editor-feature.js?v=20260807-material-states-v1"></script>
+<script src="src/presentation/editor/pixel-art-editor.js?v=20260807-material-states-v1"></script>
+<script src="src/presentation/editor/voxel-workspace.js?v=20260807-material-states-v1"></script>
+<script src="src/presentation/editor/behavior-editor.js?v=20260807-testworld-v1"></script>
+<script src="src/presentation/editor/behavior-test-world.js?v=20260807-always-on-v3"></script>
 </body>
 </html>

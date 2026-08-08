@@ -5,22 +5,94 @@
   var prefabSpriteImageCache = new Map();
   var habboCompositeCache = new Map();
   var habboSpriteDrawDebugOnce = new Set();
+  var habboImageReadyRevision = 0;
+
+  function getHabboCurrentViewRotation() {
+    try {
+      if (typeof getSafeMainEditorViewRotation === 'function') {
+        var safe = getSafeMainEditorViewRotation(null);
+        if (safe && safe.viewRotation != null) return Number(safe.viewRotation) || 0;
+      }
+    } catch (_) {}
+    try {
+      var runtime = global.App && global.App.state && global.App.state.runtimeState;
+      if (runtime && runtime.editor && runtime.editor.visualRotation != null) return Number(runtime.editor.visualRotation) || 0;
+      if (runtime && runtime.editor && runtime.editor.rotation != null) return Number(runtime.editor.rotation) || 0;
+    } catch (_) {}
+    try { if (global.editor && global.editor.rotation != null) return Number(global.editor.rotation) || 0; } catch (_) {}
+    return 0;
+  }
+
+  function resolveHabboVisualFacing(worldRotation) {
+    var facingApi = getItemFacingCoreApi();
+    var viewRotation = getHabboCurrentViewRotation();
+    var visualFacing = facingApi && typeof facingApi.resolveViewRelativeFacing === 'function'
+      ? facingApi.resolveViewRelativeFacing(worldRotation, viewRotation)
+      : ((((Math.round(Number(worldRotation) || 0) - Math.round(Number(viewRotation) || 0)) % 4) + 4) % 4);
+    var snapshot = { version: 'habbo-view-relative-facing-v2', worldRotation: Number(worldRotation) || 0, viewRotation: viewRotation, visualFacing: visualFacing };
+    try { global.__HABBO_VIEW_FACING_LAST__ = snapshot; } catch (_) {}
+    return snapshot;
+  }
 
   function getHabboLayerConfigList(prefab, rotation) {
     if (!prefab || !prefab.habboLayerDirections) return null;
     var facingApi = getItemFacingCoreApi();
+    var visual = typeof resolveHabboVisualFacing === 'function'
+      ? resolveHabboVisualFacing(rotation)
+      : { worldRotation: Number(rotation) || 0, viewRotation: 0, visualFacing: Number(rotation) || 0 };
     var resolved = facingApi && typeof facingApi.resolveSpriteFacing === 'function'
-      ? facingApi.resolveSpriteFacing(prefab, rotation)
-      : { directionKey: rotKeyForSprite(rotation), mirrorX: false, strategy: 'single', availableKeys: [rotKeyForSprite(rotation)] };
+      ? facingApi.resolveSpriteFacing(prefab, visual.visualFacing)
+      : { directionKey: rotKeyForSprite(visual.visualFacing), mirrorX: false, strategy: 'single', availableKeys: [rotKeyForSprite(visual.visualFacing)] };
     var rawList = prefab.habboLayerDirections[resolved.directionKey] || prefab.habboLayerDirections['0'] || null;
+    var normalizedRotation = Number(rotKeyForSprite(rotation));
+    var normalizedVisualFacing = Number(rotKeyForSprite(visual.visualFacing));
+    var diagKey = String(prefab.id || 'unknown') + '|world=' + normalizedRotation + '|view=' + Number(visual.viewRotation || 0).toFixed(3) + '|visual=' + normalizedVisualFacing + '|' + String(resolved.directionKey) + '|' + String(!!resolved.mirrorX);
+    if (!habboSpriteDrawDebugOnce.has(diagKey)) {
+      habboSpriteDrawDebugOnce.add(diagKey);
+      if (typeof pushHabboDebug === 'function') {
+        var footprint = facingApi && typeof facingApi.getRotatedFootprint === 'function' ? facingApi.getRotatedFootprint(prefab, normalizedRotation) : null;
+        pushHabboDebug('habbo-facing:resolved', {
+          prefab: prefab.id || '',
+          rotation: normalizedRotation,
+          worldRotation: normalizedRotation,
+          viewRotation: visual.viewRotation,
+          visualFacing: normalizedVisualFacing,
+          strategy: resolved.strategy || '',
+          directionKey: String(resolved.directionKey),
+          sourceDirection: resolved.sourceDirection == null ? null : Number(resolved.sourceDirection),
+          sourceKind: resolved.sourceKind || '',
+          mirrorX: !!resolved.mirrorX,
+          availableKeys: resolved.availableKeys || [],
+          footprint: footprint,
+          layerCount: rawList ? rawList.length : 0,
+          sourceVisualDirections: prefab.habboMeta && prefab.habboMeta.sourceVisualDirections || [],
+          directionMap: prefab.habboMeta && prefab.habboMeta.directionMap || []
+        });
+      }
+    }
     if (!rawList) return null;
     return rawList.map(function (layer) {
       return Object.assign({}, layer, {
         flipX: !!layer.flipX !== !!resolved.mirrorX,
         __resolvedDirectionKey: resolved.directionKey,
-        __spriteStrategy: resolved.strategy
+        __resolvedSourceDirection: resolved.sourceDirection,
+        __resolvedMirrorX: !!resolved.mirrorX,
+        __spriteStrategy: resolved.strategy,
+        __worldRotation: normalizedRotation,
+        __viewRotation: visual.viewRotation,
+        __visualFacing: normalizedVisualFacing
       });
     });
+  }
+
+  function requestHabboVisualRefresh(reason) {
+    habboImageReadyRevision += 1;
+    habboCompositeCache.clear();
+    try { global.__HABBO_IMAGE_READY_REVISION__ = habboImageReadyRevision; } catch (_) {}
+    try {
+      if (typeof global.requestRender === 'function') global.requestRender(reason || 'habbo-image-ready');
+      else if (typeof global.render === 'function') global.requestAnimationFrame(function () { try { global.render(); } catch (_) {} });
+    } catch (_) {}
   }
 
   function getCachedImageFromDataUrl(key, dataUrl) {
@@ -28,6 +100,12 @@
     var cached = prefabSpriteImageCache.get(key);
     if (cached) return cached;
     var img = new Image();
+    try {
+      img.addEventListener('load', function () { requestHabboVisualRefresh('habbo-layer-image-load'); }, { once: true });
+      img.addEventListener('error', function () { requestHabboVisualRefresh('habbo-layer-image-error'); }, { once: true });
+    } catch (_) {
+      img.onload = function () { requestHabboVisualRefresh('habbo-layer-image-load'); };
+    }
     img.src = dataUrl;
     prefabSpriteImageCache.set(key, img);
     return img;
@@ -50,6 +128,7 @@
   }
 
   function habboCompositeCacheKey(prefab, rotation) {
+    var visual = resolveHabboVisualFacing(rotation);
     var sig = '';
     if (prefab && prefab.habboLayerDirections) {
       var keys = Object.keys(prefab.habboLayerDirections).sort();
@@ -59,7 +138,7 @@
         return k + ':' + arr.length + ':' + first;
       }).join('|');
     }
-    return String(prefab && prefab.id || 'unknown') + '|habbo-composite|' + rotKeyForSprite(rotation) + '|tileW=' + String(settings && settings.tileW || 64) + '|tileH=' + String(settings && settings.tileH || 32) + '|sig=' + sig;
+    return String(prefab && prefab.id || 'unknown') + '|habbo-composite|world=' + rotKeyForSprite(rotation) + '|visual=' + rotKeyForSprite(visual.visualFacing) + '|tileW=' + String(settings && settings.tileW || 64) + '|tileH=' + String(settings && settings.tileH || 32) + '|sig=' + sig;
   }
 
   function getHabboPlacementCoreApiForRender() {
@@ -106,7 +185,20 @@
   }
 
   function getHabboRoomOrigin(prefab, origin, anchor, rotation) {
-    return requireHabboPlacementCoreForRender().getHabboRoomOrigin(prefab, origin, anchor, rotation, getHabboTileMetricsForRender(), iso, { floorBaselineOffset: 20 });
+    var result = requireHabboPlacementCoreForRender().getHabboRoomOrigin(prefab, origin, anchor, rotation, getHabboTileMetricsForRender(), iso, { floorBaselineOffset: 0 });
+    try {
+      global.__HABBO_SPRITE_VOXEL_ALIGNMENT_LAST__ = {
+        version: 'habbo-sprite-voxel-anchor-v4',
+        prefabId: prefab && prefab.id || null,
+        instanceOrigin: { x: Number(origin && origin.x || 0), y: Number(origin && origin.y || 0), z: Number(origin && origin.z || 0) },
+        rotation: Number(rotation || 0),
+        roomAnchorCells: result && result.roomAnchorCells || null,
+        worldAnchor: result && result.worldAnchor || null,
+        screenAnchor: result ? { x: result.x, y: result.y } : null,
+        floorBaselineOffset: 0
+      };
+    } catch (_) {}
+    return result;
   }
 
   function getHabboProxyVisualShift(prefab, rotation) {
@@ -139,6 +231,7 @@
 
   function buildHabboComposite(prefab, rotation) {
     if (!prefab || prefab.kind !== 'habbo_import') return null;
+    var visual = resolveHabboVisualFacing(rotation);
     var layers = getHabboLayerConfigList(prefab, rotation);
     if (!layers || !layers.length) return null;
     var sortedLayers = layers.slice().sort(function (a, b) {
@@ -152,7 +245,7 @@
     var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (var li = 0; li < sortedLayers.length; li++) {
       var layer = sortedLayers[li];
-      var cacheKey = prefab.id + '|layer|' + rotKeyForSprite(rotation) + '|' + String(layer.name || li);
+      var cacheKey = prefab.id + '|layer|visual=' + rotKeyForSprite(visual.visualFacing) + '|' + String(layer.name || li);
       var img = getHabboLayerDrawable(layer, cacheKey);
       if (!img) continue;
       var srcW = img.naturalWidth || img.videoWidth || img.width || 0;
@@ -249,7 +342,7 @@
     }
     pushHabboDebug('habbo-composite:built', { prefab: prefab.id, rotation: rotation, bbox: { x: minX, y: minY, w: width, h: height }, layers: layerSnapshots.map(function (l) { return { name: l.name, kind: l.kind, drawX: l.drawX, drawY: l.drawY, drawW: l.drawW, drawH: l.drawH, flipX: l.flipX, alpha: l.alpha, blend: l.blend, zOrderHint: l.zOrderHint }; }) });
     detailLog('callsite src/presentation/render/render.js::buildHabboComposite prefab=' + String(prefab.id || 'unknown') + ' rotation=' + String(rotation || 0) + ' bbox=(' + [minX, minY, width, height].join(',') + ') layers=' + String(layerSnapshots.length));
-    return { canvas: localCanvas, offsetPx: { x: minX, y: minY }, width: width, height: height, layers: layerSnapshots };
+    return { canvas: localCanvas, offsetPx: { x: minX, y: minY }, width: width, height: height, layers: layerSnapshots, worldRotation: Number(rotKeyForSprite(rotation)), viewRotation: visual.viewRotation, visualFacing: Number(rotKeyForSprite(visual.visualFacing)) };
   }
 
   function getHabboComposite(prefab, rotation) {
@@ -267,6 +360,7 @@
 
   var api = {
     getHabboLayerConfigList: getHabboLayerConfigList,
+    requestHabboVisualRefresh: requestHabboVisualRefresh,
     getCachedImageFromDataUrl: getCachedImageFromDataUrl,
     getHabboLayerDrawable: getHabboLayerDrawable,
     getHabboCanvasBlendMode: getHabboCanvasBlendMode,
@@ -287,6 +381,8 @@
     buildHabboComposite: buildHabboComposite,
     getHabboComposite: getHabboComposite,
     rotKeyForSprite: rotKeyForSprite,
+    getHabboCurrentViewRotation: getHabboCurrentViewRotation,
+    resolveHabboVisualFacing: resolveHabboVisualFacing,
   };
   global.__APP_PRESENTATION_HABBO_COMPOSITE_RENDERER__ = api;
   global.__HABBO_COMPOSITE_RENDERER__ = api;

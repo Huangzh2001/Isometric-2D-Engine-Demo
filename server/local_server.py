@@ -20,6 +20,7 @@ PREFAB_DIR = ROOT / 'assets' / 'prefabs'
 SCENE_DIR = ROOT / 'assets' / 'scenes'
 DEFAULT_SCENE_META = SCENE_DIR / '_default_scene.json'
 HABBO_ROOT_META = ROOT / 'config' / 'habbo_asset_root.json'
+ASSET_LIBRARY_ROOT_META = ROOT / 'config' / 'emergent_asset_library_root.json'
 DEFAULT_HABBO_ROOT_RAW = r'E:\\hzh\\Habbo\\habbofurni_models_classified'
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8765
 ROLE = str(sys.argv[2]) if len(sys.argv) > 2 else 'server'
@@ -38,6 +39,9 @@ P0_ROUTE_REGISTRY = {
     'GET': [
         '/api/health',
         '/api/prefabs/index',
+        '/api/asset-library/config',
+        '/api/asset-library/index',
+        '/api/asset-library/file',
         '/api/habbo/config',
         '/api/habbo/index',
         '/api/habbo/library/index',
@@ -51,6 +55,7 @@ P0_ROUTE_REGISTRY = {
     ],
     'POST': [
         '/api/prefabs/save',
+        '/api/asset-library/config',
         '/api/scenes/save',
         '/api/habbo/config',
         '/api/self-check/report',
@@ -263,6 +268,114 @@ def list_scene_files() -> list[dict]:
         items.append(summarize_scene_file(path, default_file))
     items.sort(key=lambda item: (not item.get('isDefault', False), -float(item.get('modifiedAt') or 0), str(item.get('file') or '')))
     return items
+
+
+
+def normalize_asset_library_root(value: str) -> Path:
+    raw = str(value or '').strip()
+    if not raw:
+        raise ValueError('empty asset library root')
+    path = Path(os.path.expanduser(raw))
+    if not path.is_absolute():
+        path = (ROOT / path).resolve()
+    else:
+        path = path.resolve()
+    return path
+
+
+def read_asset_library_root() -> Path | None:
+    try:
+        if not ASSET_LIBRARY_ROOT_META.exists():
+            return None
+        data = json.loads(ASSET_LIBRARY_ROOT_META.read_text(encoding='utf-8'))
+        raw = str(data.get('root') or '').strip()
+        return normalize_asset_library_root(raw) if raw else None
+    except Exception:
+        return None
+
+
+def describe_asset_library_root(root_path: Path | None = None) -> dict:
+    root_path = root_path if root_path is not None else read_asset_library_root()
+    configured = root_path is not None
+    exists = bool(root_path and root_path.exists() and root_path.is_dir())
+    return {
+        'configured': configured,
+        'root': str(root_path) if root_path else '',
+        'exists': exists,
+    }
+
+
+def write_asset_library_root(root_value: str) -> dict:
+    root_path = normalize_asset_library_root(root_value)
+    ASSET_LIBRARY_ROOT_META.parent.mkdir(parents=True, exist_ok=True)
+    ASSET_LIBRARY_ROOT_META.write_text(json.dumps({'root': str(root_path)}, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    return describe_asset_library_root(root_path)
+
+
+def _read_asset_library_metadata(path: Path) -> dict:
+    result = {'id': '', 'name': path.stem, 'kind': '', 'format': 'json' if path.suffix.lower() == '.json' else 'hzhmat', 'valid': False}
+    try:
+        raw = path.read_bytes()
+        if len(raw) >= 2 and raw[0:2] == b'\x1f\x8b':
+            import gzip
+            raw = gzip.decompress(raw)
+        data = json.loads(raw.decode('utf-8'))
+        prefab = data.get('prefab') if isinstance(data, dict) and isinstance(data.get('prefab'), dict) else data
+        if isinstance(prefab, dict) and str(prefab.get('id') or '').strip():
+            result['valid'] = True
+            result['id'] = str(prefab.get('id') or '')
+            result['name'] = str(prefab.get('name') or prefab.get('id') or result['name'])
+            result['kind'] = str(prefab.get('kind') or '')
+            behavior = prefab.get('behavior') if isinstance(prefab.get('behavior'), dict) else {}
+            public_api = behavior.get('publicApi') if isinstance(behavior.get('publicApi'), dict) else {}
+            result['commands'] = len(public_api.get('commands') or []) if isinstance(public_api.get('commands'), list) else 0
+            result['events'] = len(public_api.get('events') or []) if isinstance(public_api.get('events'), list) else 0
+        if isinstance(data, dict) and data.get('format'):
+            result['packageFormat'] = str(data.get('format') or '')
+    except Exception as exc:
+        result['parseError'] = str(exc)
+    return result
+
+
+def list_asset_library_items(root_path: Path) -> list[dict]:
+    if not root_path.exists() or not root_path.is_dir():
+        return []
+    paths = []
+    for path in root_path.rglob('*'):
+        if not path.is_file():
+            continue
+        name = path.name.lower()
+        if path.suffix.lower() == '.json' or name.endswith('.hzhmat') or name.endswith('.hzhmat.json'):
+            paths.append(path)
+    items = []
+    for path in sorted(paths, key=lambda p: p.as_posix().lower()):
+        meta = _read_asset_library_metadata(path)
+        if not meta.get('valid'):
+            continue
+        stat = path.stat()
+        meta.update({
+            'relativePath': path.relative_to(root_path).as_posix(),
+            'size': int(stat.st_size),
+            'mtimeMs': int(stat.st_mtime * 1000),
+        })
+        items.append(meta)
+    return items
+
+
+def resolve_asset_library_path(relative_path: str) -> tuple[Path, Path]:
+    root_path = read_asset_library_root()
+    if not root_path or not root_path.exists() or not root_path.is_dir():
+        raise FileNotFoundError('asset library root is not configured or does not exist')
+    requested = str(relative_path or '').replace('\\', '/').lstrip('/')
+    target = (root_path / requested).resolve()
+    root_resolved = root_path.resolve()
+    try:
+        target.relative_to(root_resolved)
+    except Exception:
+        raise FileNotFoundError('asset path escapes configured library root')
+    if not target.exists() or not target.is_file():
+        raise FileNotFoundError(f'asset not found: {requested}')
+    return root_resolved, target
 
 
 def normalize_habbo_root(value: str) -> Path:
@@ -1194,6 +1307,30 @@ class Handler(SimpleHTTPRequestHandler):
                 })
             return self._json(200, {'items': items})
 
+        if parsed.path == '/api/asset-library/config':
+            info = describe_asset_library_root()
+            return self._json(200, {'ok': True, **info})
+
+        if parsed.path == '/api/asset-library/index':
+            info = describe_asset_library_root()
+            if not info['configured']:
+                return self._json(200, {'ok': True, **info, 'items': []})
+            if not info['exists']:
+                return self._json(404, {'ok': False, **info, 'items': [], 'error': f"Asset library root not found: {info['root']}"})
+            root_path = read_asset_library_root()
+            items = list_asset_library_items(root_path)
+            return self._json(200, {'ok': True, **info, 'count': len(items), 'items': items})
+
+        if parsed.path == '/api/asset-library/file':
+            query = parse_qs(parsed.query or '')
+            requested = (query.get('path') or [''])[0]
+            try:
+                _, target = resolve_asset_library_path(requested)
+            except FileNotFoundError as exc:
+                return self._json(404, {'ok': False, 'error': str(exc)})
+            content_type = 'application/gzip' if target.name.lower().endswith('.hzhmat') else 'application/json; charset=utf-8'
+            return self._bytes(200, target.read_bytes(), content_type)
+
         if parsed.path == '/api/habbo/config':
             info = describe_habbo_root(); log_server(f"[habbo-config:get] root={info.get('root')} exists={info.get('exists')} itemCount={info.get('itemCount')}"); return self._json(200, {'ok': True, **info})
 
@@ -1412,6 +1549,16 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         parsed = urlparse(self.path)
+        if parsed.path == '/api/asset-library/config':
+            try:
+                length = int(self.headers.get('Content-Length', '0'))
+                body = self.rfile.read(length)
+                payload = json.loads(body.decode('utf-8'))
+                info = write_asset_library_root(str(payload.get('root') or ''))
+                return self._json(200, {'ok': True, **info})
+            except Exception as exc:
+                return self._json(400, {'ok': False, 'error': str(exc)})
+
         if parsed.path == '/api/prefabs/save':
             try:
                 length = int(self.headers.get('Content-Length', '0'))

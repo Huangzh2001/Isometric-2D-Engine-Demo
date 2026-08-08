@@ -1148,6 +1148,16 @@ safeListen(ui.terrainDetailedProfilingEnabled, 'change', () => uiHandleTerrainDe
 safeListen(ui.terrainDebugFaceColorsEnabled, 'change', () => { uiHandleTerrainDebugFaceColorsToggle('terrain-panel:debug-face-colors-toggle'); });
 safeListen(ui.terrainBoundaryDebugRedEnabled, 'change', () => { uiHandleTerrainBoundaryDebugRedToggle('terrain-panel:boundary-red-debug-toggle'); });
 
+// Visual diagnostics are opt-in. Explicitly clear the HTML state because
+// browsers may restore checkbox state across reloads.
+try {
+  if (ui.showCanvasDebugText) ui.showCanvasDebugText.checked = false;
+  if (ui.showItemFacingDebug) ui.showItemFacingDebug.checked = false;
+  if (ui.showHabboDebugOverlay) ui.showHabboDebugOverlay.checked = false;
+  if (ui.shadowDebugDetailed) ui.shadowDebugDetailed.checked = false;
+  if (typeof window !== 'undefined') window.__PIXI_PLAYER_CHUNK_DEBUG_OVERLAY__ = false;
+} catch (_) {}
+
 safeListen(ui.previewRotateLeft, 'click', () => uiHandlePreviewFacingRotate(-1, 'ui.previewRotateLeft.click'));
 safeListen(ui.previewRotateRight, 'click', () => uiHandlePreviewFacingRotate(1, 'ui.previewRotateRight.click'));
 safeListen(ui.previewFacing0, 'click', () => uiHandlePreviewFacingSet(0, 'ui.previewFacing0.click'));
@@ -1156,6 +1166,7 @@ safeListen(ui.previewFacing2, 'click', () => uiHandlePreviewFacingSet(2, 'ui.pre
 safeListen(ui.previewFacing3, 'click', () => uiHandlePreviewFacingSet(3, 'ui.previewFacing3.click'));
 safeListen(ui.selectedRotateLeft, 'click', () => uiHandleSelectedFacingRotate(-1, 'ui.selectedRotateLeft.click'));
 safeListen(ui.selectedRotateRight, 'click', () => uiHandleSelectedFacingRotate(1, 'ui.selectedRotateRight.click'));
+safeListen(ui.showCanvasDebugText, 'change', () => { pushLog('ui: showCanvasDebugText=' + (!!(ui.showCanvasDebugText && ui.showCanvasDebugText.checked))); });
 safeListen(ui.showItemFacingDebug, 'change', () => { if (typeof refreshInspectorPanels === 'function') refreshInspectorPanels(); });
 safeListen(ui.prefabSelect, 'change', () => {
   var placementCoreForTerrainBlock = getUiPlacementCoreApi();
@@ -1408,7 +1419,25 @@ safeListen(ui.downloadSelfCheckReport, 'click', () => {
   }
 });
 safeListen(ui.downloadHabboDebug, 'click', exportHabboDebug);
-safeListen(ui.showHabboDebugOverlay, 'change', () => { pushLog('ui: showHabboDebugOverlay=' + (!!ui.showHabboDebugOverlay.checked)); });
+function syncHabboDebugOverlayToggleUi() {
+  var enabled = !!(ui.showHabboDebugOverlay && ui.showHabboDebugOverlay.checked);
+  if (ui.toggleHabboDebugOverlay) {
+    ui.toggleHabboDebugOverlay.textContent = enabled ? '关闭 Habbo 调试信息' : '显示 Habbo 调试信息';
+    ui.toggleHabboDebugOverlay.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+  }
+}
+if (ui.showHabboDebugOverlay) ui.showHabboDebugOverlay.checked = false;
+syncHabboDebugOverlayToggleUi();
+safeListen(ui.toggleHabboDebugOverlay, 'click', () => {
+  if (!ui.showHabboDebugOverlay) return;
+  ui.showHabboDebugOverlay.checked = !ui.showHabboDebugOverlay.checked;
+  syncHabboDebugOverlayToggleUi();
+  pushLog('ui: showHabboDebugOverlay=' + (!!ui.showHabboDebugOverlay.checked));
+});
+safeListen(ui.showHabboDebugOverlay, 'change', () => {
+  syncHabboDebugOverlayToggleUi();
+  pushLog('ui: showHabboDebugOverlay=' + (!!ui.showHabboDebugOverlay.checked));
+});
 safeListen(ui.dumpScene, 'click', () => exportSceneJsonDownload());
 safeListen(ui.dumpCandidate, 'click', () => pushLog(`candidate-json: ${JSON.stringify(editor.preview || null)}`));
 safeListen(ui.applyPlayerSettings, 'click', applySettings);

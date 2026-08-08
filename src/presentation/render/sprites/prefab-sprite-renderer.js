@@ -3,6 +3,7 @@
   'use strict';
 
   var prefabSpriteImageCache = new Map();
+  var prefabSpriteAlphaMaskCache = new Map();
 
   function getHabboCompositeRendererApiForSpriteRenderer() {
     return global.__APP_PRESENTATION_HABBO_COMPOSITE_RENDERER__ || global.__HABBO_COMPOSITE_RENDERER__ || global.IsometricHabboCompositeRenderer || null;
@@ -60,12 +61,49 @@
     return img;
   }
 
+  function getPrefabSpriteCurrentViewRotation() {
+    try {
+      if (typeof getSafeMainEditorViewRotation === 'function') {
+        var safe = getSafeMainEditorViewRotation(null);
+        if (safe && safe.viewRotation != null) return Number(safe.viewRotation) || 0;
+      }
+    } catch (_) {}
+    try {
+      var runtime = global.App && global.App.state && global.App.state.runtimeState;
+      if (runtime && runtime.editor && runtime.editor.visualRotation != null) return Number(runtime.editor.visualRotation) || 0;
+      if (runtime && runtime.editor && runtime.editor.rotation != null) return Number(runtime.editor.rotation) || 0;
+    } catch (_) {}
+    try { if (global.editor && global.editor.rotation != null) return Number(global.editor.rotation) || 0; } catch (_) {}
+    return 0;
+  }
+
+  // The instance rotation is persistent world-facing. A four-direction sprite,
+  // however, is artwork for the face currently visible from the camera.
+  // Voxel geometry stays in world space and is projected by the camera; only
+  // sprite image/registration selection uses the camera-relative facing.
+  function resolvePrefabSpriteVisualFacing(worldRotation) {
+    var facingApi = getItemFacingCoreApi();
+    var viewRotation = getPrefabSpriteCurrentViewRotation();
+    var visualFacing = facingApi && typeof facingApi.resolveViewRelativeFacing === 'function'
+      ? facingApi.resolveViewRelativeFacing(worldRotation, viewRotation)
+      : ((((Math.round(Number(worldRotation) || 0) - Math.round(Number(viewRotation) || 0)) % 4) + 4) % 4);
+    var snapshot = {
+      version: 'prefab-sprite-view-relative-facing-v1',
+      worldRotation: Number(worldRotation) || 0,
+      viewRotation: Number(viewRotation) || 0,
+      visualFacing: Number(visualFacing) || 0
+    };
+    try { global.__PREFAB_SPRITE_VIEW_FACING_LAST__ = snapshot; } catch (_) {}
+    return snapshot;
+  }
+
   function getPrefabSpriteConfig(prefab, rotation) {
     if (!prefab) return null;
     var facingApi = getItemFacingCoreApi();
+    var visual = resolvePrefabSpriteVisualFacing(rotation);
     var resolved = facingApi && typeof facingApi.resolveSpriteFacing === 'function'
-      ? facingApi.resolveSpriteFacing(prefab, rotation)
-      : { directionKey: rotKeyForSprite(rotation), mirrorX: false, strategy: 'single', availableKeys: [rotKeyForSprite(rotation)] };
+      ? facingApi.resolveSpriteFacing(prefab, visual.visualFacing)
+      : { directionKey: rotKeyForSprite(visual.visualFacing), mirrorX: false, strategy: 'single', availableKeys: [rotKeyForSprite(visual.visualFacing)] };
     var raw = null;
     if (prefab.spriteDirections && prefab.spriteDirections[resolved.directionKey]) raw = prefab.spriteDirections[resolved.directionKey];
     else if (prefab.spriteDirections && prefab.spriteDirections['0']) raw = prefab.spriteDirections['0'];
@@ -75,14 +113,27 @@
       flipX: !!raw.flipX !== !!resolved.mirrorX,
       __resolvedDirectionKey: resolved.directionKey,
       __spriteStrategy: resolved.strategy,
-      __availableDirectionKeys: resolved.availableKeys || []
+      __availableDirectionKeys: resolved.availableKeys || [],
+      __worldRotation: visual.worldRotation,
+      __viewRotation: visual.viewRotation,
+      __visualFacing: visual.visualFacing
     });
+  }
+
+  function getRuntimeSpriteAnchor(prefab, rotation, spriteCfg) {
+    var base = prefab && prefab.anchor ? prefab.anchor : { x: 0, y: 0, z: 0 };
+    if (String(spriteCfg && spriteCfg.anchorMode || '') === 'scuti-floor-origin') return base;
+    try {
+      var facingApi = getItemFacingCoreApi();
+      if (facingApi && typeof facingApi.getRotatedAnchor === 'function') return facingApi.getRotatedAnchor(prefab, rotation);
+    } catch (_) {}
+    return base;
   }
 
   function getPrefabSpriteImage(prefab, rotation) {
     var spriteCfg = getPrefabSpriteConfig(prefab, rotation);
     if (!spriteCfg || !spriteCfg.image) return null;
-    var key = prefab.id + '|' + rotKeyForSprite(rotation) + '|' + spriteCfg.image + '|' + (!!spriteCfg.flipX);
+    var key = prefab.id + '|visual=' + String(spriteCfg.__resolvedDirectionKey || rotKeyForSprite(rotation)) + '|' + spriteCfg.image + '|' + (!!spriteCfg.flipX);
     var cached = prefabSpriteImageCache.get(key);
     if (cached) return cached;
     var img = new Image();
@@ -97,9 +148,24 @@
     return !prefab || (prefab.renderMode || 'voxel') !== 'sprite_proxy';
   }
 
+  function isUnifiedHzhRuntimePrefab(prefab) {
+    return !!(prefab && (
+      prefab.hzhUnifiedRuntime === true ||
+      prefab.useLegacyHabboRuntime === false ||
+      (prefab.localFrame && (
+        String(prefab.localFrame.rotationSpace || '') === 'anchor-cell-center' ||
+        String(prefab.localFrame.rotationSpace || '') === 'editor-anchor-corner'
+      ))
+    ));
+  }
+
+  function usesLegacyHabboComposite(prefab) {
+    return !!(prefab && prefab.kind === 'habbo_import' && prefab.habboLayerDirections && !isUnifiedHzhRuntimePrefab(prefab));
+  }
+
   function prefabHasSprite(prefab) {
     if (!prefab || (prefab.renderMode || 'voxel') === 'voxel') return false;
-    if (prefab.kind === 'habbo_import' && prefab.habboLayerDirections) {
+    if (usesLegacyHabboComposite(prefab)) {
       var layerKeys = Object.keys(prefab.habboLayerDirections);
       for (var li = 0; li < layerKeys.length; li++) {
         var rawLayers = prefab.habboLayerDirections[layerKeys[li]];
@@ -127,7 +193,7 @@
     if (!prefabHasSprite(prefab)) return false;
     var rotation = origin && origin.rotation != null ? origin.rotation : 0;
     var anchor = prefab.anchor || { x: 0, y: 0, z: 0 };
-    if (prefab.kind === 'habbo_import' && prefab.habboLayerDirections) {
+    if (usesLegacyHabboComposite(prefab)) {
       var layers = getHabboLayerConfigList(prefab, rotation);
       if (!layers || !layers.length) {
         detailLog('callsite src/presentation/render/render.js::drawPrefabSpriteAt layered-miss prefab=' + String(prefab.id || 'unknown') + ' rotation=' + String(rotation) + ' keys=' + Object.keys(prefab.habboLayerDirections || {}).join(','));
@@ -231,8 +297,9 @@
     var spriteCfg = getPrefabSpriteConfig(prefab, rotation);
     var img = getPrefabSpriteImage(prefab, rotation);
     if (!spriteCfg || !img || !img.complete || !img.naturalWidth || !img.naturalHeight) return false;
+    anchor = getRuntimeSpriteAnchor(prefab, rotation, spriteCfg);
     var spritePixelScale = settings.tileW / 64;
-    if (prefab.kind === 'habbo_import') {
+    if (prefab.kind === 'habbo_import' && !isUnifiedHzhRuntimePrefab(prefab)) {
       var visualSize = Math.max(1, Number(spriteCfg.visualSize) || 64);
       spritePixelScale = settings.tileW / visualSize;
     }
@@ -269,6 +336,136 @@
     return true;
   }
 
+  function getPrefabSpriteScreenBounds(instance, prefab) {
+    if (!instance || !prefab || !prefabHasSprite(prefab)) return null;
+    var rotation = instance.rotation != null ? Number(instance.rotation || 0) : 0;
+    var baseAnchor = prefab.anchor || { x: 0, y: 0, z: 0 };
+
+    if (usesLegacyHabboComposite(prefab)) {
+      var composite = getHabboComposite(prefab, rotation);
+      if (!composite || !composite.canvas || !Number(composite.width || 0) || !Number(composite.height || 0)) return null;
+      var roomOrigin = getHabboRoomOrigin(prefab, instance, baseAnchor, rotation);
+      return {
+        x: Math.round(Number(roomOrigin.x || 0) + Number(composite.offsetPx && composite.offsetPx.x || 0)),
+        y: Math.round(Number(roomOrigin.y || 0) + Number(composite.offsetPx && composite.offsetPx.y || 0)),
+        width: Math.max(1, Math.round(Number(composite.width || 0))),
+        height: Math.max(1, Math.round(Number(composite.height || 0))),
+        source: 'habbo-composite-render-bounds'
+      };
+    }
+
+    var spriteCfg = getPrefabSpriteConfig(prefab, rotation);
+    var img = getPrefabSpriteImage(prefab, rotation);
+    if (!spriteCfg || !img || !img.complete || !img.naturalWidth || !img.naturalHeight) return null;
+    var spritePixelScale = settings.tileW / 64;
+    if (prefab.kind === 'habbo_import' && !isUnifiedHzhRuntimePrefab(prefab)) {
+      var visualSize = Math.max(1, Number(spriteCfg.visualSize) || 64);
+      spritePixelScale = settings.tileW / visualSize;
+    }
+    var totalScale = Math.max(0.05, Number(spriteCfg.scale) || 1) * spritePixelScale;
+    var drawW = Math.max(1, Math.round(img.naturalWidth * totalScale));
+    var drawH = Math.max(1, Math.round(img.naturalHeight * totalScale));
+    var offsetX = Math.round((spriteCfg.offsetPx && spriteCfg.offsetPx.x || 0) * spritePixelScale);
+    var offsetY = Math.round((spriteCfg.offsetPx && spriteCfg.offsetPx.y || 0) * spritePixelScale);
+    var anchor = getRuntimeSpriteAnchor(prefab, rotation, spriteCfg);
+    var x, y;
+    if (String(spriteCfg.anchorMode || '') === 'scuti-floor-origin') {
+      var roomOrigin2 = getHabboRoomOrigin(prefab, instance, baseAnchor, rotation);
+      x = Math.round(roomOrigin2.x + offsetX);
+      y = Math.round(roomOrigin2.y + offsetY);
+    } else {
+      var foot = iso((instance.x || 0) + (anchor.x || 0), (instance.y || 0) + (anchor.y || 0), (instance.z || 0) + (anchor.z || 0));
+      x = Math.round(foot.x - drawW / 2 + offsetX);
+      y = Math.round(foot.y - drawH + offsetY);
+    }
+    if (spriteCfg.flipX) x -= drawW;
+    return { x: x, y: y, width: drawW, height: drawH, source: 'simple-sprite-render-bounds' };
+  }
+
+  function getPrefabSpriteAlphaMask(img) {
+    if (!img || !img.complete || !img.naturalWidth || !img.naturalHeight) return null;
+    var key = String(img.currentSrc || img.src || '') + '|' + Number(img.naturalWidth) + 'x' + Number(img.naturalHeight);
+    if (prefabSpriteAlphaMaskCache.has(key)) return prefabSpriteAlphaMaskCache.get(key);
+    try {
+      var canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Number(img.naturalWidth) || 1);
+      canvas.height = Math.max(1, Number(img.naturalHeight) || 1);
+      var cctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (!cctx) return null;
+      cctx.clearRect(0, 0, canvas.width, canvas.height);
+      cctx.drawImage(img, 0, 0);
+      var rgba = cctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      var alpha = new Uint8Array(canvas.width * canvas.height);
+      for (var i = 0, p = 0; i < rgba.length; i += 4, p++) alpha[p] = rgba[i + 3];
+      var mask = { width: canvas.width, height: canvas.height, alpha: alpha };
+      prefabSpriteAlphaMaskCache.set(key, mask);
+      return mask;
+    } catch (_) {
+      // Cross-origin images can make the canvas unreadable. Keep those
+      // clickable via the exact draw bounds rather than making them unusable.
+      prefabSpriteAlphaMaskCache.set(key, null);
+      return null;
+    }
+  }
+
+  function mapSpriteScreenPointToSourcePixel(bounds, sx, sy, sourceW, sourceH, flipX) {
+    if (!bounds || !Number(bounds.width) || !Number(bounds.height)) return null;
+    var width = Math.max(1, Math.floor(Number(sourceW) || 0));
+    var height = Math.max(1, Math.floor(Number(sourceH) || 0));
+    var u = (Number(sx) - Number(bounds.x || 0)) / Math.max(1, Number(bounds.width) || 1);
+    var v = (Number(sy) - Number(bounds.y || 0)) / Math.max(1, Number(bounds.height) || 1);
+    if (!Number.isFinite(u) || !Number.isFinite(v) || u < 0 || u >= 1 || v < 0 || v >= 1) return null;
+    var sourceX = Math.max(0, Math.min(width - 1, Math.floor(u * width)));
+    var sourceY = Math.max(0, Math.min(height - 1, Math.floor(v * height)));
+    if (flipX) sourceX = width - 1 - sourceX;
+    return { x: sourceX, y: sourceY };
+  }
+
+  // Hit-test the exact simple sprite drawn by drawPrefabSpriteAt().  A plain
+  // draw rectangle is not enough for unified material canvases because large
+  // transparent margins are common; clicking those margins used to trigger
+  // Behavior away from the visible furniture.
+  function hitTestPrefabSpriteAtScreen(instance, prefab, sx, sy, options) {
+    options = options || {};
+    var bounds = getPrefabSpriteScreenBounds(instance, prefab);
+    if (!bounds) return null;
+    var px = Number(sx), py = Number(sy);
+    if (!Number.isFinite(px) || !Number.isFinite(py)) return null;
+    if (px < bounds.x || px >= bounds.x + bounds.width || py < bounds.y || py >= bounds.y + bounds.height) return null;
+
+    // Legacy layered Habbo composites do not use the unified simple-sprite
+    // canvas. Their existing exact composite bounds remain the compatibility
+    // fallback; unified .hzhmat assets continue below to alpha testing.
+    if (usesLegacyHabboComposite(prefab)) {
+      return { hit: true, alpha: null, bounds: bounds, source: 'legacy-composite-bounds' };
+    }
+
+    var rotation = instance && instance.rotation != null ? Number(instance.rotation || 0) : 0;
+    var spriteCfg = getPrefabSpriteConfig(prefab, rotation);
+    var img = getPrefabSpriteImage(prefab, rotation);
+    if (!spriteCfg || !img || !img.complete || !img.naturalWidth || !img.naturalHeight) return null;
+    var mask = getPrefabSpriteAlphaMask(img);
+    if (!mask) return { hit: true, alpha: null, bounds: bounds, source: 'simple-sprite-bounds-alpha-unavailable' };
+
+    var sourcePoint = mapSpriteScreenPointToSourcePixel(bounds, px, py, mask.width, mask.height, !!spriteCfg.flipX);
+    if (!sourcePoint) return null;
+    var sourceX = sourcePoint.x;
+    var sourceY = sourcePoint.y;
+    // drawPrefabSpriteAt currently mirrors only X. Do not apply flipY here
+    // until the canonical renderer itself draws flipY.
+    var alpha = mask.alpha[sourceY * mask.width + sourceX] || 0;
+    var threshold = Math.max(1, Math.min(255, Number(options.alphaThreshold) || 8));
+    if (alpha < threshold) return null;
+    return {
+      hit: true,
+      alpha: alpha,
+      sourceX: sourceX,
+      sourceY: sourceY,
+      bounds: bounds,
+      source: 'simple-sprite-alpha'
+    };
+  }
+
   function drawPrefabSpriteInstance(instance, alpha) {
     var prefab = getPrefabById(instance.prefabId);
     return drawPrefabSpriteAt(prefab, instance, alpha);
@@ -276,7 +473,7 @@
 
   function getSpriteDepthSplitCandidate(instance, prefab, viewRotation) {
     if (!instance || !prefab || !prefabHasSprite(prefab)) return null;
-    if (prefab.kind === 'habbo_import' && prefab.habboLayerDirections) return null;
+    if (usesLegacyHabboComposite(prefab)) return null;
     var spriteCfg = getPrefabSpriteConfig(prefab, instance && instance.rotation != null ? instance.rotation : 0);
     var img = getPrefabSpriteImage(prefab, instance && instance.rotation != null ? instance.rotation : 0);
     if (!spriteCfg || !img || !img.complete || !img.naturalWidth || !img.naturalHeight) return null;
@@ -299,15 +496,15 @@
 
   function drawPrefabSpritePartInstance(instance, prefab, part, alpha) {
     if (!instance || !prefab || !part) return false;
-    if (prefab.kind === 'habbo_import' && prefab.habboLayerDirections) return false;
+    if (usesLegacyHabboComposite(prefab)) return false;
     var rotation = instance && instance.rotation != null ? instance.rotation : 0;
     var spriteCfg = getPrefabSpriteConfig(prefab, rotation);
     var img = getPrefabSpriteImage(prefab, rotation);
     if (!spriteCfg || !img || !img.complete || !img.naturalWidth || !img.naturalHeight) return false;
     if (spriteCfg.flipX) return drawPrefabSpriteAt(prefab, instance, alpha);
-    var anchor = prefab.anchor || { x: 0, y: 0, z: 0 };
+    var anchor = getRuntimeSpriteAnchor(prefab, rotation, spriteCfg);
     var spritePixelScale = settings.tileW / 64;
-    if (prefab.kind === 'habbo_import') {
+    if (prefab.kind === 'habbo_import' && !isUnifiedHzhRuntimePrefab(prefab)) {
       var visualSize = Math.max(1, Number(spriteCfg.visualSize) || 64);
       spritePixelScale = settings.tileW / visualSize;
     }
@@ -344,7 +541,9 @@
   }
 
   function drawHabboDebugOverlay() {
-    if (!ui.showHabboDebugOverlay || !ui.showHabboDebugOverlay.checked || typeof prototypes === 'undefined') return;
+    var masterDebugText = false;
+    try { masterDebugText = !!(global.document && global.document.getElementById('showCanvasDebugText') && global.document.getElementById('showCanvasDebugText').checked); } catch (_) {}
+    if (!masterDebugText || !ui.showHabboDebugOverlay || !ui.showHabboDebugOverlay.checked || typeof prototypes === 'undefined') return;
     ctx.save();
     ctx.font = '11px monospace';
     var count = 0;
@@ -467,7 +666,7 @@
       x: (instance && instance.x || 0) + (anchor.x || 0),
       y: (instance && instance.y || 0) + (anchor.y || 0),
       z: (instance && instance.z || 0) + (anchor.z || 0)
-    }, prefab && prefab.h, viewRotation);
+    }, 0, viewRotation);
     return { sortKey: Number(sortMeta.sortKey || 0) + 0.0005, tie: Number(sortMeta.tie || 0) + 300000, occlusion: occlusion, sortBase: sortBase };
   }
 
@@ -479,6 +678,9 @@
     prefabHasSprite: prefabHasSprite,
     drawPrefabSpriteAt: drawPrefabSpriteAt,
     drawPrefabSpriteInstance: drawPrefabSpriteInstance,
+    getPrefabSpriteScreenBounds: getPrefabSpriteScreenBounds,
+    mapSpriteScreenPointToSourcePixel: mapSpriteScreenPointToSourcePixel,
+    hitTestPrefabSpriteAtScreen: hitTestPrefabSpriteAtScreen,
     getSpriteDepthSplitCandidate: getSpriteDepthSplitCandidate,
     drawPrefabSpritePartInstance: drawPrefabSpritePartInstance,
     drawHabboDebugOverlay: drawHabboDebugOverlay,

@@ -1837,6 +1837,25 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
       ? { compatibleAxis: normalizeCompatibleAxisMeta(Object.assign({}, sourcePreview.compatibleAxis || authoritative.compatibleAxis || {}, { rotation: committedRotation })), source: 'placement:placeCurrentPrefab.compatible-axis' }
       : null;
     var instanceExtras = Object.assign({}, terrainBlockExtras || {}, microTriExtras || {}, compatibleAxisExtras || {});
+    // Retain the exact prefab definition before committing the instance. Habbo
+    // imports can refresh the selector/registry asynchronously; without an
+    // exact retained definition, the renderer may briefly resolve the instance
+    // to the registry's first fallback prefab and omit its sprite until another
+    // camera action forces a rebuild.
+    try {
+      var registryForCommit = (window.App && window.App.state && window.App.state.prefabRegistry) ? window.App.state.prefabRegistry : null;
+      var exactForCommit = registryForCommit && typeof registryForCommit.getPrefabByIdExact === 'function'
+        ? registryForCommit.getPrefabByIdExact(committedPrefabId)
+        : null;
+      if (!exactForCommit) {
+        var selectedForCommit = null;
+        try { selectedForCommit = typeof currentPrefab === 'function' ? currentPrefab() : null; } catch (_) {}
+        if (selectedForCommit && String(selectedForCommit.id) === String(committedPrefabId)) exactForCommit = selectedForCommit;
+      }
+      if (exactForCommit && registryForCommit && typeof registryForCommit.retainPrefabRuntimeSnapshot === 'function') {
+        registryForCommit.retainPrefabRuntimeSnapshot(exactForCommit, { source: 'placement:placeCurrentPrefab:retain-exact-prefab' });
+      }
+    } catch (_) {}
     var instance = makeInstance(committedPrefabId, authoritative.origin.x, authoritative.origin.y, authoritative.origin.z, committedRotation, Object.keys(instanceExtras).length ? instanceExtras : undefined);
     try {
       if (isStairTracePrefabId(committedPrefabId)) {
@@ -1888,6 +1907,14 @@ var PLACEMENT_MAINPATH_COMPAT_EXPORTS = ['startDragging', 'commitPreview', 'canc
       rebuildBoxesFromInstances({ source: 'placement:placeCurrentPrefab' });
       placementStateWrite('addInstance', { source: 'placement:placeCurrentPrefab', instanceId: instance.instanceId, prefabId: instance.prefabId, instances: instances.length, boxes: boxes.length });
     }
+    try {
+      var habboRenderer = window.__APP_PRESENTATION_HABBO_COMPOSITE_RENDERER__ || window.__HABBO_COMPOSITE_RENDERER__;
+      if (habboRenderer && typeof habboRenderer.requestHabboVisualRefresh === 'function') {
+        habboRenderer.requestHabboVisualRefresh('placement-commit');
+      } else if (typeof window.requestRender === 'function') {
+        window.requestRender('placement-commit');
+      }
+    } catch (_) {}
     return instance;
   }
 

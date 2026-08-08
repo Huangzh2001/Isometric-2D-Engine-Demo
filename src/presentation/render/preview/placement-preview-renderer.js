@@ -855,21 +855,25 @@ function drawPlacementPreview() {
     }
   }
 
-  ctx.fillStyle = stroke;
-  ctx.font = '13px sans-serif';
-  var labelPt = b
-    ? iso(b.x, b.y, b.z + b.h)
-    : (origin
-        ? iso(origin.x, origin.y, origin.z + 1)
-        : iso(previewBoxes[0].x, previewBoxes[0].y, previewBoxes[0].z + 1));
-  var labelX = labelPt.x + 6;
-  var labelY = labelPt.y - 8;
-  var status = ok
-    ? `${b.name} 体素=${previewBoxes.length} 尺寸 ${b.w}×${b.d}×${b.h}`
-    : `不可放置：${editor.preview.reason} / prefab=${editor.preview.prefabId || proto.id || 'n/a'} / 体素=${previewBoxes.length}`;
-  ctx.fillText(status, labelX, labelY);
-  if (!ok && editor.preview.reason === 'player' && origin) {
-    ctx.fillText(`阻挡：玩家占位 (${origin.x}, ${origin.y}, z=${origin.z})`, labelX, labelY - 16);
+  var showCanvasDebugText = false;
+  try { showCanvasDebugText = !!(global.document && global.document.getElementById('showCanvasDebugText') && global.document.getElementById('showCanvasDebugText').checked); } catch (_) {}
+  if (showCanvasDebugText) {
+    ctx.fillStyle = stroke;
+    ctx.font = '13px sans-serif';
+    var labelPt = b
+      ? iso(b.x, b.y, b.z + b.h)
+      : (origin
+          ? iso(origin.x, origin.y, origin.z + 1)
+          : iso(previewBoxes[0].x, previewBoxes[0].y, previewBoxes[0].z + 1));
+    var labelX = labelPt.x + 6;
+    var labelY = labelPt.y - 8;
+    var status = ok
+      ? `${b.name} 体素=${previewBoxes.length} 尺寸 ${b.w}×${b.d}×${b.h}`
+      : `不可放置：${editor.preview.reason} / prefab=${editor.preview.prefabId || proto.id || 'n/a'} / 体素=${previewBoxes.length}`;
+    ctx.fillText(status, labelX, labelY);
+    if (!ok && editor.preview.reason === 'player' && origin) {
+      ctx.fillText(`阻挡：玩家占位 (${origin.x}, ${origin.y}, z=${origin.z})`, labelX, labelY - 16);
+    }
   }
 }
 

@@ -2241,30 +2241,37 @@
   }
 
 
+  function isCanvasDebugTextMasterEnabledForPixiOverlay() {
+    try {
+      var master = global.document && global.document.getElementById('showCanvasDebugText');
+      return !!(master && master.checked);
+    } catch (_) {}
+    return false;
+  }
+
   function isPlayerChunkDebugOverlayEnabled() {
+    if (!isCanvasDebugTextMasterEnabledForPixiOverlay()) return false;
     try {
       if (global.__PIXI_PLAYER_CHUNK_DEBUG_OVERLAY__ === true) return true;
       if (global.__PIXI_PLAYER_CHUNK_DEBUG_OVERLAY__ === false) return false;
       if (global.localStorage) {
-        var raw = global.localStorage.getItem('pixiPlayerChunkDebugOverlay');
+        var raw = global.localStorage.getItem('pixiPlayerChunkDebugOverlayV2');
         if (raw === '0' || raw === 'false' || raw === 'off') return false;
         if (raw === '1' || raw === 'true' || raw === 'on') return true;
       }
     } catch (_) {}
-    // This package is explicitly a debug-overlay build, so keep the overlay on
-    // unless the user disables it. It only adds diagnostic display objects and
-    // must not affect cache/render decisions.
-    return true;
+    return false;
   }
 
   function isPlayerChunkDebugOverlayLabelsEnabled() {
+    if (!isCanvasDebugTextMasterEnabledForPixiOverlay()) return false;
     try {
       if (global.localStorage) {
         var raw = global.localStorage.getItem('pixiPlayerChunkDebugOverlayLabels');
-        if (raw === '0' || raw === 'false' || raw === 'off') return false;
+        if (raw === '1' || raw === 'true' || raw === 'on') return true;
       }
     } catch (_) {}
-    return true;
+    return false;
   }
 
   function getPlayerChunkDebugOverlayGraphics(container) {

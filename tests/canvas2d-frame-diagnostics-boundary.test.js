@@ -10,10 +10,24 @@ function runFile(context, rel) { vm.runInContext(read(rel), context, { filename:
 
 const diagnosticsRel = 'src/presentation/render/renderer/canvas2d-frame-diagnostics.js';
 const rendererRel = 'src/presentation/render/renderer/canvas2d-renderer.js';
+const main1BundleRel = 'dist/bundles/main-1.bundle.js';
+const main2BundleRel = 'dist/bundles/main-2.bundle.js';
 const indexSource = read('index.html');
-assert(indexSource.indexOf(diagnosticsRel) >= 0, 'index.html must load canvas2d-frame-diagnostics.js');
-assert(indexSource.indexOf(rendererRel) >= 0, 'index.html must load canvas2d-renderer.js');
-assert(indexSource.indexOf(diagnosticsRel) < indexSource.indexOf(rendererRel), 'frame diagnostics owner must load before renderer');
+
+const loadsDirectSources = indexSource.indexOf(diagnosticsRel) >= 0 || indexSource.indexOf(rendererRel) >= 0;
+if (loadsDirectSources) {
+  assert(indexSource.indexOf(diagnosticsRel) >= 0, 'index.html must load canvas2d-frame-diagnostics.js');
+  assert(indexSource.indexOf(rendererRel) >= 0, 'index.html must load canvas2d-renderer.js');
+  assert(indexSource.indexOf(diagnosticsRel) < indexSource.indexOf(rendererRel), 'frame diagnostics owner must load before renderer');
+} else {
+  assert(indexSource.indexOf(main1BundleRel) >= 0, 'index.html must load main-1.bundle.js');
+  assert(indexSource.indexOf(main2BundleRel) >= 0, 'index.html must load main-2.bundle.js');
+  assert(indexSource.indexOf(main1BundleRel) < indexSource.indexOf(main2BundleRel), 'main-1 bundle must load before main-2 bundle');
+  const main1Bundle = read(main1BundleRel);
+  const main2Bundle = read(main2BundleRel);
+  assert(main1Bundle.indexOf(diagnosticsRel) >= 0, 'main-1 bundle must contain canvas2d-frame-diagnostics.js');
+  assert(main2Bundle.indexOf(rendererRel) >= 0, 'main-2 bundle must contain canvas2d-renderer.js');
+}
 
 const appRoot = { renderer: { diagnostics: {} }, infrastructure: {} };
 const binds = [];

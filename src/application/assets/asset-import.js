@@ -217,7 +217,7 @@ function getEditorModeValue(source) {
   return 'view';
 }
 
-function refreshPrototypeSelection(source) {
+function refreshImportedPrototypeSelection(source) {
   var registryApi = getPrefabRegistryWriteApi();
   if (registryApi && typeof registryApi.refreshPrototypeSelection === 'function') {
     var result = registryApi.refreshPrototypeSelection({ source: String(source || 'asset-import:refresh-prototype-selection') });
@@ -264,6 +264,11 @@ function traceImportedPrefab(prefab, sourceKind, source) {
 }
 
 function queueImportedLegacyRepair(prefab, source) {
+  // Unified .hzhmat prefabs already contain their authored states/artwork/voxel data.
+  // They must never be reparsed through the old flat-SWF repair path, otherwise
+  // the runtime can overwrite calibrated registration data or try to fetch a SWF
+  // that is intentionally no longer part of the game package.
+  if (prefab && prefab.materialStates && Array.isArray(prefab.materialStates.states)) return;
   if (!prefab || !(typeof isLegacyFlatHabboPrefab === 'function') || !isLegacyFlatHabboPrefab(prefab)) return;
   pushLog('habbo-repair:queued prefab=' + prefab.id + ' source=' + source + ' reason=legacy-flat-prefab');
   if (typeof queueLegacyHabboPrefabRepair === 'function') {
@@ -398,7 +403,7 @@ function selectImportedPrefabForEditor(prefab, options) {
       return { prefab: prefab, prototypeIndex: -1 };
     }
   }
-  refreshPrototypeSelection(String(options.refreshSource || 'asset-import:select-imported-prefab'));
+  refreshImportedPrototypeSelection(String(options.refreshSource || 'asset-import:select-imported-prefab'));
   assetImportLog('import-prefab:select-done id=' + prefab.id + ' source=' + String(options.source || 'unknown') + ' index=' + protoIndex);
   return { prefab: prefab, prototypeIndex: protoIndex };
 }

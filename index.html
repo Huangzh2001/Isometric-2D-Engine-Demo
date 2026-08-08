@@ -4,14 +4,34 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>等距房间编辑 + 光影一体化 Demo</title>
-  <link rel="stylesheet" href="styles/main.css" />
+  <script>
+    (function(){
+      try {
+        var p = localStorage.getItem('hzh.main.appearance') || 'system';
+        var t = p === 'light' || p === 'dark' ? p : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme-preference', p);
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (_) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="styles/main.css?v=20260808-apple-ui-theme-v12" />
 </head>
 <body>
-  <div style="position:fixed;top:8px;left:12px;z-index:99999;padding:10px 14px;border:2px solid #70ffb0;background:#0d2217;color:#dcfff0;font:700 14px/1.2 system-ui;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.35)">ENTRY: MAIN / index.html / start.bat / HABBO SELECTOR FIX 20260325MP</div>
+  <div class="entryBadge">MAIN · index.html · start.bat</div>
   <div class="layout">
-    <aside class="panel sidebar">
+    <aside class="panel sidebar" id="mainSidebar">
+      <button id="sidebarCollapseToggle" class="sidebarCollapseToggle" type="button" aria-controls="mainSidebar" aria-expanded="true" title="收起侧边栏"><span class="sidebarCollapseGlyph" aria-hidden="true">‹</span><span class="srOnly">收起侧边栏</span></button>
       <h1>等距房间编辑 + 光影一体化 Demo</h1>
       <p>这版把<strong>房间编辑系统 + 多光源系统 + 人物代理体积阴影</strong>合并在一起。人物的阴影不再按单点脚底处理，而是按一个可调尺寸的代理长方体投影到地面，并随移动实时更新。</p>
+
+      <div class="appearanceControl" role="group" aria-label="外观主题">
+        <span class="appearanceLabel">外观</span>
+        <div class="appearanceSegments">
+          <button id="themeAuto" class="appearanceSegment active" type="button" data-theme-choice="system" aria-pressed="true">自动</button>
+          <button id="themeLight" class="appearanceSegment" type="button" data-theme-choice="light" aria-pressed="false">浅色</button>
+          <button id="themeDark" class="appearanceSegment" type="button" data-theme-choice="dark" aria-pressed="false">深色</button>
+        </div>
+      </div>
 
       <div class="panelTabs">
         <button id="tabWorld" class="panelTab active">世界</button>
@@ -143,10 +163,11 @@
           <label><input id="xrayFaces" type="checkbox"> 调试：额外显示隐藏面</label>
           <label><input id="showDebugBox" type="checkbox"> 调试：显示脚点/体积线</label>
           <label><input id="showFrontLines" type="checkbox"> 调试：显示所有前沿线</label>
-          <label><input id="verboseLog" type="checkbox" checked> 调试：详细日志（很啰嗦）</label>
+          <label><input id="showCanvasDebugText" type="checkbox"> 调试：显示画布文字信息</label>
+          <label><input id="verboseLog" type="checkbox"> 调试：详细日志（很啰嗦）</label>
           <label><input id="actorSortDiagEnabled" type="checkbox"> 调试：人物/方块排序深度日志（导出用）</label>
-          <label><input id="showPixiPlayerChunkDebugOverlay" type="checkbox" checked> 调试：显示 Pixi 人物 chunk 网格覆盖层</label>
-          <label><input id="shadowDebugDetailed" type="checkbox" checked> 阴影调试：详细几何日志</label>
+          <label><input id="showPixiPlayerChunkDebugOverlay" type="checkbox"> 调试：显示 Pixi 人物 chunk 网格覆盖层</label>
+          <label><input id="shadowDebugDetailed" type="checkbox"> 阴影调试：详细几何日志</label>
           <label><input id="terrainDetailedProfilingEnabled" type="checkbox"> 生成详细地形日志（默认关闭）</label>
         </div>
 
@@ -182,7 +203,8 @@
           <div id="acceptanceReplayStatus" class="hintBox">验收回放：未运行。将自动保存报告到 logs/self-check，并在页面上显示虚拟点击与步骤状态。</div>
           <div class="rowButtons rowButtons2">
             <button id="downloadHabboDebug">下载 Habbo 调试 JSON</button>
-            <label style="display:flex;align-items:center;gap:6px;font-size:12px;"><input id="showHabboDebugOverlay" type="checkbox" checked> 显示 Habbo 调试覆盖层</label>
+            <button id="toggleHabboDebugOverlay" type="button" aria-pressed="false">显示 Habbo 调试信息</button>
+            <input id="showHabboDebugOverlay" type="checkbox" hidden>
           </div>
           <textarea id="debugLog" rows="12" readonly placeholder="这里会显示放置、排序、阴影、循环依赖等日志。"></textarea>
         </div>
@@ -257,7 +279,7 @@
             <span id="previewFacingLabel">N</span>
           </div>
           <div class="hintBox">已放置实例原地旋转已从本阶段 UI 降级；本阶段只验证放置前 previewFacing。</div>
-          <label style="display:flex;align-items:center;gap:8px;font-size:12px;"><input id="showItemFacingDebug" type="checkbox" checked> 显示 item facing 语义面调试色</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;"><input id="showItemFacingDebug" type="checkbox"> 显示 item facing 语义面调试色</label>
         </div>
         <div class="group inspectorGroup">
           <h2>物品检查器</h2>
@@ -1097,7 +1119,7 @@
   
   
   
-    <script src="dist/bundles/main-1.bundle.js"></script>
+    <script src="dist/bundles/main-1.bundle.js?v=20260808-sprite-shadow-segmented-depth-v17"></script>
   <script data-pixi-migration="pxm0718k0f-optional-loader-config">
     window.__PIXI_LIBRARY_URLS__ = window.__PIXI_LIBRARY_URLS__ || [
       'vendor/pixi.min.js',
@@ -1160,6 +1182,10 @@
   
   
   
-    <script src="dist/bundles/main-2.bundle.js"></script>
+    <script src="dist/bundles/main-2.bundle.js?v=20260808-sprite-shadow-segmented-depth-v17"></script>
+    <script src="src/core/domain/pixel-art-core.js?v=20260807-behavior-main-test-v2"></script>
+    <script src="src/presentation/editor/behavior-main-test-bridge.js?v=20260807-player-sprite-depth-v10"></script>
+    <script src="src/presentation/ui/main-sidebar-collapse.js?v=20260808-apple-ui-theme-v12"></script>
+    <script src="src/presentation/ui/main-theme.js?v=20260808-apple-ui-theme-v12"></script>
 </body>
 </html>

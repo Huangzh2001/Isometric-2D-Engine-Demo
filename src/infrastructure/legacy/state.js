@@ -1481,21 +1481,32 @@ function composeHabboDirectionSprite(meta, bitmaps, direction, options) {
   };
 }
 
-function buildHabboLayerDirectionsFromBitmaps(meta, bitmaps) {
+
+function getHabboFacingPlanForMeta(meta) {
   var preferredSize = chooseHabboPreferredVisualSize(meta);
   var vis = chooseHabboVisualization(meta, preferredSize);
-  var directions = [];
-  if (vis && vis.directions && vis.directions.length) directions = vis.directions.slice();
-  if (!directions.length) directions = (meta.visualDirections && meta.visualDirections.length) ? meta.visualDirections.slice() : [0];
-  directions = directions.filter(function (v, i, arr) { return arr.indexOf(v) === i; }).sort(function (a, b) { return a - b; });
-  var baseDirection = directions.indexOf(0) >= 0 ? 0 : (directions[0] || 0);
-  var altDirection = directions.indexOf(2) >= 0 ? 2 : (directions.length > 1 ? directions[1] : baseDirection);
+  var directions = (vis && Array.isArray(vis.directions) && vis.directions.length)
+    ? vis.directions.slice()
+    : ((meta && Array.isArray(meta.visualDirections) && meta.visualDirections.length) ? meta.visualDirections.slice() : [0]);
+  var facingApi = null;
+  try { facingApi = window.__ITEM_FACING_CORE__ || (window.App && window.App.domain && window.App.domain.itemFacingCore) || null; } catch (_) {}
+  if (!facingApi || typeof facingApi.buildHabboFacingPlan !== 'function') {
+    throw new Error('Missing Habbo facing plan owner: src/core/domain/item-facing-core.js');
+  }
+  var plan = facingApi.buildHabboFacingPlan(directions);
+  meta.habboFacingPlan = cloneJsonSafe(plan);
+  return plan;
+}
+
+function buildHabboLayerDirectionsFromBitmaps(meta, bitmaps) {
+  var preferredSize = chooseHabboPreferredVisualSize(meta);
+  var facingPlan = getHabboFacingPlanForMeta(meta);
   var activeState = getHabboVisualizationState(meta);
 
-  function buildForDirection(direction) {
+  function buildForDirection(direction, logicalDirectionKey) {
     var chosenVis = chooseHabboVisualization(meta, preferredSize);
     if (!chosenVis) {
-      pushHabboDebug('buildLayers:none-visualization', { type: meta.type || '', dir: direction, preferredSize: preferredSize, visualizationSizes: meta && meta.visualizationInfo && meta.visualizationInfo.sizes ? Object.keys(meta.visualizationInfo.sizes) : [] });
+      pushHabboDebug('buildLayers:none-visualization', { type: meta.type || '', dir: direction, logicalDirectionKey: logicalDirectionKey, preferredSize: preferredSize, visualizationSizes: meta && meta.visualizationInfo && meta.visualizationInfo.sizes ? Object.keys(meta.visualizationInfo.sizes) : [] });
       return null;
     }
     var actualDirection = chosenVis.directions.indexOf(direction) >= 0 ? direction : (chosenVis.directions.indexOf(0) >= 0 ? 0 : (chosenVis.directions[0] || direction));
@@ -1507,12 +1518,12 @@ function buildHabboLayerDirectionsFromBitmaps(meta, bitmaps) {
       if (!asset && frameId !== 0) asset = chooseHabboAssetForLayer(meta, letter, actualDirection, 0, chosenVis.size || preferredSize);
       if (!asset && actualDirection !== 0) asset = chooseHabboAssetForLayer(meta, letter, 0, frameId, chosenVis.size || preferredSize);
       if (!asset) {
-        pushHabboDebug('buildLayers:skip', { type: meta.type || '', dir: direction, actualDirection: actualDirection, layerId: layerId, letter: letter, frame: frameId, reason: 'missing-asset' });
+        pushHabboDebug('buildLayers:skip', { type: meta.type || '', dir: direction, logicalDirectionKey: logicalDirectionKey, actualDirection: actualDirection, layerId: layerId, letter: letter, frame: frameId, reason: 'missing-asset' });
         continue;
       }
       var image = resolveHabboLayerImage(bitmaps, asset);
       if (!image) {
-        pushHabboDebug('buildLayers:skip', { type: meta.type || '', dir: direction, actualDirection: actualDirection, asset: asset.name, layerId: layerId, frame: frameId, reason: 'missing-image', source: asset.source || '' });
+        pushHabboDebug('buildLayers:skip', { type: meta.type || '', dir: direction, logicalDirectionKey: logicalDirectionKey, actualDirection: actualDirection, asset: asset.name, layerId: layerId, frame: frameId, reason: 'missing-image', source: asset.source || '' });
         continue;
       }
       var props = layerId === chosenVis.layerCount ? { x: 0, y: 0, z: 0, alpha: 51, ink: '' } : (chosenVis.layers[layerId] || { x: 0, y: 0, z: 0, alpha: null, ink: '' });
@@ -1522,9 +1533,6 @@ function buildHabboLayerDirectionsFromBitmaps(meta, bitmaps) {
       var regY = Number(asset.y) || 0;
       var alpha = props.alpha == null ? (letter === 'sd' ? 0.2 : 1) : Math.max(0, Math.min(1, Number(props.alpha) / 255));
       var blend = String(props.ink || '').toUpperCase();
-      // Scuti 语义里，layer 的 x/y 是贴图左上角相对 furniture container 原点的偏移；
-      // 对镜像资源，左上角不是 -regX，而要先把图片宽度吃进去：regX - image.width。
-      // 之前 layered/composite 路径一直把 flip 图层也当成 -regX，导致 mirrored part/body 被系统性甩错。
       var topLeftX = (asset.flipH ? (regX - Number(image.width || 0)) : (-regX)) + propX;
       var topLeftY = (-regY) + propY;
       var layerObj = {
@@ -1550,9 +1558,10 @@ function buildHabboLayerDirectionsFromBitmaps(meta, bitmaps) {
         blend: blend,
         frameId: frameId,
         direction: actualDirection,
+        logicalDirectionKey: String(logicalDirectionKey),
         zOrderHint: (letter === 'sd' ? -10000 : 0) + (Number(props.z) || 0),
       };
-      pushHabboDebug('buildLayers:layer', { type: meta.type || '', dir: direction, actualDirection: actualDirection, asset: asset.name, layerId: layerId, kind: layerObj.kind, frame: frameId, size: asset.size, reg: { x: regX, y: regY }, props: { x: propX, y: propY, z: Number(props.z) || 0 }, offsetPx: layerObj.offsetPx, offsetZ: layerObj.offsetZ, alpha: alpha, blend: blend, flipX: layerObj.flipX, wh: { w: image.width, h: image.height }, source: asset.source || '' });
+      pushHabboDebug('buildLayers:layer', { type: meta.type || '', dir: direction, logicalDirectionKey: logicalDirectionKey, actualDirection: actualDirection, asset: asset.name, layerId: layerId, kind: layerObj.kind, frame: frameId, size: asset.size, reg: { x: regX, y: regY }, props: { x: propX, y: propY, z: Number(props.z) || 0 }, offsetPx: layerObj.offsetPx, offsetZ: layerObj.offsetZ, alpha: alpha, blend: blend, flipX: layerObj.flipX, wh: { w: image.width, h: image.height }, source: asset.source || '' });
       built.push(layerObj);
     }
     built.sort(function (a, b) {
@@ -1560,27 +1569,44 @@ function buildHabboLayerDirectionsFromBitmaps(meta, bitmaps) {
       if ((a.layerIndex || 0) !== (b.layerIndex || 0)) return (a.layerIndex || 0) - (b.layerIndex || 0);
       return String(a.name || '').localeCompare(String(b.name || ''));
     });
-    pushHabboDebug('buildLayers:dir-done', { type: meta.type || '', dir: direction, actualDirection: actualDirection, count: built.length, layers: built.map(function(l){ return { name:l.name, kind:l.kind, layerIndex:l.layerIndex, frame:l.frameId, offsetPx:l.offsetPx, offsetZ:l.offsetZ, alpha:l.alpha, blend:l.blend, wh:{w:l.width,h:l.height}, flipX:l.flipX }; }) });
+    pushHabboDebug('buildLayers:dir-done', { type: meta.type || '', dir: direction, logicalDirectionKey: String(logicalDirectionKey), actualDirection: actualDirection, count: built.length, layers: built.map(function(l){ return { name:l.name, kind:l.kind, layerIndex:l.layerIndex, frame:l.frameId, offsetPx:l.offsetPx, offsetZ:l.offsetZ, alpha:l.alpha, blend:l.blend, wh:{w:l.width,h:l.height}, flipX:l.flipX }; }) });
     return built;
   }
-  var baseLayers = buildForDirection(baseDirection);
-  if (!baseLayers || !baseLayers.length) { habboTrace('layerDirections:none baseDir=' + baseDirection); return null; }
-  var altLayers = buildForDirection(altDirection) || baseLayers;
-  habboTrace('layerDirections baseDir=' + baseDirection + ' altDir=' + altDirection + ' base=' + baseLayers.map(function (l) { return l.name + '@(' + l.offsetPx.x + ',' + l.offsetPx.y + ',' + l.offsetZ + ')/' + l.width + 'x' + l.height + (l.flipX ? ':flip' : '') + ':a=' + l.alpha + ':b=' + l.blend; }).join(' | ') + ' alt=' + altLayers.map(function (l) { return l.name + '@(' + l.offsetPx.x + ',' + l.offsetPx.y + ',' + l.offsetZ + ')/' + l.width + 'x' + l.height + (l.flipX ? ':flip' : '') + ':a=' + l.alpha + ':b=' + l.blend; }).join(' | '));
-  return { '0': baseLayers, '1': altLayers };
+
+  var out = {};
+  facingPlan.selectedSourceDirections.forEach(function (sourceDirection, index) {
+    var layers = buildForDirection(sourceDirection, index);
+    if (layers && layers.length) out[String(index)] = layers;
+  });
+  var keys = Object.keys(out).sort();
+  if (!keys.length) {
+    habboTrace('layerDirections:none sourceDirs=' + facingPlan.sourceDirections.join(','));
+    return null;
+  }
+  meta.habboFacingPlan = cloneJsonSafe(facingPlan);
+  pushHabboDebug('habbo-facing:import-plan', { type: meta.type || '', preferredSize: preferredSize, sourceDirections: facingPlan.sourceDirections, selectedSourceDirections: facingPlan.selectedSourceDirections, ignoredSourceDirections: facingPlan.ignoredSourceDirections, generatedFacingStrategy: facingPlan.strategy, directionMap: facingPlan.directionMap, builtDirectionKeys: keys });
+  habboTrace('layerDirections strategy=' + facingPlan.strategy + ' sourceDirs=' + facingPlan.sourceDirections.join(',') + ' selected=' + facingPlan.selectedSourceDirections.join(',') + ' keys=' + keys.join(','));
+  return out;
 }
 
 function buildHabboSpriteDirectionsFromBitmaps(meta, bitmaps) {
-  var baseDirection = meta.visualDirections.indexOf(0) >= 0 ? 0 : (meta.visualDirections.length ? meta.visualDirections[0] : 0);
-  var altDirection = meta.visualDirections.indexOf(2) >= 0 ? 2 : (meta.visualDirections.length > 1 ? meta.visualDirections[1] : baseDirection);
-  var baseSprite = composeHabboDirectionSprite(meta, bitmaps, baseDirection, { includeShadow: false });
-  var altSprite = composeHabboDirectionSprite(meta, bitmaps, altDirection, { includeShadow: false }) || baseSprite;
-  if (!baseSprite) { habboTrace('spriteDirections:none baseDir=' + baseDirection); return null; }
-  habboTrace('spriteDirections baseDir=' + baseDirection + ' altDir=' + altDirection + ' base=' + baseSprite.width + 'x' + baseSprite.height + ' offset=(' + (baseSprite.offsetPx && baseSprite.offsetPx.x || 0) + ',' + (baseSprite.offsetPx && baseSprite.offsetPx.y || 0) + ') alt=' + ((altSprite||baseSprite).width) + 'x' + ((altSprite||baseSprite).height));
-  return {
-    '0': baseSprite,
-    '1': altSprite || baseSprite
-  };
+  var facingPlan = getHabboFacingPlanForMeta(meta);
+  var out = {};
+  facingPlan.selectedSourceDirections.forEach(function (sourceDirection, index) {
+    var sprite = composeHabboDirectionSprite(meta, bitmaps, sourceDirection, { includeShadow: false });
+    if (!sprite) return;
+    sprite.sourceDirection = sourceDirection;
+    sprite.logicalDirectionKey = String(index);
+    out[String(index)] = sprite;
+  });
+  var keys = Object.keys(out).sort();
+  if (!keys.length) {
+    habboTrace('spriteDirections:none sourceDirs=' + facingPlan.sourceDirections.join(','));
+    return null;
+  }
+  meta.habboFacingPlan = cloneJsonSafe(facingPlan);
+  habboTrace('spriteDirections strategy=' + facingPlan.strategy + ' sourceDirs=' + facingPlan.sourceDirections.join(',') + ' selected=' + facingPlan.selectedSourceDirections.join(',') + ' keys=' + keys.join(','));
+  return out;
 }
 
 function buildHabboFloorAnchor(meta) {
@@ -1637,6 +1663,7 @@ async function buildHabboPrefabDefinition(runtime, options) {
   var base = options.base || '#b7d0d4';
   var spriteDirections = runtime && runtime.spriteDirections ? runtime.spriteDirections : null;
   var habboLayerDirections = runtime && runtime.habboLayerDirections ? runtime.habboLayerDirections : null;
+  var facingPlan = meta.habboFacingPlan || getHabboFacingPlanForMeta(meta);
   var directionGroups = {};
   (meta.assets || []).forEach(function (asset) {
     var key = String(asset.direction || 0);
@@ -1680,21 +1707,29 @@ async function buildHabboPrefabDefinition(runtime, options) {
       proxyDims: cloneJsonSafe(proxyDims),
       logicDirections: cloneJsonSafe(meta.logicDirections),
       visualDirections: cloneJsonSafe(meta.visualDirections),
+      sourceVisualDirections: cloneJsonSafe(facingPlan.sourceDirections),
+      sourceDirectionCount: Number(facingPlan.sourceDirectionCount || facingPlan.sourceDirections.length || 1),
+      selectedSourceDirections: cloneJsonSafe(facingPlan.selectedSourceDirections),
+      ignoredSourceDirections: cloneJsonSafe(facingPlan.ignoredSourceDirections),
+      generatedFacingStrategy: String(facingPlan.strategy || 'single-mirror'),
+      directionMap: cloneJsonSafe(facingPlan.directionMap),
       visualization: meta.visualization || '',
       logic: meta.logic || '',
+      roomAnchorMode: 'rotated-position-tile-center',
       scutiReference: {
-        roomAnchor: 'position-tile-center-not-footprint-center',
-        spriteOrganization: 'direction -> extracted bitmap layers with offsets',
+        roomAnchor: 'rotated-position-tile-center',
+        spriteOrganization: 'source direction -> logical 0..3 facing map -> extracted bitmap layers with offsets',
         sorting: 'proxy-first + sprite overlay',
         zoomSelection: 'prefer-size-64-then-largest'
       },
       layersByDirection: directionGroups,
       usesFlattenedFrame: false,
       notes: [
-        '当前版会直接从 SWF 的 DefineBitsLossless2 位图 tag 重建 2D 图层，不再依赖外部 _frame.png。',
-        '组织方式参考 Scuti：先读 objectData / visualization / assets，再按 direction + layer offsets 组装显示对象。',
-        '当前渲染按 direction + layer 逐层绘制，包含 shadow/body/part；多格 floor furni 的锚点按 Scuti 的 room object 逻辑固定在放置 tile 的中心，而不是整个 footprint 的中心。',
-        '如果某个 SWF 含有更复杂的动画/状态/特殊 visualization，这一版仍会先按 static floor furni 的方式处理。'
+        'SWF 有四个可用方向时，逻辑方向 0/1/2/3 分别使用四套原生图层。',
+        'SWF 有两个可用方向时，前两个逻辑方向使用原生图层，另外两个方向由对应原生方向水平镜像生成。',
+        'SWF 只有一个可用方向时，四次旋转按“原图、镜像、原图、镜像”生成；不伪造背面，只保证图像轴向与旋转后的 voxel footprint 一致。',
+        '图片注册点绑定旋转后的 position tile 中心；voxel 使用同一个实例原点，因此预览和放置后的视觉位置保持一致。',
+        '每次方向解析与合成都会写入 Habbo 调试日志；可用“下载 Habbo 旋转调试 JSON”导出。'
       ],
     },
   };

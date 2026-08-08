@@ -641,7 +641,12 @@ var __APP_CORE_SCENE_DOMAIN_CORE__ = (function () {
       ? facingApi.computeSortBase(prefab, instance && instance.rotation != null ? instance.rotation : 0, instance || { x: x, y: y, z: z })
       : null;
     var anchor = sortBase && sortBase.rotatedAnchor ? sortBase.rotatedAnchor : { x: 0, y: 0, z: 0 };
-    var sortMeta = computeViewAwareSortMeta({ x: x + anchor.x, y: y + anchor.y, z: z + anchor.z }, h, viewRotation, sortBias);
+    // Atomic prefab sprites are depth-sorted by their ground/foot anchor, just like the player.
+    // Visual height must not push the whole image in front of a player on a nearer ground tile.
+    // The view rotation already changes the projected ground-depth axis; adding prefab height here
+    // made the player/sprite order flip incorrectly after camera rotation.
+    var depthAnchor = { x: x + anchor.x, y: y + anchor.y, z: z + anchor.z };
+    var sortMeta = computeViewAwareSortMeta(depthAnchor, 0, viewRotation, sortBias);
     var occludesPlayer = false;
     if (mode === 'box_occlusion') occludesPlayer = computeProjectedPlayerSpriteOcclusion(playerBox, Object.assign({}, b, { x: x, y: y, z: z, h: h, viewRotation: viewRotation }));
     return {
@@ -649,7 +654,10 @@ var __APP_CORE_SCENE_DOMAIN_CORE__ = (function () {
       tie: sortMeta.tie,
       occludesPlayer: !!occludesPlayer,
       sortMode: mode,
-      sortBase: sortBase
+      sortBase: sortBase,
+      depthAnchor: depthAnchor,
+      sortAnchorMode: 'sprite-foot-anchor',
+      visualHeightExcludedFromDepth: true
     };
   }
 

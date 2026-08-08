@@ -6,7 +6,13 @@
 (function registerProjectionDebugOverlay(global) {
   var OWNER = 'src/presentation/render/debug/projection-debug-overlay.js';
 
+function isCanvasDebugTextEnabledForProjectionOverlay() {
+  try { return !!(global.document && global.document.getElementById('showCanvasDebugText') && global.document.getElementById('showCanvasDebugText').checked); } catch (_) {}
+  return false;
+}
+
 function drawSelectedInstanceProjectionDebug() {
+  if (!isCanvasDebugTextEnabledForProjectionOverlay()) return;
   if (typeof shadowDebugDetailed !== 'undefined' && !shadowDebugDetailed) return;
   var inst = getSelectedInstance();
   if (!inst) return;
@@ -127,6 +133,7 @@ function drawFacingLegendPanel(proto, anchorPoint) {
 
 
 function drawItemFacingPrototypeOverlay() {
+  if (!isCanvasDebugTextEnabledForProjectionOverlay()) return;
   if (!ui.showItemFacingDebug || !ui.showItemFacingDebug.checked) return;
   var target = null;
   var bounds = null;

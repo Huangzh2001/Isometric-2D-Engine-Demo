@@ -1,0 +1,49 @@
+{
+  "version": "habbo-multi-sample-analysis-v2-position-tile",
+  "rule": {
+    "footprint": "habbo-position-tile-footprint-registration-v3",
+    "imageRegistration": "habbo-position-tile-registration-v3-no-double-anchor",
+    "calibrationExport": "translation-invariant-registration-point-alignment-v2"
+  },
+  "samples": [
+    {
+      "name": "army_c15_bed",
+      "dimensions": { "x": 1, "y": 3, "z": 1.3 },
+      "selectedDirections": [0, 2],
+      "role": "validates source-axis preservation, segmented-layer mirror correction and position-tile registration"
+    },
+    {
+      "name": "bed_silo_two",
+      "dimensions": { "x": 2, "y": 3, "z": 1.9 },
+      "selectedDirectionsFallback": [0, 2],
+      "role": "validates multi-tile position-tile registration; visualization direction list is absent so same-size assets are used"
+    },
+    {
+      "name": "bling_bed",
+      "dimensions": { "x": 2, "y": 3, "z": 1.6 },
+      "selectedDirections": [2, 4],
+      "globalDirections": [0, 2, 4],
+      "role": "proves selected visualization directions must override global fallback directions"
+    },
+    {
+      "name": "val11_present",
+      "dimensions": { "x": 1, "y": 1, "z": 1.2 },
+      "selectedDirections": [0],
+      "role": "high-confidence manual validation of the half-tile registration vector"
+    },
+    {
+      "name": "shelves_silo",
+      "dimensions": { "x": 2, "y": 1, "z": 1.0 },
+      "selectedDirections": [0, 2, 4, 6],
+      "role": "validates four native directions and position-tile registration on a non-square footprint"
+    }
+  ],
+  "invariants": [
+    "absolute voxel editor coordinates are excluded",
+    "objectData x/y axes are not sorted by length",
+    "prefab.anchor stores the position tile",
+    "sprite offsets contain only the image registration correction and the half-tile vector because anchor is projected separately",
+    "manual per-facing transforms remain material-level overrides"
+  ],
+  "evidenceFile": "HABBO_POSITION_TILE_REGISTRATION_EVIDENCE.json"
+}

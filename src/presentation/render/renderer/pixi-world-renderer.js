@@ -38,6 +38,9 @@
     pixiCanvasHeight: 0,
     pixiRendererWidth: 0,
     pixiRendererHeight: 0,
+    pixiLogicalWidth: 0,
+    pixiLogicalHeight: 0,
+    pixiMetricSignature: '',
     pixiResolution: 0,
     pixiRendererType: 'unknown',
     pixiLoadRequested: false,
@@ -251,6 +254,44 @@
       }
     } catch (_) {}
     return { width: 0, height: 0 };
+  }
+
+  // IMPORTANT: every projection helper in the main editor (iso(), mouse.x/y,
+  // screenToFloor(), sprite bounds, voxel faces) works in CSS/logical pixels.
+  // The legacy Canvas2D backing store is larger by DPR, but that physical size
+  // is NOT a second world coordinate system. Pixi must therefore use the CSS
+  // viewport as its logical stage size and use resolution only for backing
+  // density. Feeding targetCanvas.width/height into Pixi as logical width/height
+  // scales the whole Pixi world away from the mouse and hit-test coordinates.
+  function getPixiLogicalCanvasMetrics(targetCanvas) {
+    var css = getCanvasCssRect(targetCanvas);
+    // The canonical main-editor coordinate space is VIEW_W/VIEW_H, which are
+    // integer logical pixels configured by configureCanvasForDisplay().
+    // getBoundingClientRect() may be fractional under browser/page scaling and
+    // must not be fed back into renderer.resize() every frame.
+    var styleW = targetCanvas && targetCanvas.style ? parseFloat(targetCanvas.style.width || '') : 0;
+    var styleH = targetCanvas && targetCanvas.style ? parseFloat(targetCanvas.style.height || '') : 0;
+    var runtimeW = Number(global && global.VIEW_W || 0);
+    var runtimeH = Number(global && global.VIEW_H || 0);
+    var logicalW = Math.max(1, Number(runtimeW || styleW || (targetCanvas && targetCanvas.clientWidth) || css.width || 0) || 1);
+    var logicalH = Math.max(1, Number(runtimeH || styleH || (targetCanvas && targetCanvas.clientHeight) || css.height || 0) || 1);
+    var backingW = Math.max(1, Number(targetCanvas && targetCanvas.width || 0) || Math.round(logicalW * getDevicePixelRatio()));
+    var backingH = Math.max(1, Number(targetCanvas && targetCanvas.height || 0) || Math.round(logicalH * getDevicePixelRatio()));
+    var runtimeDpr = Number(global && global.dpr || 0);
+    var rx = backingW / logicalW;
+    var ry = backingH / logicalH;
+    var backingScale = Number.isFinite(runtimeDpr) && runtimeDpr > 0
+      ? runtimeDpr
+      : (Number.isFinite(rx) && Number.isFinite(ry) ? Math.max(1, Math.min(rx, ry)) : getDevicePixelRatio());
+    return {
+      logicalWidth: logicalW,
+      logicalHeight: logicalH,
+      backingWidth: backingW,
+      backingHeight: backingH,
+      backingScale: Math.max(1, backingScale),
+      cssWidth: Number(css.width || logicalW),
+      cssHeight: Number(css.height || logicalH)
+    };
   }
 
   function detectActiveBackend() {
@@ -524,22 +565,14 @@
   }
 
   function getPixiStageCoordinateBounds(targetCanvas) {
-    // Pixi was initialized/resized with the backing canvas size
-    // (targetCanvas.width/height, usually CSS size * DPR).  The floor projection
-    // points are submitted into that same Pixi stage coordinate space.  Using the
-    // CSS client rect here under-culls the right/bottom side at DPR > 1, which is
-    // exactly the visible symptom reported by the user: the floor exists, but the
-    // computed visible range is too small.
-    var css = getCanvasCssRect(targetCanvas);
-    var dpr = getDevicePixelRatio();
+    // World projection and pointer coordinates are CSS/logical pixels. Keep
+    // culling in that exact space too; the backing store belongs only to raster
+    // density and must never change world geometry or picking.
+    var metrics = getPixiLogicalCanvasMetrics(targetCanvas);
     var rendererW = Number(state.pixiRendererWidth || 0);
     var rendererH = Number(state.pixiRendererHeight || 0);
-    var canvasW = Number(targetCanvas && targetCanvas.width || 0);
-    var canvasH = Number(targetCanvas && targetCanvas.height || 0);
-    var cssWAsStage = Number(css.width || 0) * dpr;
-    var cssHAsStage = Number(css.height || 0) * dpr;
-    var w = Math.max(1, Math.round(rendererW || canvasW || cssWAsStage || Number(css.width || 0) || 1));
-    var h = Math.max(1, Math.round(rendererH || canvasH || cssHAsStage || Number(css.height || 0) || 1));
+    var w = Math.max(1, Number(metrics.logicalWidth || 1));
+    var h = Math.max(1, Number(metrics.logicalHeight || 1));
     return {
       minX: 0,
       minY: 0,
@@ -547,14 +580,14 @@
       maxY: h,
       width: w,
       height: h,
-      coordinateSpace: 'pixi-stage-backing-pixels',
-      cssWidth: Number(css.width || 0),
-      cssHeight: Number(css.height || 0),
-      dpr: dpr,
+      coordinateSpace: 'pixi-stage-logical-css-pixels',
+      cssWidth: Number(metrics.cssWidth || metrics.logicalWidth || 0),
+      cssHeight: Number(metrics.cssHeight || metrics.logicalHeight || 0),
+      dpr: Number(metrics.backingScale || 1),
       rendererWidth: rendererW,
       rendererHeight: rendererH,
-      canvasWidth: canvasW,
-      canvasHeight: canvasH
+      canvasWidth: Number(metrics.backingWidth || 0),
+      canvasHeight: Number(metrics.backingHeight || 0)
     };
   }
 
@@ -1773,14 +1806,25 @@
     var app = state.pixiApp;
     var pixiCanvas = state.pixiCanvas || (app && (app.canvas || app.view)) || null;
     if (!targetCanvas || !app || !pixiCanvas) return false;
-    var cssRect = getCanvasCssRect(targetCanvas);
-    var width = Math.max(1, Number(targetCanvas.width || Math.round((cssRect.width || targetCanvas.clientWidth || 1) * getDevicePixelRatio())));
-    var height = Math.max(1, Number(targetCanvas.height || Math.round((cssRect.height || targetCanvas.clientHeight || 1) * getDevicePixelRatio())));
-    try {
-      if (app.renderer && typeof app.renderer.resize === 'function') app.renderer.resize(width, height);
-      else if (typeof app.resize === 'function') app.resize();
-    } catch (_) {}
-    updatePixiCanvasStyle(targetCanvas, pixiCanvas);
+    var logicalMetrics = getPixiLogicalCanvasMetrics(targetCanvas);
+    var width = Math.max(1, Number(logicalMetrics.logicalWidth || 1));
+    var height = Math.max(1, Number(logicalMetrics.logicalHeight || 1));
+    var metricSignature = [width, height, Number(logicalMetrics.backingWidth || 0), Number(logicalMetrics.backingHeight || 0), Number(logicalMetrics.backingScale || 1)].join('|');
+    var metricsChanged = state.pixiMetricSignature !== metricSignature;
+    // renderer.resize() is destructive/expensive in Pixi: it can resize the
+    // WebGL backbuffer and dependent render targets. Never call it on stable
+    // frames. v7 did so several times per frame using fractional CSS sizes,
+    // causing severe GPU stalls.
+    if (metricsChanged) {
+      try {
+        if (app.renderer && typeof app.renderer.resize === 'function') app.renderer.resize(width, height);
+        else if (typeof app.resize === 'function') app.resize();
+      } catch (_) {}
+      updatePixiCanvasStyle(targetCanvas, pixiCanvas);
+      state.pixiMetricSignature = metricSignature;
+      state.pixiLogicalWidth = width;
+      state.pixiLogicalHeight = height;
+    }
     state.pixiCanvasWidth = Number(pixiCanvas.width || width || 0);
     state.pixiCanvasHeight = Number(pixiCanvas.height || height || 0);
     try {
@@ -1858,13 +1902,13 @@
 
     try {
       var app = new Application();
-      var cssRect = getCanvasCssRect(targetCanvas);
-      var width = Math.max(1, Number(targetCanvas.width || Math.round((cssRect.width || targetCanvas.clientWidth || 1) * getDevicePixelRatio())));
-      var height = Math.max(1, Number(targetCanvas.height || Math.round((cssRect.height || targetCanvas.clientHeight || 1) * getDevicePixelRatio())));
+      var logicalMetrics = getPixiLogicalCanvasMetrics(targetCanvas);
+      var width = Math.max(1, Number(logicalMetrics.logicalWidth || 1));
+      var height = Math.max(1, Number(logicalMetrics.logicalHeight || 1));
       var initOptions = {
         width: width,
         height: height,
-        resolution: getDevicePixelRatio(),
+        resolution: Math.max(1, Number(logicalMetrics.backingScale || getDevicePixelRatio() || 1)),
         autoDensity: true,
         backgroundAlpha: 0,
         antialias: false,
@@ -4199,6 +4243,8 @@
     getLastPixiStaticWorldPacketSummary: getLastPixiStaticWorldPacketSummary,
     applyPlayerOcclusionFadePass: applyPlayerOcclusionFadePass,
     getLastPlayerOcclusionFadeSummary: function getLastPlayerOcclusionFadeSummary() { return state.lastPlayerOcclusionFadeSummary || null; },
+    getPixiLogicalCanvasMetrics: getPixiLogicalCanvasMetrics,
+    getPixiStageCoordinateBounds: getPixiStageCoordinateBounds,
     getStatus: getStatus,
     summarizeCoverage: function summarizeCoverage() {
       return {

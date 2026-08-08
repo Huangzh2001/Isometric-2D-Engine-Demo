@@ -4,6 +4,8 @@
 > 任何 AI 或开发者在修改代码、增加功能、调整结构之前，都应先阅读本文件。  
 > 本文件优先于旧阶段性说明；后续开发以这里的约束为准。
 
+> **上层产品架构参考：** 凡涉及未来 Prefab 的 Material、Component / Capability、Properties、References、Commands、Events、Lua Behavior、Gameplay API、事件驱动运行时或 Scene Logic，修改前必须同时阅读 `docs/EMERGENT_ASSET_SYSTEM_DEVELOPMENT_GUIDE.zh-CN.md`。该文档规定的是“涌现式素材系统”的目标架构；不得把目标设计误认为当前全部已经实现。
+
 ---
 
 ## 1. 项目定位
@@ -1883,3 +1885,10 @@ Rules:
 - `src/application/render/static-world-renderable-builder.js` remains the chunk-level orchestrator and must not re-own large visible face descriptor loops, face tie priority tables, packet ID/faceKey construction, or direct `packets.sort(compareRenderablesByDomain)` logic.
 - Both owner files stay in `src/application/render/`; they must not depend on DOM, Canvas, localStorage, Image, fetch, storage, UI, or renderer implementation details.
 - Guardrails: `node scripts/check_static_world_face_descriptor_builder_boundary.js` and `node scripts/check_static_world_packet_ordering_boundary.js`.
+
+
+## Emergent asset library boundary
+- Treat the emergent asset library as an external content root, not as a subfolder owned by the game.
+- Behavior TestWorld must be able to place the current draft and arbitrary external library Prefabs together.
+- Do not couple external Prefab behavior to renderer internals or a particular game client.
+- The current Lua Test Runtime is intentionally a subset; do not describe it as a complete Lua VM.

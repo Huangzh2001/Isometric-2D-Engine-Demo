@@ -114,6 +114,13 @@
     return normalizeFacing(normalizeFacing(value) + toInt(delta, 0));
   }
 
+  // Convert a persistent world-facing into the face visible from the current
+  // editor camera. Placement/footprint code must keep using worldFacing;
+  // sprite selection uses this relative facing.
+  function resolveViewRelativeFacing(worldFacing, viewRotation) {
+    return normalizeFacing(normalizeFacing(worldFacing) - normalizeViewRotation(viewRotation));
+  }
+
   function getFacingLabel(value) {
     return FACE_LABELS[normalizeFacing(value)] || 'N';
   }
@@ -127,12 +134,153 @@
     return Number.isFinite(n) ? n : Number(fallback || 0);
   }
 
-  function getBaseDimensions(prefab) {
-    var safe = prefab || {};
+  function getRawAnchor(prefab) {
+    var anchor = prefab && prefab.anchor ? prefab.anchor : null;
     return {
-      w: Math.max(1, toFiniteNumber(safe.w, 1)),
-      d: Math.max(1, toFiniteNumber(safe.d, 1)),
-      h: Math.max(1, toFiniteNumber(safe.h, 1))
+      x: toFiniteNumber(anchor && anchor.x, 0),
+      y: toFiniteNumber(anchor && anchor.y, 0),
+      z: toFiniteNumber(anchor && anchor.z, 0)
+    };
+  }
+
+  function getRelativeVoxelAlignment(prefab) {
+    if (!prefab || typeof prefab !== 'object') return null;
+    // A runtime local frame and authored sprite/voxel registration are
+    // complementary. Do not discard the registration merely because the
+    // prefab has already been compiled into a local frame.
+    if (prefab.sprite && prefab.sprite.relativeVoxelAlignment) return prefab.sprite.relativeVoxelAlignment;
+    var dirs = prefab.spriteDirections;
+    if (dirs && typeof dirs === 'object') {
+      var keys = Object.keys(dirs);
+      for (var i = 0; i < keys.length; i++) {
+        var cfg = dirs[keys[i]];
+        if (cfg && cfg.relativeVoxelAlignment) return cfg.relativeVoxelAlignment;
+      }
+    }
+    return null;
+  }
+
+  // Runtime geometry is expressed in a prefab-local frame.
+  //
+  // IMPORTANT FOR UNIFIED HZH ASSETS:
+  // The voxel editor already has a real authored registration point:
+  // prefab/state.anchor.  Voxel coordinates are meaningful *relative to that
+  // anchor*.  They must not be normalized back to the occupied bounding-box
+  // minimum, because doing so destroys intentionally offset voxel geometry.
+  // The old translation-invariant metadata is useful for calibration/learning
+  // but is not the runtime placement origin.
+  function getPrefabLocalFrame(prefab) {
+    var safe = prefab || {};
+    if (safe.localFrame && safe.localFrame.origin && safe.localFrame.bounds && safe.localFrame.anchor) {
+      var fastAnchor = {
+        x: toFiniteNumber(safe.localFrame.anchor.x, 0),
+        y: toFiniteNumber(safe.localFrame.anchor.y, 0),
+        z: toFiniteNumber(safe.localFrame.anchor.z, 0)
+      };
+      var fastRotationSpace = String(safe.localFrame.rotationSpace || '');
+      var fastIsEditorAnchorCorner = fastRotationSpace === 'editor-anchor-corner';
+      var fastPivot = safe.localFrame.pivot && typeof safe.localFrame.pivot === 'object'
+        ? {
+            x: toFiniteNumber(safe.localFrame.pivot.x, fastAnchor.x + (fastIsEditorAnchorCorner ? 0 : 0.5)),
+            y: toFiniteNumber(safe.localFrame.pivot.y, fastAnchor.y + (fastIsEditorAnchorCorner ? 0 : 0.5)),
+            z: toFiniteNumber(safe.localFrame.pivot.z, fastAnchor.z)
+          }
+        : {
+            x: fastAnchor.x + (fastIsEditorAnchorCorner ? 0 : 0.5),
+            y: fastAnchor.y + (fastIsEditorAnchorCorner ? 0 : 0.5),
+            z: fastAnchor.z
+          };
+      return {
+        version: String(safe.localFrame.version || 'prefab-local-frame-v1'),
+        origin: {
+          x: toFiniteNumber(safe.localFrame.origin.x, 0),
+          y: toFiniteNumber(safe.localFrame.origin.y, 0),
+          z: toFiniteNumber(safe.localFrame.origin.z, 0)
+        },
+        bounds: {
+          w: Math.max(0.001, toFiniteNumber(safe.localFrame.bounds.w, 1)),
+          d: Math.max(0.001, toFiniteNumber(safe.localFrame.bounds.d, 1)),
+          h: Math.max(0.001, toFiniteNumber(safe.localFrame.bounds.h, 1))
+        },
+        anchor: fastAnchor,
+        pivot: fastPivot,
+        rotationSpace: fastRotationSpace || 'legacy-bounds'
+      };
+    }
+
+    var voxels = Array.isArray(safe.voxels) ? safe.voxels : [];
+    var minX = Infinity, minY = Infinity, minZ = Infinity;
+    var maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+    for (var i = 0; i < voxels.length; i++) {
+      var v = voxels[i] || {};
+      var x = toFiniteNumber(v.x, 0), y = toFiniteNumber(v.y, 0), z = toFiniteNumber(v.z, 0);
+      var w = Math.max(0.001, toFiniteNumber(v.w, 1));
+      var d = Math.max(0.001, toFiniteNumber(v.d, 1));
+      var h = Math.max(0.001, toFiniteNumber(v.h, 1));
+      minX = Math.min(minX, x); minY = Math.min(minY, y); minZ = Math.min(minZ, z);
+      maxX = Math.max(maxX, x + w); maxY = Math.max(maxY, y + d); maxZ = Math.max(maxZ, z + h);
+    }
+
+    var alignment = getRelativeVoxelAlignment(safe);
+    var rawAnchor = getRawAnchor(safe);
+    var hasUnifiedAuthoredRegistration = !!(
+      alignment ||
+      safe.hzhUnifiedRuntime === true ||
+      safe.useLegacyHabboRuntime === false ||
+      safe.materialStates ||
+      safe.artworkStateBundle ||
+      safe.voxelStateBundle
+    );
+
+    // Unified assets use the authored anchor itself as local origin.  This is
+    // exactly the coordinate reference used by the voxel editor's iso(anchor)
+    // overlay.  Do not substitute occupied minX/minY here.
+    var originX = hasUnifiedAuthoredRegistration
+      ? rawAnchor.x
+      : (Number.isFinite(minX) ? minX : 0);
+    var originY = hasUnifiedAuthoredRegistration
+      ? rawAnchor.y
+      : (Number.isFinite(minY) ? minY : 0);
+    var originZ = hasUnifiedAuthoredRegistration
+      ? rawAnchor.z
+      : (Number.isFinite(minZ) ? minZ : 0);
+
+    var inferredW = Number.isFinite(maxX) ? Math.max(0.001, maxX - originX) : Math.max(1, toFiniteNumber(safe.w, 1));
+    var inferredD = Number.isFinite(maxY) ? Math.max(0.001, maxY - originY) : Math.max(1, toFiniteNumber(safe.d, 1));
+    var inferredH = Number.isFinite(maxZ) ? Math.max(0.001, maxZ - originZ) : Math.max(1, toFiniteNumber(safe.h, 1));
+    var boundsW = alignment && alignment.localBounds && Number.isFinite(Number(alignment.localBounds.w))
+      ? Math.max(0.001, Number(alignment.localBounds.w)) : inferredW;
+    var boundsD = alignment && alignment.localBounds && Number.isFinite(Number(alignment.localBounds.d))
+      ? Math.max(0.001, Number(alignment.localBounds.d)) : inferredD;
+
+    // Legacy prefabs without editor registration metadata may intentionally use
+    // explicit w/d/h larger than their occupied voxels.
+    if (!alignment) {
+      boundsW = Math.max(boundsW, toFiniteNumber(safe.w, boundsW));
+      boundsD = Math.max(boundsD, toFiniteNumber(safe.d, boundsD));
+      inferredH = Math.max(inferredH, toFiniteNumber(safe.h, inferredH));
+    }
+
+    var localAnchor = { x: rawAnchor.x - originX, y: rawAnchor.y - originY, z: rawAnchor.z - originZ };
+
+    return {
+      version: hasUnifiedAuthoredRegistration ? 'prefab-anchor-local-frame-v3' : 'prefab-local-frame-v1',
+      origin: { x: originX, y: originY, z: originZ },
+      bounds: { w: Math.max(0.001, boundsW), d: Math.max(0.001, boundsD), h: Math.max(0.001, inferredH) },
+      anchor: localAnchor,
+      pivot: hasUnifiedAuthoredRegistration
+        ? { x: localAnchor.x, y: localAnchor.y, z: localAnchor.z }
+        : { x: localAnchor.x + 0.5, y: localAnchor.y + 0.5, z: localAnchor.z },
+      rotationSpace: hasUnifiedAuthoredRegistration ? 'editor-anchor-corner' : 'legacy-bounds'
+    };
+  }
+
+  function getBaseDimensions(prefab) {
+    var frame = getPrefabLocalFrame(prefab);
+    return {
+      w: Math.max(0.001, toFiniteNumber(frame && frame.bounds && frame.bounds.w, 1)),
+      d: Math.max(0.001, toFiniteNumber(frame && frame.bounds && frame.bounds.d, 1)),
+      h: Math.max(0.001, toFiniteNumber(frame && frame.bounds && frame.bounds.h, 1))
     };
   }
 
@@ -391,22 +539,101 @@
   }
 
   function getBaseAnchor(prefab) {
-    var anchor = prefab && prefab.anchor ? prefab.anchor : null;
+    var frame = getPrefabLocalFrame(prefab);
+    var anchor = frame && frame.anchor ? frame.anchor : { x: 0, y: 0, z: 0 };
     return {
-      x: toInt(anchor && anchor.x, 0),
-      y: toInt(anchor && anchor.y, 0),
-      z: toInt(anchor && anchor.z, 0)
+      x: toFiniteNumber(anchor.x, 0),
+      y: toFiniteNumber(anchor.y, 0),
+      z: toFiniteNumber(anchor.z, 0)
     };
+  }
+
+  function usesAnchorRelativeRotation(prefab) {
+    var frame = getPrefabLocalFrame(prefab);
+    var mode = frame ? String(frame.rotationSpace || '') : '';
+    return mode === 'anchor-cell-center' || mode === 'editor-anchor-corner';
+  }
+
+  function usesEditorAnchorCornerRotation(prefab) {
+    var frame = getPrefabLocalFrame(prefab);
+    return !!(frame && String(frame.rotationSpace || '') === 'editor-anchor-corner');
+  }
+
+  function getAnchorRotationPivot(prefab) {
+    var frame = getPrefabLocalFrame(prefab);
+    var anchor = frame && frame.anchor ? frame.anchor : { x: 0, y: 0, z: 0 };
+    var editorAnchorCorner = usesEditorAnchorCornerRotation(prefab);
+    if (frame && frame.pivot) {
+      return {
+        x: toFiniteNumber(frame.pivot.x, toFiniteNumber(anchor.x, 0) + (editorAnchorCorner ? 0 : 0.5)),
+        y: toFiniteNumber(frame.pivot.y, toFiniteNumber(anchor.y, 0) + (editorAnchorCorner ? 0 : 0.5)),
+        z: toFiniteNumber(frame.pivot.z, toFiniteNumber(anchor.z, 0))
+      };
+    }
+    if (editorAnchorCorner) {
+      return {
+        x: toFiniteNumber(anchor.x, 0),
+        y: toFiniteNumber(anchor.y, 0),
+        z: toFiniteNumber(anchor.z, 0)
+      };
+    }
+    // anchor denotes the authored positioning cell; the physical rotation
+    // pivot is that cell's centre. This keeps a 1x1 voxel in the same cell and
+    // lets offset voxels rotate around the exact point used by the artwork.
+    return {
+      x: toFiniteNumber(anchor.x, 0) + 0.5,
+      y: toFiniteNumber(anchor.y, 0) + 0.5,
+      z: toFiniteNumber(anchor.z, 0)
+    };
+  }
+
+  function rotatePointAroundAnchorPivot(x, y, prefab, facing) {
+    var pivot = getAnchorRotationPivot(prefab);
+    var dx = toFiniteNumber(x, 0) - pivot.x;
+    var dy = toFiniteNumber(y, 0) - pivot.y;
+    var editorAnchorCorner = usesEditorAnchorCornerRotation(prefab);
+    switch (normalizeFacing(facing)) {
+      // These two mappings intentionally differ from the legacy room-item
+      // rotation. They are the exact relative transforms used by the voxel
+      // editor's viewPoint():
+      //   f1: (dx,dy) -> (-dy,+dx)
+      //   f3: (dx,dy) -> (+dy,-dx)
+      case 1: return editorAnchorCorner
+        ? { x: pivot.x - dy, y: pivot.y + dx }
+        : { x: pivot.x + dy, y: pivot.y - dx };
+      case 2: return { x: pivot.x - dx, y: pivot.y - dy };
+      case 3: return editorAnchorCorner
+        ? { x: pivot.x + dy, y: pivot.y - dx }
+        : { x: pivot.x - dy, y: pivot.y + dx };
+      default: return { x: toFiniteNumber(x, 0), y: toFiniteNumber(y, 0) };
+    }
+  }
+
+  function rotateBoxAroundAnchorPivot(x, y, w, d, prefab, facing) {
+    var p0 = rotatePointAroundAnchorPivot(x, y, prefab, facing);
+    var p1 = rotatePointAroundAnchorPivot(x + w, y, prefab, facing);
+    var p2 = rotatePointAroundAnchorPivot(x, y + d, prefab, facing);
+    var p3 = rotatePointAroundAnchorPivot(x + w, y + d, prefab, facing);
+    var xs = [p0.x, p1.x, p2.x, p3.x];
+    var ys = [p0.y, p1.y, p2.y, p3.y];
+    var minX = Math.min.apply(Math, xs), maxX = Math.max.apply(Math, xs);
+    var minY = Math.min.apply(Math, ys), maxY = Math.max.apply(Math, ys);
+    return { x: minX, y: minY, w: Math.max(0.001, maxX - minX), d: Math.max(0.001, maxY - minY) };
   }
 
   function getRotatedAnchor(prefab, facing) {
     var anchor = getBaseAnchor(prefab);
+    if (usesAnchorRelativeRotation(prefab)) {
+      // The authored positioning cell is the rotation pivot and therefore does
+      // not walk around the voxel bounding rectangle when the item rotates.
+      return { x: anchor.x, y: anchor.y, z: anchor.z };
+    }
     var dims = getBaseDimensions(prefab);
     switch (normalizeFacing(facing)) {
       case 0: return { x: anchor.x, y: anchor.y, z: anchor.z };
-      case 1: return { x: anchor.y, y: Math.max(0, dims.w - 1 - anchor.x), z: anchor.z };
-      case 2: return { x: Math.max(0, dims.w - 1 - anchor.x), y: Math.max(0, dims.d - 1 - anchor.y), z: anchor.z };
-      case 3: return { x: Math.max(0, dims.d - 1 - anchor.y), y: anchor.x, z: anchor.z };
+      case 1: return { x: anchor.y, y: dims.w - 1 - anchor.x, z: anchor.z };
+      case 2: return { x: dims.w - 1 - anchor.x, y: dims.d - 1 - anchor.y, z: anchor.z };
+      case 3: return { x: dims.d - 1 - anchor.y, y: anchor.x, z: anchor.z };
       default: return { x: anchor.x, y: anchor.y, z: anchor.z };
     }
   }
@@ -424,7 +651,7 @@
     return (Number(dy) || 0) >= 0 ? 'south' : 'north';
   }
 
-  function rotateCardinalDirection(value, facing) {
+  function rotateCardinalDirection(value, facing, prefab) {
     var dir = normalizeCardinalDirection(value);
     var r = normalizeFacing(facing);
     var vectors = {
@@ -436,34 +663,45 @@
     var vector = vectors[dir] || vectors.east;
     var dx = vector.dx;
     var dy = vector.dy;
-    if (r === 1) return cardinalDirectionFromVector(dy, -dx);
+    var editorAnchorCorner = usesEditorAnchorCornerRotation(prefab);
+    if (r === 1) return editorAnchorCorner
+      ? cardinalDirectionFromVector(-dy, dx)
+      : cardinalDirectionFromVector(dy, -dx);
     if (r === 2) return cardinalDirectionFromVector(-dx, -dy);
-    if (r === 3) return cardinalDirectionFromVector(-dy, dx);
+    if (r === 3) return editorAnchorCorner
+      ? cardinalDirectionFromVector(dy, -dx)
+      : cardinalDirectionFromVector(-dy, dx);
     return dir;
   }
 
   function rotateVoxel(v, prefab, facing) {
-    var x = toFiniteNumber(v && v.x, 0);
-    var y = toFiniteNumber(v && v.y, 0);
-    var z = toFiniteNumber(v && v.z, 0);
+    var frame = getPrefabLocalFrame(prefab);
+    var x = toFiniteNumber(v && v.x, 0) - toFiniteNumber(frame && frame.origin && frame.origin.x, 0);
+    var y = toFiniteNumber(v && v.y, 0) - toFiniteNumber(frame && frame.origin && frame.origin.y, 0);
+    var z = toFiniteNumber(v && v.z, 0) - toFiniteNumber(frame && frame.origin && frame.origin.z, 0);
     var w = Math.max(0.001, toFiniteNumber(v && v.w, 1));
     var d = Math.max(0.001, toFiniteNumber(v && v.d, 1));
     var h = Math.max(0.001, toFiniteNumber(v && v.h, 1));
-    var dims = getBaseDimensions(prefab);
     var r = normalizeFacing(facing);
     var base;
-    switch (r) {
-      case 0: base = { x: x, y: y, z: z, w: w, d: d, h: h }; break;
-      case 1: base = { x: y, y: Math.max(0, dims.w - x - w), z: z, w: d, d: w, h: h }; break;
-      case 2: base = { x: Math.max(0, dims.w - x - w), y: Math.max(0, dims.d - y - d), z: z, w: w, d: d, h: h }; break;
-      case 3: base = { x: Math.max(0, dims.d - y - d), y: x, z: z, w: d, d: w, h: h }; break;
-      default: base = { x: x, y: y, z: z, w: w, d: d, h: h }; break;
+    if (usesAnchorRelativeRotation(prefab)) {
+      var rotatedBox = rotateBoxAroundAnchorPivot(x, y, w, d, prefab, r);
+      base = { x: rotatedBox.x, y: rotatedBox.y, z: z, w: rotatedBox.w, d: rotatedBox.d, h: h };
+    } else {
+      var dims = getBaseDimensions(prefab);
+      switch (r) {
+        case 0: base = { x: x, y: y, z: z, w: w, d: d, h: h }; break;
+        case 1: base = { x: y, y: dims.w - x - w, z: z, w: d, d: w, h: h }; break;
+        case 2: base = { x: dims.w - x - w, y: dims.d - y - d, z: z, w: w, d: d, h: h }; break;
+        case 3: base = { x: dims.d - y - d, y: x, z: z, w: d, d: w, h: h }; break;
+        default: base = { x: x, y: y, z: z, w: w, d: d, h: h }; break;
+      }
     }
     if (Array.isArray(v && v.collisionPolygon2d)) {
       base.collisionPolygon2d = v.collisionPolygon2d.map(function (pt) { return rotatePrimitivePoint(pt, prefab, r); });
     }
     if (v && v.slopeDirection != null) {
-      base.slopeDirection = rotateCardinalDirection(v.slopeDirection, r);
+      base.slopeDirection = rotateCardinalDirection(v.slopeDirection, r, prefab);
     }
     return base;
   }
@@ -476,28 +714,35 @@
     });
   }
   function rotatePrimitivePoint(pt, prefab, facing) {
-    var x = toFiniteNumber(pt && pt.x, 0);
-    var y = toFiniteNumber(pt && pt.y, 0);
+    var frame = getPrefabLocalFrame(prefab);
+    var x = toFiniteNumber(pt && pt.x, 0) - toFiniteNumber(frame && frame.origin && frame.origin.x, 0);
+    var y = toFiniteNumber(pt && pt.y, 0) - toFiniteNumber(frame && frame.origin && frame.origin.y, 0);
+    if (usesAnchorRelativeRotation(prefab)) return rotatePointAroundAnchorPivot(x, y, prefab, facing);
     var dims = getBaseDimensions(prefab);
     switch (normalizeFacing(facing)) {
       case 0: return { x: x, y: y };
-      case 1: return { x: y, y: Math.max(0, dims.w - x) };
-      case 2: return { x: Math.max(0, dims.w - x), y: Math.max(0, dims.d - y) };
-      case 3: return { x: Math.max(0, dims.d - y), y: x };
+      case 1: return { x: y, y: dims.w - x };
+      case 2: return { x: dims.w - x, y: dims.d - y };
+      case 3: return { x: dims.d - y, y: x };
       default: return { x: x, y: y };
     }
   }
 
   function rotatePrimitiveSortCell(cell, prefab, facing) {
-    var x = toFiniteNumber(cell && cell.x, 0);
-    var y = toFiniteNumber(cell && cell.y, 0);
-    var z = toFiniteNumber(cell && cell.z, 0);
+    var frame = getPrefabLocalFrame(prefab);
+    var x = toFiniteNumber(cell && cell.x, 0) - toFiniteNumber(frame && frame.origin && frame.origin.x, 0);
+    var y = toFiniteNumber(cell && cell.y, 0) - toFiniteNumber(frame && frame.origin && frame.origin.y, 0);
+    var z = toFiniteNumber(cell && cell.z, 0) - toFiniteNumber(frame && frame.origin && frame.origin.z, 0);
+    if (usesAnchorRelativeRotation(prefab)) {
+      var p = rotatePointAroundAnchorPivot(x + 0.5, y + 0.5, prefab, facing);
+      return { x: p.x - 0.5, y: p.y - 0.5, z: z };
+    }
     var dims = getBaseDimensions(prefab);
     switch (normalizeFacing(facing)) {
       case 0: return { x: x, y: y, z: z };
-      case 1: return { x: y, y: Math.max(0, dims.w - 1 - x), z: z };
-      case 2: return { x: Math.max(0, dims.w - 1 - x), y: Math.max(0, dims.d - 1 - y), z: z };
-      case 3: return { x: Math.max(0, dims.d - 1 - y), y: x, z: z };
+      case 1: return { x: y, y: dims.w - 1 - x, z: z };
+      case 2: return { x: dims.w - 1 - x, y: dims.d - 1 - y, z: z };
+      case 3: return { x: dims.d - 1 - y, y: x, z: z };
       default: return { x: x, y: y, z: z };
     }
   }
@@ -528,41 +773,186 @@
     return keys.length ? keys : ['0'];
   }
 
-  function detectSpriteStrategy(prefab) {
-    var keys = getAvailableDirectionKeys(prefab)
-      .map(function (key) { return normalizeFacing(parseInt(key, 10)); })
+  function normalizeHabboSourceDirections(values) {
+    var list = Array.isArray(values) ? values : [];
+    return list.map(function (value) { return toInt(value, 0); })
       .filter(function (value, index, arr) { return arr.indexOf(value) === index; })
       .sort(function (a, b) { return a - b; });
+  }
+
+  function habboDirectionDistance(a, b) {
+    var delta = Math.abs(toInt(a, 0) - toInt(b, 0)) % 8;
+    return Math.min(delta, 8 - delta);
+  }
+
+  function chooseHabboOrthogonalPair(directions) {
+    var dirs = normalizeHabboSourceDirections(directions);
+    if (dirs.length <= 2) return dirs.slice(0, 2);
+    var best = [dirs[0], dirs[1]];
+    var bestScore = Infinity;
+    for (var i = 0; i < dirs.length; i++) {
+      for (var j = i + 1; j < dirs.length; j++) {
+        var distance = habboDirectionDistance(dirs[i], dirs[j]);
+        var score = Math.abs(distance - 2) * 100 + i * 10 + j;
+        if (score < bestScore) {
+          bestScore = score;
+          best = [dirs[i], dirs[j]];
+        }
+      }
+    }
+    return best;
+  }
+
+  function chooseHabboFourDirections(directions) {
+    var dirs = normalizeHabboSourceDirections(directions);
+    var canonical = [0, 2, 4, 6];
+    if (canonical.every(function (dir) { return dirs.indexOf(dir) >= 0; })) return canonical;
+    if (dirs.length <= 4) return dirs.slice(0, 4);
+    var out = [];
+    for (var i = 0; i < 4; i++) {
+      var index = Math.floor(i * dirs.length / 4);
+      var selected = dirs[Math.min(dirs.length - 1, index)];
+      if (out.indexOf(selected) < 0) out.push(selected);
+    }
+    for (var j = 0; j < dirs.length && out.length < 4; j++) {
+      if (out.indexOf(dirs[j]) < 0) out.push(dirs[j]);
+    }
+    return out.slice(0, 4);
+  }
+
+  function buildHabboFacingPlan(sourceDirections) {
+    var source = normalizeHabboSourceDirections(sourceDirections);
+    if (!source.length) source = [0];
+    var selected;
+    var strategy;
+    if (source.length >= 4) {
+      selected = chooseHabboFourDirections(source);
+      strategy = 'four-native';
+    } else if (source.length >= 2) {
+      selected = chooseHabboOrthogonalPair(source);
+      strategy = 'two-mirror';
+    } else {
+      selected = [source[0]];
+      strategy = 'single-mirror';
+    }
+    var directionMap;
+    if (strategy === 'four-native') {
+      directionMap = [0, 1, 2, 3].map(function (facing) {
+        return { gameFacing: facing, directionKey: String(facing), sourceDirection: selected[facing], mirrorX: false, sourceKind: 'native' };
+      });
+    } else if (strategy === 'two-mirror') {
+      directionMap = [
+        { gameFacing: 0, directionKey: '0', sourceDirection: selected[0], mirrorX: false, sourceKind: 'native' },
+        { gameFacing: 1, directionKey: '1', sourceDirection: selected[1], mirrorX: false, sourceKind: 'native' },
+        { gameFacing: 2, directionKey: '0', sourceDirection: selected[0], mirrorX: true, sourceKind: 'generated-mirror' },
+        { gameFacing: 3, directionKey: '1', sourceDirection: selected[1], mirrorX: true, sourceKind: 'generated-mirror' }
+      ];
+    } else {
+      directionMap = [
+        { gameFacing: 0, directionKey: '0', sourceDirection: selected[0], mirrorX: false, sourceKind: 'native' },
+        { gameFacing: 1, directionKey: '0', sourceDirection: selected[0], mirrorX: true, sourceKind: 'generated-mirror' },
+        { gameFacing: 2, directionKey: '0', sourceDirection: selected[0], mirrorX: false, sourceKind: 'reused-native' },
+        { gameFacing: 3, directionKey: '0', sourceDirection: selected[0], mirrorX: true, sourceKind: 'generated-mirror' }
+      ];
+    }
+    return {
+      strategy: strategy,
+      sourceDirections: source.slice(),
+      sourceDirectionCount: source.length,
+      selectedSourceDirections: selected.slice(),
+      ignoredSourceDirections: source.filter(function (dir) { return selected.indexOf(dir) < 0; }),
+      directionMap: directionMap
+    };
+  }
+
+  function normalizeSpriteStrategyName(value) {
+    var name = String(value || '').toLowerCase();
+    if (name === 'four' || name === 'four-native') return 'four';
+    if (name === 'two' || name === 'two-mirror') return 'two-mirror';
+    if (name === 'single-mirror') return 'single-mirror';
+    return name === 'single' ? 'single' : '';
+  }
+
+  function getExplicitHabboDirectionMap(prefab) {
+    var meta = prefab && prefab.habboMeta ? prefab.habboMeta : null;
+    var map = meta && Array.isArray(meta.directionMap) ? meta.directionMap : null;
+    if (!map || !map.length) return null;
+    return map.map(function (entry) {
+      return {
+        gameFacing: normalizeFacing(entry && entry.gameFacing),
+        directionKey: String(entry && entry.directionKey != null ? entry.directionKey : '0'),
+        sourceDirection: toInt(entry && entry.sourceDirection, 0),
+        mirrorX: !!(entry && entry.mirrorX),
+        sourceKind: String(entry && entry.sourceKind || '')
+      };
+    });
+  }
+
+  function detectSpriteStrategy(prefab) {
+    var rawKeys = getAvailableDirectionKeys(prefab);
+    var keys = rawKeys.map(function (key) { return normalizeFacing(parseInt(key, 10)); })
+      .filter(function (value, index, arr) { return arr.indexOf(value) === index; })
+      .sort(function (a, b) { return a - b; });
+    var meta = prefab && prefab.habboMeta ? prefab.habboMeta : null;
+    var explicit = normalizeSpriteStrategyName(meta && meta.generatedFacingStrategy);
+    var explicitMap = getExplicitHabboDirectionMap(prefab);
+    if (explicitMap && explicitMap.length) {
+      return { strategy: explicit || (keys.length >= 4 ? 'four' : (keys.length >= 2 ? 'two-mirror' : 'single-mirror')), keys: keys.length ? keys : [0], directionMap: explicitMap };
+    }
+    var sourceDirectionCount = meta && Number(meta.sourceDirectionCount || (Array.isArray(meta.sourceVisualDirections) ? meta.sourceVisualDirections.length : 0) || (Array.isArray(meta.visualDirections) ? meta.visualDirections.length : 0));
+    if (prefab && prefab.kind === 'habbo_import' && sourceDirectionCount === 1) return { strategy: 'single-mirror', keys: keys.length ? keys : [0], directionMap: null };
+    if (explicit) return { strategy: explicit, keys: keys.length ? keys : [0], directionMap: null };
     if (keys.length >= 4) return { strategy: 'four', keys: keys };
     if (keys.length === 2) return { strategy: 'two-mirror', keys: keys };
+    if (prefab && prefab.kind === 'habbo_import') return { strategy: 'single-mirror', keys: keys.length ? keys : [0] };
     return { strategy: 'single', keys: keys.length ? keys : [0] };
   }
 
   function resolveSpriteFacing(prefab, facing) {
     var analysis = detectSpriteStrategy(prefab);
     var r = normalizeFacing(facing);
-    if (analysis.strategy === 'four') {
+    if (analysis.directionMap && analysis.directionMap.length) {
+      var mapped = analysis.directionMap.filter(function (entry) { return normalizeFacing(entry.gameFacing) === r; })[0] || analysis.directionMap[0];
+      var mappedKey = String(mapped.directionKey);
+      var availableRawKeys = getAvailableDirectionKeys(prefab);
+      if (availableRawKeys.indexOf(mappedKey) < 0) mappedKey = availableRawKeys[0] || '0';
       return {
-        strategy: 'four',
-        directionKey: String(r),
-        mirrorX: false,
-        availableKeys: analysis.keys.slice()
+        strategy: analysis.strategy,
+        directionKey: mappedKey,
+        mirrorX: !!mapped.mirrorX,
+        sourceDirection: mapped.sourceDirection,
+        sourceKind: mapped.sourceKind || '',
+        gameFacing: r,
+        availableKeys: availableRawKeys.slice()
       };
+    }
+    if (analysis.strategy === 'four') {
+      var fourKey = analysis.keys.indexOf(r) >= 0 ? r : analysis.keys[r % analysis.keys.length];
+      return { strategy: 'four', directionKey: String(fourKey), mirrorX: false, sourceDirection: null, sourceKind: 'native', gameFacing: r, availableKeys: analysis.keys.slice() };
     }
     if (analysis.strategy === 'two-mirror') {
       var lowKey = analysis.keys[0];
-      var highKey = analysis.keys[1];
-      if (r === 0) return { strategy: 'two-mirror', directionKey: String(lowKey), mirrorX: false, availableKeys: analysis.keys.slice() };
-      if (r === 1) return { strategy: 'two-mirror', directionKey: String(highKey), mirrorX: false, availableKeys: analysis.keys.slice() };
-      if (r === 2) return { strategy: 'two-mirror', directionKey: String(lowKey), mirrorX: true, availableKeys: analysis.keys.slice() };
-      return { strategy: 'two-mirror', directionKey: String(highKey), mirrorX: true, availableKeys: analysis.keys.slice() };
+      var highKey = analysis.keys[1] == null ? analysis.keys[0] : analysis.keys[1];
+      if (r === 0) return { strategy: 'two-mirror', directionKey: String(lowKey), mirrorX: false, sourceDirection: null, sourceKind: 'native', gameFacing: r, availableKeys: analysis.keys.slice() };
+      if (r === 1) return { strategy: 'two-mirror', directionKey: String(highKey), mirrorX: false, sourceDirection: null, sourceKind: 'native', gameFacing: r, availableKeys: analysis.keys.slice() };
+      if (r === 2) return { strategy: 'two-mirror', directionKey: String(lowKey), mirrorX: true, sourceDirection: null, sourceKind: 'generated-mirror', gameFacing: r, availableKeys: analysis.keys.slice() };
+      return { strategy: 'two-mirror', directionKey: String(highKey), mirrorX: true, sourceDirection: null, sourceKind: 'generated-mirror', gameFacing: r, availableKeys: analysis.keys.slice() };
     }
+    var singleKey = String((analysis.keys && analysis.keys.length ? analysis.keys[0] : 0));
+    var singleMirror = analysis.strategy === 'single-mirror' && (r % 2 === 1);
     return {
-      strategy: 'single',
-      directionKey: String((analysis.keys && analysis.keys.length ? analysis.keys[0] : 0)),
-      mirrorX: false,
+      strategy: analysis.strategy,
+      directionKey: singleKey,
+      mirrorX: singleMirror,
+      sourceDirection: null,
+      sourceKind: singleMirror ? 'generated-mirror' : (r === 2 && analysis.strategy === 'single-mirror' ? 'reused-native' : 'native'),
+      gameFacing: r,
       availableKeys: analysis.keys.slice()
     };
+  }
+
+  function buildSpriteFacingMatrix(prefab) {
+    return [0, 1, 2, 3].map(function (facing) { return resolveSpriteFacing(prefab, facing); });
   }
 
   function computeSortBase(prefab, facing, instance) {
@@ -607,6 +997,7 @@
     normalizeFacing: normalizeFacing,
     normalizeViewRotation: normalizeViewRotation,
     rotateFacing: rotateFacing,
+    resolveViewRelativeFacing: resolveViewRelativeFacing,
     getFacingLabel: getFacingLabel,
     getSemanticFaceColors: getSemanticFaceColors,
     getDefaultSemanticTextureMap: getDefaultSemanticTextureMap,
@@ -624,6 +1015,7 @@
     getSemanticFaceNeighborDelta: getSemanticFaceNeighborDelta,
     getSemanticFaceWorldPoints: faceWorldPoints,
     buildDebugCuboidFaceRenderables: buildDebugCuboidFaceRenderables,
+    getPrefabLocalFrame: getPrefabLocalFrame,
     getRotatedFootprint: getRotatedFootprint,
     getBaseAnchor: getBaseAnchor,
     getRotatedAnchor: getRotatedAnchor,
@@ -631,6 +1023,8 @@
     rotateVoxel: rotateVoxel,
     rotateVoxelList: rotateVoxelList,
     rotatePrimitiveList: rotatePrimitiveList,
+    buildHabboFacingPlan: buildHabboFacingPlan,
+    buildSpriteFacingMatrix: buildSpriteFacingMatrix,
     detectSpriteStrategy: detectSpriteStrategy,
     resolveSpriteFacing: resolveSpriteFacing,
     computeSortBase: computeSortBase,

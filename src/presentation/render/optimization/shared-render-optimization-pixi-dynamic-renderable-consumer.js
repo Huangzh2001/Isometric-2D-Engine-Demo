@@ -121,15 +121,33 @@
     return null;
   }
 
+  var retainedPrefabById = Object.create(null);
+
   function getPrefabByIdSafe(prefabId) {
+    var id = String(prefabId || '').trim();
+    if (!id) return null;
+    var prefab = null;
     try {
-      if (typeof global.getPrefabById === 'function') return global.getPrefabById(prefabId) || null;
+      var registry = global.App && global.App.state && global.App.state.prefabRegistry;
+      if (registry && typeof registry.getPrefabByIdExact === 'function') prefab = registry.getPrefabByIdExact(id);
     } catch (_) {}
     try {
-      var list = Array.isArray(global.prototypes) ? global.prototypes : [];
-      for (var i = 0; i < list.length; i++) if (list[i] && String(list[i].id) === String(prefabId)) return list[i];
+      if (!prefab && typeof global.getPrefabByIdExact === 'function') prefab = global.getPrefabByIdExact(id);
     } catch (_) {}
-    return null;
+    try {
+      if (!prefab && typeof global.getPrefabById === 'function') {
+        var candidate = global.getPrefabById(id);
+        if (candidate && String(candidate.id) === id) prefab = candidate;
+      }
+    } catch (_) {}
+    try {
+      if (!prefab) {
+        var list = Array.isArray(global.prototypes) ? global.prototypes : [];
+        for (var i = 0; i < list.length; i++) if (list[i] && String(list[i].id) === id) { prefab = list[i]; break; }
+      }
+    } catch (_) {}
+    if (prefab) retainedPrefabById[id] = prefab;
+    return prefab || retainedPrefabById[id] || null;
   }
 
   function getInstanceByIdSafe(instanceId) {
@@ -166,6 +184,31 @@
     return true;
   }
 
+  function isUnifiedHzhRuntimePrefab(prefab) {
+    return !!(prefab && (
+      prefab.hzhUnifiedRuntime === true ||
+      prefab.useLegacyHabboRuntime === false ||
+      (prefab.localFrame && (
+        String(prefab.localFrame.rotationSpace || '') === 'anchor-cell-center' ||
+        String(prefab.localFrame.rotationSpace || '') === 'editor-anchor-corner'
+      ))
+    ));
+  }
+
+  function usesLegacyHabboComposite(prefab) {
+    return !!(prefab && prefab.kind === 'habbo_import' && prefab.habboLayerDirections && !isUnifiedHzhRuntimePrefab(prefab));
+  }
+
+  function getRuntimeSpriteAnchor(prefab, rotation, spriteCfg) {
+    var base = prefab && prefab.anchor ? prefab.anchor : { x: 0, y: 0, z: 0 };
+    if (String(spriteCfg && spriteCfg.anchorMode || '') === 'scuti-floor-origin') return base;
+    try {
+      var facingApi = global.__ITEM_FACING_CORE__ || (global.App && global.App.domain && global.App.domain.itemFacingCore) || null;
+      if (facingApi && typeof facingApi.getRotatedAnchor === 'function') return facingApi.getRotatedAnchor(prefab, rotation);
+    } catch (_) {}
+    return base;
+  }
+
   function getSimpleSpriteDrawSnapshot(renderable, instance, prefab) {
     var spriteApi = getSpriteRendererApi();
     if (!spriteApi || typeof spriteApi.getPrefabSpriteConfig !== 'function' || typeof spriteApi.getPrefabSpriteImage !== 'function') return { ok: false, reason: 'prefab-sprite-renderer-api-missing' };
@@ -177,7 +220,7 @@
     if (spriteCfg.flipX) return { ok: false, reason: 'flipx-not-supported-in-pxm0711a' };
     var settings = getSettings();
     var spritePixelScale = Number(settings.tileW || 80) / 64;
-    if (prefab.kind === 'habbo_import') {
+    if (prefab.kind === 'habbo_import' && !isUnifiedHzhRuntimePrefab(prefab)) {
       var visualSize = Math.max(1, Number(spriteCfg.visualSize) || 64);
       spritePixelScale = Number(settings.tileW || 80) / visualSize;
     }
@@ -188,7 +231,7 @@
     var drawH = Math.max(1, Math.round(srcH * totalScale));
     var offsetX = Math.round((spriteCfg.offsetPx && spriteCfg.offsetPx.x || 0) * spritePixelScale);
     var offsetY = Math.round((spriteCfg.offsetPx && spriteCfg.offsetPx.y || 0) * spritePixelScale);
-    var anchor = prefab.anchor || { x: 0, y: 0, z: 0 };
+    var anchor = getRuntimeSpriteAnchor(prefab, rotation, spriteCfg);
     var x = 0;
     var y = 0;
     if (String(spriteCfg.anchorMode || '') === 'scuti-floor-origin') {
@@ -220,7 +263,7 @@
   }
 
   function getHabboCompositeDrawSnapshot(renderable, instance, prefab) {
-    if (!(prefab && prefab.kind === 'habbo_import' && prefab.habboLayerDirections)) return { ok: false, reason: 'not-habbo-composite' };
+    if (!usesLegacyHabboComposite(prefab)) return { ok: false, reason: 'not-habbo-composite' };
     var habbo = getHabboCompositeApi();
     if (!habbo || typeof habbo.getHabboComposite !== 'function' || typeof habbo.getHabboRoomOrigin !== 'function') return { ok: false, reason: 'habbo-composite-api-missing' };
     var rotation = instance && instance.rotation != null ? Number(instance.rotation || 0) : 0;
@@ -237,7 +280,10 @@
       y: y,
       width: Math.max(1, Math.round(Number(composite.width || 0))),
       height: Math.max(1, Math.round(Number(composite.height || 0))),
-      textureKey: ['habbo-composite', prefab.id || '', rotation, composite.width || 0, composite.height || 0].join('|'),
+      textureKey: ['habbo-composite', prefab.id || '', 'world=' + rotation, 'visual=' + Number(composite.visualFacing != null ? composite.visualFacing : rotation), composite.width || 0, composite.height || 0].join('|'),
+      worldRotation: rotation,
+      viewRotation: Number(composite.viewRotation || 0),
+      visualFacing: Number(composite.visualFacing != null ? composite.visualFacing : rotation),
       textureSourceType: 'canvas',
       prefabKind: prefab.kind || 'habbo_import',
       anchorMode: 'habbo-composite'
@@ -247,7 +293,9 @@
   function getDrawSnapshot(renderable) {
     if (!renderable) return { ok: false, reason: 'renderable-missing' };
     if (String(renderable.kind || '') !== 'prefab-sprite') return { ok: false, reason: 'unsupported-kind-' + String(renderable.kind || 'unknown') };
-    var instance = getInstanceByIdSafe(renderable.instanceId);
+    var instance = renderable && renderable.__previewInstance
+      ? renderable.__previewInstance
+      : getInstanceByIdSafe(renderable.instanceId);
     if (!instance) return { ok: false, reason: 'instance-missing' };
     var prefab = getPrefabByIdSafe(renderable.prefabId || instance.prefabId);
     if (!prefab) return { ok: false, reason: 'prefab-missing' };
@@ -890,7 +938,10 @@
       graphics.x = Number(local.x || 0);
       graphics.y = Number(local.y || 0);
       var fill = parseCssColorForPixi(renderable && (renderable.fill || renderable.textureColor || renderable.color), '#7aa2f7');
-      drawGraphicsPolygon(graphics, local.points, fill.color, Math.min(1, Math.max(0.08, fill.alpha * 0.84)));
+      var polygonAlpha = renderable && renderable.shadowReceiverOverlayOnly === true
+        ? Math.min(1, Math.max(0, fill.alpha))
+        : Math.min(1, Math.max(0.08, fill.alpha * 0.84));
+      drawGraphicsPolygon(graphics, local.points, fill.color, polygonAlpha);
       markContainerNeedsSort();
     } catch (_) { return false; }
     state.seenKeys[key] = true;
@@ -988,6 +1039,34 @@
     var adopted = 0;
     var graphicsBoundsUnion = null;
     var graphicsSamples = [];
+    var previewSpriteAdopted = false;
+    if (options.origin && prefabId && prefabId !== 'unknown') {
+      var previewRotation = options.rotation != null ? Number(options.rotation) : 0;
+      if (!Number.isFinite(previewRotation)) previewRotation = 0;
+      var previewInstance = {
+        instanceId: 'placement-preview-sprite',
+        prefabId: prefabId,
+        x: Number(options.origin.x || 0),
+        y: Number(options.origin.y || 0),
+        z: Number(options.origin.z || 0),
+        rotation: previewRotation
+      };
+      var previewSpriteRenderable = {
+        id: 'placement-preview-sprite',
+        kind: 'prefab-sprite',
+        instanceId: 'placement-preview-sprite',
+        prefabId: prefabId,
+        alpha: valid ? 0.78 : 0.42,
+        __drawIndex: Number(options.zIndex != null ? options.zIndex : 900000) + 10000,
+        __previewInstance: previewInstance
+      };
+      previewSpriteAdopted = adoptRenderable(previewSpriteRenderable, { source: 'placement-preview-sprite' }) === true;
+      if (previewSpriteAdopted) {
+        var previewSpriteKey = makeRenderableKey(previewSpriteRenderable);
+        seen[previewSpriteKey] = true;
+        adopted += 1;
+      }
+    }
     for (var pi = 0; pi < previewPrimitives.length; pi++) {
       var primitive = previewPrimitives[pi] || {};
       if (!Array.isArray(primitive.vertices2d) || primitive.vertices2d.length < 3) continue;
@@ -1080,7 +1159,7 @@
       var keys = Object.keys(state.sprites || {});
       for (var k = 0; k < keys.length; k++) {
         var existingKey = keys[k];
-        if (existingKey.indexOf('placement-preview|') !== 0 && existingKey.indexOf('placement-preview-primitive|') !== 0) continue;
+        if (existingKey.indexOf('placement-preview|') !== 0 && existingKey.indexOf('placement-preview-primitive|') !== 0 && existingKey.indexOf('placement-preview-sprite|') !== 0) continue;
         if (seen[existingKey]) continue;
         var stale = state.sprites[existingKey];
         if (stale) stale.visible = false;
@@ -1098,6 +1177,8 @@
       pixiDrawsPlacementPreview: adopted > 0,
       canvas2dSkipsPlacementPreviewWorld: adopted > 0,
       previewBoxCount: adopted,
+      previewSpriteAdopted: previewSpriteAdopted,
+      previewSpriteCount: previewSpriteAdopted ? 1 : 0,
       previewPrimitiveCount: previewPrimitives.length,
       previewPrimitiveSourceCount: previewPrimitivesRaw.length,
       previewRenderMode: isVertexSquareTriBlockPrefabId(prefabId) && previewPrimitivesRaw.length !== previewPrimitives.length ? 'unified-vertex-square' : 'default',
@@ -1117,6 +1198,7 @@
       origin: options.origin || null,
       rotation: options.rotation != null ? Number(options.rotation) : null,
       previewBoxCount: adopted,
+      previewSpriteAdopted: previewSpriteAdopted,
       graphicsBoundsUnion: summary.graphicsBoundsUnion,
       graphicsSamples: graphicsSamples,
       container: summary.container
@@ -1137,7 +1219,7 @@
       var keys = Object.keys(state.sprites || {});
       for (var k = 0; k < keys.length; k++) {
         var key = keys[k];
-        if (key.indexOf('placement-preview|') !== 0 && key.indexOf('placement-preview-primitive|') !== 0) continue;
+        if (key.indexOf('placement-preview|') !== 0 && key.indexOf('placement-preview-primitive|') !== 0 && key.indexOf('placement-preview-sprite|') !== 0) continue;
         var sprite = state.sprites[key];
         if (sprite && sprite.visible !== false) activePreviewBefore += 1;
         if (sprite && sprite.visible !== false) {
@@ -1147,7 +1229,7 @@
       }
       for (var k2 = 0; k2 < keys.length; k2++) {
         var key2 = keys[k2];
-        if (key2.indexOf('placement-preview|') !== 0 && key2.indexOf('placement-preview-primitive|') !== 0) continue;
+        if (key2.indexOf('placement-preview|') !== 0 && key2.indexOf('placement-preview-primitive|') !== 0 && key2.indexOf('placement-preview-sprite|') !== 0) continue;
         var sprite2 = state.sprites[key2];
         if (sprite2 && sprite2.visible !== false) activePreviewAfter += 1;
       }
@@ -1271,7 +1353,8 @@
       sprite.width = Math.max(1, Math.round(Number(snapshot.width || 1)));
       sprite.height = Math.max(1, Math.round(Number(snapshot.height || 1)));
       sprite.visible = true;
-      sprite.alpha = 1;
+      var requestedAlpha = renderable && renderable.alpha != null ? Number(renderable.alpha) : 1;
+      sprite.alpha = Number.isFinite(requestedAlpha) ? Math.max(0, Math.min(1, requestedAlpha)) : 1;
       sprite.zIndex = getRenderableOrderIndex(renderable);
       sprite.eventMode = 'none';
       if (state.container) {
@@ -1332,11 +1415,26 @@
   function endFrame(options) {
     options = options || {};
     var removed = 0;
+    var retainedTransient = 0;
     try {
       var keys = Object.keys(state.sprites);
       for (var i = 0; i < keys.length; i++) {
         var key = keys[i];
-        if (state.seenKeys[key]) continue;
+        var adoptedMeta = state.adoptedKeys[key] || {};
+        if (state.seenKeys[key]) {
+          adoptedMeta.missedFrames = 0;
+          state.adoptedKeys[key] = adoptedMeta;
+          continue;
+        }
+        adoptedMeta.missedFrames = Math.max(0, Number(adoptedMeta.missedFrames || 0)) + 1;
+        state.adoptedKeys[key] = adoptedMeta;
+        // Scene rebuilds and view rotations can produce a transient frame with
+        // an incomplete dynamic order. Keep the previous sprite briefly rather
+        // than flashing/disappearing immediately.
+        if (adoptedMeta.missedFrames <= 2) {
+          retainedTransient += 1;
+          continue;
+        }
         var sprite = state.sprites[key];
         try { if (sprite && sprite.parent && typeof sprite.parent.removeChild === 'function') sprite.parent.removeChild(sprite); } catch (_) {}
         try { if (sprite && typeof sprite.destroy === 'function') sprite.destroy({ children: true, texture: false, baseTexture: false }); } catch (_) {}
@@ -1363,6 +1461,8 @@
       unsupportedDynamicRenderableCount: state.unsupportedCountThisFrame,
       activeDynamicSpriteCount: activeSpriteCount,
       removedOrphanDynamicSprites: removed,
+      retainedTransientDynamicSprites: retainedTransient,
+      orphanRemovalGraceFrames: 2,
       textureCreatedCount: state.textureCreatedCount,
       textureReusedCount: state.textureReusedCount,
       spriteCreatedCount: state.spriteCreatedCount,
@@ -1381,6 +1481,39 @@
     global.__PIXI_MIGRATION_LAST_DYNAMIC_RENDERABLE_CONSUMER_SUMMARY__ = summary;
     notify(summary, 'summary');
     return summary;
+  }
+
+  function pickPrefabSpriteAtScreen(screenX, screenY) {
+    var x = Number(screenX), y = Number(screenY);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    var best = null;
+    try {
+      var keys = Object.keys(state.sprites || {});
+      for (var i = 0; i < keys.length; i++) {
+        var key = keys[i];
+        var meta = state.adoptedKeys[key] || null;
+        var sprite = state.sprites[key] || null;
+        if (!meta || String(meta.kind || '') !== 'prefab-sprite' || !meta.instanceId || !sprite || sprite.visible === false || Number(sprite.alpha) <= 0) continue;
+        var b = null;
+        try { if (typeof sprite.getBounds === 'function') b = sprite.getBounds(); } catch (_) {}
+        var bx = b && Number.isFinite(Number(b.x)) ? Number(b.x) : Number(meta.x || 0);
+        var by = b && Number.isFinite(Number(b.y)) ? Number(b.y) : Number(meta.y || 0);
+        var bw = b && Number.isFinite(Number(b.width)) ? Number(b.width) : Number(meta.width || 0);
+        var bh = b && Number.isFinite(Number(b.height)) ? Number(b.height) : Number(meta.height || 0);
+        if (!(bw > 0 && bh > 0) || x < bx || x > bx + bw || y < by || y > by + bh) continue;
+        var z = Number(meta.zIndex || 0);
+        if (!best || z >= best.zIndex) {
+          best = {
+            instanceId: String(meta.instanceId),
+            prefabId: String(meta.prefabId || ''),
+            zIndex: z,
+            bounds: { x: bx, y: by, width: bw, height: bh },
+            source: 'pixi-rendered-prefab-sprite'
+          };
+        }
+      }
+    } catch (_) {}
+    return best;
   }
 
   function getStatus() {
@@ -1406,6 +1539,7 @@
     shouldSkipCanvas2dDynamicRenderable: shouldSkipCanvas2dDynamicRenderable,
     drawPlacementPreview: drawPlacementPreview,
     clearPlacementPreview: clearPlacementPreview,
+    pickPrefabSpriteAtScreen: pickPrefabSpriteAtScreen,
     getStatus: getStatus
   };
 

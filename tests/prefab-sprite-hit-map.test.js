@@ -1,0 +1,21 @@
+const fs = require('fs');
+const vm = require('vm');
+function assert(cond, msg) { if (!cond) throw new Error(msg); }
+const code = fs.readFileSync('src/presentation/render/sprites/prefab-sprite-renderer.js', 'utf8');
+const window = {};
+const context = { window, globalThis: window, console, Math, Number, String, Object, Array, JSON, Map, Uint8Array };
+vm.createContext(context);
+vm.runInContext(code, context, { filename: 'prefab-sprite-renderer.js' });
+const api = window.__PREFAB_SPRITE_RENDERER__;
+assert(api && typeof api.mapSpriteScreenPointToSourcePixel === 'function', 'source-pixel mapper must be exported');
+const b = { x: 100, y: 50, width: 200, height: 100 };
+let p = api.mapSpriteScreenPointToSourcePixel(b, 100, 50, 20, 10, false);
+assert(p.x === 0 && p.y === 0, 'top-left screen pixel must map to top-left source pixel');
+p = api.mapSpriteScreenPointToSourcePixel(b, 299.9, 149.9, 20, 10, false);
+assert(p.x === 19 && p.y === 9, 'bottom-right screen pixel must map to bottom-right source pixel');
+p = api.mapSpriteScreenPointToSourcePixel(b, 100, 50, 20, 10, true);
+assert(p.x === 19 && p.y === 0, 'flipX must mirror source lookup exactly like draw transform');
+p = api.mapSpriteScreenPointToSourcePixel(b, 299.9, 50, 20, 10, true);
+assert(p.x === 0 && p.y === 0, 'flipX right edge must map to source left edge');
+assert(api.mapSpriteScreenPointToSourcePixel(b, 99, 50, 20, 10, false) === null, 'outside point must not hit');
+console.log('prefab-sprite-hit-map.test.js: OK');

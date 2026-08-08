@@ -1,0 +1,27 @@
+'use strict';
+const fs = require('fs');
+const path = require('path');
+const root = path.resolve(__dirname, '..');
+const html = fs.readFileSync(path.join(root, 'START_V18_ONLY.html'), 'utf8');
+const css = fs.readFileSync(path.join(root, 'styles/editor-flat-v4.css'), 'utf8');
+const workspace = fs.readFileSync(path.join(root, 'src/presentation/editor/voxel-workspace.js'), 'utf8');
+const editor = fs.readFileSync(path.join(root, 'src/presentation/editor/editor-unified-v18.js'), 'utf8');
+const pixel = fs.readFileSync(path.join(root, 'src/presentation/editor/pixel-art-editor.js'), 'utf8');
+function assert(value, message) { if (!value) throw new Error(message); }
+assert((html.match(/data-voxel-facing=/g) || []).length === 4, 'voxel toolbar must expose four direction buttons');
+assert(html.includes('id="voxelFacingStatus"') && html.includes('id="voxelFacingInline"'), 'direction status is missing');
+assert(css.includes('.voxelFacingSegment') && css.includes('.activeVoxelFacing'), 'direction segmented control style is missing');
+assert(workspace.includes('function setFacing(facing, reason)'), 'voxel workspace direction controller missing');
+assert(workspace.includes("event.altKey && ['0','1','2','3'].includes(event.key)"), 'voxel direction keyboard shortcut missing');
+assert(editor.includes('function viewPoint(x, y, facing = state.activeFacing)'), 'isometric projection is not direction-aware');
+assert(editor.includes('function logicalCellFromView'), 'rotated top-down picking inverse is missing');
+assert(editor.includes('setVoxelViewFacing,'), 'editor API does not expose voxel facing');
+assert(editor.includes('facingTransforms:'), 'per-facing alignment transforms are not exported');
+assert(editor.includes('persistActiveFacingTransform()'), 'active direction alignment is not persisted');
+assert(editor.includes("version: 'translation-invariant-registration-point-alignment-v2'"), 'export must compare authored registration points after removing arbitrary voxel editor translation');
+assert(editor.includes('removedEditorTranslation'), 'relative voxel alignment must record the removed absolute editor translation');
+assert(editor.includes('registrationFromFootprintOriginPx'), 'relative voxel alignment must use image registration point rather than raw bottom-centre offsets');
+assert(editor.includes('normalizedAnchorCell'), 'relative voxel alignment must preserve the position tile inside the normalized footprint');
+assert(pixel.includes('activeFacing: doc.activeFacing'), 'pixel document sync does not identify current direction');
+assert(pixel.includes('setActiveFacing:setActiveFacingExternal'), 'pixel editor does not expose external direction switching');
+console.log('voxel-four-facing-alignment.test.js: OK');

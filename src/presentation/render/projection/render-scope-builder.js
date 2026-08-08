@@ -108,17 +108,63 @@ function getInstanceWorldBoundsForRender(inst) {
   return getInstanceProxyBounds(inst);
 }
 
+function shouldBypassDynamicSpriteCameraCullingForRender(inst) {
+  try {
+    var prefab = typeof getPrefabById === 'function' ? getPrefabById(inst && inst.prefabId) : null;
+    return !!(prefab && typeof prefabHasSprite === 'function' && prefabHasSprite(prefab));
+  } catch (_) {}
+  return false;
+}
+
 function filterInstancesForMainCameraScope(inputInstances, scope) {
   var list = Array.isArray(inputInstances) ? inputInstances : [];
-  var visibilityCore = getRenderVisibilityCoreApi();
-  if (visibilityCore && typeof visibilityCore.filterByCameraScope === 'function') {
-    return visibilityCore.filterByCameraScope(list, scope, getInstanceWorldBoundsForRender);
-  }
   if (!scope || scope.cameraCullingEnabled === false) return list.slice();
-  return list.filter(function (inst) {
-    var bounds = getInstanceWorldBoundsForRender(inst);
-    return !bounds || worldBoundsIntersectXY(bounds, scope.cullingWorldBounds);
+
+  // Sprite-bearing dynamic instances use registration points and image bounds
+  // that are not represented by the voxel proxy AABB.  In particular, Habbo
+  // sprites can still be on-screen after a 90-degree view rotation while their
+  // proxy is classified outside the camera's world culling bounds.  Culling
+  // them here makes the Pixi consumer delete the sprite as an orphan and the
+  // item remains invisible until another unrelated rebuild.  Keep sprite
+  // instances in the frame plan; Pixi/Canvas clipping handles their pixels.
+  var alwaysVisible = [];
+  var cullable = [];
+  list.forEach(function (inst) {
+    if (shouldBypassDynamicSpriteCameraCullingForRender(inst)) alwaysVisible.push(inst);
+    else cullable.push(inst);
   });
+
+  var visibilityCore = getRenderVisibilityCoreApi();
+  var visibleCullable;
+  if (visibilityCore && typeof visibilityCore.filterByCameraScope === 'function') {
+    visibleCullable = visibilityCore.filterByCameraScope(cullable, scope, getInstanceWorldBoundsForRender);
+  } else {
+    visibleCullable = cullable.filter(function (inst) {
+      var bounds = getInstanceWorldBoundsForRender(inst);
+      return !bounds || worldBoundsIntersectXY(bounds, scope.cullingWorldBounds);
+    });
+  }
+
+  var alwaysVisibleSet = new Set(alwaysVisible);
+  var visibleCullableSet = new Set(visibleCullable);
+  var result = list.filter(function (inst) {
+    return alwaysVisibleSet.has(inst) || visibleCullableSet.has(inst);
+  });
+  try {
+    if (typeof window !== 'undefined') {
+      window.__DYNAMIC_SPRITE_CAMERA_CULLING_LAST__ = {
+        version: 'dynamic-sprite-culling-bypass-v1',
+        inputCount: list.length,
+        spriteBypassCount: alwaysVisible.length,
+        cullableCount: cullable.length,
+        visibleCullableCount: visibleCullable.length,
+        outputCount: result.length,
+        cameraCullingEnabled: scope.cameraCullingEnabled !== false,
+        cullingWorldBounds: scope.cullingWorldBounds || null
+      };
+    }
+  } catch (_) {}
+  return result;
 }
 
 function getMainEditorCameraScreenViewportBounds() {
