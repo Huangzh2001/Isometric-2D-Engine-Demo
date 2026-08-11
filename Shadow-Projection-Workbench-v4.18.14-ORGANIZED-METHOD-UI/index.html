@@ -1,0 +1,116 @@
+<!doctype html><html lang="zh-CN" data-launch-mode="runtime-files"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shadow Projection Workbench v4.18.14 · Organized Methods</title><link rel="stylesheet" href="style.css"></head><body><div id="versionBadge" style="position:fixed;right:10px;bottom:10px;z-index:99999;background:#111;color:#fff;padding:5px 8px;border-radius:7px;font:12px/1.2 system-ui;opacity:.78;pointer-events:none">v4.18.14 · ORGANIZED METHODS</div>
+<div id="bootStatus" style="position:fixed;left:10px;bottom:10px;z-index:200000;background:#fff7d6;color:#594600;padding:6px 9px;border:1px solid #d8c46b;border-radius:7px;font:600 11px/1.35 system-ui;pointer-events:none">v4.18.14 启动中…</div>
+
+<div class="app">
+<header class="toolbar">
+<div class="group assetGroup"><button id="assetPrev" title="上一个素材">‹</button><select id="assetSelect" title="测试素材"></select><button id="assetNext" title="下一个素材">›</button><button id="assetBrowserToggle">素材库</button></div>
+<div class="group" id="selectGroup"><button class="active" data-select="caster">投影物</button><button data-select="receiverA">接收体 A</button><button data-select="receiverB">接收体 B</button><button data-select="light">光源</button></div>
+<div class="group"><button id="viewPrev">↶ 视角</button><button id="viewNext">视角 ↷</button></div>
+<div class="group" id="lightGroup"><button class="active" data-light="directional">太阳</button><button data-light="point">点光源</button></div>
+<div class="group keyframeQuickBar collapsed" id="keyframeQuickBar">
+<button data-kfslot="3" title="左上 / NW"><img alt="NW"/><span>↖</span></button>
+<button data-kfslot="0" title="右上 / NE"><img alt="NE"/><span>↗</span></button>
+<button data-kfslot="1" title="右下 / SE"><img alt="SE"/><span>↘</span></button>
+<button data-kfslot="2" title="左下 / SW"><img alt="SW"/><span>↙</span></button>
+<span class="keyframePointHint" id="keyframePointHint">Direct Shadow Hull 为独立连续算法；方向光四个 exact 端点严格旁路到原 vector-contour renderer</span>
+</div>
+<div class="methodSelector" id="shadowMethodSelector">
+<label class="methodSelectBox"><span>阴影方法</span><select id="shadowFamilySelect" aria-label="阴影方法">
+<option value="voxel">体素投影阴影</option>
+<option value="sprite-transform">精灵图投影变换</option>
+<option value="height">高度图投影阴影</option>
+<option value="keyframe">四向关键帧插值阴影</option>
+<option value="reconstruction" selected>四视图 3D 重建</option>
+</select></label>
+<label class="methodSelectBox"><span>子类型</span><select id="shadowVariantSelect" aria-label="阴影方法子类型"></select></label>
+<span class="methodHint" id="shadowMethodHint"></span>
+<label id="consensusControl" class="methodInlineControl" style="display:none">支持度 <input id="consensusSupportSlider" type="range" min="0" max="100" step="5" value="50"><b id="consensusSupportValue">50%</b></label>
+<button id="heightSliceToggle" class="methodToolButton" style="display:none">查看高度图</button>
+<span class="reconstructionAvailability" id="reconstructionAvailability"></span>
+</div>
+<button id="footprintInspectToggle" class="utilityButton" title="调试：查看 Footprint 估计">Footprint</button>
+<div id="legacyShadowArchive" hidden aria-hidden="true">
+<button data-shadow="shadowhull" id="shadowHullModeBtn">Direct Shadow Hull</button>
+<button data-shadow="aabbhull" id="aabbHullModeBtn">AABB-constrained Direct Shadow Hull</button>
+<button data-shadow="consensus" id="consensusModeBtn">Consensus Support</button>
+<button data-shadow="keyframemorph" id="keyframeMorphModeBtn">四向射线传输</button>
+<button data-shadow="voxel">纯 Voxel 阴影</button>
+<button data-shadow="sprite">经典四向阴影</button>
+<button data-shadow="keyframe" id="keyframeModeBtn">四方向精确关键帧</button>
+<button data-shadow="viewline">视图基准线投影</button>
+<button data-shadow="baselinetiles">基准线分块投影</button>
+<button data-shadow="support">Footprint 支撑边界阴影</button>
+<button data-shadow="height">高度图阴影</button>
+<button data-shadow="reconstruct" id="reconstructionModeBtn">四视图重建算法</button>
+</div>
+<button id="addReceiver">＋ 接收体</button><button id="removeReceiver">－</button>
+<div class="spacer"></div>
+<button id="hudToggle">HUD</button><button id="formulaToggle">公式</button>
+</header>
+<div class="heightSlicePanel collapsed" id="heightSlicePanel">
+<div class="heightSliceHead"><div><b>C(z) / 高度图查看器</b><span>每张真实输入方向图对应一张连续高度图；斜向图的等高线严格平行于底面最下面两条边。</span></div><button id="heightSliceClose">×</button></div>
+<div class="heightSliceControls">
+<label>等高线数 <input id="heightSliceCount" max="20" min="2" type="range" value="10"/><span id="heightSliceCountValue">10</span></label>
+<label>显示高度范围 <input id="heightSliceHeight" max="120" min="12" type="range" value="72"/><span id="heightSliceHeightValue">72 px</span></label>
+<label><input checked="" id="heightSliceOverlay" type="checkbox"/> 显示等高线</label>
+</div>
+<div class="heightSliceBody heightMapBody">
+<section class="heightSliceLayers heightMapViewsSection"><h3>输入方向图 → 连续高度图</h3><div class="heightMapViewGrid" id="heightMapViewGrid"></div></section>
+<section class="heightSliceLayers"><h3>实际重建横截面 C(z)</h3><div class="heightCrossSectionGrid" id="heightCrossSectionGrid"></div></section>
+<section class="heightSliceLayers"><h3>连续高度规则</h3><div class="heightMapRule" id="heightMapRule"></div><pre id="heightSliceInfo"></pre></section>
+</div>
+</div>
+<div class="footprintPanel collapsed" id="footprintPanel">
+<div class="footprintPanelHead"><div><b>Footprint 估计查看器</b><span>把当前素材估计出来的 footprint 直接高亮画在原始输入图上，方便判断对错。</span></div><button id="footprintPanelClose">×</button></div>
+<div class="footprintPanelBody">
+<section class="footprintExplain">
+<div class="footprintPanelInfo" id="footprintPanelInfo">等待计算…</div>
+<div class="footprintLegend">
+<span><i class="lgOuter"></i> 外部 proxy / 放置单元</span>
+<span><i class="lgFp"></i> 估计 footprint</span>
+<span><i class="lgBase"></i> 支撑基线</span><span><i class="lgSamples"></i> 实际用于估计的接地点</span>
+</div>
+</section>
+<section><h3>输入方向图上的 footprint</h3><div class="footprintViewGrid" id="footprintViewGrid"></div></section>
+</div>
+</div>
+<div class="logDock" id="logDock"><button id="exportJsonl">导出日志 JSONL</button><button id="exportMd">导出日志 MD</button></div>
+<div class="stageWrap"><canvas class="stage" id="view"></canvas><div class="hud" id="hud"></div><pre class="formula" id="formula"></pre><div class="assetNote" id="assetNote"></div>
+<div class="calibrationPanel" id="calibrationPanel">
+<div class="calibrationHead"><b>阴影方向校准</b><button id="mappingReset">恢复默认</button></div>
+<div class="mapHint mapHintStrong" id="calibrationModelHint">当前素材方向模型说明</div>
+<div class="directionGridWrap">
+<div class="directionGridTitle">方向素材分布</div>
+<div aria-label="8方向素材分布" class="directionGrid" id="directionGrid"></div>
+<div class="directionGridLegend">外围 8 格永远代表 N / NE / E / SE / S / SW / W / NW。正四向只填上下左右；斜四向只填四角。</div>
+</div>
+<div class="playerControls">
+<label>人物显示朝向 <select id="playerDirSelect"><option value="front">前</option><option value="right">右</option><option value="back">后</option><option value="left">左</option></select></label>
+<label><input id="playerAnimToggle" type="checkbox"/> 原地播放行走动画</label>
+<div class="playerMoveBlock">
+<div class="moveTitle">人物移动测试（按住）</div>
+<div class="movePad" id="playerMovePad">
+<button class="moveUp" data-move="up" title="W / ↑">▲</button>
+<button class="moveLeft" data-move="left" title="A / ←">◀</button>
+<button class="moveDown" data-move="down" title="S / ↓">▼</button>
+<button class="moveRight" data-move="right" title="D / →">▶</button>
+</div>
+<div class="moveHint">WASD / 方向键也可持续移动；点过校准控件后仍然有效。</div>
+</div>
+</div>
+<div class="calibrationLive" id="calibrationLive">当前映射等待计算</div>
+<div class="mapHint" id="calibrationUsageHint">使用方法：先拖动光源，看“当前”这一行写的是哪个方向，再只改那一行的下拉框。映射调整会写入导出日志。</div>
+</div><div class="assetBrowser collapsed" id="assetBrowser"><div class="assetBrowserHead"><b>透明 Sprite 测试素材</b><span>点击缩略图立即切换</span><button id="assetBrowserClose">×</button></div><div class="assetGrid" id="assetGrid"></div></div></div>
+<footer class="footer"><span><b class="axisX">X</b> 世界 X</span><span><b class="axisY">Y</b> 世界 Y</span><span><b class="axisZ">Z</b> 高度</span><span class="lightDot">● 光源/方向</span><span>直接拖 XYZ 手柄</span><span>滚轮：缩放</span><span><span class="kbd">R</span> 旋转视角</span><span><span class="kbd">F</span> 旋转素材/人物朝向</span><span>人物：WASD/方向键移动</span><span class="status" id="status"></span></footer>
+</div>
+
+
+<script>(function(){function report(msg){var e=document.getElementById('bootStatus');if(!e)return;e.style.background='#fff0f0';e.style.color='#8b0000';e.style.borderColor='#d46a6a';e.style.maxWidth='70vw';e.style.whiteSpace='pre-wrap';e.style.pointerEvents='auto';e.textContent='v4.18.14 运行错误：\n'+msg;}window.__shadowReport=report;window.addEventListener('error',function(ev){report((ev.message||'JavaScript error')+'\n'+(ev.filename||'')+':'+(ev.lineno||0)+':'+(ev.colno||0));});window.addEventListener('unhandledrejection',function(ev){report(String(ev.reason&&ev.reason.stack||ev.reason||'Unhandled promise rejection'));});})();</script>
+<script src="reused/view-rotation-core.js"></script>
+<script src="reused/render-hit-test.js"></script>
+<script src="reused/axis-drag-core.js"></script>
+<script src="reused/original-voxel-shadow-math.js"></script>
+<script src="math.js"></script>
+<script src="benchmark-geometry.js"></script>
+<script src="app.js"></script>
+<div id="launchModeMarker" style="display:none">v4.18.14-runtime-files</div></body></html>
